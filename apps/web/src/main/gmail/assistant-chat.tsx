@@ -55,7 +55,7 @@ import {
 } from "./chat-context";
 import { ChatMarkdown } from "./chat-markdown";
 import {
-  AttachmentCard,
+  AttachmentChip,
   ComposerAttachments,
   DropOverlay,
   SentAttachments,
@@ -1880,33 +1880,30 @@ export function AssistantChatPanel({
               ) : null}
               <div className={cn("relative", COMPOSER_SURFACE)}>
                 <ComposerAttachments items={files.items} onRemove={files.remove}>
-                  {/* The mail this message is about: a card too; click to leave it out. */}
+                  {/* The mail this message is about; click to leave it out. */}
                   {context ? (
-                    <AttachmentCard
+                    <AttachmentChip
                       name={
                         quote
-                          ? "Quote"
+                          ? `“${quote.text}”`
                           : context.conversations.length > 1
                             ? `${context.conversations.length} conversations`
                             : context.conversations[0].subject || "(no subject)"
                       }
+                      detail={
+                        quote
+                          ? "Quote"
+                          : context.conversations.length > 1
+                            ? context.conversations
+                                .slice(0, 3)
+                                .map((c) => c.subject || "(no subject)")
+                                .join(" · ")
+                            : context.conversations[0].from
+                      }
                       title={attach ? "Attached to this message" : "Not attached"}
-                      icon={<ContextKindIcon kind={attachKind} />}
+                      tile={<ContextKindIcon kind={attachKind} />}
                       off={!attach}
                       onClick={() => setAttach((a) => !a)}
-                      preview={
-                        <span className="flex w-full flex-col gap-1 self-start p-3 text-left text-[11px] leading-snug text-muted-foreground">
-                          {quote ? (
-                            <span className="line-clamp-4">“{quote.text}”</span>
-                          ) : (
-                            context.conversations.slice(0, 3).map((c, i) => (
-                              <span key={i} className="truncate">
-                                {c.subject || "(no subject)"}
-                              </span>
-                            ))
-                          )}
-                        </span>
-                      }
                     />
                   ) : null}
                 </ComposerAttachments>

@@ -238,22 +238,23 @@ export function filesFromPaste(data: DataTransfer): File[] {
 // ---------------------------------------------------------------------------
 
 /**
- * An attachment in the composer, Codex's card: a preview on top, a footer
- * with the kind's icon and the name, and a remove button on hover.
+ * An attachment in the composer: a compact two-line chip (mostly mail, so
+ * a name and a detail say more than a preview would): a tile with the kind's
+ * icon or a thumbnail, the name over a muted detail, and remove on hover.
  */
-export function AttachmentCard({
-  preview,
-  icon,
+export function AttachmentChip({
+  tile,
   name,
+  detail,
   title,
   pending,
   off,
   onClick,
   onRemove,
 }: {
-  preview: ReactNode;
-  icon: ReactNode;
+  tile: ReactNode;
   name: string;
+  detail?: string;
   title?: string;
   /** Still uploading. */
   pending?: boolean;
@@ -266,7 +267,7 @@ export function AttachmentCard({
     <div
       title={title ?? name}
       className={cn(
-        "group/attachment relative w-40 shrink-0 overflow-hidden rounded-xl border border-foreground/10 bg-card transition-opacity",
+        "group/attachment relative flex h-11 w-max min-w-0 max-w-60 shrink-0 items-center gap-2 rounded-xl border border-foreground/10 bg-card py-1.5 pl-1.5 pr-3 transition-opacity",
         off && "opacity-50",
       )}
     >
@@ -279,43 +280,47 @@ export function AttachmentCard({
           className="absolute inset-0 z-10 cursor-pointer rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus-ring"
         />
       ) : null}
-      <div className="flex h-24 items-center justify-center overflow-hidden bg-foreground/[0.04]">
-        {preview}
-      </div>
-      <div className="flex h-9 items-center gap-2 border-t border-foreground/10 px-2.5">
-        <span className="flex shrink-0 text-muted-foreground [&_svg]:size-4">{icon}</span>
-        <span className={cn("min-w-0 truncate text-[13px] text-foreground", off && "line-through")}>
+      <span className="relative flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-foreground/[0.06] text-muted-foreground [&_svg]:size-4">
+        {tile}
+        {pending ? (
+          <span className="absolute inset-0 flex items-center justify-center bg-card/70">
+            <LoaderCircleIcon className="animate-spin" />
+          </span>
+        ) : null}
+      </span>
+      <span className="flex min-w-0 flex-col">
+        <span
+          className={cn("truncate text-[13px] leading-4 text-foreground", off && "line-through")}
+        >
           {name}
         </span>
-      </div>
-      {pending ? (
-        <span className="pointer-events-none absolute inset-0 flex items-center justify-center bg-canvas/50">
-          <LoaderCircleIcon className="size-4 animate-spin text-muted-foreground" />
-        </span>
-      ) : null}
+        {detail ? (
+          <span className="truncate text-[11px] leading-4 text-muted-foreground">{detail}</span>
+        ) : null}
+      </span>
       {onRemove ? (
         <button
           type="button"
           onClick={onRemove}
           aria-label={`Remove ${name}`}
-          className="absolute right-1.5 top-1.5 z-20 flex size-5 cursor-pointer items-center justify-center rounded-full bg-black/60 text-white opacity-0 transition-opacity group-hover/attachment:opacity-100 focus-visible:opacity-100"
+          className="absolute -right-1.5 -top-1.5 z-20 flex size-4.5 cursor-pointer items-center justify-center rounded-full border border-foreground/10 bg-popover text-muted-foreground opacity-0 shadow-sm transition-opacity hover:text-foreground group-hover/attachment:opacity-100 focus-visible:opacity-100"
         >
-          <XIcon className="size-3" />
+          <XIcon className="size-2.5" />
         </button>
       ) : null}
     </div>
   );
 }
 
-/** A file's extension, for its card ("PDF", "XLSX"). */
+/** A file's extension, for its chip ("PDF", "XLSX"). */
 function extensionOf(name: string): string {
   const dot = name.lastIndexOf(".");
-  return dot > 0 && dot < name.length - 1 ? name.slice(dot + 1, dot + 6).toUpperCase() : "FILE";
+  return dot > 0 && dot < name.length - 1 ? name.slice(dot + 1, dot + 6).toUpperCase() : "File";
 }
 
 /**
- * The composer's attachments as cards in a row at its top, like Codex's;
- * `children` go first (the attached mail).
+ * The composer's attachments as chips in a row at its top; `children` go
+ * first (the attached mail).
  */
 export function ComposerAttachments({
   items,
@@ -328,28 +333,26 @@ export function ComposerAttachments({
 }) {
   if (items.length === 0 && !children) return null;
   return (
-    <div className="flex gap-2 overflow-x-auto px-3 pt-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+    <div className="flex gap-2 overflow-x-auto px-3 pb-0.5 pt-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       {children}
       {items.map((item) => (
-        <AttachmentCard
+        <AttachmentChip
           key={item.key}
           name={item.name}
-          title={
-            item.kind === "file" ? `${item.name} · ${formatAttachmentSize(item.size)}` : item.name
+          detail={
+            item.kind === "image"
+              ? "Image"
+              : `${extensionOf(item.name)} · ${formatAttachmentSize(item.size)}`
           }
           pending={!item.staged}
           onRemove={() => onRemove(item.key)}
-          icon={item.kind === "image" ? <ImageIcon /> : <FileTextIcon />}
-          preview={
+          tile={
             item.kind === "image" && item.previewUrl ? (
-              <img className="size-full object-cover" alt={item.name} src={item.previewUrl} />
+              <img className="size-full object-cover" alt="" src={item.previewUrl} />
+            ) : item.kind === "image" ? (
+              <ImageIcon />
             ) : (
-              <span className="flex flex-col items-center gap-1.5 text-muted-foreground">
-                <FileTextIcon className="size-7" strokeWidth={1.25} />
-                <span className="text-[11px] font-medium tracking-wide">
-                  {extensionOf(item.name)}
-                </span>
-              </span>
+              <FileTextIcon />
             )
           }
         />
