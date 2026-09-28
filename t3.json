@@ -24,6 +24,11 @@
       "name": "Dev (Mac app)",
       "command": "pnpm dev:desktop",
       "icon": "play"
+    },
+    {
+      "name": "Dev (iPhone app)",
+      "command": "pnpm dev:ios",
+      "icon": "play"
     }
   ]
 }

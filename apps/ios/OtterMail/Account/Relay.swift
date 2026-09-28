@@ -1,0 +1,263 @@
+import Foundation
+
+/**
+ * The Otter relay (infra/relay; its API is packages/contracts/src/relay.ts):
+ * who's signed in, the Gmail accounts linked to them, the preferences that
+ * follow them, and a WebSocket that says when mail, accounts or preferences
+ * changed. It never sees mail, and this app's Gmail tokens never go there.
+ */
+@MainActor
+final class Relay {
+    struct User: Codable, Equatable {
+        var id: String
+        var email: String
+        var name: String?
+        var picture: String?
+    }
+
+    struct Account: Codable {
+        var email: String
+        var name: String?
+        var picture: String?
+        var displayName: String?
+        var color: String?
+    }
+
+    struct Device: Decodable, Identifiable {
+        var id: String
+        var token: String
+        var userAgent: String?
+        var updatedAt: Date
+    }
+
+    enum Event {
+        case mail(email: String)
+        case accounts
+        case preferences
+    }
+
+    struct Failure: LocalizedError {
+        var status: Int
+        var message: String
+        var errorDescription: String? { message }
+    }
+
+    /** `OTTER_RELAY_URL` in the scheme points a dev build at `pnpm dev`'s relay (http://localhost:8787). */
+    let baseURL = URL(string: ProcessInfo.processInfo.environment["OTTER_RELAY_URL"] ?? "https://relay.mail.otterware.dev")!
+
+    private static let sessionKey = "otter-session"
+    private(set) var token: String? = Keychain.get(sessionKey)
+    /** Called when the relay ends this session (signed out on another device, or expired). */
+    var onSignedOut: () -> Void = {}
+
+    var isSignedIn: Bool { token != nil }
+
+    // ── Session ──────────────────────────────────────────────────────────────
+
+    /** Signs in with a Google ID token, as the Mac app does; keeps the session. */
+    func signIn(idToken: String) async throws -> User {
+        struct Body: Encodable { var provider = "google"; var idToken: [String: String] }
+        struct Response: Decodable { var user: User }
+        let (data, response) = try await send("POST", "/v1/auth/sign-in/social", body: Body(idToken: ["token": idToken]), authorized: false)
+        guard let token = response.value(forHTTPHeaderField: "set-auth-token") else {
+            throw Failure(status: 0, message: "The relay didn't return a session.")
+        }
+        self.token = token
+        Keychain.set(Self.sessionKey, token)
+        return try JSONDecoder().decode(Response.self, from: data).user
+    }
+
+    /** Ends the session on the relay when it can, and forgets it here. */
+    func signOut() async {
+        _ = try? await send("POST", "/v1/auth/sign-out", body: [String: String]())
+        forget()
+    }
+
+    private func forget() {
+        token = nil
+        Keychain.set(Self.sessionKey, nil)
+        disconnect()
+    }
+
+    func me() async throws -> (user: User, pushTopic: String) {
+        struct Response: Decodable { var user: User; var pushTopic: String }
+        let response: Response = try await get("/v1/me")
+        return (response.user, response.pushTopic)
+    }
+
+    func devices() async throws -> [Device] {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .custom { decoder in
+            let text = try decoder.singleValueContainer().decode(String.self)
+            return (try? Date(text, strategy: .iso8601.year().month().day().time(includingFractionalSeconds: true)))
+                ?? (try? Date(text, strategy: .iso8601)) ?? .distantPast
+        }
+        let (data, _) = try await send("GET", "/v1/auth/list-sessions")
+        return try decoder.decode([Device].self, from: data)
+    }
+
+    func revoke(_ device: Device) async throws {
+        _ = try await send("POST", "/v1/auth/revoke-session", body: ["token": device.token])
+    }
+
+    func deleteUser() async throws {
+        _ = try await send("POST", "/v1/auth/delete-user", body: [String: String]())
+        forget()
+    }
+
+    // ── Linked accounts ──────────────────────────────────────────────────────
+
+    func accounts() async throws -> [Account] {
+        struct Response: Decodable { var accounts: [Account] }
+        let response: Response = try await get("/v1/accounts")
+        return response.accounts
+    }
+
+    /** Links the mailbox (with an ID token proving the sign-in) or updates its profile. */
+    func putAccount(_ email: String, idToken: String? = nil, profile: Account) async throws {
+        struct Body: Encodable {
+            var idToken: String?
+            var name, picture, displayName, color: String?
+        }
+        let body = Body(idToken: idToken, name: profile.name, picture: profile.picture, displayName: profile.displayName, color: profile.color)
+        _ = try await send("PUT", "/v1/accounts/\(Self.path(email))", body: body)
+    }
+
+    func unlink(_ email: String) async throws {
+        _ = try await send("DELETE", "/v1/accounts/\(Self.path(email))")
+    }
+
+    // ── Preferences ──────────────────────────────────────────────────────────
+
+    /** The account's preference sections (`ui`, `settings`, …), as JSON. */
+    func preferences() async throws -> [String: Any] {
+        let (data, _) = try await send("GET", "/v1/preferences")
+        let object = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        return object?["preferences"] as? [String: Any] ?? [:]
+    }
+
+    /** Replaces the sections given; the others stay. */
+    func putPreferences(_ sections: [String: Any]) async throws {
+        let body = try JSONSerialization.data(withJSONObject: ["preferences": sections])
+        _ = try await send("PUT", "/v1/preferences", data: body)
+    }
+
+    // ── Events ───────────────────────────────────────────────────────────────
+
+    private var socket: URLSessionWebSocketTask?
+    private var listening: Task<Void, Never>?
+
+    /** Keeps the event stream open (reconnecting as needed) until `disconnect()`. */
+    func connect(onEvent: @escaping (Event) -> Void) {
+        guard listening == nil, token != nil else { return }
+        listening = Task { [weak self] in
+            var delay: Duration = .seconds(1)
+            while !Task.isCancelled, let self, let token = self.token {
+                var request = URLRequest(url: self.eventsURL)
+                request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+                let socket = URLSession.shared.webSocketTask(with: request)
+                self.socket = socket
+                socket.resume()
+                let pinging = Task {
+                    while !Task.isCancelled {
+                        try? await Task.sleep(for: .seconds(30))
+                        try? await socket.send(.string("ping"))
+                    }
+                }
+                do {
+                    while true {
+                        guard case .string(let text) = try await socket.receive() else { continue }
+                        delay = .seconds(1)
+                        if let event = Self.event(text) { onEvent(event) }
+                    }
+                } catch {}
+                pinging.cancel()
+                let ended = socket.closeCode.rawValue == 4001 || socket.closeReason == Data("Signed out".utf8)
+                if ended || (socket.response as? HTTPURLResponse)?.statusCode == 401 {
+                    // The relay ended this session (signed out from another device).
+                    self.forget()
+                    self.onSignedOut()
+                    return
+                }
+                try? await Task.sleep(for: delay)
+                delay = min(delay * 2, .seconds(60))
+            }
+        }
+    }
+
+    func disconnect() {
+        listening?.cancel()
+        listening = nil
+        socket?.cancel(with: .goingAway, reason: nil)
+        socket = nil
+    }
+
+    private var eventsURL: URL {
+        var components = URLComponents(url: baseURL.appending(path: "/v1/events"), resolvingAgainstBaseURL: false)!
+        components.scheme = components.scheme == "http" ? "ws" : "wss"
+        return components.url!
+    }
+
+    private static func event(_ text: String) -> Event? {
+        guard
+            let data = text.data(using: .utf8),
+            let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        else { return nil }
+        switch object["type"] as? String {
+        case "mail": return (object["email"] as? String).map { .mail(email: $0) }
+        case "accounts": return .accounts
+        case "preferences": return .preferences
+        default: return nil
+        }
+    }
+
+    // ── Requests ─────────────────────────────────────────────────────────────
+
+    private static func path(_ email: String) -> String {
+        email.lowercased().addingPercentEncoding(withAllowedCharacters: .urlPathAllowed.subtracting(["@", "/"])) ?? email
+    }
+
+    private func get<T: Decodable>(_ route: String) async throws -> T {
+        let (data, _) = try await send("GET", route)
+        return try JSONDecoder().decode(T.self, from: data)
+    }
+
+    private func send(
+        _ method: String, _ route: String, body: some Encodable, authorized: Bool = true
+    ) async throws -> (Data, HTTPURLResponse) {
+        try await send(method, route, data: try JSONEncoder().encode(body), authorized: authorized)
+    }
+
+    @discardableResult
+    private func send(
+        _ method: String, _ route: String, data: Data? = nil, authorized: Bool = true
+    ) async throws -> (Data, HTTPURLResponse) {
+        var request = URLRequest(url: URL(string: route, relativeTo: baseURL)!)
+        request.httpMethod = method
+        request.setValue("Otter Mail/\(Bundle.main.version) (iPhone)", forHTTPHeaderField: "User-Agent")
+        if let data {
+            request.httpBody = data
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        }
+        if authorized {
+            guard let token else { throw Failure(status: 401, message: "Not signed in to Otter Mail.") }
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        let (body, response) = try await URLSession.shared.data(for: request)
+        let http = response as! HTTPURLResponse
+        guard (200..<300).contains(http.statusCode) else {
+            let message = (try? JSONSerialization.jsonObject(with: body) as? [String: Any])
+                .flatMap { ($0["error"] as? String) ?? ($0["message"] as? String) }
+            if http.statusCode == 401, authorized, token != nil {
+                forget()
+                onSignedOut()
+            }
+            throw Failure(status: http.statusCode, message: message ?? "The relay answered \(http.statusCode).")
+        }
+        return (body, http)
+    }
+}
+
+extension Bundle {
+    var version: String { object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0" }
+}
