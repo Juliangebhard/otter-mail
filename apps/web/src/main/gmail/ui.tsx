@@ -32,30 +32,27 @@ export { cn };
 
 /** Shared control chrome: rounded, focus ring, pressed scale, disabled fade. */
 const CONTROL =
-  "relative inline-flex shrink-0 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-[var(--control-radius)] border font-medium outline-none transition-[box-shadow,scale] active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-1 focus-visible:ring-offset-canvas disabled:pointer-events-none disabled:opacity-64 [&_svg]:pointer-events-none [&_svg]:shrink-0";
+  "relative inline-flex shrink-0 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border font-normal outline-none transition-[box-shadow,scale,background-color,color] active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-1 focus-visible:ring-offset-canvas disabled:pointer-events-none disabled:opacity-64 [&_svg]:pointer-events-none [&_svg]:shrink-0";
 
 export const BUTTON_VARIANTS = {
-  /** Solid blue call to action (send, confirm). */
-  primary:
-    "border-primary bg-primary text-primary-foreground shadow-xs shadow-primary/24 not-disabled:inset-shadow-[0_1px_rgb(255_255_255/16%)] hover:bg-primary/90 active:shadow-none",
-  /** Bordered neutral control on the card surface. */
-  outline:
-    "border-input bg-popover text-foreground shadow-xs/5 hover:bg-accent-surface/50 dark:bg-input/32 dark:hover:bg-input/64",
+  /** Solid call to action (send, confirm), flat in the theme's primary. */
+  primary: "border-transparent bg-primary text-primary-foreground hover:bg-primary/88",
+  /** Quiet pill with a faint border. */
+  outline: "border-border bg-transparent text-foreground hover:bg-accent-surface",
   /** Quiet control that only shows a surface on hover. */
   ghost: "border-transparent text-foreground hover:bg-accent-surface",
   /** Ghost in the muted tone, brightening on hover (toolbar icons). */
   "ghost-muted":
     "border-transparent text-muted-foreground hover:bg-accent-surface hover:text-foreground",
-  destructive:
-    "border-destructive bg-destructive text-white shadow-xs shadow-destructive/24 hover:bg-destructive/90",
+  destructive: "border-transparent bg-destructive text-white hover:bg-destructive/88",
 } as const;
 
 export const BUTTON_SIZES = {
   xs: "h-6 px-[calc(--spacing(2)-1px)] text-xs [&_svg:not([class*='size-'])]:size-3.5",
-  sm: "h-7 px-[calc(--spacing(2.5)-1px)] text-xs [&_svg:not([class*='size-'])]:size-3.5",
+  sm: "h-7 px-[calc(--spacing(2.5)-1px)] text-[13px] [&_svg:not([class*='size-'])]:size-3.5",
   default: "h-8 px-[calc(--spacing(3)-1px)] text-sm [&_svg:not([class*='size-'])]:size-4",
   "icon-xs": "size-6 [&_svg:not([class*='size-'])]:size-3.5",
-  "icon-sm": "size-7 [&_svg:not([class*='size-'])]:size-3.5",
+  "icon-sm": "size-7 [&_svg:not([class*='size-'])]:size-4",
   icon: "size-8 [&_svg:not([class*='size-'])]:size-4",
 } as const;
 
@@ -247,7 +244,7 @@ export function HintTooltip({
                   : { top: -9999, left: -9999, visibility: "hidden" }
               }
               className={cn(
-                "tooltip-in pointer-events-none fixed z-[140] flex max-w-80 items-center gap-1.5 whitespace-nowrap rounded-md border border-border bg-popover px-2 py-1 text-xs leading-snug text-popover-foreground shadow-md/5",
+                "tooltip-in pointer-events-none fixed z-[140] flex max-w-80 items-center gap-1.5 whitespace-nowrap rounded-lg border border-border/60 bg-popover px-2 py-1 text-xs leading-snug text-popover-foreground shadow-lg/10",
                 placement?.side === "bottom" ? "origin-top" : "origin-bottom",
               )}
             >
@@ -266,7 +263,7 @@ export function Kbd({ children, className }: { children: ReactNode; className?: 
   return (
     <kbd
       className={cn(
-        "pointer-events-none inline-flex h-5 min-w-5 select-none items-center justify-center gap-1 rounded bg-muted px-1 font-sans text-xs font-medium text-muted-foreground",
+        "pointer-events-none inline-flex h-5 min-w-5 select-none items-center justify-center gap-1 rounded-md bg-muted px-1 font-sans text-xs text-muted-foreground",
         className,
       )}
     >

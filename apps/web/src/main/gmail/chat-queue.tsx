@@ -93,7 +93,7 @@ export function QueuedRunsControl({
       role="region"
       aria-label={`${items.length} queued message${items.length === 1 ? "" : "s"}`}
       aria-live="polite"
-      className="relative z-0 mb-2 rounded-2xl border border-border/70 bg-(--chat-composer-surface) px-1.5 py-1 text-xs shadow-xs/5"
+      className="relative z-0 mb-2 rounded-2xl border border-(--chat-composer-outline) bg-(--chat-composer-surface) px-1.5 py-1 text-sm shadow-xs/5 dark:border-transparent"
     >
       <button
         type="button"

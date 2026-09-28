@@ -2,6 +2,7 @@ import type React from "react";
 import type { ReactNode } from "react";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { Dialog } from "~/components/ui/dialog";
+import { EmptyState } from "~/components/ui/empty-state";
 import { Text } from "~/components/ui/text";
 import { toast } from "./toast";
 import {
@@ -22,7 +23,9 @@ import {
   MailIcon,
   MailOpenIcon,
   RotateCcwIcon,
+  InboxIcon,
   SearchIcon,
+  SearchXIcon,
   ShieldCheckIcon,
   Trash2Icon,
   XIcon,
@@ -394,7 +397,7 @@ function MessageRow({
   return (
     // Off-screen rows skip layout/paint (long scrolls load thousands of rows);
     // `auto` remembers each row's real height once it has rendered.
-    <div className="px-2 py-0.5 [contain-intrinsic-size:auto_92px] [content-visibility:auto]">
+    <div className="px-1 py-px [contain-intrinsic-size:auto_84px] [content-visibility:auto]">
       <ContextMenu>
         <ContextMenuTrigger asChild>
           <button
@@ -408,7 +411,7 @@ function MessageRow({
               if (e.shiftKey) e.preventDefault();
             }}
             className={[
-              "group relative flex w-full cursor-pointer select-none items-start gap-2.5 overflow-hidden rounded-md px-(--sidebar-row-content-inset) py-(--sidebar-content-inset) text-left outline-none focus-visible:ring-2 focus-visible:ring-focus-ring",
+              "group relative flex w-full cursor-pointer select-none items-start gap-2.5 overflow-hidden rounded-lg px-3 py-2.5 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-focus-ring",
               selected
                 ? "bg-sidebar-row-active"
                 : checked
@@ -420,10 +423,10 @@ function MessageRow({
           >
             <div
               className={[
-                "flex min-w-0 flex-1 flex-col gap-px transition-opacity",
+                "flex min-w-0 flex-1 flex-col gap-0.5 transition-opacity",
                 // Read mail recedes; hover or selection brings it back.
                 !unread && !selected && !isDraft
-                  ? "opacity-65 group-hover:opacity-100 dark:opacity-55"
+                  ? "opacity-80 group-hover:opacity-100 dark:opacity-70"
                   : "",
               ].join(" ")}
             >
@@ -434,7 +437,7 @@ function MessageRow({
                   ) : null}
                   {labelIds.includes("IMPORTANT") ? <ImportantMarker muted /> : null}
                   {isDraft ? (
-                    <span className="shrink-0 text-sm font-semibold leading-snug text-destructive-foreground">
+                    <span className="shrink-0 text-sm font-medium leading-snug text-destructive-foreground">
                       Draft
                     </span>
                   ) : null}
@@ -444,8 +447,8 @@ function MessageRow({
                       isDraft
                         ? "text-muted-foreground"
                         : unread
-                          ? "font-semibold text-foreground"
-                          : "font-medium text-foreground",
+                          ? "font-medium text-foreground"
+                          : "font-normal text-foreground",
                     ].join(" ")}
                   >
                     {isDraft
@@ -489,27 +492,25 @@ function MessageRow({
                       aria-label={combinedMeta.accountName}
                     />
                   ) : null}
-                  <span className={["text-xs tabular-nums text-muted-foreground/55"].join(" ")}>
+                  <span className="text-xs tabular-nums text-muted-foreground">
                     {formatRelativeDate(message.date)}
                   </span>
                 </div>
               </div>
               <span
                 className={[
-                  "truncate text-sm leading-snug",
-                  unread ? "font-medium text-foreground/90" : "text-foreground/80",
+                  "truncate text-[13px] leading-snug",
+                  unread ? "text-foreground/90" : "text-muted-foreground",
                 ].join(" ")}
               >
                 {message.subject || "(no subject)"}
               </span>
-              <span
-                className={["truncate text-xs leading-snug", "text-muted-foreground/70"].join(" ")}
-              >
+              <span className="truncate text-[13px] leading-snug text-muted-foreground/75">
                 {decodeEntities(message.snippet) || " "}
               </span>
               {/* Chips only when they add something beyond the current view. */}
               {(showInboxChip && labelIds.includes("INBOX")) || shownLabels.length > 0 ? (
-                <div className="mt-1 flex h-4.5 items-center gap-1 overflow-hidden">
+                <div className="mt-1 flex h-5 items-center gap-1 overflow-hidden">
                   {showInboxChip && labelIds.includes("INBOX") ? (
                     <InboxChip selected={selected} />
                   ) : null}
@@ -623,7 +624,7 @@ function ThreadMessageRow({
       type="button"
       onClick={onClick}
       className={cn(
-        "group flex w-full cursor-pointer select-none flex-col gap-px rounded-md py-1.5 pr-(--sidebar-row-content-inset) pl-6 text-left outline-none focus-visible:ring-2 focus-visible:ring-focus-ring",
+        "group flex w-full cursor-pointer select-none flex-col gap-0.5 rounded-lg py-2 pr-3 pl-6 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-focus-ring",
         selected ? "bg-sidebar-row-active" : "hover:bg-sidebar-row-hover",
       )}
     >
@@ -633,25 +634,25 @@ function ThreadMessageRow({
             <span className="size-1.5 shrink-0 rounded-full bg-primary" aria-hidden />
           ) : null}
           {isDraft ? (
-            <span className="shrink-0 text-xs font-semibold text-destructive-foreground">
+            <span className="shrink-0 text-[13px] font-medium text-destructive-foreground">
               Draft
             </span>
           ) : null}
           <span
             className={cn(
-              "min-w-0 truncate text-xs",
-              message.unread ? "font-semibold text-foreground" : "font-medium text-foreground/85",
+              "min-w-0 truncate text-[13px]",
+              message.unread ? "font-medium text-foreground" : "text-foreground/85",
             )}
           >
             {message.fromName || message.fromEmail}
           </span>
         </span>
-        <span className="shrink-0 text-2xs tabular-nums text-muted-foreground/55">
+        <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
           {formatRelativeDate(message.date)}
         </span>
       </span>
       <span className="flex items-center gap-1.5">
-        <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground/70">
+        <span className="min-w-0 flex-1 truncate text-[13px] text-muted-foreground/75">
           {decodeEntities(message.snippet) || " "}
         </span>
         {message.hasAttachments ? (
@@ -1485,17 +1486,17 @@ export function MessageList({
       {/* Header */}
       <div
         className={cn(
-          "drag-region flex h-(--workspace-topbar-height) shrink-0 items-center gap-2 border-b border-border px-4",
+          "drag-region flex h-(--workspace-topbar-height) shrink-0 items-center gap-1 px-4",
           search && "hidden",
         )}
       >
         {headerLeading}
-        <div className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+        <div className="min-w-0 flex-1 truncate text-sm text-muted-foreground">
           {formatMailboxSummary(mailboxTotal, mailboxUnread)}
         </div>
         <HintTooltip label="Search this mailbox" shortcut="search.focus">
           <IconBtn label="Search this mailbox" onClick={onSearchView}>
-            <SearchIcon className="size-3.5" />
+            <SearchIcon className="size-4" />
           </IconBtn>
         </HintTooltip>
         <HintTooltip label={unreadOnly ? "Show all messages" : "Show unread only"}>
@@ -1507,9 +1508,9 @@ export function MessageList({
             onClick={() => setMailboxMode(unreadOnly ? "all" : "unread")}
           >
             {unreadOnly ? (
-              <CircleDotIcon className="size-3.5 text-primary" />
+              <CircleDotIcon className="size-4 text-primary" />
             ) : (
-              <CircleIcon className="size-3.5" />
+              <CircleIcon className="size-4" />
             )}
           </IconBtn>
         </HintTooltip>
@@ -1518,20 +1519,21 @@ export function MessageList({
       <div
         ref={scrollRef}
         onScroll={maybeLoadMore}
-        className={["min-h-0 flex-1 overflow-y-auto py-1", checked.size > 0 ? "pb-16" : ""].join(
-          " ",
-        )}
+        className={[
+          "min-h-0 flex-1 overflow-y-auto pb-1 pt-[9px] [scrollbar-gutter:stable_both-edges]",
+          checked.size > 0 ? "pb-16" : "",
+        ].join(" ")}
       >
         {signedOutAccount && !isCombined && !search && visibleMessages.length === 0 ? (
           <SignedOutMailbox account={signedOutAccount} />
         ) : isLoading ? (
           <div className="flex flex-col gap-0">
             {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="flex w-full items-start gap-3 px-5 py-2.5">
-                <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-                  <div className="h-3.5 w-32 animate-skeleton rounded-sm bg-secondary" />
-                  <div className="h-3 w-48 animate-skeleton rounded-sm bg-accent-surface" />
-                  <div className="h-3 w-40 animate-skeleton rounded-sm bg-accent-surface" />
+              <div key={i} className="flex w-full items-start gap-3 px-5 py-3">
+                <div className="flex min-w-0 flex-1 flex-col gap-2">
+                  <div className="h-3.5 w-32 animate-skeleton rounded-full bg-secondary" />
+                  <div className="h-3 w-48 animate-skeleton rounded-full bg-accent-surface" />
+                  <div className="h-3 w-40 animate-skeleton rounded-full bg-accent-surface" />
                 </div>
               </div>
             ))}
@@ -1543,34 +1545,36 @@ export function MessageList({
             <span className="text-sm text-muted-foreground">Loading more mail…</span>
           </div>
         ) : search && !search.query ? (
-          <div className="flex h-full flex-col items-center justify-center gap-1 px-8 text-center">
-            <span className="text-sm font-medium text-foreground">Search your mail</span>
-            <span className="text-sm text-muted-foreground">{SEARCH_HINT}</span>
-          </div>
+          <EmptyState
+            className="h-full px-8"
+            media={<SearchIcon className="size-10 stroke-[1.25] text-muted-foreground" />}
+            title="Search your mail"
+            description={SEARCH_HINT}
+          />
         ) : search && visibleMessages.length === 0 ? (
-          <div className="flex h-full flex-col items-center justify-center gap-1 px-8 text-center">
-            <span className="text-sm font-medium text-foreground">
-              {gmailSearch.isError ? "Search failed" : "No messages matched your search"}
-            </span>
-            <span className="text-sm text-muted-foreground">
-              {gmailSearch.isError
+          <EmptyState
+            className="h-full px-8"
+            media={<SearchXIcon className="size-10 stroke-[1.25] text-muted-foreground" />}
+            title={gmailSearch.isError ? "Search failed" : "No messages matched your search"}
+            description={
+              gmailSearch.isError
                 ? String(gmailSearch.error?.message ?? "Gmail didn't answer.")
-                : "Try different words, or use Advanced search."}
-            </span>
-          </div>
+                : "Try different words, or use Advanced search."
+            }
+          />
         ) : visibleMessages.length === 0 ? (
-          <div className="flex h-full flex-col items-center justify-center gap-1 px-6 text-center">
-            <span className="text-sm font-medium text-foreground">
-              {unreadOnly ? "No unread messages" : "No messages"}
-            </span>
-            <span className="text-sm text-muted-foreground">
-              {unreadOnly
+          <EmptyState
+            className="h-full px-6"
+            media={<InboxIcon className="size-10 stroke-[1.25] text-muted-foreground" />}
+            title={unreadOnly ? "No unread messages" : "No messages"}
+            description={
+              unreadOnly
                 ? "Everything here has been read."
                 : searchQuery
                   ? "No messages match your search."
-                  : "This label is empty."}
-            </span>
-          </div>
+                  : "This label is empty."
+            }
+          />
         ) : (
           <>
             {visibleMessages.map((message) => (
@@ -1632,11 +1636,11 @@ export function MessageList({
 
       {checked.size > 0 ? (
         <div className="absolute inset-x-0 bottom-3 z-10 flex justify-center px-3">
-          <div className="dropdown-glass flex items-center gap-0.5 rounded-lg px-2 py-1 shadow-[0_16px_40px_-18px_rgb(0_0_0/55%)] dark:shadow-[0_18px_44px_-18px_rgb(0_0_0/80%)]">
-            <span className="pl-1 text-xs font-medium tabular-nums text-foreground">
+          <div className="dropdown-glass flex items-center gap-0.5 rounded-xl px-2 py-1 shadow-[0_16px_40px_-18px_rgb(0_0_0/55%)] dark:shadow-[0_18px_44px_-18px_rgb(0_0_0/80%)]">
+            <span className="pl-1 text-sm font-medium tabular-nums text-foreground">
               {checked.size}
             </span>
-            <span className="pr-1 text-xs text-muted-foreground">selected</span>
+            <span className="pr-1 text-sm text-muted-foreground">selected</span>
             <span className="mx-1 h-5 w-px shrink-0 bg-border" aria-hidden />
             {allTrashed ? (
               <>

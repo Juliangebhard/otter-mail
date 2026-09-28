@@ -7,9 +7,10 @@
  *    radio menu, with the fast-tier bolt on the trigger.
  */
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Popover } from "radix-ui";
 import {
+  CheckIcon,
   ChevronDownIcon,
   LockIcon,
   LockOpenIcon,
@@ -43,14 +44,15 @@ import { shortcutLabelFor, useKeybindingsState } from "../keybindings/store";
 // Composer control look (T3's ComposerControl, size "sm")
 // ---------------------------------------------------------------------------
 
+// Codex's composer controls: quiet, muted text pills that brighten on hover.
 export const COMPOSER_CONTROL =
-  "relative inline-flex shrink-0 cursor-pointer items-center justify-center whitespace-nowrap rounded-(--control-radius) border border-transparent outline-none hover:bg-accent-surface data-[state=open]:bg-accent-surface focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-1 focus-visible:ring-offset-canvas disabled:pointer-events-none disabled:opacity-64 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg]:-mx-0.5 [&_svg[data-composer-control-icon]]:mx-0 h-7 gap-1.5 px-2.5 text-sm font-medium text-secondary-label [&_svg:not([class*='text-'])]:text-muted-foreground hover:text-foreground [&_svg:not([class*='size-'])]:size-4";
+  "relative inline-flex shrink-0 cursor-pointer items-center justify-center whitespace-nowrap rounded-full border border-transparent outline-none transition-colors hover:bg-accent-surface data-[state=open]:bg-accent-surface focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-1 focus-visible:ring-offset-canvas disabled:pointer-events-none disabled:opacity-64 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg]:-mx-0.5 [&_svg[data-composer-control-icon]]:mx-0 h-7 gap-1.5 px-2.5 text-sm font-normal text-muted-foreground [&_svg:not([class*='text-'])]:text-muted-foreground hover:text-foreground [&_svg:not([class*='size-'])]:size-4";
 
 export function ComposerControlChevron() {
   return (
     <ChevronDownIcon
       aria-hidden
-      className="size-3.5 shrink-0 text-icon-muted"
+      className="size-3 shrink-0 text-icon-muted"
       data-composer-control-chevron
       strokeWidth={2.25}
     />
@@ -64,10 +66,6 @@ function closeFocus(event: Event, returnFocus?: () => void): void {
   returnFocus();
 }
 
-export function ComposerControlSeparator() {
-  return <span className="mx-0.5 h-4 w-px shrink-0 bg-border" aria-hidden />;
-}
-
 // ---------------------------------------------------------------------------
 // Search (tokenized; every token must hit name, slug, or provider)
 // ---------------------------------------------------------------------------
@@ -78,7 +76,30 @@ type PickerItem = {
   slug: string;
   name: string;
   providerName: string;
+  /** Sub-provider (Hermes' "Anthropic", …): the heading it sits under. */
+  group: string | null;
 };
+
+/**
+ * A model's name for people: a provider's display name as given, and a bare
+ * id made readable ("claude-haiku-4-5-20251001" → "Claude Haiku 4.5",
+ * "gpt-6-astra" → "GPT-6 Astra").
+ */
+export function modelLabel(name: string): string {
+  if (!/^[a-z0-9.-]+$/.test(name)) return name;
+  const parts = name.split("-").filter((part) => !/^\d{8}$/.test(part));
+  const words: string[] = [];
+  for (const part of parts) {
+    const last = words[words.length - 1];
+    if (/^\d+$/.test(part) && last && /\d$/.test(last)) words[words.length - 1] = `${last}.${part}`;
+    else if (/^\d/.test(part) && last === "GPT") words[words.length - 1] = `GPT-${part}`;
+    else if (part === "gpt") words.push("GPT");
+    // OpenAI's o-series keeps its lowercase (o3, o4-mini).
+    else if (/^o\d/.test(part)) words.push(part);
+    else words.push(part.charAt(0).toUpperCase() + part.slice(1));
+  }
+  return words.join(" ");
+}
 
 function searchScore(item: PickerItem, query: string, favorite: boolean): number | null {
   const tokens = query.toLowerCase().split(/\s+/).filter(Boolean);
@@ -106,7 +127,7 @@ function searchScore(item: PickerItem, query: string, favorite: boolean): number
 // ---------------------------------------------------------------------------
 
 const RAIL_BUTTON =
-  "relative isolate flex aspect-square w-full cursor-pointer items-center justify-center rounded-md transition-colors hover:bg-[color-mix(in_srgb,var(--popover)_90%,var(--contrast-foreground))] focus-visible:bg-foreground/10 focus-visible:outline-none";
+  "relative isolate flex aspect-square w-full cursor-pointer items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-foreground/[0.06] hover:text-foreground focus-visible:bg-foreground/10 focus-visible:outline-none aria-pressed:bg-foreground/10 aria-pressed:text-foreground";
 
 function describeProvider(p: ProviderSnapshot): string {
   if (isProviderUsable(p)) return p.displayName;
@@ -126,29 +147,14 @@ function ModelPickerRail({
   lockedKind: ProviderKind | null;
   onSelect: (value: ProviderKind | "favorites") => void;
 }) {
-  const contentRef = useRef<HTMLDivElement>(null);
-  const [indicatorTop, setIndicatorTop] = useState<number | null>(null);
-  useLayoutEffect(() => {
-    const item = contentRef.current?.querySelector<HTMLElement>(
-      `[data-model-picker-provider="${selected}"]`,
-    );
-    setIndicatorTop(item ? item.offsetTop + item.offsetHeight / 2 - 10 : null);
-  }, [providers, selected]);
-
   return (
     <div
-      className="w-11 shrink-0 overflow-hidden bg-muted/30"
+      className="w-12 shrink-0 overflow-hidden border-e border-foreground/10"
       data-model-picker-sidebar
       aria-label="Providers"
     >
       <div className="h-full overflow-y-auto overscroll-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        <div ref={contentRef} className="relative flex min-h-full flex-col gap-1 p-1">
-          {indicatorTop !== null ? (
-            <div
-              className="pointer-events-none absolute right-0 z-10 h-5 w-0.75 rounded-l-full bg-primary transition-[top] duration-200 ease-out"
-              style={{ top: indicatorTop }}
-            />
-          ) : null}
+        <div className="flex min-h-full flex-col gap-1 p-1.5">
           <div className="relative w-full" data-model-picker-provider="favorites">
             <HintTooltip label="Favorites">
               <button
@@ -158,11 +164,11 @@ function ModelPickerRail({
                 aria-label="Favorites"
                 aria-pressed={selected === "favorites"}
               >
-                <StarIcon className="size-5 shrink-0 fill-current" aria-hidden />
+                <StarIcon className="size-4 shrink-0" aria-hidden />
               </button>
             </HintTooltip>
           </div>
-          <div className="border-b border-border/70" aria-hidden />
+          <div className="mx-1.5 my-0.5 border-b border-foreground/10" aria-hidden />
           {providers.map((p) => {
             const locked = lockedKind !== null && lockedKind !== p.kind;
             const disabled = !isProviderUsable(p) || locked;
@@ -183,7 +189,7 @@ function ModelPickerRail({
                     aria-pressed={selected === p.kind}
                     aria-label={tooltip}
                   >
-                    <ProviderIcon kind={p.kind} className="size-5" />
+                    <ProviderIcon kind={p.kind} className="size-4.5" />
                   </button>
                 </HintTooltip>
               </div>
@@ -204,6 +210,7 @@ function ModelListRow({
   highlighted,
   selected,
   favorite,
+  showProvider,
   jumpLabel,
   onHover,
   onPick,
@@ -213,6 +220,8 @@ function ModelListRow({
   highlighted: boolean;
   selected: boolean;
   favorite: boolean;
+  /** Favorites and search mix providers: say whose each model is. */
+  showProvider: boolean;
   jumpLabel: string | null;
   onHover: () => void;
   onPick: () => void;
@@ -226,35 +235,40 @@ function ModelListRow({
       onMouseMove={onHover}
       onClick={onPick}
       className={cn(
-        "group relative flex min-h-7 w-full min-w-0 cursor-pointer items-center gap-2 rounded-sm px-2 py-1 text-sm outline-none",
-        selected && "bg-foreground/[0.08] text-foreground",
-        highlighted && "bg-accent-surface text-foreground",
+        "group relative flex h-8 w-full min-w-0 shrink-0 cursor-pointer items-center gap-2 rounded-lg px-2 text-sm outline-none",
+        highlighted && "bg-foreground/[0.06]",
       )}
     >
-      <div className="min-w-0 flex-1 text-left">
-        <div className="min-w-0 truncate text-xs font-medium leading-snug">{item.name}</div>
-        <div className="mt-1 flex items-center gap-1.5">
-          <ProviderIcon kind={item.kind} className="size-3 shrink-0" />
-          <span className="truncate text-xs font-normal leading-snug text-muted-foreground/70">
-            {item.providerName}
-          </span>
-        </div>
-      </div>
-      <div className="flex shrink-0 items-center gap-1.5">
-        {jumpLabel ? <Kbd>{jumpLabel}</Kbd> : null}
-        <button
-          type="button"
-          className="-mr-1 inline-flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-(--control-radius) text-muted-foreground hover:bg-accent-surface hover:text-foreground"
-          onClick={(event) => {
-            event.stopPropagation();
-            onToggleFavorite();
-          }}
-          aria-label={favorite ? "Remove from favorites" : "Add to favorites"}
-          title={favorite ? "Remove from favorites" : "Add to favorites"}
-        >
-          <StarIcon className={cn("size-3", favorite && "fill-current text-yellow-500")} />
-        </button>
-      </div>
+      {showProvider ? <ProviderIcon kind={item.kind} className="size-3.5 shrink-0" /> : null}
+      <span className="min-w-0 truncate text-foreground">{modelLabel(item.name)}</span>
+      {showProvider ? (
+        <span className="min-w-0 truncate text-[13px] text-muted-foreground">
+          {item.providerName}
+        </span>
+      ) : null}
+      <span className="flex-1" />
+      {jumpLabel ? (
+        <Kbd className="hidden group-data-[highlighted]:inline-flex">{jumpLabel}</Kbd>
+      ) : null}
+      <button
+        type="button"
+        className={cn(
+          "inline-flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground hover:bg-foreground/[0.06] hover:text-foreground",
+          !favorite && "opacity-0 group-hover:opacity-100 focus-visible:opacity-100",
+        )}
+        onClick={(event) => {
+          event.stopPropagation();
+          onToggleFavorite();
+        }}
+        aria-label={favorite ? "Remove from favorites" : "Add to favorites"}
+        title={favorite ? "Remove from favorites" : "Add to favorites"}
+      >
+        <StarIcon className={cn("size-3.5", favorite && "fill-current text-yellow-500")} />
+      </button>
+      <CheckIcon
+        aria-hidden
+        className={cn("size-4 shrink-0 text-foreground", !selected && "invisible")}
+      />
     </div>
   );
 }
@@ -311,6 +325,7 @@ function ModelPickerContent({
               slug: m.slug,
               name: m.name,
               providerName: m.subProvider ? `${p.displayName} · ${m.subProvider}` : p.displayName,
+              group: m.subProvider ?? null,
             })),
         ),
     [railProviders, hiddenSet, activeKind],
@@ -332,13 +347,16 @@ function ModelPickerContent({
       rail === "favorites"
         ? allowed.filter((i) => favoriteSet.has(i.key))
         : allowed.filter((i) => i.kind === rail);
-    // Favorites float to the top of a provider's list.
-    return rail === "favorites"
-      ? inRail
-      : [
-          ...inRail.filter((i) => favoriteSet.has(i.key)),
-          ...inRail.filter((i) => !favoriteSet.has(i.key)),
-        ];
+    if (rail === "favorites") return inRail;
+    // A provider's list: by sub-provider heading, favorites first under each.
+    const groups = [...new Set(inRail.map((i) => i.group))];
+    return groups.flatMap((group) => {
+      const inGroup = inRail.filter((i) => i.group === group);
+      return [
+        ...inGroup.filter((i) => favoriteSet.has(i.key)),
+        ...inGroup.filter((i) => !favoriteSet.has(i.key)),
+      ];
+    });
   }, [allItems, favoriteSet, lockedKind, query, rail]);
 
   // Highlight the active model when it's in view, else the first row.
@@ -371,6 +389,8 @@ function ModelPickerContent({
   };
 
   const showRail = !query.trim() && railProviders.length > 0;
+  // Favorites and search results mix providers; a provider's own list doesn't.
+  const mixed = rail === "favorites" || query.trim() !== "";
   return (
     <div
       className="relative flex h-screen max-h-86.5 w-screen max-w-90 flex-row overflow-hidden"
@@ -387,17 +407,12 @@ function ModelPickerContent({
           }}
         />
       ) : null}
-      <div
-        className={cn(
-          "flex min-h-0 flex-1 flex-col overflow-hidden bg-muted/40",
-          showRail && "border-l border-border/70",
-        )}
-      >
-        <div className="min-w-0 shrink-0 px-3 pt-2.5">
-          <div className="relative -translate-y-px border-b border-border/70 pb-1.5 transition-colors focus-within:border-focus-ring">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        <div className="min-w-0 shrink-0 border-b border-foreground/10 px-3 py-2">
+          <div className="relative">
             <SearchIcon
               aria-hidden
-              className="pointer-events-none absolute left-0 top-1.5 size-4 shrink-0 text-muted-foreground/55"
+              className="pointer-events-none absolute left-0 top-1.5 size-4 shrink-0 text-muted-foreground"
             />
             <input
               ref={searchRef}
@@ -408,7 +423,7 @@ function ModelPickerContent({
               autoCapitalize="off"
               spellCheck={false}
               aria-label="Search models"
-              className="h-6.5 w-full bg-transparent ps-5 font-sans text-sm leading-6.5 text-foreground outline-none placeholder:text-muted-foreground/70"
+              className="h-7 w-full bg-transparent ps-6 font-sans text-sm leading-7 text-foreground outline-none placeholder:text-muted-foreground"
               onKeyDown={(e) => {
                 const native = e.nativeEvent;
                 const jump = MODEL_PICKER_JUMP_COMMANDS.findIndex((c) => matchesCommand(native, c));
@@ -454,29 +469,37 @@ function ModelPickerContent({
         <div
           ref={listRef}
           role="listbox"
-          className="relative min-h-0 flex-1 overflow-y-auto overscroll-y-contain py-1.5 pl-2 pr-px"
+          className="relative min-h-0 flex-1 overflow-y-auto overscroll-y-contain p-1.5"
         >
-          <div className="flex flex-col gap-0.5">
+          <div className="flex flex-col">
             {items.map((item, index) => (
-              <ModelListRow
-                key={item.key}
-                item={item}
-                highlighted={index === highlight}
-                selected={item.key === activeKey}
-                favorite={favoriteSet.has(item.key)}
-                jumpLabel={
-                  index < MODEL_PICKER_JUMP_COMMANDS.length
-                    ? shortcutLabelFor(resolved, MODEL_PICKER_JUMP_COMMANDS[index])
-                    : null
-                }
-                onHover={() => setHighlight(index)}
-                onPick={() => pick(item)}
-                onToggleFavorite={() => toggleFavorite(item.key)}
-              />
+              <Fragment key={item.key}>
+                {/* A provider's own list sits under its sub-provider headings. */}
+                {!mixed && item.group && item.group !== items[index - 1]?.group ? (
+                  <div className="px-2 pb-1 pt-2 text-[13px] text-muted-foreground first:pt-1">
+                    {item.group}
+                  </div>
+                ) : null}
+                <ModelListRow
+                  item={item}
+                  showProvider={mixed}
+                  highlighted={index === highlight}
+                  selected={item.key === activeKey}
+                  favorite={favoriteSet.has(item.key)}
+                  jumpLabel={
+                    index < MODEL_PICKER_JUMP_COMMANDS.length
+                      ? shortcutLabelFor(resolved, MODEL_PICKER_JUMP_COMMANDS[index])
+                      : null
+                  }
+                  onHover={() => setHighlight(index)}
+                  onPick={() => pick(item)}
+                  onToggleFavorite={() => toggleFavorite(item.key)}
+                />
+              </Fragment>
             ))}
           </div>
           {items.length === 0 ? (
-            <div className="p-2 text-center text-sm text-muted-foreground">
+            <div className="px-2 py-6 text-center text-sm text-muted-foreground">
               {rail === "favorites" && !query.trim() ? "No favorite models yet" : "No models found"}
             </div>
           ) : null}
@@ -496,6 +519,8 @@ export function ProviderModelPicker({
   lockedKind,
   onPick,
   returnFocus,
+  chevron = true,
+  className,
 }: {
   providers: ProviderSnapshot[];
   activeKind: ProviderKind;
@@ -504,12 +529,18 @@ export function ProviderModelPicker({
   onPick: (kind: ProviderKind, slug: string) => void;
   /** Where focus goes when the popover closes (the composer). */
   returnFocus?: () => void;
+  /** Off when the traits picker follows and carries the chevron (Codex's "Model Medium ⌄"). */
+  chevron?: boolean;
+  className?: string;
 }) {
   const [open, setOpen] = useState(false);
   useCommandHandlers({ "modelPicker.toggle": () => setOpen((o) => !o) });
   const active = providers.find((p) => p.kind === activeKind);
   const model = active?.models.find((m) => m.slug === active.model);
-  const label = model?.name ?? active?.model ?? active?.displayName ?? "Choose model";
+  const label =
+    (model?.name ?? active?.model)
+      ? modelLabel(model?.name ?? active?.model ?? "")
+      : (active?.displayName ?? "Choose model");
 
   return (
     <Popover.Root open={open} onOpenChange={setOpen}>
@@ -519,15 +550,21 @@ export function ProviderModelPicker({
             type="button"
             aria-label={label}
             data-chat-provider-model-picker
-            className={cn(COMPOSER_CONTROL, "min-w-0 max-w-48 shrink justify-between sm:max-w-56")}
+            className={cn(
+              COMPOSER_CONTROL,
+              "min-w-0 max-w-48 shrink justify-between text-foreground/90 sm:max-w-56",
+              className,
+            )}
           >
             <span className="flex min-w-0 flex-1 items-center gap-1.5">
-              <ProviderIcon kind={activeKind} className="size-4" />
+              <ProviderIcon kind={activeKind} className="size-3.5 opacity-80" />
               <span className="min-w-0 flex-1 truncate">{label}</span>
             </span>
-            <span aria-hidden className="flex items-center">
-              <ComposerControlChevron />
-            </span>
+            {chevron ? (
+              <span aria-hidden className="flex items-center">
+                <ComposerControlChevron />
+              </span>
+            ) : null}
           </button>
         </Popover.Trigger>
       </HintTooltip>
@@ -580,11 +617,13 @@ export function TraitsPicker({
   values,
   onChange,
   returnFocus,
+  className,
 }: {
   options: ProviderModelOption[];
   values: Partial<Record<ProviderModelOption["id"], string>>;
   onChange: (id: ProviderModelOption["id"], value: string) => void;
   returnFocus?: () => void;
+  className?: string;
 }) {
   if (options.length === 0) return null;
   // Like T3: the Fast service tier is a bolt, not text; efforts are the label.
@@ -612,6 +651,7 @@ export function TraitsPicker({
             className={cn(
               COMPOSER_CONTROL,
               "min-w-0 max-w-40 shrink justify-start overflow-hidden sm:max-w-48",
+              className,
             )}
           >
             <span className="flex w-full min-w-0 items-center gap-1.5">

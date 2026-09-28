@@ -19,6 +19,7 @@ const SYNCED_KEYS = [
   "assistant:favorite-models",
   "assistant:hidden-models",
   "assistant:follow-up-behavior",
+  "mail:mailboxes",
 ] as const;
 
 export type SyncedKey = (typeof SYNCED_KEYS)[number];

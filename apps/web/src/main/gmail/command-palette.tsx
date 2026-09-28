@@ -39,7 +39,12 @@ import { useDebouncedValue, useSearchMessages } from "./hooks";
 import { getAccountColor, getAccountDisplayName } from "./account-style";
 import { cn } from "./ui";
 import { COMBINED_ACCOUNT_ID } from "./custom-views";
-import { APP_THEMES, setThemeForAppearance, useThemeChoice } from "../theme/apply-theme";
+import {
+  APP_THEMES,
+  previewTheme,
+  setThemeForAppearance,
+  useThemeChoice,
+} from "../theme/apply-theme";
 import type { GmailAccount, GmailMessageSummary, MailView } from "./types";
 import type { KeybindingCommand } from "../keybindings/commands";
 import { shortcutLabelFor, useKeybindingsState } from "../keybindings/store";
@@ -154,11 +159,20 @@ export function CommandPalette({
   const themeChoice = useThemeChoice();
   const [scheme, setScheme] = useState<"system" | "light" | "dark">("system");
 
+  // Each opening starts fresh, set while rendering so the first frame
+  // doesn't show the page or search from last time.
+  const [shownOpen, setShownOpen] = useState(open);
+  if (open !== shownOpen) {
+    setShownOpen(open);
+    if (open) {
+      setQuery("");
+      setPage("root");
+      setHighlight(0);
+    }
+  }
+
   useEffect(() => {
     if (!open) return;
-    setQuery("");
-    setPage("root");
-    setHighlight(0);
     void window.desktopBridge.nativeTheme
       .getInfo()
       .then((info) => setScheme(info.themeSource))
@@ -388,7 +402,31 @@ export function CommandPalette({
   const flat = groups.flatMap((g) => g.items);
   const clamped = Math.min(highlight, Math.max(flat.length - 1, 0));
 
-  useEffect(() => setHighlight(0), [query, page]);
+  // A fresh list starts at its top; the theme list starts on the current
+  // theme. Set while rendering: a frame on another row would preview it.
+  const listKey = `${page}\u0000${query}`;
+  const [highlightFor, setHighlightFor] = useState(listKey);
+  if (highlightFor !== listKey) {
+    setHighlightFor(listKey);
+    setHighlight(
+      page === "theme" && query === ""
+        ? Math.max(
+            0,
+            flat.findIndex((i) => i.checked),
+          )
+        : 0,
+    );
+  }
+
+  // Changing theme: the highlighted one shows (here only, nothing saved)
+  // until Enter or a click picks it; leaving or closing puts yours back.
+  const previewId =
+    open && page === "theme" ? (flat[clamped]?.id.replace(/^theme:/, "") ?? null) : null;
+  useEffect(() => {
+    if (!previewId) return;
+    previewTheme(previewId);
+    return () => previewTheme(null);
+  }, [previewId]);
 
   // Keep the highlighted row in view while arrowing.
   useEffect(() => {
@@ -445,18 +483,18 @@ export function CommandPalette({
 
   return createPortal(
     <div className="no-drag fixed inset-0 z-[100]" role="presentation">
-      {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-canvas/60 backdrop-blur-[4px]"
-        onPointerDown={close}
-        aria-hidden
-      />
+      {/* Backdrop: clear, like Linear's; a click outside closes. */}
+      <div className="absolute inset-0" onPointerDown={close} aria-hidden />
       <div className="pointer-events-none absolute inset-0 flex flex-col items-center px-4 pt-[10vh]">
         <div
           role="dialog"
           aria-modal="true"
           aria-label="Command palette"
-          className="dialog-glass pointer-events-auto relative flex max-h-105 w-full max-w-xl flex-col overflow-hidden rounded-2xl border text-foreground"
+          className={cn(
+            "pointer-events-auto relative flex max-h-105 w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-foreground/10 text-foreground shadow-[0_24px_64px_-24px_rgb(0_0_0/45%)] transition-[background-color] dark:shadow-[0_24px_64px_-24px_rgb(0_0_0/80%)]",
+            // Changing theme: a see-through window, so the preview shows behind it.
+            page === "theme" ? "bg-popover/70 backdrop-blur-md" : "bg-popover",
+          )}
         >
           {/* Search field */}
           <div className="relative flex h-12 shrink-0 items-center gap-2.5 px-4">
@@ -479,7 +517,7 @@ export function CommandPalette({
           {/* Results */}
           <div
             ref={listRef}
-            className="min-h-0 flex-1 scroll-py-2 overflow-y-auto border-t border-border/60 p-2"
+            className="min-h-0 flex-1 scroll-py-1.5 overflow-y-auto border-t border-border/50 p-1.5"
           >
             {flat.length === 0 ? (
               <div className="py-10 text-center text-sm text-muted-foreground">
@@ -488,7 +526,7 @@ export function CommandPalette({
             ) : (
               groups.map((group) => (
                 <div key={group.id} className="[&+&]:mt-1.5" role="group" aria-label={group.label}>
-                  <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
+                  <div className="px-2.5 pt-2 pb-1 text-[13px] text-muted-foreground">
                     {group.label}
                   </div>
                   {group.items.map((item) => {
@@ -505,15 +543,15 @@ export function CommandPalette({
                         onMouseDown={(e) => e.preventDefault()}
                         onClick={() => execute(item)}
                         className={cn(
-                          "flex min-h-7 cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none [&_svg:not([class*='text-'])]:text-muted-foreground",
-                          active && "bg-foreground/[0.09] text-foreground",
+                          "flex min-h-8 cursor-pointer select-none items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm outline-none [&_svg:not([class*='text-'])]:text-muted-foreground",
+                          active && "bg-foreground/[0.07] text-foreground",
                         )}
                       >
                         {item.icon}
                         {item.description ? (
                           <span className="flex min-w-0 flex-1 flex-col">
                             <span className="truncate text-sm text-foreground">{item.title}</span>
-                            <span className="truncate text-xs text-muted-foreground/70">
+                            <span className="truncate text-xs text-muted-foreground">
                               {item.description}
                             </span>
                           </span>
@@ -547,7 +585,7 @@ export function CommandPalette({
           </div>
 
           {/* Key hints */}
-          <div className="flex shrink-0 items-center gap-3 bg-foreground/[0.025] px-4 py-2.5 text-sm font-medium text-muted-foreground">
+          <div className="flex shrink-0 items-center gap-3 border-t border-border/50 px-4 py-2.5 text-[13px] text-muted-foreground">
             <span className="flex items-center gap-1">
               <Kbd>
                 <ArrowUpIcon />

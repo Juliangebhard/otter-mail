@@ -21,7 +21,7 @@
  * focus/brand color (the active account's color when one is selected).
  * ------------------------------------------------------------------------- */
 :root {
-  --radius: 0.625rem;
+  --radius: 0.5rem;
   --control-radius: 0.5rem;
   --sidebar-content-inset: 0.5rem;
   --sidebar-control-gap: 0.5rem;
@@ -138,7 +138,9 @@ html[data-platform="web"] {
   --success-foreground: #34d399;
   --warning-foreground: #fbbf24;
   --warning-surface: color-mix(in srgb, var(--warning) 16%, transparent);
-  --sidebar-surface: var(--card);
+  /* The sidebar's black (its [data-app-sidebar] scope), so the window frame
+     around the content panel is one color. */
+  --sidebar-surface: #000;
   --sidebar-control-surface: var(--muted);
   --sidebar-row-hover: var(--accent-surface);
   --sidebar-row-active: var(--accent-surface);
@@ -357,6 +359,13 @@ html[data-platform="web"] {
   background-size: 256px 256px;
 }
 
+/* While a theme is being applied (theme/apply-theme.ts), nothing fades. */
+html[data-theme-switching] *,
+html[data-theme-switching] *::before,
+html[data-theme-switching] *::after {
+  transition: none !important;
+}
+
 /* Micro-label: 11px medium sans (metadata, field labels, section captions). */
 .te-label {
   font-size: 0.6875rem;
@@ -408,7 +417,7 @@ html[data-platform="web"] {
   color: var(--muted-foreground);
 }
 
-/* Slim overlay scrollbars everywhere (6px thumb, no track). */
+/* Slim scrollbars everywhere (6px thumb, no track). */
 ::-webkit-scrollbar {
   width: var(--app-scrollbar-width);
   height: var(--app-scrollbar-width);
@@ -416,15 +425,22 @@ html[data-platform="web"] {
 ::-webkit-scrollbar-track {
   background: transparent;
 }
+/* Overlay-style, like Codex: the thumb shows while its scroller is hovered. */
 ::-webkit-scrollbar-thumb {
-  background: var(--app-scrollbar-thumb);
+  background: transparent;
   border-radius: 3px;
+}
+:hover::-webkit-scrollbar-thumb {
+  background: var(--app-scrollbar-thumb);
 }
 ::-webkit-scrollbar-thumb:hover {
   background: var(--app-scrollbar-thumb-hover);
 }
 .te-scroll {
   scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+.te-scroll:hover {
   scrollbar-color: var(--app-scrollbar-thumb) transparent;
 }
 
@@ -525,6 +541,25 @@ html[data-platform="web"] {
     100% calc(var(--workspace-titlebar-scroll-fade-height) + 1px),
     100% calc(100% - var(--workspace-titlebar-scroll-fade-height)),
     var(--app-scrollbar-width) 100%;
+}
+
+/* A scroller whose rows fade out at both ends instead of being cut off by
+   what sits above and below it; its pt-3/pb-8 let the end rows scroll clear. */
+@utility scroll-fade-y {
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    black 0.75rem,
+    black calc(100% - 2rem),
+    transparent
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    black 0.75rem,
+    black calc(100% - 2rem),
+    transparent
+  );
 }
 
 /* Range slider for settings (ported from Otter Code). */

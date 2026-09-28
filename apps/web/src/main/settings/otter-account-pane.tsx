@@ -10,7 +10,7 @@ import { useAccounts } from "../gmail/hooks";
 import { toast } from "../gmail/toast";
 import { Btn, cn } from "../gmail/ui";
 import { otterApi, useOtterAccount } from "../otter-account";
-import { SettingsGroup, SettingsRow, SettingsSection } from "./settings-ui";
+import { SettingsGroup, SettingsPageContainer, SettingsRow, SettingsSection } from "./settings-ui";
 
 /**
  * Settings › Otter account, opened from the user button at the bottom of the
@@ -212,21 +212,22 @@ function SignedInPane({ state }: { state: OtterAccountState }) {
 export function OtterAccountPane() {
   const state = useOtterAccount();
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto">
-      <div className="mx-auto w-full max-w-3xl space-y-6 px-4 pb-16 pt-4 sm:px-6">
-        {!state ? null : state.user ? (
-          <SignedInPane state={state} />
-        ) : (
-          <SettingsGroup>
-            <SettingsRow
-              title="Sign in to Otter Mail"
-              description="Your mailboxes on every device you use, and new mail the moment it arrives. Otter Mail's servers only learn your addresses, never your mail."
-              control={<SignInControl />}
-            />
-          </SettingsGroup>
-        )}
-      </div>
-    </div>
+    <SettingsPageContainer
+      title="Account"
+      description="Your Otter account brings your mailboxes to every device, with new mail pushed as it arrives."
+    >
+      {!state ? null : state.user ? (
+        <SignedInPane state={state} />
+      ) : (
+        <SettingsGroup>
+          <SettingsRow
+            title="Sign in to Otter Mail"
+            description="Your mailboxes on every device you use, and new mail the moment it arrives. Otter Mail's servers only learn your addresses, never your mail."
+            control={<SignInControl />}
+          />
+        </SettingsGroup>
+      )}
+    </SettingsPageContainer>
   );
 }
 

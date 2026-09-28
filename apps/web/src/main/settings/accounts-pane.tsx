@@ -5,7 +5,9 @@ import { useQuery } from "@tanstack/react-query";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { Dialog } from "~/components/ui/dialog";
 import { Text } from "~/components/ui/text";
-import { CheckIcon, PlusIcon, RotateCwIcon } from "lucide-react";
+import { CheckIcon, GripVerticalIcon, LayersIcon, PlusIcon, RotateCwIcon } from "lucide-react";
+import { Switch } from "~/components/ui/switch";
+import { arrangeAccounts, setMailboxArrangement, useMailboxArrangement } from "../mailboxes";
 import { gmailApi } from "../gmail/api";
 import { toast } from "../gmail/toast";
 import {
@@ -23,16 +25,19 @@ import {
 } from "../gmail/account-style";
 import type { GmailAccount, SyncStatus } from "../gmail/types";
 import { Btn, HintTooltip, cn, restoreFocusForKeyboardOnly } from "../gmail/ui";
-import { DraftInput, SettingsGroup, SettingsRow, SettingsSection } from "./settings-ui";
+import {
+  DraftInput,
+  SettingsGroup,
+  SettingsPageContainer,
+  SettingsRow,
+  SettingsSection,
+} from "./settings-ui";
 
 /**
- * Settings › Mailboxes, laid out like Settings › Assistant: one card split into
- * the account list (avatar, name, sync state) and the selected account's
- * editor (status, profile, signature, removal).
+ * Settings › Mailboxes: the list of mailboxes (turn on or off, drag to
+ * reorder), then the selected mailbox's settings (status, profile, signature,
+ * removal) below it.
  */
-
-const CARD_HEIGHT =
-  "@min-[48rem]/accounts:h-[min(44rem,calc(100dvh-9rem))] @min-[48rem]/accounts:min-h-[32rem]";
 
 function timeAgo(ts: number): string {
   const mins = Math.floor((Date.now() - ts) / 60_000);
@@ -97,7 +102,7 @@ function ColorPicker({
           <button
             type="button"
             aria-label={label}
-            className="flex size-7 cursor-pointer items-center justify-center rounded-md outline-none transition-colors hover:bg-accent-surface focus-visible:ring-2 focus-visible:ring-focus-ring"
+            className="flex size-7 cursor-pointer items-center justify-center rounded-lg outline-none transition-colors hover:bg-accent-surface focus-visible:ring-2 focus-visible:ring-focus-ring"
           >
             <span
               className="size-3.5 rounded-full ring-1 ring-inset ring-black/10"
@@ -183,7 +188,13 @@ function StatusText({ status, className }: { status: StatusLine; className?: str
   );
 }
 
-function AccountAvatar({ account, size = "small" }: { account: GmailAccount; size?: "small" }) {
+function AccountAvatar({
+  account,
+  size = "small",
+}: {
+  account: GmailAccount;
+  size?: "small" | "medium";
+}) {
   const displayName = getAccountDisplayName(account);
   return (
     <span className="relative shrink-0">
@@ -205,14 +216,14 @@ function SignInButton({ email, label }: { email?: string; label: string }) {
   const signIn = useAddAccount();
   if (signIn.isPending) {
     return (
-      <Btn size="xs" onClick={() => void gmailApi.cancelAddAccount()}>
+      <Btn size="sm" onClick={() => void gmailApi.cancelAddAccount()}>
         Cancel sign-in
       </Btn>
     );
   }
   return (
     <Btn
-      size="xs"
+      size="sm"
       variant={email ? "primary" : "outline"}
       onClick={() =>
         void signIn.mutateAsync(email).catch((err: unknown) => {
@@ -232,25 +243,73 @@ function SignInButton({ email, label }: { email?: string; label: string }) {
 // List
 // ---------------------------------------------------------------------------
 
+/** Row reordering (drag the grip): where a dragged mailbox would land. */
+type DropSpot = { email: string; after: boolean } | null;
+
 function AccountListRow({
   account,
   selected,
   onSelect,
+  on,
+  onToggle,
+  lastOn,
+  dragging,
+  dropSpot,
+  onDragStart,
+  onDragOver,
+  onDrop,
+  onDragEnd,
 }: {
   account: GmailAccount;
   selected: boolean;
   onSelect: () => void;
+  on: boolean;
+  onToggle: (on: boolean) => void;
+  /** The only mailbox still on: it can't be turned off. */
+  lastOn: boolean;
+  dragging: boolean;
+  dropSpot: DropSpot;
+  onDragStart: () => void;
+  onDragOver: (after: boolean) => void;
+  onDrop: () => void;
+  onDragEnd: () => void;
 }) {
   const sync = useSyncStatusOnly(account.id);
   const status = accountStatus(account, sync.data);
+  const dropHere = dropSpot?.email === account.email;
   return (
     <div
       data-slot="settings-row"
+      draggable
+      onDragStart={(e) => {
+        e.dataTransfer.effectAllowed = "move";
+        onDragStart();
+      }}
+      onDragOver={(e) => {
+        e.preventDefault();
+        const box = e.currentTarget.getBoundingClientRect();
+        onDragOver(e.clientY > box.top + box.height / 2);
+      }}
+      onDrop={(e) => {
+        e.preventDefault();
+        onDrop();
+      }}
+      onDragEnd={onDragEnd}
       className={cn(
-        "relative flex min-h-18 items-center gap-3 px-3 py-3 transition-colors sm:px-4",
-        selected ? "bg-muted/45" : "hover:bg-muted/25",
+        "group/row relative flex min-h-[60px] items-center gap-3 px-4 py-2.5 transition-colors",
+        selected ? "bg-foreground/[0.04]" : "hover:bg-foreground/[0.03]",
+        dragging && "opacity-40",
       )}
     >
+      {dropHere ? (
+        <span
+          aria-hidden
+          className={cn(
+            "pointer-events-none absolute inset-x-4 h-0.5 rounded-full bg-primary",
+            dropSpot.after ? "-bottom-px" : "-top-px",
+          )}
+        />
+      ) : null}
       <button
         type="button"
         className="absolute inset-0 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus-ring"
@@ -258,14 +317,58 @@ function AccountListRow({
         aria-label={`Select ${account.email}`}
         aria-pressed={selected}
       />
-      <AccountAvatar account={account} />
-      <span className="pointer-events-none min-w-0 flex-1">
-        <span className="block truncate text-sm font-medium text-foreground">
-          {getAccountDisplayName(account)}
+      {/* In the row's left padding, so the avatars line up with the text of every other row. */}
+      <GripVerticalIcon
+        aria-hidden
+        className="pointer-events-none absolute left-0.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground/0 transition-colors group-hover/row:text-muted-foreground/70"
+      />
+      <span className={cn("pointer-events-none contents", !on && "[&>*]:opacity-50")}>
+        <AccountAvatar account={account} size="medium" />
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-sm text-foreground">
+            {getAccountDisplayName(account)}
+          </span>
+          <span className="flex min-w-0 items-center gap-1.5 text-[13px] leading-[18px] text-muted-foreground">
+            <span className="min-w-0 shrink truncate">{account.email}</span>
+            <span aria-hidden>·</span>
+            {on ? (
+              <StatusText status={status} className="shrink-0" />
+            ) : (
+              <span className="shrink-0">Turned off</span>
+            )}
+          </span>
         </span>
-        <span className="block truncate text-xs text-muted-foreground/80">{account.email}</span>
-        <StatusText status={status} className="mt-0.5 text-xs text-muted-foreground/80" />
       </span>
+      <HintTooltip label={lastOn ? "Keep at least one mailbox on" : on ? "Turn off" : "Turn on"}>
+        <span className="relative z-10 flex">
+          <Switch
+            checked={on}
+            disabled={lastOn}
+            onCheckedChange={onToggle}
+            aria-label={`${getAccountDisplayName(account)} on`}
+          />
+        </span>
+      </HintTooltip>
+    </div>
+  );
+}
+
+/** "All mailboxes", the combined inbox: pinned first, only turned on or off. */
+function AllMailboxesRow({ on, onToggle }: { on: boolean; onToggle: (on: boolean) => void }) {
+  return (
+    <div data-slot="settings-row" className="flex min-h-[60px] items-center gap-3 px-4 py-2.5">
+      <span className={cn("contents", !on && "[&>*]:opacity-50")}>
+        <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-foreground/[0.06] text-muted-foreground">
+          <LayersIcon className="size-4" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-sm text-foreground">All mailboxes</span>
+          <span className="block truncate text-[13px] leading-[18px] text-muted-foreground">
+            One inbox for every mailbox
+          </span>
+        </span>
+      </span>
+      <Switch checked={on} onCheckedChange={onToggle} aria-label="All mailboxes on" />
     </div>
   );
 }
@@ -349,7 +452,7 @@ function AccountEditor({ account }: { account: GmailAccount }) {
       >
         <SettingsRow
           title="Status"
-          status={<StatusText status={status} className="text-xs text-muted-foreground" />}
+          description={<StatusText status={status} />}
           control={
             account.signedOut ? (
               <SignInButton email={account.email} label="Sign in" />
@@ -363,9 +466,6 @@ function AccountEditor({ account }: { account: GmailAccount }) {
             )
           }
         />
-      </SettingsSection>
-
-      <SettingsSection title="Profile">
         <SettingsRow
           title="Display name"
           description="Shown in the sidebar and account switcher. Only used in Otter Mail."
@@ -399,28 +499,21 @@ function AccountEditor({ account }: { account: GmailAccount }) {
 
       <SettingsSection
         title="Signature"
+        description="Added to new messages, replies and forwards from this account. Saved in Gmail, so it's the same there and on every device."
         headerAction={
-          <Btn size="xs" variant="primary" onClick={saveSignature}>
+          <Btn size="sm" variant="primary" onClick={saveSignature}>
             Save signature
           </Btn>
         }
       >
-        <div className="p-3 sm:p-4">
-          <p className="mb-2 text-xs text-muted-foreground">
-            Added to new messages, replies and forwards from this account. Saved in Gmail, so it's
-            the same there and on every device.
-          </p>
-          <div className="rounded-lg border border-input bg-canvas dark:bg-input/32">
-            <RichTextArea
-              key={shown}
-              ref={signatureRef}
-              placeholder="Your signature…"
-              ariaLabel={`Signature for ${account.email}`}
-              minHeightClass="min-h-[96px]"
-              initialHTML={shown}
-            />
-          </div>
-        </div>
+        <RichTextArea
+          key={shown}
+          ref={signatureRef}
+          placeholder="Your signature…"
+          ariaLabel={`Signature for ${account.email}`}
+          minHeightClass="min-h-[96px]"
+          initialHTML={shown}
+        />
       </SettingsSection>
 
       <SettingsSection title="Remove">
@@ -461,62 +554,88 @@ function AccountEditor({ account }: { account: GmailAccount }) {
 
 export function AccountsPane() {
   const accountsQuery = useAccounts();
-  const accounts = accountsQuery.data ?? [];
+  // Every mailbox, turned-off ones too, in the user's order: turning them on
+  // or off and reordering follow the Otter account to every device.
+  const arrangement = useMailboxArrangement();
+  const accounts = arrangeAccounts(accountsQuery.data ?? [], arrangement);
+  const onCount = accounts.filter((a) => !arrangement.off.includes(a.email)).length;
+  const [dragEmail, setDragEmail] = useState<string | null>(null);
+  const [dropSpot, setDropSpot] = useState<DropSpot>(null);
+  const dropMailbox = () => {
+    if (dragEmail && dropSpot && dragEmail !== dropSpot.email) {
+      const order = accounts.map((a) => a.email).filter((e) => e !== dragEmail);
+      const at = order.indexOf(dropSpot.email) + (dropSpot.after ? 1 : 0);
+      order.splice(at, 0, dragEmail);
+      setMailboxArrangement({ ...arrangement, order });
+    }
+    setDragEmail(null);
+    setDropSpot(null);
+  };
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const current = accounts.find((a) => a.id === selectedId) ?? accounts[0];
   // Signatures live in Gmail: pick up edits made there.
   useEffect(() => void gmailApi.refreshSignatures().catch(() => {}), []);
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto">
-      <div className="@container/accounts mx-auto w-full max-w-5xl space-y-2.5 px-4 pb-16 pt-4 sm:px-6">
-        <div className="flex min-h-11 min-w-0 items-center gap-2 px-3 sm:px-4">
-          <h2 className="text-sm font-normal text-foreground/70">Mailboxes</h2>
-          <div className="ml-auto flex min-w-0 shrink-0 items-center gap-2">
-            {accounts.length > 0 ? (
-              <span className="text-2xs text-muted-foreground">
-                {accounts.length} mailbox{accounts.length === 1 ? "" : "es"}
-              </span>
-            ) : null}
-            <SignInButton label="Add mailbox" />
-          </div>
-        </div>
-
-        {current ? (
-          <SettingsGroup
-            divided={false}
-            className={cn(
-              CARD_HEIGHT,
-              "overflow-hidden @min-[48rem]/accounts:grid @min-[48rem]/accounts:grid-cols-[17rem_minmax(0,1fr)]",
-            )}
-          >
-            <div className="border-b border-border/60 bg-muted/10 @min-[48rem]/accounts:flex @min-[48rem]/accounts:min-h-0 @min-[48rem]/accounts:flex-col @min-[48rem]/accounts:border-r @min-[48rem]/accounts:border-b-0">
-              <div className="divide-y divide-border/50 @min-[48rem]/accounts:min-h-0 @min-[48rem]/accounts:flex-1 @min-[48rem]/accounts:overflow-y-auto">
-                {accounts.map((account) => (
-                  <AccountListRow
-                    key={account.id}
-                    account={account}
-                    selected={account.id === current.id}
-                    onSelect={() => setSelectedId(account.id)}
-                  />
-                ))}
-              </div>
-            </div>
-            <div className="min-w-0 @min-[48rem]/accounts:min-h-0 @min-[48rem]/accounts:overflow-y-auto">
-              <div className="space-y-6 p-4">
-                <AccountEditor key={current.id} account={current} />
-              </div>
-            </div>
-          </SettingsGroup>
-        ) : (
+    <SettingsPageContainer
+      title="Mailboxes"
+      description="Turn mailboxes on or off and drag them into order, on every device."
+      action={<SignInButton label="Add mailbox" />}
+    >
+      {current ? (
+        <>
           <SettingsGroup>
-            <SettingsRow
-              title={accountsQuery.isLoading ? "Loading mailboxes…" : "No mailboxes yet"}
-              description="Add a Gmail account to start syncing mail. You'll sign in with Google in your browser."
-            />
+            {accounts.length > 1 ? (
+              <AllMailboxesRow
+                on={arrangement.combined}
+                onToggle={(combined) => setMailboxArrangement({ ...arrangement, combined })}
+              />
+            ) : null}
+            {accounts.map((account) => {
+              const on = !arrangement.off.includes(account.email);
+              return (
+                <AccountListRow
+                  key={account.id}
+                  account={account}
+                  selected={account.id === current.id}
+                  onSelect={() => setSelectedId(account.id)}
+                  on={on}
+                  lastOn={on && onCount === 1}
+                  onToggle={(next) =>
+                    setMailboxArrangement({
+                      ...arrangement,
+                      off: next
+                        ? arrangement.off.filter((e) => e !== account.email)
+                        : [...arrangement.off, account.email],
+                    })
+                  }
+                  dragging={dragEmail === account.email}
+                  dropSpot={dropSpot}
+                  onDragStart={() => setDragEmail(account.email)}
+                  onDragOver={(after) =>
+                    dragEmail && dragEmail !== account.email
+                      ? setDropSpot({ email: account.email, after })
+                      : setDropSpot(null)
+                  }
+                  onDrop={dropMailbox}
+                  onDragEnd={() => {
+                    setDragEmail(null);
+                    setDropSpot(null);
+                  }}
+                />
+              );
+            })}
           </SettingsGroup>
-        )}
-      </div>
-    </div>
+          <AccountEditor key={current.id} account={current} />
+        </>
+      ) : (
+        <SettingsGroup>
+          <SettingsRow
+            title={accountsQuery.isLoading ? "Loading mailboxes…" : "No mailboxes yet"}
+            description="Add a Gmail account to start syncing mail. You'll sign in with Google in your browser."
+          />
+        </SettingsGroup>
+      )}
+    </SettingsPageContainer>
   );
 }

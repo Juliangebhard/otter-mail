@@ -74,9 +74,9 @@ function ToolBtn({
       onMouseDown={(e) => e.preventDefault()}
       onClick={onClick}
       className={[
-        "flex size-6 shrink-0 items-center justify-center rounded-sm",
+        "flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-lg transition-colors",
         active
-          ? "bg-secondary text-foreground"
+          ? "bg-accent-surface text-foreground"
           : "text-muted-foreground hover:bg-accent-surface hover:text-foreground",
       ].join(" ")}
     >
@@ -283,53 +283,53 @@ export const RichTextArea = forwardRef<
     <div className="flex min-w-0 flex-1 flex-col">
       <div
         className={cn(
-          "flex items-center gap-0.5 border-b border-border/50 px-3 py-1",
+          "flex items-center gap-0.5 border-b border-border/40 px-4 py-1.5",
           !showToolbar && "hidden",
         )}
       >
         <ToolBtn label="Bold (⌘B)" active={toolbar.bold} onClick={() => exec("bold")}>
-          <BoldIcon className="size-3.5" />
+          <BoldIcon className="size-4" />
         </ToolBtn>
         <ToolBtn label="Italic (⌘I)" active={toolbar.italic} onClick={() => exec("italic")}>
-          <ItalicIcon className="size-3.5" />
+          <ItalicIcon className="size-4" />
         </ToolBtn>
         <ToolBtn
           label="Underline (⌘U)"
           active={toolbar.underline}
           onClick={() => exec("underline")}
         >
-          <UnderlineIcon className="size-3.5" />
+          <UnderlineIcon className="size-4" />
         </ToolBtn>
         <ToolBtn
           label="Strikethrough (⇧⌘X)"
           active={toolbar.strike}
           onClick={() => exec("strikeThrough")}
         >
-          <StrikethroughIcon className="size-3.5" />
+          <StrikethroughIcon className="size-4" />
         </ToolBtn>
         <span className="mx-1 h-4 w-px shrink-0 bg-border" aria-hidden />
         <ToolBtn label="Link (⌘K)" onClick={openLinkInput}>
-          <Link2Icon className="size-3.5" />
+          <Link2Icon className="size-4" />
         </ToolBtn>
         <span className="mx-1 h-4 w-px shrink-0 bg-border" aria-hidden />
         <ToolBtn label="Bulleted list (⇧⌘8)" onClick={() => exec("insertUnorderedList")}>
-          <ListIcon className="size-3.5" />
+          <ListIcon className="size-4" />
         </ToolBtn>
         <ToolBtn label="Numbered list (⇧⌘7)" onClick={() => exec("insertOrderedList")}>
-          <ListOrderedIcon className="size-3.5" />
+          <ListOrderedIcon className="size-4" />
         </ToolBtn>
         <ToolBtn label="Quote (⇧⌘9)" onClick={() => exec("formatBlock", "blockquote")}>
-          <TextQuoteIcon className="size-3.5" />
+          <TextQuoteIcon className="size-4" />
         </ToolBtn>
         <span className="mx-1 h-4 w-px shrink-0 bg-border" aria-hidden />
         <ToolBtn label="Clear formatting (⌘\\)" onClick={() => exec("removeFormat")}>
-          <RemoveFormattingIcon className="size-3.5" />
+          <RemoveFormattingIcon className="size-4" />
         </ToolBtn>
       </div>
 
       {linkOpen ? (
-        <div className="flex items-center gap-2 border-b border-border/50 px-4 py-1.5">
-          <span className="shrink-0 text-xs font-medium text-muted-foreground">Link</span>
+        <div className="flex items-center gap-2 border-b border-border/40 px-5 py-1.5">
+          <span className="shrink-0 text-sm text-muted-foreground">Link</span>
           <input
             value={linkUrl}
             onChange={(e) => setLinkUrl(e.target.value)}
@@ -352,7 +352,7 @@ export const RichTextArea = forwardRef<
           <button
             type="button"
             onClick={applyLink}
-            className="shrink-0 cursor-pointer text-xs font-medium text-primary hover:brightness-110"
+            className="shrink-0 cursor-pointer text-sm font-medium text-primary hover:brightness-110"
           >
             Apply
           </button>
@@ -372,7 +372,7 @@ export const RichTextArea = forwardRef<
         onKeyDown={handleKeyDown}
         onBlur={onBlur}
         className={[
-          "te-scroll w-full flex-1 overflow-y-auto bg-transparent px-4 py-3",
+          "te-scroll w-full flex-1 overflow-y-auto bg-transparent px-5 py-3.5",
           "text-sm leading-relaxed text-foreground outline-none",
           minHeightClass ?? "min-h-[38px]",
           maxHeightClass ?? "max-h-[55vh]",

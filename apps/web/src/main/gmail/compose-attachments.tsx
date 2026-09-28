@@ -176,11 +176,11 @@ export function AttachmentChips({
 }) {
   if (!attachments || attachments.length === 0) return null;
   return (
-    <div className="flex flex-wrap items-center gap-1.5 px-4 pb-1 pt-2">
+    <div className="flex flex-wrap items-center gap-1.5 px-5 pb-1 pt-2">
       {attachments.map((att, i) => (
         <span
           key={`${att.name}:${i}`}
-          className="flex h-7 max-w-64 items-center gap-1.5 rounded-lg border border-border/70 bg-secondary/60 pl-2 pr-1 text-xs text-foreground"
+          className="flex h-8 max-w-64 items-center gap-1.5 rounded-xl border border-border/40 bg-accent-surface/60 pl-2.5 pr-1 text-sm text-foreground"
         >
           <button
             type="button"

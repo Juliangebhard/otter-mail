@@ -103,9 +103,9 @@ function SchemeCard({
       aria-pressed={selected}
       onClick={onSelect}
       className={cn(
-        "flex flex-col items-center gap-2 rounded-xl border bg-card/40 p-2 pb-2.5 text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-focus-ring",
+        "flex cursor-pointer flex-col items-center gap-2 rounded-xl border bg-card p-2 pb-2.5 text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-focus-ring",
         selected
-          ? "border-primary text-foreground ring-1 ring-primary"
+          ? "border-focus-ring text-foreground ring-1 ring-focus-ring"
           : "border-border/60 text-muted-foreground hover:border-input hover:text-foreground",
       )}
     >
@@ -240,8 +240,8 @@ function ThemeCard({
         }
       }}
       className={cn(
-        "flex cursor-pointer flex-col gap-2 rounded-xl border bg-card/40 pb-3 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-focus-ring",
-        active ? "border-input" : "border-border/60 hover:border-input",
+        "flex cursor-pointer flex-col gap-2 rounded-xl border bg-card pb-3.5 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-focus-ring",
+        active ? "border-foreground/25" : "border-border/60 hover:border-input",
       )}
     >
       <div className="flex min-h-16 items-center justify-center gap-2.5 px-3 pt-3">
@@ -255,7 +255,7 @@ function ThemeCard({
           />
         ))}
       </div>
-      <span className="px-4 text-sm font-medium text-foreground">{theme.label}</span>
+      <span className="px-4 text-sm text-foreground">{theme.label}</span>
     </div>
   );
 }
@@ -263,10 +263,6 @@ function ThemeCard({
 // ---------------------------------------------------------------------------
 // Pane
 // ---------------------------------------------------------------------------
-
-function SectionTitle({ children }: { children: string }) {
-  return <h2 className="px-3 text-sm font-normal text-foreground/70 sm:px-4">{children}</h2>;
-}
 
 export function AppearancePane() {
   const [themeInfo, setThemeInfo] = useState<NativeThemeInfo | null>(null);
@@ -308,9 +304,8 @@ export function AppearancePane() {
   const dark = themeColors(choice.dark, "dark");
 
   return (
-    <SettingsPageContainer>
-      <section className="space-y-2.5">
-        <SectionTitle>Color scheme</SectionTitle>
+    <SettingsPageContainer title="Appearance">
+      <SettingsSection title="Color scheme" variant="plain">
         <div className="grid grid-cols-3 gap-3">
           {(["system", "light", "dark"] as const).map((s) => (
             <SchemeCard
@@ -323,10 +318,13 @@ export function AppearancePane() {
             />
           ))}
         </div>
-      </section>
+      </SettingsSection>
 
-      <section className="space-y-2.5">
-        <SectionTitle>Themes</SectionTitle>
+      <SettingsSection
+        title="Themes"
+        description="Click a theme to use it everywhere, or a single orb to use it for light or dark mode only."
+        variant="plain"
+      >
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
           {APP_THEMES.map((theme) => (
             <ThemeCard
@@ -339,10 +337,7 @@ export function AppearancePane() {
             />
           ))}
         </div>
-        <p className="px-3 text-xs text-muted-foreground/80 sm:px-4">
-          Click a theme to use it everywhere, or a single orb to use it for light or dark mode only.
-        </p>
-      </section>
+      </SettingsSection>
 
       <SettingsSection title="Motion">
         <SettingsRow
@@ -353,7 +348,7 @@ export function AppearancePane() {
               <PanelAnimationsPreview durationMs={panelAnimationDurationMs} />
               <div className="flex w-full items-center gap-3">
                 <output
-                  className="min-w-16 rounded-md bg-muted px-2 py-1 text-center font-mono text-xs font-medium tabular-nums text-foreground"
+                  className="min-w-16 rounded-lg bg-muted px-2 py-1 text-center font-mono text-xs tabular-nums text-foreground"
                   htmlFor="panel-animation-duration"
                 >
                   {panelAnimationDurationMs} ms

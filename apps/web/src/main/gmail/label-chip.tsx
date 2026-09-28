@@ -3,11 +3,13 @@ import { ChevronsRightIcon, InboxIcon, XIcon } from "lucide-react";
 import type { GmailLabel } from "./types";
 
 /** Badge chrome shared by every chip (Otter Code's `Badge`, size sm). */
+// no-drag: in the reader's title band (a window-drag region in the Mac app)
+// the pill must get hover, or its remove button never shows.
 const PILL =
-  "group relative inline-flex h-4.5 w-fit max-w-32 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-sm border px-1 text-2xs font-medium leading-none";
+  "no-drag group relative inline-flex h-5 w-fit max-w-32 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-full border px-2 text-2xs font-medium leading-none";
 
 /** Neutral outline chip. */
-const OUTLINE = "border-input bg-canvas text-muted-foreground dark:bg-input/32";
+const OUTLINE = "border-border/60 bg-transparent text-muted-foreground";
 
 /**
  * Tinted chip driven by a `--label` color: a faint wash of the label over the
@@ -21,8 +23,8 @@ function tint(color: string): CSSProperties {
   return { "--label": color } as CSSProperties;
 }
 
-/** Hover-revealed remove control: overlays the chip's right edge (bg-inherit
-    paints over the text below), so the chip never changes size. */
+/** Hover-revealed remove control, after the name: the chip is see-through,
+    so an overlay couldn't cover the text. */
 function RemoveButton({ label, onRemove }: { label: string; onRemove: () => void }) {
   return (
     <button
@@ -33,7 +35,7 @@ function RemoveButton({ label, onRemove }: { label: string; onRemove: () => void
         e.stopPropagation();
         onRemove();
       }}
-      className="absolute inset-y-0 right-0 hidden w-4 items-center justify-center rounded-r-sm bg-inherit group-hover:flex"
+      className="-me-1 hidden size-3.5 shrink-0 cursor-pointer items-center justify-center rounded-full hover:bg-foreground/15 group-hover:flex focus-visible:flex"
     >
       <XIcon className="size-2.5" strokeWidth={3} />
     </button>
@@ -48,12 +50,13 @@ const CATEGORY_CHIPS: Record<string, { name: string; bg: string }> = {
   CATEGORY_FORUMS: { name: "Forums", bg: "#7627bb" },
 };
 
-export function CategoryChip({ id }: { id: string }) {
+export function CategoryChip({ id, onRemove }: { id: string; onRemove?: () => void }) {
   const meta = CATEGORY_CHIPS[id];
   if (!meta) return null;
   return (
     <span className={`${PILL} ${TINTED}`} style={tint(meta.bg)}>
       {meta.name}
+      {onRemove ? <RemoveButton label={`Remove "${meta.name}"`} onRemove={onRemove} /> : null}
     </span>
   );
 }

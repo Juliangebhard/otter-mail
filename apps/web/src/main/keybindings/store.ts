@@ -18,11 +18,11 @@ import {
 } from "./keys";
 
 /**
- * The live keybindings (Otter Code's merge model): rules from
- * userData/keybindings.json replace every default of a command they mention;
- * other commands keep their defaults. Later rules win at dispatch. Every
- * window loads the file and re-reads it on the `keybindings:updated`
- * broadcast (settings edits and hand edits alike).
+ * The live keybindings (Otter Code's merge model): the user's rules (Settings
+ * → Keybindings, stored by the backend and synced with the Otter account)
+ * replace every default of a command they mention; other commands keep their
+ * defaults. Later rules win at dispatch. Every window loads them and re-reads
+ * them on the `keybindings:updated` broadcast.
  */
 
 export type ResolvedKeybinding = {
@@ -33,15 +33,12 @@ export type ResolvedKeybinding = {
 
 type FileResult = {
   rules: { key: string; command: string; when?: string }[] | null;
-  issues: { kind: string; index?: number }[];
 };
 
 type State = {
   /** Effective rules in order (defaults not overridden, then the file's). */
   rules: KeybindingRule[];
   resolved: ResolvedKeybinding[];
-  /** Entries dropped on load: unknown command, bad key, or bad `when`. */
-  issueCount: number;
   loaded: boolean;
 };
 
@@ -71,45 +68,25 @@ export function mergeWithDefaults(custom: KeybindingRule[]): KeybindingRule[] {
 
 function stateFor(file: FileResult | null): State {
   const custom: KeybindingRule[] = [];
-  let issueCount = file?.issues.length ?? 0;
   for (const entry of file?.rules ?? []) {
-    if (!isKeybindingCommand(entry.command)) {
-      issueCount++;
-      continue;
-    }
+    // A command this version doesn't have (renamed, or from a newer one) is skipped.
+    if (!isKeybindingCommand(entry.command)) continue;
     const rule: KeybindingRule = { key: entry.key, command: entry.command };
     if (entry.when) rule.when = entry.when;
-    if (!parseShortcut(rule.key) || (rule.when && !parseWhen(rule.when))) issueCount++;
     custom.push(rule);
   }
   const rules = mergeWithDefaults(custom);
-  return {
-    rules,
-    resolved: resolve(rules),
-    issueCount,
-
-    loaded: file !== null,
-  };
+  return { rules, resolved: resolve(rules), loaded: file !== null };
 }
 
 let state: State = stateFor(null);
 const listeners = new Set<() => void>();
 const emit = () => listeners.forEach((l) => l());
 
-let lastOwnWrite = 0;
-type ReloadListener = (info: { initial: boolean; external: boolean; issueCount: number }) => void;
-let loadedOnce = false;
-const reloadListeners = new Set<ReloadListener>();
-
 async function load(): Promise<void> {
   try {
-    const file = await ipc<FileResult>("keybindings:read");
-    const external = Date.now() - lastOwnWrite > 1500;
-    const initial = !loadedOnce;
-    loadedOnce = true;
-    state = stateFor(file);
+    state = stateFor(await ipc<FileResult>("keybindings:read"));
     emit();
-    reloadListeners.forEach((l) => l({ initial, external, issueCount: state.issueCount }));
   } catch (error) {
     console.log("[Keybindings:load] failed", { error: String(error) });
   }
@@ -138,13 +115,6 @@ export function useKeybindingsState(): State {
   return useSyncExternalStore(subscribe, () => state);
 }
 
-/** Fires after every (re)load; `external` = not caused by this app's own save. */
-export function onKeybindingsReload(listener: ReloadListener): () => void {
-  ensureStarted();
-  reloadListeners.add(listener);
-  return () => reloadListeners.delete(listener);
-}
-
 // ── Editing (settings) ───────────────────────────────────────────────────────
 
 const sameRule = (a: KeybindingRule, b: KeybindingRule) =>
@@ -153,9 +123,8 @@ const sameRule = (a: KeybindingRule, b: KeybindingRule) =>
   normalizeWhen(a.when) === normalizeWhen(b.when);
 
 async function write(rules: KeybindingRule[]): Promise<void> {
-  lastOwnWrite = Date.now();
   // Optimistic: the settings list updates now; the broadcast re-read confirms.
-  state = { ...stateFor({ rules, issues: [] }), loaded: true };
+  state = { ...stateFor({ rules }), loaded: true };
   emit();
   await ipc("keybindings:write", { rules });
 }
@@ -175,13 +144,6 @@ export async function upsertKeybinding(
 export async function removeKeybinding(rule: KeybindingRule): Promise<void> {
   console.log("[Keybindings:remove]", { command: rule.command, key: rule.key });
   await write(state.rules.filter((r) => !sameRule(r, rule)));
-}
-
-/** Opens keybindings.json in the default editor (writing it out first if new). */
-export async function openKeybindingsFile(): Promise<void> {
-  const file = await ipc<FileResult>("keybindings:read");
-  if (file.rules === null) await write(state.rules);
-  await ipc("keybindings:openFile");
 }
 
 /** Keeps label shortcuts on a renamed (or re-nested) label and the labels under it. */

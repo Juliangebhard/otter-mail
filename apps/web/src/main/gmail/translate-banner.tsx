@@ -83,6 +83,9 @@ export function useMessageTranslation(accountId: string, detail: GmailMessageDet
   };
 }
 
+/** The banner's actions: outline pills. */
+const PILL = buttonClass("outline", "sm", "rounded-full border-border/60");
+
 function errorMessage(error: Error, from: string, to: string): string {
   if (error instanceof TranslationUnavailableError) {
     if (error.status === "notInstalled")
@@ -131,45 +134,41 @@ function TranslateBanner({
   else text = `Translated from ${from} to ${to}.`;
 
   return (
-    <div className="mb-3 flex min-h-9 items-center gap-2 rounded-lg border border-border/60 bg-secondary/40 py-1 pr-1 pl-3">
+    <div className="mb-4 flex min-h-11 items-center gap-2.5 rounded-2xl border border-border/60 bg-card py-1.5 pr-1.5 pl-3.5">
       {pending ? (
-        <LoaderCircleIcon className="size-3.5 shrink-0 animate-spin text-muted-foreground" />
+        <LoaderCircleIcon className="size-4 shrink-0 animate-spin text-muted-foreground" />
       ) : (
-        <LanguagesIcon className="size-3.5 shrink-0 text-muted-foreground" />
+        <LanguagesIcon className="size-4 shrink-0 text-muted-foreground" />
       )}
-      <span className="min-w-0 flex-1 text-xs text-muted-foreground">{text}</span>
+      <span className="min-w-0 flex-1 text-sm text-muted-foreground">{text}</span>
       {notInstalled ? (
         <button
           type="button"
           onClick={() => void window.desktopBridge.openExternal(TRANSLATION_SETTINGS_URL)}
-          className={buttonClass("outline", "xs")}
+          className={PILL}
         >
           Open Settings
         </button>
       ) : null}
       {translating && error ? (
-        <button type="button" onClick={onRetry} className={buttonClass("outline", "xs")}>
+        <button type="button" onClick={onRetry} className={PILL}>
           Try Again
         </button>
       ) : null}
       {translating ? (
-        <button type="button" onClick={onShowOriginal} className={buttonClass("outline", "xs")}>
+        <button type="button" onClick={onShowOriginal} className={PILL}>
           Show Original
         </button>
       ) : (
-        <button
-          type="button"
-          onClick={() => onTranslate(target)}
-          className={buttonClass("outline", "xs")}
-        >
+        <button type="button" onClick={() => onTranslate(target)} className={PILL}>
           Translate to {to}
         </button>
       )}
       {otherTargets.length > 0 ? (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <IconBtn label="Translate to another language" className="size-6">
-              <ChevronDownIcon className="size-3.5" />
+            <IconBtn label="Translate to another language">
+              <ChevronDownIcon className="size-4" />
             </IconBtn>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">

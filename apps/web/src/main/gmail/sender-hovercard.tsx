@@ -71,7 +71,7 @@ export function SenderHoverCard({
     <button
       type="button"
       onClick={onClick}
-      className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-foreground/90 hover:bg-accent-surface"
+      className="flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left text-sm text-foreground hover:bg-accent-surface"
     >
       <span className="shrink-0 text-muted-foreground">{icon}</span>
       {label}
@@ -94,21 +94,19 @@ export function SenderHoverCard({
               style={{ left: pos.x, top: pos.y }}
               onMouseEnter={clearTimers}
               onMouseLeave={hide}
-              className="dropdown-glass fixed z-50 w-64 rounded-lg p-3 shadow-[0_16px_40px_-18px_rgb(0_0_0/55%)] dark:shadow-[0_18px_44px_-18px_rgb(0_0_0/80%)]"
+              className="dropdown-glass fixed z-50 w-72 rounded-2xl p-3 shadow-[0_16px_40px_-18px_rgb(0_0_0/55%)] dark:shadow-[0_18px_44px_-18px_rgb(0_0_0/80%)]"
             >
               <div className="flex items-center gap-2.5">
                 <SenderAvatar name={name} email={email} accountId={accountId} />
                 <div className="min-w-0">
-                  <div className="truncate text-sm font-semibold text-foreground">
-                    {displayName}
-                  </div>
-                  <div className="truncate text-xs text-muted-foreground/70">{email}</div>
+                  <div className="truncate text-sm font-medium text-foreground">{displayName}</div>
+                  <div className="truncate text-[13px] text-muted-foreground">{email}</div>
                 </div>
               </div>
-              <div className="mt-2 flex flex-col gap-0.5 border-t border-border pt-1.5">
+              <div className="-mx-1 mt-3 flex flex-col gap-0.5">
                 {onCompose ? (
                   <Action
-                    icon={<SquarePenIcon className="size-3.5" />}
+                    icon={<SquarePenIcon className="size-4" />}
                     label="New message"
                     onClick={() => {
                       onCompose(email);
@@ -118,7 +116,7 @@ export function SenderHoverCard({
                 ) : null}
                 {onSearch ? (
                   <Action
-                    icon={<SearchIcon className="size-3.5" />}
+                    icon={<SearchIcon className="size-4" />}
                     label="Find emails"
                     onClick={() => {
                       onSearch(email);
@@ -128,7 +126,7 @@ export function SenderHoverCard({
                 ) : null}
                 {onAsk ? (
                   <Action
-                    icon={<SparklesIcon className="size-3.5" />}
+                    icon={<SparklesIcon className="size-4" />}
                     label="Ask the assistant about them"
                     onClick={() => {
                       onAsk(email, displayName);
@@ -137,7 +135,7 @@ export function SenderHoverCard({
                   />
                 ) : null}
                 <Action
-                  icon={<CopyIcon className="size-3.5" />}
+                  icon={<CopyIcon className="size-4" />}
                   label="Copy address"
                   onClick={copyEmail}
                 />

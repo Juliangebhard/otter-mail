@@ -38,7 +38,7 @@ export function SenderAvatar({
   });
   const photo = photoQuery.data?.dataUrl ?? null;
 
-  const sizeClasses = size === "sm" ? "size-6 text-2xs rounded-sm" : "size-9 text-sm rounded-md";
+  const sizeClasses = size === "sm" ? "size-6 text-2xs rounded-md" : "size-9 text-sm rounded-lg";
 
   if (photo) {
     // Transparent logos need a white backing, but painting it under the whole
@@ -70,7 +70,7 @@ export function SenderAvatar({
   return (
     <span
       className={[
-        "shrink-0 flex items-center justify-center font-semibold select-none",
+        "shrink-0 flex items-center justify-center font-medium select-none",
         sizeClasses,
         className ?? "",
       ].join(" ")}

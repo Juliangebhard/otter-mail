@@ -11,7 +11,7 @@ Gmail, calm and fast. A macOS app, and the same app in your browser at
   built-in translator on the web; nothing leaves your device)
 - Calendar invitations you can answer in place, and one-click unsubscribe
 - An assistant that works on your mail through Claude Code, Codex or Hermes
-- Keyboard shortcuts for everything, editable in Settings or in `keybindings.json`
+- Keyboard shortcuts for everything, editable in Settings
 
 ## Mac app and web app
 
@@ -32,7 +32,6 @@ switched off in the web app.
 | Signatures, kept in Gmail                                     | ✓                                 | ✓                                              | ✓                                              |
 | Gmail sign-in                                                 | Tokens stay on your Mac           | Through our relay (tokens pass, never stored)  | Through our relay (tokens pass, never stored)  |
 | Keyboard shortcuts, edited in Settings                        | ✓                                 | ✓                                              | ✓                                              |
-| `keybindings.json` opened in an editor                        | ✓                                 | –                                              | –                                              |
 | Menu-bar mini inbox, launch at login                          | ✓                                 | –                                              | –                                              |
 | Default mail app (mailto: links)                              | ✓                                 | –                                              | –                                              |
 | On-device translation                                         | ✓ Apple Translation               | ✓ Chrome's built-in translator                 | –                                              |

@@ -8,7 +8,6 @@ import {
   setAdvanceDirection as persistAdvanceDirection,
   type AdvanceDirection,
 } from "../gmail/advance-direction";
-import { cn } from "../gmail/ui";
 import { AppearancePane } from "./appearance-pane";
 import { KeybindingsPane } from "./keybindings-pane";
 import { AccountsPane } from "./accounts-pane";
@@ -77,11 +76,7 @@ function RowSelect({
   return (
     // "" keeps the Select controlled (showing the placeholder) while the value loads.
     <Select value={value ?? ""} onValueChange={onValueChange} disabled={disabled}>
-      <SelectTrigger
-        size="small"
-        aria-label={ariaLabel}
-        className={cn("w-full sm:w-44", className)}
-      >
+      <SelectTrigger variant="pill" aria-label={ariaLabel} className={className}>
         <SelectValue placeholder={placeholder ?? "Loading…"} />
       </SelectTrigger>
       <SelectContent>
@@ -214,7 +209,7 @@ function GeneralPane() {
   };
 
   return (
-    <SettingsPageContainer>
+    <SettingsPageContainer title="General">
       <SettingsSection title="Startup & menu bar">
         <SettingsRow
           title="Launch at login"
@@ -285,7 +280,6 @@ function GeneralPane() {
               onValueChange={handleAdvanceDirectionChange}
               options={ADVANCE_DIRECTION_OPTIONS}
               ariaLabel="After archive, delete, or move"
-              className="sm:w-60"
             />
           }
         />

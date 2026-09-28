@@ -2,6 +2,13 @@ import { forwardRef, useEffect, useState, type ComponentProps, type ReactNode } 
 import { Undo2Icon } from "lucide-react";
 import { cn, HintTooltip } from "../gmail/ui";
 
+/*
+ * Settings layout (after ChatGPT's): one centered column. The page title, page
+ * description, section titles and descriptions share the card's left edge;
+ * inside a card every row's text starts 16px in and every control ends 16px
+ * from the right.
+ */
+
 /** Shared settings card surface, with separators between rows. */
 export function SettingsGroup({
   variant = "grouped",
@@ -12,23 +19,68 @@ export function SettingsGroup({
   return (
     <div
       {...props}
+      data-slot={variant === "grouped" ? "settings-group" : undefined}
       className={cn(
         "relative overflow-visible text-foreground",
-        variant === "grouped"
-          ? "rounded-xl border border-border/60 bg-card/40 shadow-xs/5"
-          : "space-y-1",
+        variant === "grouped" ? "rounded-xl border border-border/60 bg-card" : "space-y-1",
+        variant === "grouped" && divided && "[&>*+*]:border-t [&>*+*]:border-border/40",
+        // Row hovers and selections follow the card's corners.
         variant === "grouped" &&
-          divided &&
-          "[&>*+*]:border-t [&>*+*]:border-border/50 [&>[data-slot=settings-row]]:rounded-none",
+          "[&>*:first-child]:rounded-t-[11px] [&>*:last-child]:rounded-b-[11px]",
         className,
       )}
     />
   );
 }
 
-/** A titled group of rows. */
+/** A section's title (and optional description) above its card, flush with the card's edge. */
+export function SettingsSectionHeader({
+  title,
+  description,
+  icon,
+  action,
+  muted,
+}: {
+  title: ReactNode;
+  description?: ReactNode;
+  icon?: ReactNode;
+  action?: ReactNode;
+  /** Quiet group label (the keybindings list) instead of a section title. */
+  muted?: boolean;
+}) {
+  return (
+    // Text outside the cards lines up with the text inside them (Linear):
+    // the cards' 1px border + 16px padding.
+    <div
+      className={cn(
+        "flex min-h-7 items-center justify-between gap-4 px-[17px]",
+        muted ? "mb-1" : "mb-3",
+      )}
+    >
+      <div className="min-w-0">
+        <h2
+          data-slot="settings-section-title"
+          className={cn(
+            "flex items-center gap-2 text-sm",
+            muted ? "text-muted-foreground" : "font-medium text-foreground",
+          )}
+        >
+          {icon}
+          {title}
+        </h2>
+        {description ? (
+          <p className="mt-0.5 text-[13px] leading-[18px] text-muted-foreground">{description}</p>
+        ) : null}
+      </div>
+      {action ? <div className="flex shrink-0 items-center gap-2">{action}</div> : null}
+    </div>
+  );
+}
+
+/** A titled group of rows. "plain" leaves the children uncarded (grids, lists). */
 export function SettingsSection({
   title,
+  description,
   icon,
   headerAction,
   variant = "grouped",
@@ -36,24 +88,22 @@ export function SettingsSection({
   className,
   ...props
 }: Omit<ComponentProps<"section">, "title"> & {
-  title: string;
+  title: ReactNode;
+  description?: ReactNode;
   icon?: ReactNode;
   headerAction?: ReactNode;
   variant?: "grouped" | "plain";
   children: ReactNode;
 }) {
   return (
-    <section {...props} className={cn("space-y-2.5", className)}>
-      <div className="flex min-h-7 items-start justify-between gap-4 px-3 sm:px-4">
-        <div className="min-w-0">
-          <h2 className="flex min-h-7 items-center gap-2 text-sm font-normal text-foreground/70">
-            {icon}
-            {title}
-          </h2>
-        </div>
-        <div className="flex min-h-7 min-w-7 items-center justify-end">{headerAction}</div>
-      </div>
-      <SettingsGroup variant={variant}>{children}</SettingsGroup>
+    <section {...props} className={className}>
+      <SettingsSectionHeader
+        title={title}
+        description={description}
+        icon={icon}
+        action={headerAction}
+      />
+      {variant === "grouped" ? <SettingsGroup>{children}</SettingsGroup> : children}
     </section>
   );
 }
@@ -84,16 +134,12 @@ export function SettingsRow({
     <div
       {...props}
       data-slot="settings-row"
-      className={cn(
-        "@container/settings-row rounded-xl px-3 sm:px-4",
-        children ? "pt-3 pb-1" : "py-3",
-        className,
-      )}
+      className={cn("@container/settings-row px-4", children ? "pt-2.5 pb-1" : "py-2.5", className)}
     >
-      <div className="flex flex-col gap-3 @min-[32rem]/settings-row:grid @min-[32rem]/settings-row:grid-cols-[minmax(0,1fr)_minmax(10rem,auto)] @min-[32rem]/settings-row:items-center @min-[32rem]/settings-row:gap-8">
-        <div className="min-w-0 flex-1 space-y-1">
+      <div className="flex min-h-9 flex-col gap-3 @min-[30rem]/settings-row:flex-row @min-[30rem]/settings-row:items-center @min-[30rem]/settings-row:gap-8">
+        <div className="min-w-0 flex-1">
           <div className="flex min-h-5 items-center gap-1.5">
-            <h3 className="text-sm font-medium text-foreground">{title}</h3>
+            <h3 className="text-sm font-normal text-foreground">{title}</h3>
             {resetAction ? (
               <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center">
                 {resetAction}
@@ -101,14 +147,17 @@ export function SettingsRow({
             ) : null}
           </div>
           {description ? (
-            <p className="max-w-xl text-xs leading-normal text-muted-foreground/80">
+            <p className="mt-0.5 max-w-[30rem] text-[13px] leading-[18px] text-muted-foreground">
               {description}
             </p>
           ) : null}
-          {status ? <div className="pt-0.5 text-xs text-muted-foreground">{status}</div> : null}
+          {status ? <div className="mt-1 text-xs text-muted-foreground">{status}</div> : null}
         </div>
         {control ? (
-          <div className="flex w-full min-w-0 shrink-0 items-center gap-2 @min-[32rem]/settings-row:w-auto @min-[32rem]/settings-row:justify-end">
+          <div
+            data-slot="settings-row-control"
+            className="flex min-w-0 shrink-0 items-center gap-2 @min-[30rem]/settings-row:justify-end"
+          >
             {control}
           </div>
         ) : null}
@@ -137,14 +186,52 @@ export function SettingResetButton({ label, onClick }: { label: string; onClick:
   );
 }
 
-/** Scrollable page body with the settings column width. */
-export function SettingsPageContainer({ className, ...props }: ComponentProps<"div">) {
+/**
+ * Scrollable page: the pane's title (and a one-line description) over its
+ * sections, in the settings column.
+ */
+export function SettingsPageContainer({
+  title,
+  description,
+  action,
+  className,
+  children,
+  ...props
+}: Omit<ComponentProps<"div">, "title"> & {
+  title?: ReactNode;
+  description?: ReactNode;
+  /** Beside the title, right-aligned with the cards' edge. */
+  action?: ReactNode;
+}) {
   return (
     <div className="min-h-0 flex-1 overflow-y-auto">
       <div
         {...props}
-        className={cn("mx-auto w-full max-w-3xl space-y-8 px-4 pb-16 pt-4 sm:px-6", className)}
-      />
+        className={cn("mx-auto w-full max-w-[47rem] space-y-10 px-6 pb-20 pt-14", className)}
+      >
+        {title ? (
+          <header className="flex items-end justify-between gap-4 px-[17px]">
+            <div className="min-w-0">
+              <h1
+                data-slot="settings-page-title"
+                className="text-[26px] font-medium leading-8 tracking-[-0.01em] text-foreground"
+              >
+                {title}
+              </h1>
+              {description ? (
+                <p
+                  data-slot="settings-page-description"
+                  className="mt-1.5 text-sm text-muted-foreground"
+                >
+                  {description}
+                </p>
+              ) : null}
+            </div>
+            {action ? <div className="flex shrink-0 items-center gap-2">{action}</div> : null}
+          </header>
+        ) : null}
+        {children}
+      </div>
     </div>
   );
 }
@@ -159,7 +246,7 @@ export const TextInput = forwardRef<HTMLInputElement, ComponentProps<"input">>(f
       ref={ref}
       {...props}
       className={cn(
-        "h-7.5 w-full min-w-0 rounded-lg border border-input bg-canvas px-[calc(--spacing(2.5)-1px)] text-sm text-foreground shadow-xs/5 outline-none transition-shadow placeholder:text-placeholder focus-visible:border-focus-ring focus-visible:ring-[3px] focus-visible:ring-focus-ring/24 disabled:opacity-64 dark:bg-input/32",
+        "h-8 w-full min-w-0 rounded-lg border border-border/70 bg-surface-raised/60 px-[calc(--spacing(2.75)-1px)] text-sm text-foreground outline-none transition-[box-shadow,border-color,background-color] placeholder:text-placeholder focus-visible:border-focus-ring/60 focus-visible:bg-canvas focus-visible:ring-[3px] focus-visible:ring-focus-ring/16 disabled:opacity-64",
         className,
       )}
     />

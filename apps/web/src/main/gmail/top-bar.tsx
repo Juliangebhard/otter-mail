@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { DropdownMenu as RadixMenu } from "radix-ui";
 import {
   CheckIcon,
@@ -8,14 +8,13 @@ import {
   PanelLeftIcon,
   PanelRightIcon,
 } from "lucide-react";
-import { IconBtn, HintTooltip, buttonClass, cn, restoreFocusForKeyboardOnly } from "./ui";
+import { IconBtn, HintTooltip, cn, restoreFocusForKeyboardOnly } from "./ui";
 import { COMBINED_ACCOUNT_ID } from "./custom-views";
 import { getAccountColor, getAccountDisplayName } from "./account-style";
-import { gmailApi } from "./api";
 import type { GmailAccount } from "./types";
 import type { KeybindingCommand } from "../keybindings/commands";
 import { shortcutLabelFor, useKeybindingsState } from "../keybindings/store";
-import { features } from "../features";
+import { useMailboxArrangement } from "../mailboxes";
 
 /**
  * Every column owns the slice of the title band above it, so the pane
@@ -131,7 +130,75 @@ function MailboxMark({ account, className }: { account: GmailAccount | null; cla
   );
 }
 
-/** Mailbox switcher row for the sidebar; aligned with the rows below it. */
+type MailboxOption = { id: string; account: GmailAccount | null; name: string; shortcut: string };
+
+/** The mailboxes to switch between, in ⌘1… order: All mailboxes (when on), then each account. */
+export function useMailboxOptions(accounts: GmailAccount[]): MailboxOption[] {
+  const { resolved: keybindings } = useKeybindingsState();
+  const combined = useMailboxArrangement().combined && accounts.length > 1;
+  const jump = (digit: number) =>
+    shortcutLabelFor(keybindings, `mailbox.jump.${digit}` as KeybindingCommand) ?? "";
+  return [
+    ...(combined
+      ? [{ id: COMBINED_ACCOUNT_ID, account: null, name: "All mailboxes", shortcut: jump(1) }]
+      : []),
+    ...accounts.map((account, i) => ({
+      id: account.id,
+      account,
+      name: getAccountDisplayName(account),
+      shortcut: jump(combined ? i + 2 : i + 1),
+    })),
+  ];
+}
+
+/**
+ * Dia's profile dots for the sidebar's footer: one dot per mailbox, the
+ * current one lit; click one to switch. Empty with a single mailbox.
+ */
+export function MailboxDots({
+  accounts,
+  selectedAccountId,
+  onSelectAccount,
+  className,
+}: {
+  accounts: GmailAccount[];
+  selectedAccountId: string | null;
+  onSelectAccount: (accountId: string) => void;
+  className?: string;
+}) {
+  const options = useMailboxOptions(accounts);
+  if (options.length < 2) return <span className={className} />;
+  return (
+    <div role="tablist" aria-label="Mailboxes" className={cn("flex items-center", className)}>
+      {options.map((option) => {
+        const selected = option.id === selectedAccountId;
+        return (
+          <HintTooltip key={option.id} label={option.name} hint={option.shortcut}>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={selected}
+              aria-label={option.name}
+              onClick={() => onSelectAccount(option.id)}
+              className="group/dot flex size-5 cursor-pointer items-center justify-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
+            >
+              <span
+                className={cn(
+                  "size-2 rounded-full transition-colors",
+                  selected
+                    ? "bg-sidebar-foreground"
+                    : "bg-sidebar-muted-foreground/40 group-hover/dot:bg-sidebar-muted-foreground/80",
+                )}
+              />
+            </button>
+          </HintTooltip>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Mailbox switcher, the sidebar's heading; aligned with the rows below it. */
 export function MailboxSwitcher({
   accounts,
   selectedAccountId,
@@ -143,9 +210,7 @@ export function MailboxSwitcher({
   onSelectAccount: (accountId: string) => void;
   className?: string;
 }) {
-  const { resolved: keybindings } = useKeybindingsState();
-  const jump = (digit: number) =>
-    shortcutLabelFor(keybindings, `mailbox.jump.${digit}` as KeybindingCommand) ?? "";
+  const options = useMailboxOptions(accounts);
   const isCombined = selectedAccountId === COMBINED_ACCOUNT_ID;
   const selectedAccount = isCombined
     ? null
@@ -155,18 +220,6 @@ export function MailboxSwitcher({
     : selectedAccount
       ? getAccountDisplayName(selectedAccount)
       : "Mailbox";
-  const options: { id: string; account: GmailAccount | null; name: string; shortcut: string }[] = [
-    ...(accounts.length > 1
-      ? [{ id: COMBINED_ACCOUNT_ID, account: null, name: "All mailboxes", shortcut: jump(1) }]
-      : []),
-    ...accounts.map((account, i) => ({
-      id: account.id,
-      account,
-      name: getAccountDisplayName(account),
-      shortcut: jump(accounts.length > 1 ? i + 2 : 1),
-    })),
-  ];
-
   return (
     <RadixMenu.Root>
       <RadixMenu.Trigger asChild>
@@ -174,16 +227,19 @@ export function MailboxSwitcher({
           type="button"
           aria-label="Switch mailbox"
           className={cn(
-            "group/switcher flex h-8 w-full min-w-0 cursor-pointer items-center gap-(--sidebar-control-gap) rounded-[var(--control-radius)] px-(--sidebar-row-content-inset) text-left text-sm font-medium text-sidebar-foreground outline-none transition-colors hover:bg-sidebar-row-hover focus-visible:ring-2 focus-visible:ring-focus-ring data-[state=open]:bg-sidebar-row-hover",
+            "group/switcher flex h-9 w-full min-w-0 cursor-pointer items-center gap-2 rounded-lg px-(--sidebar-row-content-inset) text-left text-sidebar-foreground outline-none transition-colors hover:bg-sidebar-row-hover focus-visible:ring-2 focus-visible:ring-focus-ring data-[state=open]:bg-sidebar-row-hover",
             className,
           )}
         >
           <span className="flex size-4 shrink-0 items-center justify-center">
-            <MailboxMark account={selectedAccount} className="text-(--sidebar-icon-color)" />
+            <MailboxMark account={selectedAccount} className="text-sidebar-muted-foreground" />
           </span>
-          <span className="min-w-0 flex-1 truncate">{mailboxName}</span>
+          {/* A heading, like Codex's "Codex ⌄": the name, then its chevron. */}
+          <span className="min-w-0 truncate text-base font-semibold tracking-tight">
+            {mailboxName}
+          </span>
           <ChevronDownIcon
-            className="size-3.5 shrink-0 text-(--sidebar-icon-color) transition-transform group-data-[state=open]/switcher:rotate-180"
+            className="size-4 shrink-0 text-sidebar-muted-foreground transition-transform group-data-[state=open]/switcher:rotate-180"
             aria-hidden
           />
         </button>
@@ -202,7 +258,7 @@ export function MailboxSwitcher({
                 key={option.id}
                 onSelect={() => onSelectAccount(option.id)}
                 className={cn(
-                  "flex min-h-7 cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1 text-sm outline-none data-[highlighted]:bg-accent-surface data-[highlighted]:text-foreground",
+                  "flex min-h-8 cursor-pointer select-none items-center gap-2 rounded-md px-2 py-1 text-sm outline-none data-[highlighted]:bg-accent-surface data-[highlighted]:text-foreground",
                   selected && "bg-foreground/[0.08]",
                 )}
               >
@@ -226,58 +282,12 @@ export function MailboxSwitcher({
 }
 
 /**
- * Outline nudge shown only while Otter Mail is not the macOS default mail app;
- * clicking asks the OS (consent dialog) and the button hides once granted.
- */
-function DefaultMailButton() {
-  const [isDefault, setIsDefault] = useState<boolean | null>(null);
-
-  const refresh = async () => {
-    try {
-      const status = await gmailApi.getDefaultMailStatus();
-      setIsDefault(status.isDefault);
-    } catch (err) {
-      console.log("[TopBar:defaultMailStatus] failed", { error: String(err) });
-    }
-  };
-
-  useEffect(() => {
-    void refresh();
-  }, []);
-
-  if (isDefault !== false) return null;
-
-  const request = async () => {
-    console.log("[TopBar:setDefaultMailApp]");
-    try {
-      await gmailApi.setDefaultMailApp();
-    } catch (err) {
-      console.log("[TopBar:setDefaultMailApp] failed", { error: String(err) });
-    }
-    void refresh();
-  };
-
-  return (
-    <HintTooltip label="Use Otter Mail for email links">
-      <button type="button" onClick={() => void request()} className={buttonClass("outline", "xs")}>
-        Set as default
-      </button>
-    </HintTooltip>
-  );
-}
-
-/**
- * Right end of the content column's title band: default-mail nudge and room
- * for the pinned assistant toggle. Views that own the band (the reader) render
- * it at the end of their own header.
+ * Right end of the content column's title band: room for the pinned
+ * assistant toggle. Views that own the band (the reader) render it at the end
+ * of their own header.
  */
 export function TitleTrailing({ showPanelToggle }: { showPanelToggle: boolean }) {
-  return (
-    <>
-      {features.defaultMailApp ? <DefaultMailButton /> : null}
-      {showPanelToggle ? <PanelControlSlot /> : null}
-    </>
-  );
+  return <>{showPanelToggle ? <PanelControlSlot /> : null}</>;
 }
 
 /** Title band of the content column: optional breadcrumb, sync status, trailing controls. */

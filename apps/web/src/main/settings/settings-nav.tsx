@@ -1,18 +1,18 @@
-import type { ComponentType } from "react";
+import { useEffect, useState, type ComponentType } from "react";
 import {
   ArrowLeftIcon,
   BotIcon,
+  CircleUserRoundIcon,
   KeyboardIcon,
   LayersIcon,
-  LogInIcon,
   PaletteIcon,
   Settings2Icon,
   MailIcon,
+  MailCheckIcon,
 } from "lucide-react";
-import type { SettingsPane } from "../gmail/api";
-import { cn, HintTooltip } from "../gmail/ui";
-import { useOtterAccount } from "../otter-account";
-import { OtterAvatar } from "./otter-account-pane";
+import { gmailApi, type SettingsPane } from "../gmail/api";
+import { HintTooltip, cn } from "../gmail/ui";
+import { features } from "../features";
 
 type SettingsSection = {
   id: SettingsPane;
@@ -22,6 +22,7 @@ type SettingsSection = {
 
 export const SETTINGS_SECTIONS: ReadonlyArray<SettingsSection> = [
   { id: "general", label: "General", icon: Settings2Icon },
+  { id: "otter", label: "Account", icon: CircleUserRoundIcon },
   { id: "appearance", label: "Appearance", icon: PaletteIcon },
   { id: "keybindings", label: "Keybindings", icon: KeyboardIcon },
   { id: "accounts", label: "Mailboxes", icon: MailIcon },
@@ -30,20 +31,17 @@ export const SETTINGS_SECTIONS: ReadonlyArray<SettingsSection> = [
 ];
 
 export function settingsSectionLabel(pane: SettingsPane): string {
-  if (pane === "otter") return "Otter account";
   return SETTINGS_SECTIONS.find((s) => s.id === pane)?.label ?? "Settings";
 }
 
+/** The mail sidebar's row (Codex): 14px regular text, muted icon, rounded pill. */
 const ROW =
-  "flex h-8 w-full cursor-pointer items-center gap-(--sidebar-control-gap) rounded-[var(--control-radius)] px-(--sidebar-row-content-inset) text-left text-sm font-medium outline-none transition-[background-color,color] focus-visible:ring-2 focus-visible:ring-focus-ring active:bg-sidebar-row-active [&>svg]:size-4 [&>svg]:shrink-0";
+  "flex h-8 w-full cursor-pointer items-center gap-2.5 rounded-lg px-(--sidebar-row-content-inset) text-left text-sm font-normal outline-none transition-[background-color,color] focus-visible:ring-2 focus-visible:ring-focus-ring active:bg-sidebar-row-active [&>svg]:size-4 [&>svg]:shrink-0";
 
 const ROW_IDLE =
-  "text-sidebar-muted-foreground/80 hover:bg-sidebar-row-hover hover:text-sidebar-foreground [&>svg]:text-(--sidebar-icon-color) hover:[&>svg]:text-sidebar-foreground";
+  "text-sidebar-foreground/90 hover:bg-sidebar-row-hover hover:text-sidebar-foreground [&>svg]:text-sidebar-muted-foreground hover:[&>svg]:text-sidebar-foreground";
 
-/**
- * Sidebar contents while the settings page is open: sections, then Back and
- * the Otter account (a sign-in row, or the user's avatar), as in Otter Code.
- */
+/** Sidebar contents while the settings page is open: the sections, then Back. */
 export function SettingsNav({
   pane,
   onSelect,
@@ -53,13 +51,12 @@ export function SettingsNav({
   onSelect: (pane: SettingsPane) => void;
   onBack: () => void;
 }) {
-  const otter = useOtterAccount();
   return (
     <>
-      <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-(--sidebar-content-inset) pb-4 pt-1">
-        <div className="px-(--sidebar-row-content-inset) pb-1 pt-1 text-xs font-medium text-sidebar-muted-foreground/70">
+      <div className="flex min-h-0 flex-1 flex-col gap-0.5 scroll-fade-y overflow-y-auto px-(--sidebar-content-inset) pb-8 pt-3">
+        <h2 className="mb-1 flex h-8 items-center px-(--sidebar-row-content-inset) text-base font-semibold text-sidebar-foreground">
           Settings
-        </div>
+        </h2>
         {SETTINGS_SECTIONS.map((section) => {
           const Icon = section.icon;
           const active = section.id === pane;
@@ -82,52 +79,52 @@ export function SettingsNav({
           );
         })}
       </div>
-      {/* Bottom rows, like Otter Code's settings sidebar. */}
-      <div className="flex shrink-0 flex-col gap-1 px-(--sidebar-content-inset) py-1">
-        {otter && !otter.user ? (
-          <button
-            type="button"
-            onClick={() => onSelect("otter")}
-            aria-current={pane === "otter" ? "page" : undefined}
-            className={cn(ROW, pane === "otter" ? "bg-sidebar-row-selected" : ROW_IDLE)}
-          >
-            <LogInIcon />
-            <span className="truncate">Sign in to Otter Mail</span>
-          </button>
-        ) : null}
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={onBack}
-            className={cn(ROW, "w-auto min-w-0 flex-1", ROW_IDLE)}
-          >
-            <ArrowLeftIcon />
-            <span className="truncate">Back</span>
-          </button>
-          {otter?.user ? (
-            <HintTooltip label={`${otter.user.name ?? otter.user.email} · Otter account`}>
-              <button
-                type="button"
-                aria-label="Otter account"
-                aria-current={pane === "otter" ? "page" : undefined}
-                onClick={() => onSelect("otter")}
-                className={cn(
-                  "relative flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-[var(--control-radius)] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-focus-ring",
-                  pane === "otter" ? "bg-sidebar-row-selected" : "hover:bg-sidebar-row-hover",
-                )}
-              >
-                <OtterAvatar user={otter.user} className="size-6" />
-                {otter.realtime === "live" ? (
-                  <span
-                    aria-hidden
-                    className="absolute bottom-1 right-1 size-2 rounded-full bg-primary ring-2 ring-sidebar-surface"
-                  />
-                ) : null}
-              </button>
-            </HintTooltip>
-          ) : null}
-        </div>
+      <div className="flex shrink-0 flex-col gap-0.5 px-(--sidebar-content-inset) pt-1 pb-(--sidebar-content-inset)">
+        {features.defaultMailApp ? <DefaultMailRow /> : null}
+        <button type="button" onClick={onBack} className={cn(ROW, ROW_IDLE)}>
+          <ArrowLeftIcon />
+          <span className="truncate">Back</span>
+        </button>
       </div>
     </>
+  );
+}
+
+/**
+ * Shown only while Otter Mail isn't the Mac's default mail app: asks macOS
+ * (a consent dialog) and hides once granted.
+ */
+function DefaultMailRow() {
+  const [isDefault, setIsDefault] = useState<boolean | null>(null);
+  const refresh = async () => {
+    try {
+      setIsDefault((await gmailApi.getDefaultMailStatus()).isDefault);
+    } catch (err) {
+      console.log("[SettingsNav:defaultMailStatus] failed", { error: String(err) });
+    }
+  };
+  useEffect(() => {
+    void refresh();
+  }, []);
+  if (isDefault !== false) return null;
+  return (
+    <HintTooltip label="Use Otter Mail for email links">
+      <button
+        type="button"
+        onClick={async () => {
+          console.log("[SettingsNav:setDefaultMailApp]");
+          try {
+            await gmailApi.setDefaultMailApp();
+          } catch (err) {
+            console.log("[SettingsNav:setDefaultMailApp] failed", { error: String(err) });
+          }
+          void refresh();
+        }}
+        className={cn(ROW, ROW_IDLE)}
+      >
+        <MailCheckIcon />
+        <span className="truncate">Set as default mail app</span>
+      </button>
+    </HintTooltip>
   );
 }

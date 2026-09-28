@@ -76,7 +76,7 @@ export function UpdateCard() {
   const manualUrl = state.manualDownloadUrl;
   const percent = Math.min(100, Math.max(0, state.downloadPercent ?? 0));
   return (
-    <div className="mx-(--sidebar-content-inset) mb-1 rounded-lg border border-border/60 bg-card/60 px-3 py-2.5 shadow-xs/5">
+    <div className="mx-(--sidebar-content-inset) mb-1 rounded-xl border border-border/60 bg-card/60 px-3 py-2.5 shadow-xs/5">
       <div className="flex items-start gap-2">
         {state.status === "downloaded" ? (
           <SparklesIcon className="mt-0.5 size-3.5 shrink-0 text-primary" />

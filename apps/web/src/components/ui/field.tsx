@@ -46,13 +46,13 @@ function Field({
             <label
               htmlFor={controlId}
               data-slot="field-label"
-              className="text-2xs font-medium text-muted-foreground"
+              className="text-[13px] text-muted-foreground"
             >
               {label}
             </label>
           ) : null}
           {description ? (
-            <p data-slot="field-description" className="text-2xs text-muted-foreground/75">
+            <p data-slot="field-description" className="text-xs text-muted-foreground">
               {description}
             </p>
           ) : null}
@@ -60,7 +60,7 @@ function Field({
       ) : null}
       {control}
       {error ? (
-        <p data-slot="field-error" className="text-2xs text-destructive-foreground">
+        <p data-slot="field-error" className="text-xs text-destructive-foreground">
           {error}
         </p>
       ) : null}

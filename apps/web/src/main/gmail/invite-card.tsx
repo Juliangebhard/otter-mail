@@ -117,9 +117,11 @@ export function InviteCard({ accountId, messageId }: { accountId: string; messag
   const answered = invite.response !== "needsAction" ? invite.response : null;
 
   return (
-    <div className="mb-3 flex flex-col gap-2 rounded-xl border border-border bg-secondary/40 px-3.5 py-3">
-      <div className="flex items-start gap-2.5">
-        <CalendarIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />
+    <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-border/60 bg-card p-3">
+      <div className="flex items-start gap-3">
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-accent-surface">
+          <CalendarIcon className="size-4 text-muted-foreground" aria-hidden />
+        </span>
         <div className="min-w-0 flex-1">
           <div
             className={cn(
@@ -129,15 +131,15 @@ export function InviteCard({ accountId, messageId }: { accountId: string; messag
           >
             {invite.summary}
           </div>
-          {when ? <div className="text-xs text-muted-foreground">{when}</div> : null}
+          {when ? <div className="text-[13px] text-muted-foreground">{when}</div> : null}
           {invite.location ? (
-            <div className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
+            <div className="flex min-w-0 items-center gap-1 text-[13px] text-muted-foreground">
               <MapPinIcon className="size-3 shrink-0" aria-hidden />
               <span className="min-w-0 truncate">{invite.location}</span>
             </div>
           ) : null}
           {invite.organizer ? (
-            <div className="text-xs text-muted-foreground/80">
+            <div className="text-[13px] text-muted-foreground">
               Organizer: {invite.organizer.name || invite.organizer.email}
             </div>
           ) : null}
@@ -146,22 +148,21 @@ export function InviteCard({ accountId, messageId }: { accountId: string; messag
           <HintTooltip label="Open in Google Calendar">
             <IconBtn
               label="Open in Google Calendar"
-              className="size-6"
               onClick={() => void window.desktopBridge.openExternal(invite.htmlLink!)}
             >
-              <ExternalLinkIcon className="size-3.5" />
+              <ExternalLinkIcon className="size-4" />
             </IconBtn>
           </HintTooltip>
         ) : null}
       </div>
       {invite.cancelled ? (
-        <div className="pl-6.5 text-xs text-muted-foreground">This event was cancelled.</div>
+        <div className="pl-13 text-sm text-muted-foreground">This event was cancelled.</div>
       ) : (
-        <div className="flex flex-wrap items-center gap-2 pl-6.5">
-          <span className="text-xs text-muted-foreground">
+        <div className="flex flex-wrap items-center gap-2 pl-13">
+          <span className="text-sm text-muted-foreground">
             {answered ? DONE[answered] : "Going?"}
           </span>
-          <div className="inline-flex overflow-hidden rounded-full border border-border">
+          <div className="inline-flex overflow-hidden rounded-full border border-border/60">
             {CHOICES.map((choice, i) => {
               const active = invite.response === choice.value;
               return (
@@ -172,8 +173,8 @@ export function InviteCard({ accountId, messageId }: { accountId: string; messag
                   aria-pressed={active}
                   onClick={() => !active && respond.mutate(choice.value)}
                   className={cn(
-                    "inline-flex h-7 cursor-pointer items-center gap-1 px-3 text-xs font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus-ring disabled:opacity-60",
-                    i > 0 && "border-l border-border",
+                    "inline-flex h-7 cursor-pointer items-center gap-1 px-3 text-[13px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus-ring disabled:opacity-60",
+                    i > 0 && "border-l border-border/60",
                     active
                       ? "bg-primary text-primary-foreground"
                       : "text-foreground hover:bg-accent-surface",
@@ -186,7 +187,7 @@ export function InviteCard({ accountId, messageId }: { accountId: string; messag
             })}
           </div>
           {!invite.calendarAccess ? (
-            <span className="text-2xs text-muted-foreground/70">
+            <span className="text-xs text-muted-foreground">
               Answers are emailed to the organizer — re-add this account to update your calendar
               too.
             </span>

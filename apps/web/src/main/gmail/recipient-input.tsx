@@ -188,9 +188,9 @@ export const RecipientInput = forwardRef<
                 }}
                 onDoubleClick={() => editAt(i)}
                 className={cn(
-                  "inline-flex h-6 max-w-64 cursor-default items-center gap-1 rounded-full border pl-2 pr-1 text-xs outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus:bg-accent-surface",
+                  "inline-flex h-6.5 max-w-64 cursor-default items-center gap-1 rounded-full border pl-2.5 pr-1 text-sm outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus:bg-accent-surface",
                   valid
-                    ? "border-border bg-secondary text-foreground"
+                    ? "border-transparent bg-accent-surface text-foreground"
                     : "border-destructive/50 bg-destructive/10 text-destructive-foreground",
                 )}
               >
@@ -260,7 +260,7 @@ export const RecipientInput = forwardRef<
         className="h-6 min-w-24 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-placeholder"
       />
       {open ? (
-        <div className="dropdown-glass absolute left-0 top-full z-50 mt-1.5 max-h-64 w-full min-w-64 overflow-y-auto rounded-lg p-1 shadow-[0_16px_40px_-18px_rgb(0_0_0/55%)] dark:shadow-[0_18px_44px_-18px_rgb(0_0_0/80%)]">
+        <div className="dropdown-glass absolute left-0 top-full z-50 mt-1.5 max-h-64 w-full min-w-64 overflow-y-auto rounded-xl p-1.5 shadow-[0_16px_40px_-18px_rgb(0_0_0/55%)] dark:shadow-[0_18px_44px_-18px_rgb(0_0_0/80%)]">
           {suggestions.map((suggestion, i) => (
             <button
               key={suggestion.email}
@@ -272,7 +272,7 @@ export const RecipientInput = forwardRef<
               }}
               onMouseEnter={() => setActiveIdx(i)}
               className={cn(
-                "flex w-full items-center gap-2.5 rounded-sm px-2 py-1.5 text-left",
+                "flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left",
                 i === activeIdx && "bg-accent-surface",
               )}
             >
@@ -282,9 +282,7 @@ export const RecipientInput = forwardRef<
                   {suggestion.name || suggestion.email}
                 </span>
                 {suggestion.name ? (
-                  <span className="truncate text-2xs text-muted-foreground">
-                    {suggestion.email}
-                  </span>
+                  <span className="truncate text-xs text-muted-foreground">{suggestion.email}</span>
                 ) : null}
               </span>
             </button>

@@ -2,6 +2,9 @@ import {
   Fragment,
   createContext,
   useContext,
+  useEffect,
+  useLayoutEffect,
+  useRef,
   useState,
   type CSSProperties,
   type DragEvent as ReactDragEvent,
@@ -18,6 +21,11 @@ import {
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuSeparator,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
 } from "./menu";
 import {
   InboxIcon,
@@ -37,9 +45,10 @@ import {
   SearchIcon,
   SquarePenIcon,
   RotateCwIcon,
+  CircleUserRoundIcon,
+  LogInIcon,
 } from "lucide-react";
 import {
-  useAccounts,
   useLabels,
   useAddAccount,
   useCreateLabel,
@@ -50,7 +59,7 @@ import {
   useViewUnreadCounts,
 } from "./hooks";
 import type { GmailLabel, MailView } from "./types";
-import { COMBINED_ACCOUNT_ID, useMailViews } from "./custom-views";
+import { COMBINED_ACCOUNT_ID, INBOX_VIEW_ID, useMailViews } from "./custom-views";
 import { ALL_MAIL_LABEL_ID } from "./label-names";
 import { buildLabelTree, type LabelTreeNode } from "./label-tree";
 import {
@@ -64,9 +73,13 @@ import { labelMoveName } from "../keybindings/commands";
 import { renameLabelKeybindings, useKeybindingsState } from "../keybindings/store";
 import { formatShortcut, parseShortcut } from "../keybindings/keys";
 import { LabelShortcutDialog } from "../settings/keybindings-pane";
-import { UnreadPill, HintTooltip, IconBtn } from "./ui";
-import { MailboxSwitcher, WindowTitle } from "./top-bar";
+import { UnreadPill, HintTooltip } from "./ui";
+import { MailboxDots, MailboxSwitcher, WindowTitle, useMailboxOptions } from "./top-bar";
 import { useOtterAccount } from "../otter-account";
+import { useMailboxes } from "../mailboxes";
+import { OtterAvatar } from "../settings/otter-account-pane";
+import type { SettingsPane } from "./api";
+import type { OtterAccountState } from "@otter-mail/contracts";
 import { UpdateCard } from "../updates";
 
 const LABEL_DRAG_MIME = "application/x-gmail-label";
@@ -80,6 +93,10 @@ type RowDragProps = {
   onDragLeave?: (e: ReactDragEvent<HTMLButtonElement>) => void;
   onDrop?: (e: ReactDragEvent<HTMLButtonElement>) => void;
 };
+
+/** A sidebar row's box (Settings' nav mirrors it). */
+const SIDEBAR_ROW =
+  "group flex h-8 w-full cursor-pointer items-center gap-2.5 rounded-lg text-left text-sm font-normal outline-none transition-[background-color,color] focus-visible:ring-2 focus-visible:ring-focus-ring active:bg-sidebar-row-active";
 
 /** Gmail's labels API only accepts colors from its fixed palette. */
 const GMAIL_LABEL_COLORS: { backgroundColor: string; textColor: string }[] = [
@@ -121,26 +138,26 @@ const SIDEBAR_SYSTEM_ORDER = [
 ];
 
 const SYSTEM_LABEL_MAP: Record<string, { name: string; icon: ReactNode }> = {
-  INBOX: { name: "Inbox", icon: <InboxIcon className="size-3.5" /> },
-  STARRED: { name: "Starred", icon: <StarIcon className="size-3.5" /> },
-  SENT: { name: "Sent", icon: <SendIcon className="size-3.5" /> },
-  DRAFT: { name: "Drafts", icon: <FileIcon className="size-3.5" /> },
-  IMPORTANT: { name: "Important", icon: <BookmarkIcon className="size-3.5" /> },
-  [ALL_MAIL_LABEL_ID]: { name: "All Mail", icon: <MailsIcon className="size-3.5" /> },
-  SPAM: { name: "Junk", icon: <ArchiveXIcon className="size-3.5" /> },
-  TRASH: { name: "Trash", icon: <Trash2Icon className="size-3.5" /> },
+  INBOX: { name: "Inbox", icon: <InboxIcon className="size-4" /> },
+  STARRED: { name: "Starred", icon: <StarIcon className="size-4" /> },
+  SENT: { name: "Sent", icon: <SendIcon className="size-4" /> },
+  DRAFT: { name: "Drafts", icon: <FileIcon className="size-4" /> },
+  IMPORTANT: { name: "Important", icon: <BookmarkIcon className="size-4" /> },
+  [ALL_MAIL_LABEL_ID]: { name: "All Mail", icon: <MailsIcon className="size-4" /> },
+  SPAM: { name: "Junk", icon: <ArchiveXIcon className="size-4" /> },
+  TRASH: { name: "Trash", icon: <Trash2Icon className="size-4" /> },
 };
 
 function viewIcon(view: MailView): ReactNode {
-  if (view.kind === "inbox") return <InboxIcon className="size-3.5" />;
-  if (view.kind === "starred") return <StarIcon className="size-3.5" />;
-  if (view.kind === "sent") return <SendIcon className="size-3.5" />;
-  if (view.kind === "drafts") return <FileIcon className="size-3.5" />;
-  if (view.kind === "important") return <BookmarkIcon className="size-3.5" />;
-  if (view.kind === "allmail") return <MailsIcon className="size-3.5" />;
-  if (view.kind === "junk") return <ArchiveXIcon className="size-3.5" />;
-  if (view.kind === "trash") return <Trash2Icon className="size-3.5" />;
-  return <LayersIcon className="size-3.5" />;
+  if (view.kind === "inbox") return <InboxIcon className="size-4" />;
+  if (view.kind === "starred") return <StarIcon className="size-4" />;
+  if (view.kind === "sent") return <SendIcon className="size-4" />;
+  if (view.kind === "drafts") return <FileIcon className="size-4" />;
+  if (view.kind === "important") return <BookmarkIcon className="size-4" />;
+  if (view.kind === "allmail") return <MailsIcon className="size-4" />;
+  if (view.kind === "junk") return <ArchiveXIcon className="size-4" />;
+  if (view.kind === "trash") return <Trash2Icon className="size-4" />;
+  return <LayersIcon className="size-4" />;
 }
 
 /** An open search, listed under the view it was started from. */
@@ -166,7 +183,7 @@ function SearchRow({
 }) {
   return (
     <SkRow
-      icon={<SearchIcon className="size-3.5" />}
+      icon={<SearchIcon className="size-4" />}
       title={search.title}
       depth={depth + 1}
       selected={search.selected}
@@ -189,7 +206,82 @@ function SearchRow({
   );
 }
 
-/** Sidebar row: muted at rest, inverted block when selected; counts live in the badge only. */
+/**
+ * The footer's avatar (Codex's): the Otter account, or a placeholder when
+ * signed out, opening the app's menu: the account, Settings, and Sync now
+ * (only while push isn't live, as before; ⌘, and ⌘R work either way).
+ */
+function AccountMenu({
+  otter,
+  onOpenSettings,
+  onSync,
+  syncing,
+}: {
+  otter: OtterAccountState | null;
+  onOpenSettings: (pane?: SettingsPane) => void;
+  onSync: () => void;
+  syncing: boolean;
+}) {
+  const user = otter?.user ?? null;
+  return (
+    <DropdownMenu>
+      <HintTooltip label={user ? (user.name ?? user.email) : "Settings"}>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            aria-label="Account and settings"
+            className="relative flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-sidebar-muted-foreground outline-none transition-colors hover:bg-sidebar-row-hover hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-focus-ring data-[state=open]:bg-sidebar-row-hover"
+          >
+            {user ? (
+              <OtterAvatar user={user} className="size-6" />
+            ) : (
+              <CircleUserRoundIcon className="size-5" />
+            )}
+          </button>
+        </DropdownMenuTrigger>
+      </HintTooltip>
+      <DropdownMenuContent side="top" className="min-w-56">
+        {user ? (
+          <DropdownMenuItem
+            icon={<OtterAvatar user={user} className="size-5" />}
+            onSelect={() => onOpenSettings("otter")}
+            className="h-auto py-1.5"
+          >
+            <span className="block truncate text-foreground">{user.name ?? user.email}</span>
+            {user.name ? (
+              <span className="block truncate text-[13px] text-muted-foreground">{user.email}</span>
+            ) : null}
+          </DropdownMenuItem>
+        ) : (
+          <DropdownMenuItem icon={<LogInIcon />} onSelect={() => onOpenSettings("otter")}>
+            Sign in to Otter Mail
+          </DropdownMenuItem>
+        )}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          icon={<SettingsIcon />}
+          accelerator="⌘,"
+          onSelect={() => onOpenSettings()}
+        >
+          Settings
+        </DropdownMenuItem>
+        {otter?.realtime === "live" ? null : (
+          <DropdownMenuItem
+            icon={<RotateCwIcon className={syncing ? "animate-spin" : undefined} />}
+            accelerator="⌘R"
+            disabled={syncing}
+            onSelect={onSync}
+          >
+            {syncing ? "Syncing…" : "Sync now"}
+          </DropdownMenuItem>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+/** Sidebar row (Codex): 14px regular text, muted icon, a rounded pill on hover
+    and when selected; counts live in the badge only. */
 function SkRow({
   icon,
   title,
@@ -222,19 +314,20 @@ function SkRow({
       style={style}
       {...dragProps}
       className={[
-        "group flex h-8 w-full cursor-pointer items-center gap-(--sidebar-control-gap) rounded-[var(--control-radius)] pr-(--sidebar-row-content-inset) text-left text-sm font-medium outline-none transition-[background-color,color] focus-visible:ring-2 focus-visible:ring-focus-ring active:bg-sidebar-row-active",
+        SIDEBAR_ROW,
+        "pr-(--sidebar-row-content-inset)",
         selected
           ? "bg-sidebar-row-selected text-sidebar-foreground"
-          : "text-sidebar-muted-foreground/80 hover:bg-sidebar-row-hover hover:text-sidebar-foreground",
+          : "text-sidebar-foreground/90 hover:bg-sidebar-row-hover hover:text-sidebar-foreground",
         dropActive ? "bg-sidebar-row-hover ring-1 ring-inset ring-primary/70" : "",
       ].join(" ")}
     >
       <span
         className={[
-          "shrink-0",
+          "flex shrink-0 items-center",
           selected
             ? "text-sidebar-foreground"
-            : "text-(--sidebar-icon-color) group-hover:text-sidebar-foreground",
+            : "text-sidebar-muted-foreground group-hover:text-sidebar-foreground",
         ].join(" ")}
       >
         {icon}
@@ -280,29 +373,36 @@ function Section({
 }) {
   const [open, setOpen] = useState(true);
   return (
-    <div className="mt-3">
+    <div className="mt-4">
       <div
         className={[
-          "group flex h-7 items-center gap-1 rounded-md pr-1",
+          "group flex h-8 items-center gap-1 rounded-lg pr-1",
           dropZone?.active ? "bg-sidebar-row-hover ring-1 ring-inset ring-primary/70" : "",
         ].join(" ")}
         onDragOver={dropZone?.onDragOver}
         onDragLeave={dropZone?.onDragLeave}
         onDrop={dropZone?.onDrop}
       >
+        {/* A plain muted heading (Codex's "Projects"); the chevron shows on
+            hover, or while the section is collapsed. */}
         <button
           type="button"
           onClick={() => setOpen((o) => !o)}
-          className="flex h-7 items-center gap-1 rounded-md px-2.5 text-xs font-medium text-sidebar-muted-foreground/70 hover:text-sidebar-foreground"
+          className="flex h-8 items-center gap-1 rounded-lg px-(--sidebar-row-content-inset) text-[13px] font-normal text-sidebar-muted-foreground outline-none hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-focus-ring"
           aria-label={`Toggle ${title}`}
         >
-          <ChevronDownIcon
-            className={["size-3 transition-transform", open ? "" : "-rotate-90"].join(" ")}
-          />
           {title}
+          <ChevronDownIcon
+            className={[
+              "size-3.5 transition-[opacity,transform]",
+              open ? "opacity-0 group-hover:opacity-100" : "-rotate-90",
+            ].join(" ")}
+          />
         </button>
         <span className="flex-1" />
-        <span className="opacity-0 group-hover:opacity-100">{action}</span>
+        <span className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100">
+          {action}
+        </span>
       </div>
       {open ? children : null}
     </div>
@@ -316,9 +416,9 @@ function SectionAddButton({ label, onClick }: { label: string; onClick: () => vo
         type="button"
         aria-label={label}
         onClick={onClick}
-        className="flex size-6 items-center justify-center rounded-md text-muted-foreground hover:bg-sidebar-row-hover hover:text-sidebar-foreground"
+        className="flex size-6 items-center justify-center rounded-md text-sidebar-muted-foreground outline-none hover:bg-sidebar-row-hover hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-focus-ring"
       >
-        <PlusIcon className="size-3.5" />
+        <PlusIcon className="size-4" />
       </button>
     </HintTooltip>
   );
@@ -330,11 +430,9 @@ function AddRow({ label, onClick }: { label: string; onClick: () => void }) {
     <button
       type="button"
       onClick={onClick}
-      className="flex h-8 w-full items-center gap-2 rounded-[var(--control-radius)] px-2.5 text-left text-sm font-medium text-sidebar-muted-foreground/80 hover:bg-sidebar-row-hover hover:text-sidebar-foreground"
+      className={`${SIDEBAR_ROW} px-(--sidebar-row-content-inset) text-sidebar-foreground/90 hover:bg-sidebar-row-hover hover:text-sidebar-foreground`}
     >
-      <span className="flex size-4 items-center justify-center rounded-sm border border-sidebar-line">
-        <PlusIcon className="size-3" />
-      </span>
+      <PlusIcon className="size-4 shrink-0 text-sidebar-muted-foreground" />
       <span className="truncate">{label}</span>
     </button>
   );
@@ -557,8 +655,8 @@ function LabelNode({
 }
 
 type AccountsSidebarProps = {
-  /** Footer utilities. */
-  onOpenSettings: () => void;
+  /** The account menu: Settings (a pane, General by default) and Sync now. */
+  onOpenSettings: (pane?: SettingsPane) => void;
   /** Opens Settings → Views on a view ("new" to create one) for a mailbox. */
   onEditView: (viewId: string, mailbox: string | null) => void;
   onSync: () => void;
@@ -580,11 +678,127 @@ type AccountsSidebarProps = {
   onCloseSearch: (id: string) => void;
 };
 
-export function AccountsSidebar({
-  onOpenSettings,
+/**
+ * The sidebar: its mailboxes' pages side by side (Dia's profiles) between the
+ * title and the footer, in a horizontal scroller that snaps a page at a time.
+ * The swipe is the platform's own scrolling: macOS follows the fingers,
+ * carries the momentum, rubber-bands at the ends and settles on a page with
+ * its own physics. Where it comes to rest picks the mailbox; the other
+ * switches (the dots, ⌘1…, the menu) scroll there.
+ */
+export function AccountsSidebar(props: AccountsSidebarProps) {
+  const { onOpenSettings, onSync, syncing, selectedAccountId, onSelectAccount } = props;
+  const otter = useOtterAccount();
+  const { accounts } = useMailboxes();
+  const mailboxIds = useMailboxOptions(accounts).map((o) => o.id);
+  const index = mailboxIds.indexOf(selectedAccountId ?? "");
+  const pageIds = index < 0 ? [selectedAccountId ?? ""] : mailboxIds;
+
+  const scroller = useRef<HTMLDivElement>(null);
+  // The page the scroller is at (or heading to), so its own resting doesn't
+  // pick a mailbox again, and a switch from elsewhere knows to scroll.
+  const shown = useRef(-1);
+
+  // A switch from elsewhere scrolls to its page (at once the first time).
+  useLayoutEffect(() => {
+    const el = scroller.current;
+    if (!el || index < 0 || shown.current === index) return;
+    const first = shown.current < 0;
+    shown.current = index;
+    el.scrollTo({ left: index * el.clientWidth, behavior: first ? "instant" : "smooth" });
+  }, [index]);
+  // Resizing the sidebar keeps the page in place.
+  useEffect(() => {
+    const el = scroller.current;
+    if (!el) return;
+    const observer = new ResizeObserver(() => {
+      if (shown.current >= 0) el.scrollLeft = shown.current * el.clientWidth;
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  // Where a swipe comes to rest picks the mailbox.
+  const settleTimer = useRef(0);
+  const settled = () => {
+    const el = scroller.current;
+    if (!el || !el.clientWidth) return;
+    const at = Math.round(el.scrollLeft / el.clientWidth);
+    if (at === shown.current || !mailboxIds[at]) return;
+    shown.current = at;
+    onSelectAccount(mailboxIds[at]);
+  };
+  useEffect(() => {
+    const el = scroller.current;
+    if (!el) return;
+    el.addEventListener("scrollend", settled);
+    return () => el.removeEventListener("scrollend", settled);
+  });
+
+  return (
+    <div className="flex h-full min-w-0 flex-col">
+      <WindowTitle />
+
+      <div
+        ref={scroller}
+        // Where there's no scrollend (older Safari), a pause in scrolling stands in.
+        onScroll={() => {
+          window.clearTimeout(settleTimer.current);
+          settleTimer.current = window.setTimeout(settled, 150);
+        }}
+        className="flex min-h-0 flex-1 snap-x snap-mandatory overflow-x-auto overflow-y-hidden overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
+        {pageIds.map((id) => {
+          const current = id === (selectedAccountId ?? "");
+          return (
+            <div key={id} className="h-full w-full shrink-0 snap-start snap-always">
+              {current ? (
+                <SidebarPage {...props} active />
+              ) : (
+                // Another mailbox as it looks once switched to: its inbox.
+                <SidebarPage
+                  {...props}
+                  active={false}
+                  selectedAccountId={id}
+                  selectedLabelId={id === COMBINED_ACCOUNT_ID ? INBOX_VIEW_ID : "INBOX"}
+                  searchSelected={false}
+                  searchPending={false}
+                  searches={[]}
+                />
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      <UpdateCard />
+
+      {/* Footer, like Codex's: who you are (and the app's menu) on the
+          left, the mailbox dots centered. */}
+      <div className="flex shrink-0 items-center gap-1 px-(--sidebar-content-inset) pb-(--sidebar-content-inset) pt-1">
+        <AccountMenu
+          otter={otter}
+          onOpenSettings={onOpenSettings}
+          onSync={onSync}
+          syncing={syncing}
+        />
+        <MailboxDots
+          accounts={accounts}
+          selectedAccountId={selectedAccountId}
+          onSelectAccount={onSelectAccount}
+          className="min-w-0 flex-1 justify-center"
+        />
+        {/* Balances the avatar so the dots sit in the middle. */}
+        <span aria-hidden className="size-8 shrink-0" />
+      </div>
+    </div>
+  );
+}
+
+/** One mailbox's page of the sidebar: its heading, rows, views and labels. */
+function SidebarPage({
+  active,
   onEditView,
-  onSync,
-  syncing,
   selectedAccountId,
   onSelectAccount,
   selectedLabelId,
@@ -597,11 +811,12 @@ export function AccountsSidebar({
   searches,
   onSelectSearch,
   onCloseSearch,
-}: AccountsSidebarProps) {
-  const otter = useOtterAccount();
+}: AccountsSidebarProps & {
+  /** The page showing; a neighbor drawn during a swipe is inert. */
+  active: boolean;
+}) {
   const isCombined = selectedAccountId === COMBINED_ACCOUNT_ID;
 
-  const accountsQuery = useAccounts();
   const labelsQuery = useLabels(isCombined ? null : selectedAccountId);
   const addAccount = useAddAccount();
   const createLabel = useCreateLabel();
@@ -625,7 +840,7 @@ export function AccountsSidebar({
   const modifyThread = useModifyThread();
   const { rules: keybindingRules } = useKeybindingsState();
 
-  const accounts = accountsQuery.data ?? [];
+  const { accounts } = useMailboxes();
   const labels: GmailLabel[] = labelsQuery.data ?? [];
   // Views belong to one mailbox; each mailbox (account or Combined) lists its own.
   const countScope = isCombined ? accounts : accounts.filter((a) => a.id === selectedAccountId);
@@ -839,11 +1054,9 @@ export function AccountsSidebar({
 
   return (
     <SearchRowsContext.Provider value={renderSearchRows}>
-      <div className="flex h-full min-w-0 flex-col">
-        <WindowTitle />
-
-        {/* Mailbox switcher row (All mailboxes / an account). */}
-        <div className="shrink-0 px-(--sidebar-content-inset) pb-1">
+      <div className="flex h-full min-w-0 flex-col" inert={!active}>
+        {/* Mailbox switcher, the sidebar's heading (Codex's "Codex ⌄"). */}
+        <div className="shrink-0 px-(--sidebar-content-inset) pb-2">
           <MailboxSwitcher
             accounts={accounts}
             selectedAccountId={selectedAccountId}
@@ -851,26 +1064,29 @@ export function AccountsSidebar({
           />
         </div>
 
-        {/* Search row + compose, like the workspace sidebar. */}
-        <div className="flex h-10 shrink-0 items-center gap-1 px-(--sidebar-content-inset)">
-          {/* Search is a mailbox: selecting it opens Gmail search in the list. */}
-          <div className="min-w-0 flex-1">
-            <SkRow
-              icon={<SearchIcon className="size-4" />}
-              title="Search"
-              selected={searchSelected}
-              dot={searchPending}
-              onClick={onOpenSearch}
-            />
-          </div>
+        {/* New message (Codex's "New chat"), then Search, which is a mailbox:
+            selecting it opens Gmail search in the list. */}
+        <div className="flex shrink-0 flex-col gap-0.5 px-(--sidebar-content-inset)">
           <HintTooltip label="New message" shortcut="compose.new">
-            <IconBtn label="New message" onClick={onCompose}>
-              <SquarePenIcon className="size-4" />
-            </IconBtn>
+            <button
+              type="button"
+              onClick={onCompose}
+              className={`${SIDEBAR_ROW} bg-sidebar-control-surface px-(--sidebar-row-content-inset) text-sidebar-foreground hover:bg-sidebar-row-hover`}
+            >
+              <SquarePenIcon className="size-4 shrink-0 text-sidebar-muted-foreground group-hover:text-sidebar-foreground" />
+              <span className="truncate">New message</span>
+            </button>
           </HintTooltip>
+          <SkRow
+            icon={<SearchIcon className="size-4" />}
+            title="Search"
+            selected={searchSelected}
+            dot={searchPending}
+            onClick={onOpenSearch}
+          />
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-(--sidebar-content-inset) pb-4 pt-1">
+        <div className="min-h-0 flex-1 scroll-fade-y overflow-y-auto px-(--sidebar-content-inset) pb-8 pt-3">
           {isCombined ? (
             <>
               {views
@@ -985,27 +1201,6 @@ export function AccountsSidebar({
                 <AddRow label="Add Gmail account" onClick={() => void handleAddAccount()} />
               ) : null}
             </>
-          )}
-        </div>
-
-        <UpdateCard />
-
-        {/* Footer utilities, like the workspace sidebar's bottom row. */}
-        <div className="flex shrink-0 items-center gap-1 px-(--sidebar-content-inset) py-1">
-          <HintTooltip label="Settings" hint="⌘,">
-            <IconBtn label="Settings" onClick={onOpenSettings} className="size-8">
-              <SettingsIcon className="size-4" />
-            </IconBtn>
-          </HintTooltip>
-          <span className="flex-1" />
-          {/* With Gmail pushing changes (Otter account connected) there's nothing to sync by
-              hand; ⌘R and the command palette still do. */}
-          {otter?.realtime === "live" ? null : (
-            <HintTooltip label={syncing ? "Syncing…" : "Sync now"} hint="⌘R">
-              <IconBtn label="Sync now" onClick={onSync} disabled={syncing} className="size-8">
-                <RotateCwIcon className={syncing ? "size-4 animate-spin" : "size-4"} />
-              </IconBtn>
-            </HintTooltip>
           )}
         </div>
 

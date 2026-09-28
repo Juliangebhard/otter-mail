@@ -3,14 +3,11 @@
  * (@otter-mail/core, served over Electron IPC) and the desktop's own.
  */
 
-import { app, ipcMain, nativeImage, shell } from "electron";
-import * as fs from "node:fs";
-import * as path from "node:path";
+import { app, ipcMain, nativeImage } from "electron";
 
 import {
   broadcast,
   getAttachmentBytes,
-  KEYBINDINGS_FILE,
   onSettingsChanged,
   registeredHandlers,
   runAsTask,
@@ -25,20 +22,6 @@ import { createTray, destroyTray } from "../services/tray.js";
 import { focusMainWindow } from "../windows/main-window.js";
 import { setSettingsTarget, takeSettingsTarget } from "../windows/settings-window.js";
 import { registerTrayPopoverHandlers } from "./tray-popover.js";
-
-/** Watches keybindings.json (editors replace files) so hand edits apply live. */
-function watchKeybindings(): void {
-  let timer: ReturnType<typeof setTimeout> | null = null;
-  try {
-    fs.watch(app.getPath("userData"), (_event, name) => {
-      if (name?.toString() !== KEYBINDINGS_FILE) return;
-      if (timer) clearTimeout(timer);
-      timer = setTimeout(() => broadcast("keybindings:updated"), 100);
-    });
-  } catch (err) {
-    logger.info("keybindings", `watch failed: ${String(err)}`);
-  }
-}
 
 export function registerHandlers(): void {
   for (const [channel, handler] of registeredHandlers()) {
@@ -80,13 +63,6 @@ export function registerHandlers(): void {
   });
 
   ipcMain.handle("window:getSettingsTarget", async () => takeSettingsTarget());
-
-  watchKeybindings();
-  ipcMain.handle("keybindings:openFile", async () => {
-    const error = await shell.openPath(path.join(app.getPath("userData"), KEYBINDINGS_FILE));
-    if (error) throw new Error(error);
-    return { ok: true };
-  });
 
   // A conversation the menu-bar popover asked the main window to open.
   ipcMain.handle("window:takePendingOpenMessage", async () => takePendingOpenMessage());

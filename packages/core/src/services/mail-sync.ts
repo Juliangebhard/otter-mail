@@ -127,6 +127,27 @@ export function setPushedAccounts(accountIds: Iterable<string>): void {
  * failure backoff, which only an explicit request (`force` without a trigger)
  * skips. A push or explicit request arriving mid-run runs once more after it.
  */
+/**
+ * Mailboxes turned off in Settings → Mailboxes (the renderer's synced UI
+ * preference `mail:mailboxes`, which names them by address, as account ids
+ * do): left unsynced, so they cost no Gmail traffic and raise no
+ * notifications. Turning one back on syncs it at once.
+ */
+let turnedOff = new Set<string>();
+
+export function followMailboxArrangement(value: string | undefined): void {
+  let off: string[] = [];
+  try {
+    const parsed = (JSON.parse(value ?? "{}") as { off?: unknown }).off;
+    if (Array.isArray(parsed)) off = parsed.filter((e): e is string => typeof e === "string");
+  } catch {
+    // Unreadable: treat every mailbox as on.
+  }
+  const was = turnedOff;
+  turnedOff = new Set(off);
+  for (const id of was) if (!turnedOff.has(id)) syncAccount(id, { force: true });
+}
+
 export function syncAccount(
   accountId: string,
   opts?: { force?: boolean; trigger?: "timer" | "push" },
@@ -138,6 +159,7 @@ export function syncAccount(
   }
   // Re-added after removal: the old run has ended (not running), start fresh.
   removed.delete(accountId);
+  if (turnedOff.has(accountId)) return;
   // Nothing to sync with until the account signs in again (Settings → Accounts).
   if (!platform().google.isSignedIn(accountId)) {
     update(accountId, { syncing: false, error: SIGNED_OUT_MESSAGE });

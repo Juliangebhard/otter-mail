@@ -239,7 +239,6 @@ export const webBridge: DesktopBridge = {
     launchAtLogin: false,
     defaultMailApp: false,
     translation: hasBuiltInTranslator,
-    keybindingsFile: false,
     dragOut: false,
   },
   invoke,

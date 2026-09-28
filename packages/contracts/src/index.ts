@@ -52,8 +52,6 @@ export interface BridgeFeatures {
   defaultMailApp: boolean;
   /** Apple's on-device translation. */
   translation: boolean;
-  /** keybindings.json on disk, opened in an editor. */
-  keybindingsFile: boolean;
   /** Dragging attachments out to Finder. */
   dragOut: boolean;
 }

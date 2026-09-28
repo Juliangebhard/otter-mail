@@ -6,8 +6,8 @@
  * files as rows, in the composer and in the sent message.
  */
 
-import { useEffect, useRef, useState, type DragEvent } from "react";
-import { FileTextIcon, LoaderCircleIcon, PaperclipIcon, XIcon } from "lucide-react";
+import { useEffect, useRef, useState, type DragEvent, type ReactNode } from "react";
+import { FileTextIcon, ImageIcon, LoaderCircleIcon, PaperclipIcon, XIcon } from "lucide-react";
 import { toast } from "./toast";
 import { gmailApi, type ChatAttachment } from "./api";
 import { cn } from "./ui";
@@ -237,81 +237,126 @@ export function filesFromPaste(data: DataTransfer): File[] {
 // Composer strip + sent message
 // ---------------------------------------------------------------------------
 
+/**
+ * An attachment in the composer: a compact two-line chip (mostly mail, so
+ * a name and a detail say more than a preview would): a tile with the kind's
+ * icon or a thumbnail, the name over a muted detail, and remove on hover.
+ */
+export function AttachmentChip({
+  tile,
+  name,
+  detail,
+  title,
+  pending,
+  off,
+  onClick,
+  onRemove,
+}: {
+  tile: ReactNode;
+  name: string;
+  detail?: string;
+  title?: string;
+  /** Still uploading. */
+  pending?: boolean;
+  /** Left out of the message (the attached mail, toggled off). */
+  off?: boolean;
+  onClick?: () => void;
+  onRemove?: () => void;
+}) {
+  return (
+    <div
+      title={title ?? name}
+      className={cn(
+        "group/attachment relative flex h-11 w-max min-w-0 max-w-60 shrink-0 items-center gap-2 rounded-xl border border-foreground/10 bg-card py-1.5 pl-1.5 pr-3 transition-opacity",
+        off && "opacity-50",
+      )}
+    >
+      {onClick ? (
+        <button
+          type="button"
+          aria-pressed={!off}
+          aria-label={name}
+          onClick={onClick}
+          className="absolute inset-0 z-10 cursor-pointer rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus-ring"
+        />
+      ) : null}
+      <span className="relative flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-foreground/[0.06] text-muted-foreground [&_svg]:size-4">
+        {tile}
+        {pending ? (
+          <span className="absolute inset-0 flex items-center justify-center bg-card/70">
+            <LoaderCircleIcon className="animate-spin" />
+          </span>
+        ) : null}
+      </span>
+      <span className="flex min-w-0 flex-col">
+        <span
+          className={cn("truncate text-[13px] leading-4 text-foreground", off && "line-through")}
+        >
+          {name}
+        </span>
+        {detail ? (
+          <span className="truncate text-[11px] leading-4 text-muted-foreground">{detail}</span>
+        ) : null}
+      </span>
+      {onRemove ? (
+        <button
+          type="button"
+          onClick={onRemove}
+          aria-label={`Remove ${name}`}
+          className="absolute -right-1.5 -top-1.5 z-20 flex size-4.5 cursor-pointer items-center justify-center rounded-full border border-foreground/10 bg-popover text-muted-foreground opacity-0 shadow-sm transition-opacity hover:text-foreground group-hover/attachment:opacity-100 focus-visible:opacity-100"
+        >
+          <XIcon className="size-2.5" />
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+/** A file's extension, for its chip ("PDF", "XLSX"). */
+function extensionOf(name: string): string {
+  const dot = name.lastIndexOf(".");
+  return dot > 0 && dot < name.length - 1 ? name.slice(dot + 1, dot + 6).toUpperCase() : "File";
+}
+
+/**
+ * The composer's attachments as chips in a row at its top; `children` go
+ * first (the attached mail).
+ */
 export function ComposerAttachments({
   items,
   onRemove,
+  children,
 }: {
   items: DraftAttachment[];
   onRemove: (key: string) => void;
+  children?: ReactNode;
 }) {
-  const images = items.filter((a) => a.kind === "image");
-  const files = items.filter((a) => a.kind === "file");
-  if (items.length === 0) return null;
+  if (items.length === 0 && !children) return null;
   return (
-    <div className="px-4 pt-3">
-      {images.length > 0 ? (
-        <div className="mb-2 flex max-w-full flex-wrap gap-2">
-          {images.map((image) => (
-            <div
-              key={image.key}
-              className="group/attachment relative h-16 w-16 shrink-0 overflow-hidden rounded-lg border border-border/80 bg-background"
-            >
-              {image.previewUrl ? (
-                <img
-                  className="h-full w-full object-cover"
-                  alt={image.name}
-                  src={image.previewUrl}
-                />
-              ) : (
-                <span className="flex h-full items-center justify-center px-1 text-[10px] text-secondary-label">
-                  {image.name}
-                </span>
-              )}
-              {!image.staged ? (
-                <span className="pointer-events-none absolute inset-0 flex items-center justify-center bg-background/50">
-                  <LoaderCircleIcon className="size-4 animate-spin text-muted-foreground" />
-                </span>
-              ) : null}
-              <button
-                type="button"
-                onClick={() => onRemove(image.key)}
-                aria-label={`Remove ${image.name}`}
-                className="absolute right-1 top-1 flex size-5 cursor-pointer items-center justify-center rounded-full bg-black/60 text-white opacity-0 transition-opacity group-hover/attachment:opacity-100 focus-visible:opacity-100"
-              >
-                <XIcon className="size-3" />
-              </button>
-            </div>
-          ))}
-        </div>
-      ) : null}
-      {files.length > 0 ? (
-        <div className="mb-2 flex flex-col gap-1">
-          {files.map((file) => (
-            <div
-              key={file.key}
-              className="flex min-w-0 items-center gap-2 py-1 text-sm text-foreground"
-            >
-              {file.staged ? (
-                <FileTextIcon className="size-4 shrink-0 text-muted-foreground" />
-              ) : (
-                <LoaderCircleIcon className="size-4 shrink-0 animate-spin text-muted-foreground" />
-              )}
-              <span className="min-w-0 flex-1 truncate">{file.name}</span>
-              <span className="shrink-0 text-xs text-secondary-label">
-                {formatAttachmentSize(file.size)}
-              </span>
-              <button
-                type="button"
-                onClick={() => onRemove(file.key)}
-                aria-label={`Remove ${file.name}`}
-                className="inline-flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-(--control-radius) text-muted-foreground hover:bg-accent-surface hover:text-foreground"
-              >
-                <XIcon className="size-3.5" />
-              </button>
-            </div>
-          ))}
-        </div>
-      ) : null}
+    <div className="flex gap-2 overflow-x-auto px-3 pb-0.5 pt-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      {children}
+      {items.map((item) => (
+        <AttachmentChip
+          key={item.key}
+          name={item.name}
+          detail={
+            item.kind === "image"
+              ? "Image"
+              : `${extensionOf(item.name)} · ${formatAttachmentSize(item.size)}`
+          }
+          pending={!item.staged}
+          onRemove={() => onRemove(item.key)}
+          tile={
+            item.kind === "image" && item.previewUrl ? (
+              <img className="size-full object-cover" alt="" src={item.previewUrl} />
+            ) : item.kind === "image" ? (
+              <ImageIcon />
+            ) : (
+              <FileTextIcon />
+            )
+          }
+        />
+      ))}
     </div>
   );
 }
@@ -332,7 +377,7 @@ export function SentAttachments({ attachments }: { attachments: SentAttachment[]
           {images.map((image, i) => (
             <div
               key={i}
-              className="aspect-[4/3] overflow-hidden rounded-lg border border-border/80 bg-background/70"
+              className="aspect-[4/3] overflow-hidden rounded-xl border border-border/60 bg-background/70"
               title={image.name}
             >
               {image.thumb ? (

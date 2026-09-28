@@ -66,7 +66,7 @@ function CopyErrorButton({ text }: { text: string }) {
       <button
         type="button"
         aria-label={label}
-        className="inline-flex size-5 items-center justify-center rounded-md text-muted-foreground/80 hover:text-muted-foreground"
+        className="inline-flex size-7 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent-surface hover:text-foreground"
         onClick={() => {
           void navigator.clipboard.writeText(text).then(() => {
             setCopied(true);
@@ -74,7 +74,11 @@ function CopyErrorButton({ text }: { text: string }) {
           });
         }}
       >
-        {copied ? <CheckIcon className="size-3 text-success" /> : <CopyIcon className="size-3" />}
+        {copied ? (
+          <CheckIcon className="size-3.5 text-success" />
+        ) : (
+          <CopyIcon className="size-3.5" />
+        )}
       </button>
     </HintTooltip>
   );
@@ -129,7 +133,7 @@ function ToastBody({
           {copyErrorText !== null ? <CopyErrorButton text={copyErrorText} /> : null}
           {hasAction ? (
             <Toast.Action
-              className={buttonClass("outline", "xs", "shrink-0")}
+              className={buttonClass("ghost", "sm", "shrink-0 rounded-full text-sm")}
               data-slot="toast-action"
             >
               {actionProps?.children}
@@ -195,7 +199,7 @@ function Toasts({ position }: { position: ToastPosition }) {
           return (
             <Toast.Root
               className={cn(
-                "dropdown-glass absolute z-[calc(9999-var(--toast-index))] w-full overflow-visible select-none rounded-lg text-popover-foreground shadow-xl shadow-black/25 [transition:transform_.5s_cubic-bezier(.22,1,.36,1),opacity_.5s,height_.15s]",
+                "dropdown-glass absolute z-[calc(9999-var(--toast-index))] w-full overflow-visible select-none rounded-xl text-popover-foreground shadow-lg shadow-black/10 dark:shadow-black/30 [transition:transform_.5s_cubic-bezier(.22,1,.36,1),opacity_.5s,height_.15s]",
                 "data-[position*=right]:right-0 data-[position*=right]:left-auto",
                 "data-[position*=left]:right-auto data-[position*=left]:left-0",
                 "data-[position*=center]:right-0 data-[position*=center]:left-0",
@@ -267,7 +271,7 @@ function Toasts({ position }: { position: ToastPosition }) {
               </div>
               <Toast.Content
                 className={cn(
-                  "pointer-events-auto flex min-h-0 items-center justify-between gap-1.5 overflow-y-visible py-3 pl-3.5 text-sm transition-opacity duration-250 [overflow-x:clip] data-expanded:opacity-100",
+                  "pointer-events-auto flex min-h-0 items-center justify-between gap-2 overflow-y-visible py-3 pl-4 text-sm transition-opacity duration-250 [overflow-x:clip] data-expanded:opacity-100",
                   hasTrailingControls ? "pr-6" : "pr-10",
                   hideCollapsedContent &&
                     "not-data-expanded:pointer-events-none not-data-expanded:opacity-0",
