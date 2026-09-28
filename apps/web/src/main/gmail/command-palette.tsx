@@ -39,7 +39,12 @@ import { useDebouncedValue, useSearchMessages } from "./hooks";
 import { getAccountColor, getAccountDisplayName } from "./account-style";
 import { cn } from "./ui";
 import { COMBINED_ACCOUNT_ID } from "./custom-views";
-import { APP_THEMES, setThemeForAppearance, useThemeChoice } from "../theme/apply-theme";
+import {
+  APP_THEMES,
+  previewTheme,
+  setThemeForAppearance,
+  useThemeChoice,
+} from "../theme/apply-theme";
 import type { GmailAccount, GmailMessageSummary, MailView } from "./types";
 import type { KeybindingCommand } from "../keybindings/commands";
 import { shortcutLabelFor, useKeybindingsState } from "../keybindings/store";
@@ -388,7 +393,27 @@ export function CommandPalette({
   const flat = groups.flatMap((g) => g.items);
   const clamped = Math.min(highlight, Math.max(flat.length - 1, 0));
 
-  useEffect(() => setHighlight(0), [query, page]);
+  // A fresh list starts at its top; the theme list starts on the current theme.
+  useEffect(() => {
+    setHighlight(
+      page === "theme" && query === ""
+        ? Math.max(
+            0,
+            flat.findIndex((i) => i.checked),
+          )
+        : 0,
+    );
+  }, [query, page]);
+
+  // Changing theme: the highlighted one shows (here only, nothing saved)
+  // until Enter or a click picks it; leaving or closing puts yours back.
+  const previewId =
+    open && page === "theme" ? (flat[clamped]?.id.replace(/^theme:/, "") ?? null) : null;
+  useEffect(() => {
+    if (!previewId) return;
+    previewTheme(previewId);
+    return () => previewTheme(null);
+  }, [previewId]);
 
   // Keep the highlighted row in view while arrowing.
   useEffect(() => {
@@ -445,9 +470,9 @@ export function CommandPalette({
 
   return createPortal(
     <div className="no-drag fixed inset-0 z-[100]" role="presentation">
-      {/* Backdrop */}
+      {/* Backdrop: clear while changing theme, so the preview shows. */}
       <div
-        className="absolute inset-0 bg-canvas/40 backdrop-blur-[2px]"
+        className={cn("absolute inset-0", page !== "theme" && "bg-canvas/40 backdrop-blur-[2px]")}
         onPointerDown={close}
         aria-hidden
       />

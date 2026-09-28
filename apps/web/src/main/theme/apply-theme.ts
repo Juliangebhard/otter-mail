@@ -139,10 +139,20 @@ function appearance(): ThemeAppearance {
   return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 
+/** A theme shown in this window without being chosen (the palette's preview). */
+let previewId: string | null = null;
+
+/** Paints `themeId` here until cleared with null; nothing is stored or synced. */
+export function previewTheme(themeId: string | null): void {
+  if (previewId === themeId) return;
+  previewId = themeId;
+  window.dispatchEvent(new Event(CHANGE_EVENT));
+}
+
 /** Applies the theme for the current system/app appearance to this window. */
 export function applyAppTheme(): void {
   const mode = appearance();
-  const themeId = getThemeChoice()[mode];
+  const themeId = previewId ?? getThemeChoice()[mode];
   const colors = themeColors(themeId, mode);
   const exact = APP_THEMES.find((t) => t.id === themeId)?.exact ?? false;
 
@@ -184,7 +194,7 @@ export function startAppTheme(): () => void {
 
 /** Whether the theme this window wears keeps its own primary (no per-account color). */
 function isMonochrome(): boolean {
-  const id = getThemeChoice()[appearance()];
+  const id = previewId ?? getThemeChoice()[appearance()];
   return APP_THEMES.find((t) => t.id === id)?.monochrome ?? false;
 }
 
