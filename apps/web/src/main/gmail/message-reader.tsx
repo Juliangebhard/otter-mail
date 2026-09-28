@@ -1394,8 +1394,8 @@ export function ExpandedRow({
           </div>
         </div>
 
-        {/* Body lines up under the sender's name */}
-        <div className="mt-4 pl-12">
+        {/* The body takes the row's full width, not indented under the avatar. */}
+        <div className="mt-4">
           {detailQuery.isLoading ? (
             <div className="flex flex-col gap-2">
               <div className="h-4 w-3/4 animate-skeleton rounded-full bg-secondary" />
