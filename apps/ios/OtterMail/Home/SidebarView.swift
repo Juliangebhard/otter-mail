@@ -135,7 +135,17 @@ struct SidebarView: View {
             .padding(.horizontal, 12)
         }
         .scrollIndicators(.hidden)
+        .contentMargins(.top, 12, for: .scrollContent)
         .contentMargins(.bottom, 96, for: .scrollContent)
+        // Rows fade out under the chips and the Compose bar instead of stopping at a line.
+        .mask {
+            VStack(spacing: 0) {
+                LinearGradient(colors: [.clear, .black], startPoint: .top, endPoint: .bottom).frame(height: 32)
+                Color.black
+                LinearGradient(colors: [.black, .clear], startPoint: .top, endPoint: .bottom).frame(height: 64)
+                Color.clear.frame(height: 40)
+            }
+        }
     }
 
     private func row(_ folder: Folder, scope: String?, color: String? = nil, indent: Int = 0) -> some View {
