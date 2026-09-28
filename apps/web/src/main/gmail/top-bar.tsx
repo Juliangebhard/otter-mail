@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { DropdownMenu as RadixMenu } from "radix-ui";
 import {
   CheckIcon,
@@ -8,14 +8,12 @@ import {
   PanelLeftIcon,
   PanelRightIcon,
 } from "lucide-react";
-import { IconBtn, HintTooltip, buttonClass, cn, restoreFocusForKeyboardOnly } from "./ui";
+import { IconBtn, HintTooltip, cn, restoreFocusForKeyboardOnly } from "./ui";
 import { COMBINED_ACCOUNT_ID } from "./custom-views";
 import { getAccountColor, getAccountDisplayName } from "./account-style";
-import { gmailApi } from "./api";
 import type { GmailAccount } from "./types";
 import type { KeybindingCommand } from "../keybindings/commands";
 import { shortcutLabelFor, useKeybindingsState } from "../keybindings/store";
-import { features } from "../features";
 import { useMailboxArrangement } from "../mailboxes";
 
 /**
@@ -284,58 +282,12 @@ export function MailboxSwitcher({
 }
 
 /**
- * Outline nudge shown only while Otter Mail is not the macOS default mail app;
- * clicking asks the OS (consent dialog) and the button hides once granted.
- */
-function DefaultMailButton() {
-  const [isDefault, setIsDefault] = useState<boolean | null>(null);
-
-  const refresh = async () => {
-    try {
-      const status = await gmailApi.getDefaultMailStatus();
-      setIsDefault(status.isDefault);
-    } catch (err) {
-      console.log("[TopBar:defaultMailStatus] failed", { error: String(err) });
-    }
-  };
-
-  useEffect(() => {
-    void refresh();
-  }, []);
-
-  if (isDefault !== false) return null;
-
-  const request = async () => {
-    console.log("[TopBar:setDefaultMailApp]");
-    try {
-      await gmailApi.setDefaultMailApp();
-    } catch (err) {
-      console.log("[TopBar:setDefaultMailApp] failed", { error: String(err) });
-    }
-    void refresh();
-  };
-
-  return (
-    <HintTooltip label="Use Otter Mail for email links">
-      <button type="button" onClick={() => void request()} className={buttonClass("outline", "xs")}>
-        Set as default
-      </button>
-    </HintTooltip>
-  );
-}
-
-/**
- * Right end of the content column's title band: default-mail nudge and room
- * for the pinned assistant toggle. Views that own the band (the reader) render
- * it at the end of their own header.
+ * Right end of the content column's title band: room for the pinned
+ * assistant toggle. Views that own the band (the reader) render it at the end
+ * of their own header.
  */
 export function TitleTrailing({ showPanelToggle }: { showPanelToggle: boolean }) {
-  return (
-    <>
-      {features.defaultMailApp ? <DefaultMailButton /> : null}
-      {showPanelToggle ? <PanelControlSlot /> : null}
-    </>
-  );
+  return <>{showPanelToggle ? <PanelControlSlot /> : null}</>;
 }
 
 /** Title band of the content column: optional breadcrumb, sync status, trailing controls. */

@@ -1,4 +1,4 @@
-import type { ComponentType } from "react";
+import { useEffect, useState, type ComponentType } from "react";
 import {
   ArrowLeftIcon,
   BotIcon,
@@ -8,9 +8,11 @@ import {
   PaletteIcon,
   Settings2Icon,
   MailIcon,
+  MailCheckIcon,
 } from "lucide-react";
-import type { SettingsPane } from "../gmail/api";
-import { cn } from "../gmail/ui";
+import { gmailApi, type SettingsPane } from "../gmail/api";
+import { HintTooltip, cn } from "../gmail/ui";
+import { features } from "../features";
 
 type SettingsSection = {
   id: SettingsPane;
@@ -77,12 +79,52 @@ export function SettingsNav({
           );
         })}
       </div>
-      <div className="shrink-0 px-(--sidebar-content-inset) pt-1 pb-(--sidebar-content-inset)">
+      <div className="flex shrink-0 flex-col gap-0.5 px-(--sidebar-content-inset) pt-1 pb-(--sidebar-content-inset)">
+        {features.defaultMailApp ? <DefaultMailRow /> : null}
         <button type="button" onClick={onBack} className={cn(ROW, ROW_IDLE)}>
           <ArrowLeftIcon />
           <span className="truncate">Back</span>
         </button>
       </div>
     </>
+  );
+}
+
+/**
+ * Shown only while Otter Mail isn't the Mac's default mail app: asks macOS
+ * (a consent dialog) and hides once granted.
+ */
+function DefaultMailRow() {
+  const [isDefault, setIsDefault] = useState<boolean | null>(null);
+  const refresh = async () => {
+    try {
+      setIsDefault((await gmailApi.getDefaultMailStatus()).isDefault);
+    } catch (err) {
+      console.log("[SettingsNav:defaultMailStatus] failed", { error: String(err) });
+    }
+  };
+  useEffect(() => {
+    void refresh();
+  }, []);
+  if (isDefault !== false) return null;
+  return (
+    <HintTooltip label="Use Otter Mail for email links">
+      <button
+        type="button"
+        onClick={async () => {
+          console.log("[SettingsNav:setDefaultMailApp]");
+          try {
+            await gmailApi.setDefaultMailApp();
+          } catch (err) {
+            console.log("[SettingsNav:setDefaultMailApp] failed", { error: String(err) });
+          }
+          void refresh();
+        }}
+        className={cn(ROW, ROW_IDLE)}
+      >
+        <MailCheckIcon />
+        <span className="truncate">Set as default mail app</span>
+      </button>
+    </HintTooltip>
   );
 }
