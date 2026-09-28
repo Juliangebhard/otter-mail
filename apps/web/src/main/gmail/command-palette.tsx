@@ -159,11 +159,20 @@ export function CommandPalette({
   const themeChoice = useThemeChoice();
   const [scheme, setScheme] = useState<"system" | "light" | "dark">("system");
 
+  // Each opening starts fresh, set while rendering so the first frame
+  // doesn't show the page or search from last time.
+  const [shownOpen, setShownOpen] = useState(open);
+  if (open !== shownOpen) {
+    setShownOpen(open);
+    if (open) {
+      setQuery("");
+      setPage("root");
+      setHighlight(0);
+    }
+  }
+
   useEffect(() => {
     if (!open) return;
-    setQuery("");
-    setPage("root");
-    setHighlight(0);
     void window.desktopBridge.nativeTheme
       .getInfo()
       .then((info) => setScheme(info.themeSource))
@@ -393,8 +402,12 @@ export function CommandPalette({
   const flat = groups.flatMap((g) => g.items);
   const clamped = Math.min(highlight, Math.max(flat.length - 1, 0));
 
-  // A fresh list starts at its top; the theme list starts on the current theme.
-  useEffect(() => {
+  // A fresh list starts at its top; the theme list starts on the current
+  // theme. Set while rendering: a frame on another row would preview it.
+  const listKey = `${page}\u0000${query}`;
+  const [highlightFor, setHighlightFor] = useState(listKey);
+  if (highlightFor !== listKey) {
+    setHighlightFor(listKey);
     setHighlight(
       page === "theme" && query === ""
         ? Math.max(
@@ -403,7 +416,7 @@ export function CommandPalette({
           )
         : 0,
     );
-  }, [query, page]);
+  }
 
   // Changing theme: the highlighted one shows (here only, nothing saved)
   // until Enter or a click picks it; leaving or closing puts yours back.
