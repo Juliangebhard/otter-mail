@@ -952,24 +952,29 @@ export function AccountsSidebar({
     setPage({ index: mailboxIndex, slide: mailboxIndex > page.index ? "next" : "prev" });
   }
   const slide = page.slide;
-  const swipe = useRef({ dx: 0, fired: false, lastAt: 0, lastDx: 0 });
+  const swipe = useRef({ dx: 0, fired: false, peak: 0, slowing: false, lastAt: 0, lastDx: 0 });
   const onWheel = (e: ReactWheelEvent) => {
     if (Math.abs(e.deltaX) <= Math.abs(e.deltaY) || mailboxIds.length < 2) return;
     const s = swipe.current;
-    // One switch per swipe. A swipe's momentum only slows down, so a new one
-    // shows as a pause, a turn, or a sudden speed-up; waiting for the wheel
-    // to go quiet instead would swallow quick successive swipes.
+    // One switch per swipe. A new swipe shows as a pause, a turn, or a
+    // speed-up once the last one's momentum has clearly slowed (a swipe's own
+    // uneven start mustn't count, nor may waiting for quiet swallow quick
+    // successive swipes).
     const speed = Math.abs(e.deltaX);
     const newSwipe =
       e.timeStamp - s.lastAt > 100 ||
       Math.sign(e.deltaX) !== Math.sign(s.lastDx) ||
-      (s.fired && speed > 6 && speed > Math.abs(s.lastDx) * 1.5);
+      (s.fired && s.slowing && speed > 6 && speed > Math.abs(s.lastDx) * 1.5);
     if (newSwipe) {
       s.dx = 0;
       s.fired = false;
+      s.peak = 0;
+      s.slowing = false;
     }
     s.lastAt = e.timeStamp;
     s.lastDx = e.deltaX;
+    s.peak = Math.max(s.peak, speed);
+    if (speed < s.peak / 2) s.slowing = true;
     if (s.fired) return;
     s.dx += e.deltaX;
     if (Math.abs(s.dx) < 50) return;

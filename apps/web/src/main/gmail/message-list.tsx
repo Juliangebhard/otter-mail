@@ -1519,9 +1519,10 @@ export function MessageList({
       <div
         ref={scrollRef}
         onScroll={maybeLoadMore}
-        className={["min-h-0 flex-1 overflow-y-auto py-1", checked.size > 0 ? "pb-16" : ""].join(
-          " ",
-        )}
+        className={[
+          "min-h-0 flex-1 overflow-y-auto pb-1 pt-2",
+          checked.size > 0 ? "pb-16" : "",
+        ].join(" ")}
       >
         {signedOutAccount && !isCombined && !search && visibleMessages.length === 0 ? (
           <SignedOutMailbox account={signedOutAccount} />
