@@ -135,15 +135,15 @@ struct SidebarView: View {
             .padding(.horizontal, 12)
         }
         .scrollIndicators(.hidden)
-        .contentMargins(.top, 12, for: .scrollContent)
+        .contentMargins(.top, 4, for: .scrollContent)
         .contentMargins(.bottom, 96, for: .scrollContent)
         // Rows fade out under the chips and the Compose bar instead of stopping at a line.
         .mask {
             VStack(spacing: 0) {
-                LinearGradient(colors: [.clear, .black], startPoint: .top, endPoint: .bottom).frame(height: 32)
+                LinearGradient(colors: [.black.opacity(0.15), .black], startPoint: .top, endPoint: .bottom).frame(height: 12)
                 Color.black
-                LinearGradient(colors: [.black, .clear], startPoint: .top, endPoint: .bottom).frame(height: 64)
-                Color.clear.frame(height: 40)
+                LinearGradient(colors: [.black, .black.opacity(0.15)], startPoint: .top, endPoint: .bottom).frame(height: 24)
+                Color.clear.frame(height: 20)
             }
         }
     }
