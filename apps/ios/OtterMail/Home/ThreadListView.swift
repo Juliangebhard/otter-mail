@@ -2,14 +2,14 @@ import SwiftUI
 
 /**
  * A folder's threads, laid out like Otter Code's task list: who, what, and a
- * line of it. The bottom bar is iOS's own: the sidebar, search, and compose.
+ * line of it. The bottom bar is iOS's own: search and compose (the sidebar
+ * is a swipe from the left).
  */
 struct ThreadListView: View {
     @Environment(MailStore.self) private var store
     @Environment(\.palette) private var palette
 
     let place: Place
-    let onMenu: () -> Void
     let onCompose: () -> Void
     let onSettings: () -> Void
     let onResume: (Draft) -> Void
@@ -78,10 +78,6 @@ struct ThreadListView: View {
                     Button("Settings", systemImage: "gearshape", action: onSettings)
                 }
             }
-            ToolbarItem(placement: .bottomBar) {
-                Button("Mailboxes", systemImage: "line.3.horizontal", action: onMenu)
-            }
-            ToolbarSpacer(.fixed, placement: .bottomBar)
             DefaultToolbarItem(kind: .search, placement: .bottomBar)
             ToolbarSpacer(.fixed, placement: .bottomBar)
             ToolbarItem(placement: .bottomBar) {

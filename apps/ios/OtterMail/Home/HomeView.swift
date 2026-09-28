@@ -9,7 +9,7 @@ struct Place: Hashable {
 
 /**
  * The app's frame, ChatGPT's: the mail list, with the sidebar drawer under
- * it. The ☰ button or a swipe from the left slides the list aside.
+ * it. A swipe from the left slides the list aside.
  */
 struct HomeView: View {
     @Environment(MailStore.self) private var store
@@ -42,7 +42,6 @@ struct HomeView: View {
                 NavigationStack(path: $path) {
                     ThreadListView(
                         place: place,
-                        onMenu: { setDrawer(open: true) },
                         onCompose: { compose() },
                         onSettings: { settingsOpen = true },
                         onResume: { draft = $0 }
