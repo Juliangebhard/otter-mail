@@ -1,7 +1,7 @@
 /**
  * Otter account sign-in, with better-auth (served under /v1/auth).
  *
- * The desktop app signs in to Google itself and hands the relay the ID token
+ * The desktop and iPhone apps sign in to Google themselves and hand the relay the ID token
  * (`POST /v1/auth/sign-in/social`, `{ provider: "google", idToken }`); the
  * bearer plugin answers with a session token the app keeps. One session per
  * device, so Settings can list and sign out devices.
@@ -20,9 +20,11 @@ const DAY_S = 24 * 60 * 60;
 
 export const googleKeys = (env: Env) => remoteKeys(env.GOOGLE_JWKS_URL || GOOGLE_JWKS_URL);
 
-/** The audiences of ID tokens from Otter Mail's own Google sign-ins (desktop and web). */
+/** The audiences of ID tokens from Otter Mail's own Google sign-ins (desktop, web and iPhone). */
 export const googleClientIds = (env: Env) =>
-  [env.GOOGLE_WEB_CLIENT_ID, env.GOOGLE_CLIENT_ID].filter(Boolean);
+  [env.GOOGLE_WEB_CLIENT_ID, env.GOOGLE_CLIENT_ID, env.GOOGLE_IOS_CLIENT_ID].filter(
+    (id): id is string => Boolean(id),
+  );
 
 const hub = (env: Env, userId: string) => env.USER_HUB.get(env.USER_HUB.idFromName(userId));
 

@@ -23,6 +23,7 @@ import type {
 
 const CLIENT_ID = "test-client.apps.googleusercontent.com";
 const WEB_CLIENT_ID = "test-web-client.apps.googleusercontent.com";
+const IOS_CLIENT_ID = "test-ios-client.apps.googleusercontent.com";
 const APP_ORIGIN = "http://app.test";
 const PUSH_AUDIENCE = "https://relay.test/push/gmail";
 const PUSH_SERVICE_ACCOUNT = "push@test.iam.gserviceaccount.com";
@@ -80,6 +81,7 @@ beforeAll(async () => {
     config: path.join(root, "wrangler.jsonc"),
     bindings: {
       GOOGLE_CLIENT_ID: { type: "plain_text", value: CLIENT_ID },
+      GOOGLE_IOS_CLIENT_ID: { type: "plain_text", value: IOS_CLIENT_ID },
       GOOGLE_JWKS_URL: { type: "plain_text", value: `http://127.0.0.1:${port}/certs` },
       GOOGLE_TOKEN_URL: { type: "plain_text", value: `http://127.0.0.1:${port}/token` },
       GOOGLE_WEB_CLIENT_ID: { type: "plain_text", value: WEB_CLIENT_ID },
@@ -261,6 +263,18 @@ describe("sign-in", () => {
     expect(a.user.id).toBe(b.user.id);
     await link(a.token, "shared-view@example.com");
     expect((await listAccounts(b.token)).map((x) => x.email)).toEqual(["shared-view@example.com"]);
+  });
+
+  it("accepts ID tokens from the iPhone app's client, to sign in and to link", async () => {
+    const response = await signInRequest(
+      await idToken("iphone@example.com", { aud: IOS_CLIENT_ID }),
+    );
+    expect(response.status).toBe(200);
+    const token = response.headers.get("set-auth-token")!;
+    const linked = await call("PUT", "/v1/accounts/iphone%40example.com", token, {
+      idToken: await idToken("iphone@example.com", { aud: IOS_CLIENT_ID }),
+    });
+    expect(linked.status).toBe(204);
   });
 
   it("rejects ID tokens for another OAuth client, and garbage", async () => {
