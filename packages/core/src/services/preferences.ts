@@ -27,7 +27,7 @@ import {
 } from "./assistant/service.js";
 import { getHermesKey } from "./assistant/settings.js";
 import { readKeybindings, writeKeybindings } from "./keybindings-store.js";
-import { configureAutoSync } from "./mail-sync.js";
+import { configureAutoSync, followMailboxArrangement } from "./mail-sync.js";
 import { getOtterUser, relayRequest } from "./otter-account.js";
 import { getSettings, updateSettings, type AppSettings } from "./settings-store.js";
 import { listViews, writeViews } from "./views-store.js";
@@ -44,6 +44,7 @@ export async function getUiPreferences(): Promise<UiPreferences> {
 
 async function writeUiPreferences(ui: UiPreferences): Promise<void> {
   await writeJson(UI_FILE, ui);
+  followMailboxArrangement(ui["mail:mailboxes"]);
   broadcast("preferences:uiChanged", ui);
 }
 

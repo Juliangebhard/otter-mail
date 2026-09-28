@@ -14,7 +14,11 @@ import { broadcast, handle } from "./ipc.js";
 import { setPlatform, type Platform } from "./platform.js";
 import { pruneAttachmentCache } from "./services/attachment-cache.js";
 import { readKeybindings, writeKeybindings } from "./services/keybindings-store.js";
-import { configureAutoSync, syncAllAccounts } from "./services/mail-sync.js";
+import {
+  configureAutoSync,
+  followMailboxArrangement,
+  syncAllAccounts,
+} from "./services/mail-sync.js";
 import { loadOtterAccount } from "./services/otter-account.js";
 import { getUiPreferences, preferenceChanged, setUiPreference } from "./services/preferences.js";
 import { getSettings, onSettingsChanged } from "./services/settings-store.js";
@@ -48,7 +52,8 @@ export async function startCore(platform: Platform): Promise<void> {
     return result;
   });
 
-  // Warm the local cache for every connected account.
+  // Warm the local cache for every connected account (turned-off ones stay cold).
+  followMailboxArrangement((await getUiPreferences())["mail:mailboxes"]);
   void syncAllAccounts({ force: true });
   configureAutoSync((await getSettings()).syncIntervalSeconds);
   void pruneAttachmentCache();

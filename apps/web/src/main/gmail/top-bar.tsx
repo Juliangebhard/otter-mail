@@ -16,6 +16,7 @@ import type { GmailAccount } from "./types";
 import type { KeybindingCommand } from "../keybindings/commands";
 import { shortcutLabelFor, useKeybindingsState } from "../keybindings/store";
 import { features } from "../features";
+import { useMailboxArrangement } from "../mailboxes";
 
 /**
  * Every column owns the slice of the title band above it, so the pane
@@ -133,20 +134,21 @@ function MailboxMark({ account, className }: { account: GmailAccount | null; cla
 
 type MailboxOption = { id: string; account: GmailAccount | null; name: string; shortcut: string };
 
-/** The mailboxes to switch between, in ⌘1… order: All mailboxes (with two or more), then each account. */
+/** The mailboxes to switch between, in ⌘1… order: All mailboxes (when on), then each account. */
 export function useMailboxOptions(accounts: GmailAccount[]): MailboxOption[] {
   const { resolved: keybindings } = useKeybindingsState();
+  const combined = useMailboxArrangement().combined && accounts.length > 1;
   const jump = (digit: number) =>
     shortcutLabelFor(keybindings, `mailbox.jump.${digit}` as KeybindingCommand) ?? "";
   return [
-    ...(accounts.length > 1
+    ...(combined
       ? [{ id: COMBINED_ACCOUNT_ID, account: null, name: "All mailboxes", shortcut: jump(1) }]
       : []),
     ...accounts.map((account, i) => ({
       id: account.id,
       account,
       name: getAccountDisplayName(account),
-      shortcut: jump(accounts.length > 1 ? i + 2 : 1),
+      shortcut: jump(combined ? i + 2 : i + 1),
     })),
   ];
 }

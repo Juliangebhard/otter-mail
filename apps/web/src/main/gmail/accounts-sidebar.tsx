@@ -49,7 +49,6 @@ import {
   LogInIcon,
 } from "lucide-react";
 import {
-  useAccounts,
   useLabels,
   useAddAccount,
   useCreateLabel,
@@ -77,6 +76,7 @@ import { LabelShortcutDialog } from "../settings/keybindings-pane";
 import { UnreadPill, HintTooltip, cn } from "./ui";
 import { MailboxDots, MailboxSwitcher, WindowTitle, useMailboxOptions } from "./top-bar";
 import { useOtterAccount } from "../otter-account";
+import { useMailboxes } from "../mailboxes";
 import { OtterAvatar } from "../settings/otter-account-pane";
 import type { SettingsPane } from "./api";
 import type { OtterAccountState } from "@otter-mail/contracts";
@@ -702,7 +702,7 @@ const SNAP_MS = 220;
 export function AccountsSidebar(props: AccountsSidebarProps) {
   const { onOpenSettings, onSync, syncing, selectedAccountId, onSelectAccount } = props;
   const otter = useOtterAccount();
-  const accounts = useAccounts().data ?? [];
+  const { accounts } = useMailboxes();
   const mailboxIds = useMailboxOptions(accounts).map((o) => o.id);
   const index = mailboxIds.indexOf(selectedAccountId ?? "");
 
@@ -863,7 +863,6 @@ function SidebarPage({
 }) {
   const isCombined = selectedAccountId === COMBINED_ACCOUNT_ID;
 
-  const accountsQuery = useAccounts();
   const labelsQuery = useLabels(isCombined ? null : selectedAccountId);
   const addAccount = useAddAccount();
   const createLabel = useCreateLabel();
@@ -887,7 +886,7 @@ function SidebarPage({
   const modifyThread = useModifyThread();
   const { rules: keybindingRules } = useKeybindingsState();
 
-  const accounts = accountsQuery.data ?? [];
+  const { accounts } = useMailboxes();
   const labels: GmailLabel[] = labelsQuery.data ?? [];
   // Views belong to one mailbox; each mailbox (account or Combined) lists its own.
   const countScope = isCombined ? accounts : accounts.filter((a) => a.id === selectedAccountId);

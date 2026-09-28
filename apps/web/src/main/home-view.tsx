@@ -78,6 +78,7 @@ import {
 } from "./gmail/custom-views";
 import { ALL_MAIL_LABEL_ID } from "./gmail/label-names";
 import { useMonochromeTheme } from "./theme/apply-theme";
+import { useMailboxes } from "./mailboxes";
 
 /** Narrowest the reader gets when the chat panel is dragged wider. */
 const READER_MIN_WIDTH = 360;
@@ -271,11 +272,14 @@ export function HomeView() {
   const addAccount = useAddAccount();
   const { views } = useMailViews();
 
-  const accounts = accountsQuery.data ?? [];
+  // The mailboxes shown: turned-on accounts, in the user's order (Settings →
+  // Mailboxes, synced with the Otter account).
+  const mailboxes = useMailboxes();
+  const accounts = mailboxes.accounts;
   const accountIds = accounts.map((a) => a.id);
   const firstRealAccountId = accounts[0]?.id ?? null;
 
-  const isCombined = selectedAccountId === COMBINED_ACCOUNT_ID;
+  const isCombined = selectedAccountId === COMBINED_ACCOUNT_ID && mailboxes.combined;
 
   const globalSync = useGlobalSyncStatus(accountIds);
   useGmailWriteFailureToasts();
@@ -345,10 +349,11 @@ export function HomeView() {
 
   // ⌘1 = Combined mailbox, ⌘2…⌘9 = accounts in rail order. The ref is
   // populated below once handleSelectAccount exists.
-  const accountSwitchRef = useRef<{ ids: string[]; select: (id: string) => void }>({
-    ids: [],
-    select: () => {},
-  });
+  const accountSwitchRef = useRef<{
+    ids: string[];
+    combined: boolean;
+    select: (id: string) => void;
+  }>({ ids: [], combined: false, select: () => {} });
 
   const undoModifyMessage = useModifyMessage();
   const undoModifyThread = useModifyThread();
@@ -458,12 +463,11 @@ export function HomeView() {
     setReaderAccountId(null);
   };
   const jumpToMailbox = (digit: number) => {
-    const { ids, select } = accountSwitchRef.current;
-    if (ids.length === 0) return false;
-    // ⌘1 = Combined (or the only account), ⌘2… = accounts in sidebar order.
-    if (digit === 1) select(ids.length > 1 ? COMBINED_ACCOUNT_ID : ids[0]);
-    else if (ids[digit - 2]) select(ids[digit - 2]);
-    else return false;
+    const { ids, combined, select } = accountSwitchRef.current;
+    // ⌘1 = All mailboxes when it's on, then the accounts in sidebar order.
+    const target = combined ? (digit === 1 ? COMBINED_ACCOUNT_ID : ids[digit - 2]) : ids[digit - 1];
+    if (!target) return false;
+    select(target);
   };
   useCommandHandlers({
     "commandPalette.toggle": () => setPaletteOpen((o) => !o),
@@ -496,7 +500,7 @@ export function HomeView() {
   // (Combined when 2+ accounts, else the first account).
   useEffect(() => {
     if (initialized || accountsQuery.isLoading || accounts.length === 0) return;
-    const canCombined = accounts.length > 1;
+    const canCombined = mailboxes.combined;
     const saved = loadLastLocation();
     let acct: string | null = null;
     let label = "INBOX";
@@ -521,7 +525,7 @@ export function HomeView() {
     setSelectedAccountId(acct);
     setSelectedLabelId(label);
     setInitialized(true);
-  }, [initialized, accountsQuery.isLoading, accounts, firstRealAccountId]);
+  }, [initialized, accountsQuery.isLoading, accounts, firstRealAccountId, mailboxes.combined]);
 
   // Persist where the user is so we can reopen here next launch.
   useEffect(() => {
@@ -719,7 +723,25 @@ export function HomeView() {
     setSelectedMessageId(null);
     setReaderAccountId(null);
   };
-  accountSwitchRef.current = { ids: accountIds, select: handleSelectAccount };
+  accountSwitchRef.current = {
+    ids: accountIds,
+    combined: mailboxes.combined,
+    select: handleSelectAccount,
+  };
+
+  // The showing mailbox was turned off (or "All mailboxes" was): move to
+  // what's first now, at its inbox.
+  const showingOff =
+    initialized &&
+    selectedAccountId !== null &&
+    (selectedAccountId === COMBINED_ACCOUNT_ID
+      ? !mailboxes.combined
+      : !accounts.some((a) => a.id === selectedAccountId));
+  useEffect(() => {
+    if (!showingOff) return;
+    const next = mailboxes.combined ? COMBINED_ACCOUNT_ID : firstRealAccountId;
+    if (next) handleSelectAccount(next);
+  }, [showingOff]);
 
   const handleSelectLabel = (labelId: string) => {
     console.log("[HomeView:selectLabel]", { labelId });
@@ -956,8 +978,8 @@ export function HomeView() {
   syncNowRef.current = syncNow;
   useEffect(() => window.desktopBridge.on("mail:syncNow", () => syncNowRef.current()), []);
 
-  // No accounts connected
-  if (!accountsQuery.isLoading && accounts.length === 0) {
+  // No accounts connected (turned-off ones count: they're still connected)
+  if (!accountsQuery.isLoading && (accountsQuery.data ?? []).length === 0) {
     return (
       <div className="h-full flex items-center justify-center bg-canvas">
         <EmptyState
