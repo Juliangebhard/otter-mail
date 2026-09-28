@@ -1985,10 +1985,10 @@ export function MessageReader({
   }, []);
   const compactTitle = readerWidth < 44 * 16;
   const compactActions = readerWidth < 36 * 16;
-  // The summary (Codex's pinned card): in the top-right corner when it fits
-  // in the margin beside the centered 48rem column (it may cover the
-  // column's 24px padding, never its text), else a popover from the toggle.
-  const summaryFits = readerWidth >= 48 * 16 + 2 * (16 * 16 + 16 - 24);
+  // The summary (Codex's pinned card): in the top-right corner, the
+  // conversation re-centering in the room left of it, when the 48rem column
+  // and the card (16rem + 1rem margins) both fit; else a popover from the toggle.
+  const summaryFits = readerWidth >= 48 * 16 + 16 * 16 + 2 * 16;
   const [summaryPinned, setSummaryPinned] = useState(
     () => localStorage.getItem("gmail:summary-pinned") !== "0",
   );
@@ -2722,9 +2722,13 @@ export function MessageReader({
 
         {/* Conversation */}
         <div
-          // The scrollbar's lane on both sides, always: the centered column
-          // doesn't slide when expanding a message makes the thread scroll.
-          className="min-h-0 flex-1 overflow-y-auto pb-6 [scrollbar-gutter:stable_both-edges]"
+          className={cn(
+            // The scrollbar's lane on both sides, always: the centered column
+            // doesn't slide when expanding a message makes the thread scroll.
+            "min-h-0 flex-1 overflow-y-auto pb-6 [scrollbar-gutter:stable_both-edges]",
+            // Room for the pinned summary, so the column centers beside it.
+            summaryShown && "pr-[18rem]",
+          )}
           onMouseUp={onParentMouseUp}
         >
           <div className="mx-auto w-full max-w-3xl">
