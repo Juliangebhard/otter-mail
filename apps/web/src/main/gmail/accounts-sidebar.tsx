@@ -20,6 +20,11 @@ import {
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuSeparator,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
 } from "./menu";
 import {
   InboxIcon,
@@ -39,6 +44,8 @@ import {
   SearchIcon,
   SquarePenIcon,
   RotateCwIcon,
+  CircleUserRoundIcon,
+  LogInIcon,
 } from "lucide-react";
 import {
   useAccounts,
@@ -66,9 +73,12 @@ import { labelMoveName } from "../keybindings/commands";
 import { renameLabelKeybindings, useKeybindingsState } from "../keybindings/store";
 import { formatShortcut, parseShortcut } from "../keybindings/keys";
 import { LabelShortcutDialog } from "../settings/keybindings-pane";
-import { UnreadPill, HintTooltip, IconBtn, cn } from "./ui";
+import { UnreadPill, HintTooltip, cn } from "./ui";
 import { MailboxDots, MailboxSwitcher, WindowTitle, useMailboxOptions } from "./top-bar";
 import { useOtterAccount } from "../otter-account";
+import { OtterAvatar } from "../settings/otter-account-pane";
+import type { SettingsPane } from "./api";
+import type { OtterAccountState } from "@otter-mail/contracts";
 import { UpdateCard } from "../updates";
 
 const LABEL_DRAG_MIME = "application/x-gmail-label";
@@ -192,6 +202,86 @@ function SearchRow({
         </span>
       }
     />
+  );
+}
+
+/**
+ * The footer's avatar (Codex's): the Otter account, or a placeholder when
+ * signed out, opening the app's menu: the account, Settings, and Sync now
+ * (only while push isn't live, as before; ⌘, and ⌘R work either way).
+ */
+function AccountMenu({
+  otter,
+  onOpenSettings,
+  onSync,
+  syncing,
+}: {
+  otter: OtterAccountState | null;
+  onOpenSettings: (pane?: SettingsPane) => void;
+  onSync: () => void;
+  syncing: boolean;
+}) {
+  const user = otter?.user ?? null;
+  return (
+    <DropdownMenu>
+      <HintTooltip label={user ? (user.name ?? user.email) : "Settings"}>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            aria-label="Account and settings"
+            className="relative flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-sidebar-muted-foreground outline-none transition-colors hover:bg-sidebar-row-hover hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-focus-ring data-[state=open]:bg-sidebar-row-hover"
+          >
+            {user ? (
+              <OtterAvatar user={user} className="size-6" />
+            ) : (
+              <CircleUserRoundIcon className="size-5" />
+            )}
+            {otter?.realtime === "live" ? (
+              <span
+                aria-hidden
+                className="absolute bottom-1 right-1 size-2 rounded-full bg-primary ring-2 ring-sidebar-surface"
+              />
+            ) : null}
+          </button>
+        </DropdownMenuTrigger>
+      </HintTooltip>
+      <DropdownMenuContent side="top" className="min-w-56">
+        {user ? (
+          <DropdownMenuItem
+            icon={<OtterAvatar user={user} className="size-5" />}
+            onSelect={() => onOpenSettings("otter")}
+            className="h-auto py-1.5"
+          >
+            <span className="block truncate text-foreground">{user.name ?? user.email}</span>
+            {user.name ? (
+              <span className="block truncate text-[13px] text-muted-foreground">{user.email}</span>
+            ) : null}
+          </DropdownMenuItem>
+        ) : (
+          <DropdownMenuItem icon={<LogInIcon />} onSelect={() => onOpenSettings("otter")}>
+            Sign in to Otter Mail
+          </DropdownMenuItem>
+        )}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          icon={<SettingsIcon />}
+          accelerator="⌘,"
+          onSelect={() => onOpenSettings()}
+        >
+          Settings
+        </DropdownMenuItem>
+        {otter?.realtime === "live" ? null : (
+          <DropdownMenuItem
+            icon={<RotateCwIcon className={syncing ? "animate-spin" : undefined} />}
+            accelerator="⌘R"
+            disabled={syncing}
+            onSelect={onSync}
+          >
+            {syncing ? "Syncing…" : "Sync now"}
+          </DropdownMenuItem>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -570,8 +660,8 @@ function LabelNode({
 }
 
 type AccountsSidebarProps = {
-  /** Footer utilities. */
-  onOpenSettings: () => void;
+  /** The account menu: Settings (a pane, General by default) and Sync now. */
+  onOpenSettings: (pane?: SettingsPane) => void;
   /** Opens Settings → Views on a view ("new" to create one) for a mailbox. */
   onEditView: (viewId: string, mailbox: string | null) => void;
   onSync: () => void;
@@ -1053,28 +1143,23 @@ export function AccountsSidebar({
 
         <UpdateCard />
 
-        {/* Footer utilities, like the workspace sidebar's bottom row. */}
+        {/* Footer, like Codex's: who you are (and the app's menu) on the
+            left, the mailbox dots centered. */}
         <div className="flex shrink-0 items-center gap-1 px-(--sidebar-content-inset) py-1">
-          <HintTooltip label="Settings" hint="⌘,">
-            <IconBtn label="Settings" onClick={onOpenSettings} className="size-8">
-              <SettingsIcon className="size-4" />
-            </IconBtn>
-          </HintTooltip>
+          <AccountMenu
+            otter={otter}
+            onOpenSettings={onOpenSettings}
+            onSync={onSync}
+            syncing={syncing}
+          />
           <MailboxDots
             accounts={accounts}
             selectedAccountId={selectedAccountId}
             onSelectAccount={onSelectAccount}
             className="min-w-0 flex-1 justify-center"
           />
-          {/* With Gmail pushing changes (Otter account connected) there's nothing to sync by
-              hand; ⌘R and the command palette still do. */}
-          {otter?.realtime === "live" ? null : (
-            <HintTooltip label={syncing ? "Syncing…" : "Sync now"} hint="⌘R">
-              <IconBtn label="Sync now" onClick={onSync} disabled={syncing} className="size-8">
-                <RotateCwIcon className={syncing ? "size-4 animate-spin" : "size-4"} />
-              </IconBtn>
-            </HintTooltip>
-          )}
+          {/* Balances the avatar so the dots sit in the middle. */}
+          <span aria-hidden className="size-8 shrink-0" />
         </div>
 
         <Dialog

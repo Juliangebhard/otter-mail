@@ -1061,8 +1061,8 @@ export function HomeView() {
                     </>
                   ) : (
                     <AccountsSidebar
-                      onOpenSettings={() =>
-                        setSettingsRoute({ pane: "general", viewId: null, mailbox: null })
+                      onOpenSettings={(pane = "general") =>
+                        setSettingsRoute({ pane, viewId: null, mailbox: null })
                       }
                       onEditView={(viewId, mailbox) =>
                         setSettingsRoute({ pane: "views", viewId, mailbox })
