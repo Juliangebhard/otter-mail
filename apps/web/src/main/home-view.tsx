@@ -39,7 +39,6 @@ import {
   useKeybindingDispatcher,
 } from "./keybindings/dispatch";
 import { MAILBOX_JUMP_COMMANDS } from "./keybindings/commands";
-import { onKeybindingsReload } from "./keybindings/store";
 import {
   useAccounts,
   useAddAccount,
@@ -442,19 +441,6 @@ export function HomeView() {
 
   // Keyboard commands (Settings › Keybindings; defaults in keybindings/commands.ts).
   useKeybindingDispatcher();
-  // Hand edits to keybindings.json apply live; say so (and flag bad entries).
-  useEffect(
-    () =>
-      onKeybindingsReload(({ initial, external, issueCount }) => {
-        if (!external) return;
-        if (issueCount > 0)
-          toast.error(
-            `${issueCount} keybinding${issueCount === 1 ? "" : "s"} in keybindings.json couldn't be used`,
-          );
-        else if (!initial) toast.success("Keybindings updated");
-      }),
-    [],
-  );
   useKeybindingContext("settingsOpen", settingsRoute !== null);
   useKeybindingContext("messageOpen", selectedMessageId !== null);
   const goTo = (combinedViewId: string, labelId: string) => {

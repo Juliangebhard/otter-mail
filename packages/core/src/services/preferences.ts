@@ -105,7 +105,7 @@ const SECTIONS = {
     },
   },
   keybindings: {
-    // No keybindings.json yet: the defaults, nothing to share.
+    // None saved yet: the defaults, nothing to share.
     read: async () => (await readKeybindings()).rules ?? undefined,
     async apply(value) {
       await writeKeybindings(value);

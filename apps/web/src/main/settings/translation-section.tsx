@@ -46,7 +46,7 @@ export function TranslationSection() {
         control={
           <DropdownMenu>
             <DropdownMenuTrigger asChild disabled={!features.translation}>
-              <Btn size="xs" variant="outline">
+              <Btn size="sm" variant="outline">
                 <PlusIcon className="size-3.5" />
                 Add language
               </Btn>
@@ -64,11 +64,11 @@ export function TranslationSection() {
           </DropdownMenu>
         }
       >
-        <ul className="mt-3 mb-2 flex flex-col gap-0.5">
+        <ul className="-mx-2.5 mt-2 mb-2 flex flex-col gap-0.5">
           {readLanguages.map((code, i) => (
             <li
               key={code}
-              className="group/lang flex h-8 items-center gap-2 rounded-lg pr-1 pl-2.5 hover:bg-foreground/[0.04]"
+              className="group/lang flex h-8 items-center gap-1 rounded-lg px-2.5 hover:bg-foreground/[0.04]"
             >
               <span className="min-w-0 flex-1 truncate text-sm text-foreground">
                 {languageName(code)}

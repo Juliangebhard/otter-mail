@@ -248,7 +248,7 @@ export function ViewEditorForm({
 
   return (
     <div className="space-y-6">
-      <div className="space-y-1 px-1">
+      <div className="space-y-1">
         <button
           type="button"
           onClick={onDone}
@@ -257,7 +257,7 @@ export function ViewEditorForm({
           <ChevronLeftIcon className="size-3.5" />
           Views
         </button>
-        <h2 className="text-xl font-normal tracking-[-0.01em] text-foreground">
+        <h2 className="text-[26px] font-medium leading-8 tracking-[-0.01em] text-foreground">
           {view ? `Edit “${view.name}”` : "New view"}
         </h2>
         <p className="text-[13px] text-muted-foreground">
@@ -360,12 +360,12 @@ export function ViewEditorForm({
           );
         })}
       </SettingsSection>
-      <p className="-mt-3 px-1 text-[13px] text-muted-foreground">
+      <p className="-mt-3 text-[13px] text-muted-foreground">
         Mail must carry every “must have” label and none of the “must not have” ones. Results from
         each account are combined.
       </p>
 
-      <div className="flex items-center gap-2 px-1">
+      <div className="flex items-center gap-2">
         {view && view.kind === "custom" ? (
           <Btn
             size="sm"

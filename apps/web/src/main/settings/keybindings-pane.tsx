@@ -1,9 +1,8 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Popover } from "radix-ui";
 import {
   ChevronDownIcon,
   EllipsisIcon,
-  FileJsonIcon,
   PlusIcon,
   SearchIcon,
   TriangleAlertIcon,
@@ -12,7 +11,7 @@ import {
 import { Dialog } from "~/components/ui/dialog";
 import { Text } from "~/components/ui/text";
 import { toast } from "../gmail/toast";
-import { Btn, HintTooltip, IconBtn, Kbd, cn, restoreFocusForKeyboardOnly } from "../gmail/ui";
+import { Btn, HintTooltip, IconBtn, cn, restoreFocusForKeyboardOnly } from "../gmail/ui";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -38,26 +37,28 @@ import {
   parseWhen,
   strokeFromEvent,
   strokeHasModifier,
-  strokeTokens,
+  formatShortcut,
   whenIdentifiers,
 } from "../keybindings/keys";
 import {
   isDefaultRule,
-  openKeybindingsFile,
   removeKeybinding,
   upsertKeybinding,
   useKeybindingsState,
 } from "../keybindings/store";
 import { useCommandHandlers } from "../keybindings/dispatch";
 import { useAccounts, useAllAccountLabels } from "../gmail/hooks";
-import { SettingsPageContainer, SettingsRow, SettingsSection } from "./settings-ui";
-import { features } from "../features";
+import {
+  SettingsGroup,
+  SettingsPageContainer,
+  SettingsRow,
+  SettingsSectionHeader,
+} from "./settings-ui";
 
 /**
  * Settings › Keybindings, after Otter Code's panel: every binding as a row
  * (command, When clause, keys), click the keys to record new ones, edit the
- * When clause in a popover, ⚠ for conflicts or unknown conditions, and the
- * raw keybindings.json one click away.
+ * When clause in a popover, and ⚠ for conflicts or unknown conditions.
  */
 
 type Row = { id: string; rule: KeybindingRule; source: "Default" | "Custom" };
@@ -101,19 +102,17 @@ function warningFor(rows: Row[], id: string, key: string, when: string | undefin
 
 // ── Pieces ───────────────────────────────────────────────────────────────────
 
-/** A key string as chips: ⌘ ⇧ K, and "then" between sequence strokes. */
+/** A key string as plain glyphs: ⇧⌘K, and "then" between sequence strokes. */
 function KeyChips({ value }: { value: string }) {
   const shortcut = parseShortcut(value);
   if (!shortcut) return <span className="font-mono text-xs text-muted-foreground">{value}</span>;
   return (
-    <span className="inline-flex items-center gap-1.5">
+    <span className="inline-flex items-center gap-1.5 text-[13px] text-foreground/85">
       {shortcut.map((stroke, i) => (
-        <span key={i} className="inline-flex items-center gap-1">
-          {i > 0 ? <span className="pe-0.5 text-2xs text-muted-foreground/70">then</span> : null}
-          {strokeTokens(stroke).map((token, j) => (
-            <Kbd key={j}>{token}</Kbd>
-          ))}
-        </span>
+        <Fragment key={i}>
+          {i > 0 ? <span className="text-xs text-muted-foreground/70">then</span> : null}
+          <span className="tracking-[0.12em] last:tracking-normal">{formatShortcut([stroke])}</span>
+        </Fragment>
       ))}
     </span>
   );
@@ -148,12 +147,12 @@ function KeyControl({
         type="button"
         onClick={() => onRecordingChange(true)}
         aria-label="Change shortcut"
-        className="-mr-1.5 inline-flex h-7 cursor-pointer items-center rounded-lg border border-transparent px-1.5 outline-none transition-colors hover:border-border/70 hover:bg-accent-surface focus-visible:border-focus-ring focus-visible:ring-[3px] focus-visible:ring-focus-ring/24"
+        className="-me-2.5 inline-flex h-7 cursor-pointer items-center rounded-full px-2.5 outline-none transition-colors hover:bg-accent-surface focus-visible:ring-2 focus-visible:ring-focus-ring"
       >
         {value ? (
           <KeyChips value={value} />
         ) : (
-          <span className="text-xs text-muted-foreground">Record shortcut</span>
+          <span className="text-[13px] text-muted-foreground">Record shortcut</span>
         )}
       </button>
     );
@@ -196,7 +195,7 @@ function KeyControl({
           }
           finish(stroke);
         }}
-        className="h-8 w-44 rounded-lg border border-focus-ring/60 bg-canvas px-2.5 font-mono text-xs text-foreground outline-none ring-[3px] ring-focus-ring/16 placeholder:font-sans placeholder:text-placeholder"
+        className="h-7 w-40 rounded-full border border-focus-ring/60 bg-canvas px-3 text-right font-mono text-xs text-foreground outline-none ring-[3px] ring-focus-ring/16 placeholder:font-sans placeholder:text-placeholder"
       />
     </div>
   );
@@ -380,80 +379,86 @@ function KeybindingRow({ row, rows }: { row: Row; rows: Row[] }) {
     void save({ command: rule.command, key: keyDraft, when: whenDraft || undefined }, rule);
 
   return (
-    <SettingsRow
-      className="group/row rounded-none"
-      title={
-        <span className="flex items-center gap-2">
+    <div className="group/row flex min-h-14 items-center gap-6 py-2">
+      <div className="min-w-0 flex-1">
+        <div className="flex min-h-5 items-center gap-2 text-sm text-foreground">
           <HintTooltip label={rule.command}>
-            <span>{commandLabel(rule.command)}</span>
+            <span className="truncate">{splitCommandLabel(rule.command).name}</span>
           </HintTooltip>
           {row.source === "Custom" ? <Badge>Custom</Badge> : null}
-        </span>
-      }
-      description={<WhenControl value={whenDraft} onChange={setWhenDraft} />}
-      control={
-        <div className="flex flex-wrap items-center justify-end gap-1.5">
-          <WarningIcon message={warning} />
-          {row.source === "Custom" ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <IconBtn
-                  label="More"
-                  className="size-6 opacity-0 transition-opacity group-focus-within/row:opacity-100 group-hover/row:opacity-100 data-[state=open]:opacity-100"
-                >
-                  <EllipsisIcon className="size-3.5" />
-                </IconBtn>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {defaults.length > 0 ? (
-                  <DropdownMenuItem
-                    onSelect={() => {
-                      // Put back this command's defaults in place of every custom rule.
-                      const custom = rows.filter(
-                        (r) => r.rule.command === rule.command && r.source === "Custom",
-                      );
-                      void (async () => {
-                        for (const r of custom) await removeKeybinding(r.rule);
-                        for (const d of defaults) await save(d);
-                      })();
-                    }}
-                  >
-                    Reset to default
-                  </DropdownMenuItem>
-                ) : null}
-                <DropdownMenuItem color="red" onSelect={() => void removeKeybinding(rule)}>
-                  Remove
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          ) : null}
-          {dirty ? (
-            <>
-              <Btn
-                variant="ghost-muted"
-                size="xs"
-                onClick={() => {
-                  setKeyDraft(rule.key);
-                  setWhenDraft(rule.when ?? "");
-                }}
-              >
-                Cancel
-              </Btn>
-              <Btn variant="primary" size="xs" onClick={commit}>
-                Save
-              </Btn>
-            </>
-          ) : null}
-          <KeyControl
-            value={keyDraft}
-            recording={recording}
-            onRecordingChange={setRecording}
-            onChange={setKeyDraft}
-          />
         </div>
-      }
-    />
+        <WhenControl value={whenDraft} onChange={setWhenDraft} />
+      </div>
+      <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+        <WarningIcon message={warning} />
+        {row.source === "Custom" ? (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <IconBtn
+                label="More"
+                className="size-6 opacity-0 transition-opacity group-focus-within/row:opacity-100 group-hover/row:opacity-100 data-[state=open]:opacity-100"
+              >
+                <EllipsisIcon className="size-3.5" />
+              </IconBtn>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {defaults.length > 0 ? (
+                <DropdownMenuItem
+                  onSelect={() => {
+                    // Put back this command's defaults in place of every custom rule.
+                    const custom = rows.filter(
+                      (r) => r.rule.command === rule.command && r.source === "Custom",
+                    );
+                    void (async () => {
+                      for (const r of custom) await removeKeybinding(r.rule);
+                      for (const d of defaults) await save(d);
+                    })();
+                  }}
+                >
+                  Reset to default
+                </DropdownMenuItem>
+              ) : null}
+              <DropdownMenuItem color="red" onSelect={() => void removeKeybinding(rule)}>
+                Remove
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : null}
+        {dirty ? (
+          <>
+            <Btn
+              variant="ghost-muted"
+              size="xs"
+              onClick={() => {
+                setKeyDraft(rule.key);
+                setWhenDraft(rule.when ?? "");
+              }}
+            >
+              Cancel
+            </Btn>
+            <Btn variant="primary" size="xs" onClick={commit}>
+              Save
+            </Btn>
+          </>
+        ) : null}
+        <KeyControl
+          value={keyDraft}
+          recording={recording}
+          onRecordingChange={setRecording}
+          onChange={setKeyDraft}
+        />
+      </div>
+    </div>
   );
+}
+
+/** "Message: Mark Unread" → group "Message", name "Mark Unread" (the list's grouping). */
+function splitCommandLabel(command: string): { group: string; name: string } {
+  const label = commandLabel(command);
+  const at = label.indexOf(": ");
+  return at < 0
+    ? { group: "Other", name: label }
+    : { group: label.slice(0, at), name: label.slice(at + 2) };
 }
 
 const COMMAND_OPTIONS = [...KEYBINDING_COMMANDS].sort((a, b) =>
@@ -561,13 +566,12 @@ function NewKeybindingRow({ rows, onDone }: { rows: Row[]; onDone: () => void })
 
   return (
     <SettingsRow
-      className="rounded-none bg-foreground/[0.02]"
       title="New keybinding"
       description={<WhenControl value={when} onChange={setWhen} />}
       control={
         <div className="flex flex-wrap items-center justify-end gap-1.5">
           <Select value={command} onValueChange={(v) => setCommand(v as KeybindingCommand)}>
-            <SelectTrigger className="w-56">
+            <SelectTrigger variant="pill" className="w-52">
               <SelectValue placeholder="Command" />
             </SelectTrigger>
             <SelectContent>
@@ -592,7 +596,7 @@ function NewKeybindingRow({ rows, onDone }: { rows: Row[]; onDone: () => void })
           />
           <Btn
             variant="primary"
-            size="xs"
+            size="sm"
             disabled={!canSave}
             onClick={() => {
               if (command === "") return;
@@ -601,7 +605,7 @@ function NewKeybindingRow({ rows, onDone }: { rows: Row[]; onDone: () => void })
           >
             Save
           </Btn>
-          <IconBtn label="Cancel" className="size-6" onClick={onDone}>
+          <IconBtn label="Cancel" onClick={onDone}>
             <XIcon className="size-3.5" />
           </IconBtn>
         </div>
@@ -613,7 +617,7 @@ function NewKeybindingRow({ rows, onDone }: { rows: Row[]; onDone: () => void })
 // ── Pane ─────────────────────────────────────────────────────────────────────
 
 export function KeybindingsPane() {
-  const { rules, issueCount } = useKeybindingsState();
+  const { rules } = useKeybindingsState();
   const [query, setQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [adding, setAdding] = useState(false);
@@ -653,7 +657,7 @@ export function KeybindingsPane() {
   const header = (
     <div className="flex items-center gap-1.5">
       {searchOpen ? (
-        <div className="relative w-44">
+        <div className="relative w-52">
           <SearchIcon className="pointer-events-none absolute start-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
           <input
             ref={searchRef}
@@ -674,62 +678,61 @@ export function KeybindingsPane() {
         </div>
       ) : (
         <>
-          <span className="text-2xs text-muted-foreground">
+          <span className="text-xs text-muted-foreground">
             {count} binding{count === 1 ? "" : "s"}
           </span>
           <HintTooltip label="Search keybindings">
-            <IconBtn
-              label="Search keybindings"
-              className="size-6"
-              onClick={() => setSearchOpen(true)}
-            >
-              <SearchIcon className="size-3.5" />
+            <IconBtn label="Search keybindings" onClick={() => setSearchOpen(true)}>
+              <SearchIcon className="size-4" />
             </IconBtn>
           </HintTooltip>
         </>
       )}
       <HintTooltip label="Add keybinding">
-        <IconBtn label="Add keybinding" className="size-6" onClick={() => setAdding(true)}>
-          <PlusIcon className="size-3.5" />
+        <IconBtn label="Add keybinding" onClick={() => setAdding(true)}>
+          <PlusIcon className="size-4" />
         </IconBtn>
       </HintTooltip>
-      {features.keybindingsFile ? (
-        <HintTooltip label="Open keybindings.json">
-          <IconBtn
-            label="Open keybindings.json"
-            className="size-6"
-            onClick={() =>
-              void openKeybindingsFile().catch((error) =>
-                toast.error(`Couldn't open keybindings.json: ${String(error)}`),
-              )
-            }
-          >
-            <FileJsonIcon className="size-3.5" />
-          </IconBtn>
-        </HintTooltip>
-      ) : null}
     </div>
   );
 
+  // Consecutive rows (sorted by label) share a group: "Message", "Go", …
+  const groups: { name: string; rows: Row[] }[] = [];
+  for (const row of visible) {
+    const name = splitCommandLabel(row.rule.command).group;
+    const last = groups[groups.length - 1];
+    if (last?.name === name) last.rows.push(row);
+    else groups.push({ name, rows: [row] });
+  }
+
   return (
-    <SettingsPageContainer>
-      <SettingsSection title="Keybindings" headerAction={header}>
-        {issueCount > 0 ? (
-          <div className="flex items-center gap-2 px-4 py-2.5 text-xs text-warning-foreground">
-            <TriangleAlertIcon className="size-3.5 shrink-0" />
-            {issueCount} entr{issueCount === 1 ? "y" : "ies"} in keybindings.json couldn't be used.
-          </div>
-        ) : null}
-        {adding ? <NewKeybindingRow rows={rows} onDone={() => setAdding(false)} /> : null}
-        {visible.map((row) => (
-          <KeybindingRow key={row.id} row={row} rows={rows} />
+    <SettingsPageContainer
+      title="Keybindings"
+      description="To change a shortcut, click its keys and press the new ones."
+      action={header}
+    >
+      {adding ? (
+        <SettingsGroup>
+          <NewKeybindingRow rows={rows} onDone={() => setAdding(false)} />
+        </SettingsGroup>
+      ) : null}
+      <div className="space-y-7">
+        {groups.map((group) => (
+          <section key={group.name}>
+            <SettingsSectionHeader title={group.name} muted />
+            <div className="[&>*+*]:border-t [&>*+*]:border-border/40">
+              {group.rows.map((row) => (
+                <KeybindingRow key={row.id} row={row} rows={rows} />
+              ))}
+            </div>
+          </section>
         ))}
-        {visible.length === 0 && !adding ? (
-          <div className="px-4 py-12 text-center text-sm text-muted-foreground">
-            No keybindings match your search.
-          </div>
-        ) : null}
-      </SettingsSection>
+      </div>
+      {visible.length === 0 && !adding ? (
+        <div className="py-12 text-center text-sm text-muted-foreground">
+          No keybindings match your search.
+        </div>
+      ) : null}
     </SettingsPageContainer>
   );
 }

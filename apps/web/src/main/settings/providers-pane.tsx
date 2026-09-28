@@ -1,8 +1,7 @@
 /**
- * Settings → Assistant, laid out like T3 Code's provider settings: a toolbar
- * with "Checked … ago" refresh, then one card split into the provider list
- * (icon, name, version, status, enable switch) and the selected provider's
- * editor.
+ * Settings → Assistant, after T3 Code's provider settings: "Checked … ago"
+ * refresh by the title, the provider list (icon, name, version, status, enable
+ * switch), then the selected provider's settings below it.
  */
 
 import { useEffect, useState, type ReactNode } from "react";
@@ -28,7 +27,13 @@ import {
 } from "../gmail/assistant-providers";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../gmail/select";
 import { Btn, cn } from "../gmail/ui";
-import { DraftInput, SettingsGroup, SettingsRow, SettingsSection, TextInput } from "./settings-ui";
+import {
+  DraftInput,
+  SettingsPageContainer,
+  SettingsRow,
+  SettingsSection,
+  TextInput,
+} from "./settings-ui";
 import { RUNTIME_MODE_OPTIONS } from "../gmail/model-picker";
 import {
   modelKey,
@@ -42,9 +47,6 @@ import {
   useFollowUpBehavior,
   type FollowUpBehavior,
 } from "../gmail/chat-queue";
-
-const CARD_HEIGHT =
-  "@min-[48rem]/providers:h-[min(44rem,calc(100dvh-9rem))] @min-[48rem]/providers:min-h-[32rem]";
 
 function useNow(intervalMs: number): number {
   const [now, setNow] = useState(() => Date.now());
@@ -96,8 +98,8 @@ function ProviderListRow({
     <div
       data-slot="settings-row"
       className={cn(
-        "group flex min-h-16 items-center gap-3 rounded-xl px-3 py-2.5 transition-colors",
-        selected ? "bg-foreground/[0.06]" : "hover:bg-foreground/[0.03]",
+        "group flex min-h-[60px] items-center gap-3 px-4 py-2.5 transition-colors",
+        selected ? "bg-foreground/[0.04]" : "hover:bg-foreground/[0.03]",
       )}
     >
       <div
@@ -108,12 +110,12 @@ function ProviderListRow({
       >
         <button
           type="button"
-          className="pointer-events-auto absolute inset-0 cursor-pointer rounded-md outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
+          className="pointer-events-auto absolute inset-0 cursor-pointer rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
           onClick={onSelect}
           aria-label={`Select ${provider.displayName}`}
           aria-pressed={selected}
         />
-        <span className="flex size-5 shrink-0 items-center justify-center">
+        <span className="flex h-5 shrink-0 items-center">
           <ProviderIcon kind={provider.kind} className="size-4" />
         </span>
         <span className="min-w-0 flex-1">
@@ -130,9 +132,9 @@ function ProviderListRow({
               </span>
             ) : null}
           </span>
-          <span className="mt-0.5 flex items-start gap-1.5 text-xs leading-normal text-muted-foreground">
+          <span className="mt-0.5 flex items-start gap-1.5 text-[13px] leading-[18px] text-muted-foreground">
             {needsAttention ? (
-              <span className="flex h-[1.45em] shrink-0 items-center">
+              <span className="flex h-[18px] shrink-0 items-center">
                 <StatusDot status={provider.status} />
               </span>
             ) : null}
@@ -226,12 +228,13 @@ function ModelsSection({
   );
 
   return (
-    <SettingsSection title="Models">
-      <div className="px-3 py-3 sm:px-4">
-        <p className="mb-3 text-xs text-muted-foreground">
-          Favorites and visibility are saved on this Mac.
-          {onPick ? " Click a model to make it the default for new chats." : ""}
-        </p>
+    <SettingsSection
+      title="Models"
+      description={`Favorites and visibility are saved on this Mac.${
+        onPick ? " Click a model to make it the default for new chats." : ""
+      }`}
+    >
+      <div className="px-4 py-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           {models.length > 8 ? (
             <TextInput
@@ -571,11 +574,7 @@ function AgentEditor({
               value={settings.runtimeMode}
               onValueChange={(value) => set({ runtimeMode: value as RuntimeMode })}
             >
-              <SelectTrigger
-                size="small"
-                aria-label={`${meta.name} access`}
-                className="w-full sm:w-44"
-              >
+              <SelectTrigger variant="pill" aria-label={`${meta.name} access`}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -625,11 +624,11 @@ export function ProvidersPane() {
 
   if (!state) {
     return (
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        <p className="p-8 text-sm text-muted-foreground">
+      <SettingsPageContainer title="Assistant">
+        <p className="text-sm text-muted-foreground">
           {query.isError ? "Provider settings are unavailable." : "Loading provider settings…"}
         </p>
-      </div>
+      </SettingsPageContainer>
     );
   }
 
@@ -639,79 +638,59 @@ export function ProvidersPane() {
   const lastChecked = Math.max(0, ...providers.map((p) => p.checkedAt ?? 0));
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto">
-      <div className="@container/providers mx-auto w-full max-w-5xl space-y-2.5 px-4 pb-16 pt-4 sm:px-6">
-        <div className="flex min-h-11 min-w-0 items-center gap-2 px-1">
-          <h2 className="text-[15px] font-medium text-foreground">Providers</h2>
-          <div className="ml-auto flex min-w-0 shrink-0 items-center gap-2">
-            <Btn
-              size="xs"
-              variant="ghost-muted"
-              disabled={refreshing}
-              aria-busy={refreshing}
-              onClick={refresh}
-              title="Refresh provider status"
-            >
-              <RotateCwIcon className={cn("size-3.5", refreshing && "animate-spin")} />
-              <span className="sr-only">Refresh provider status</span>
-              <span className="hidden min-w-0 truncate sm:inline">
-                {refreshing ? (
-                  "Refreshing providers"
-                ) : lastChecked ? (
-                  <>
-                    Checked{" "}
-                    <span className="font-mono tabular-nums">{formatAgo(now - lastChecked)}</span>
-                  </>
-                ) : (
-                  "Checking…"
-                )}
-              </span>
-            </Btn>
-          </div>
-        </div>
-
-        <SettingsGroup
-          divided={false}
-          className={cn(
-            CARD_HEIGHT,
-            "overflow-hidden @min-[48rem]/providers:grid @min-[48rem]/providers:grid-cols-[17rem_minmax(0,1fr)]",
-          )}
+    <SettingsPageContainer
+      title="Assistant"
+      description="The agents behind chat. Turn them on, pick one for new chats, and set it up."
+      action={
+        <Btn
+          size="sm"
+          variant="ghost-muted"
+          disabled={refreshing}
+          aria-busy={refreshing}
+          onClick={refresh}
+          title="Refresh provider status"
         >
-          <div className="border-b border-border/40 @min-[48rem]/providers:flex @min-[48rem]/providers:min-h-0 @min-[48rem]/providers:flex-col @min-[48rem]/providers:border-r @min-[48rem]/providers:border-b-0">
-            <div className="space-y-0.5 p-1.5 @min-[48rem]/providers:min-h-0 @min-[48rem]/providers:flex-1 @min-[48rem]/providers:overflow-y-auto">
-              {providers.map((p) => (
-                <ProviderListRow
-                  key={p.kind}
-                  provider={p}
-                  selected={p.kind === current.kind}
-                  isDefault={p.kind === state.selected}
-                  onSelect={() => setSelectedKind(p.kind)}
-                  onToggle={(enabled) => update({ [p.kind]: { enabled } })}
-                />
-              ))}
-            </div>
-          </div>
-          <div className="min-w-0 @min-[48rem]/providers:min-h-0 @min-[48rem]/providers:overflow-y-auto">
-            <div className="space-y-6 p-4">
-              <EditorHeader
-                provider={current}
-                isDefault={current.kind === state.selected}
-                onMakeDefault={() => update({ selected: current.kind })}
-              />
-              {current.macAppOnly ? null : current.kind === "hermes" ? (
-                <HermesEditor state={state} provider={current} update={update} />
-              ) : (
-                <AgentEditor kind={current.kind} state={state} provider={current} update={update} />
-              )}
-            </div>
-          </div>
-        </SettingsGroup>
-
-        <div className="pt-6">
-          <FollowUpSection />
-        </div>
-      </div>
-    </div>
+          <RotateCwIcon className={cn("size-3.5", refreshing && "animate-spin")} />
+          <span className="sr-only">Refresh provider status</span>
+          <span className="hidden min-w-0 truncate sm:inline">
+            {refreshing ? (
+              "Refreshing providers"
+            ) : lastChecked ? (
+              <>
+                Checked{" "}
+                <span className="font-mono tabular-nums">{formatAgo(now - lastChecked)}</span>
+              </>
+            ) : (
+              "Checking…"
+            )}
+          </span>
+        </Btn>
+      }
+    >
+      <SettingsSection title="Providers">
+        {providers.map((p) => (
+          <ProviderListRow
+            key={p.kind}
+            provider={p}
+            selected={p.kind === current.kind}
+            isDefault={p.kind === state.selected}
+            onSelect={() => setSelectedKind(p.kind)}
+            onToggle={(enabled) => update({ [p.kind]: { enabled } })}
+          />
+        ))}
+      </SettingsSection>
+      <EditorHeader
+        provider={current}
+        isDefault={current.kind === state.selected}
+        onMakeDefault={() => update({ selected: current.kind })}
+      />
+      {current.macAppOnly ? null : current.kind === "hermes" ? (
+        <HermesEditor state={state} provider={current} update={update} />
+      ) : (
+        <AgentEditor kind={current.kind} state={state} provider={current} update={update} />
+      )}
+      <FollowUpSection />
+    </SettingsPageContainer>
   );
 }
 
@@ -728,7 +707,7 @@ function FollowUpSection() {
             value={behavior}
             onValueChange={(value) => setFollowUpBehavior(value as FollowUpBehavior)}
           >
-            <SelectTrigger size="small" aria-label="Follow-up behavior" className="w-full sm:w-44">
+            <SelectTrigger variant="pill" aria-label="Follow-up behavior">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

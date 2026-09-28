@@ -25,7 +25,7 @@ import {
 } from "../gmail/menu";
 import type { GmailAccount, GmailLabel, MailView } from "../gmail/types";
 import { Btn, IconBtn } from "../gmail/ui";
-import { SettingsGroup, SettingsPageContainer, SettingsRow } from "./settings-ui";
+import { SettingsGroup, SettingsPageContainer, SettingsRow, SettingsSection } from "./settings-ui";
 
 /**
  * Settings › Views: custom views grouped by the mailbox that owns them. Each
@@ -92,9 +92,9 @@ function ViewRow({
           onEdit();
         }
       }}
-      className="group/row flex w-full cursor-pointer items-center gap-3 px-4 py-3.5 text-left outline-none transition-colors first:rounded-t-2xl last:rounded-b-2xl hover:bg-foreground/[0.03] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus-ring"
+      data-slot="settings-row"
+      className="group/row flex min-h-[60px] w-full cursor-pointer items-center gap-3 px-4 py-3 text-left outline-none transition-colors hover:bg-foreground/[0.03] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus-ring"
     >
-      <LayersIcon className="size-4 shrink-0 text-muted-foreground" />
       <div className="min-w-0 flex-1 space-y-1">
         <div className="flex items-baseline gap-2">
           <span className="truncate text-sm text-foreground">{view.name}</span>
@@ -135,7 +135,11 @@ function ViewRow({
           ) : null}
         </div>
       </div>
-      <div className="flex shrink-0 items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
+      <div
+        data-slot="settings-row-control"
+        className="flex shrink-0 items-center gap-0.5"
+        onClick={(e) => e.stopPropagation()}
+      >
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <IconBtn
@@ -237,7 +241,7 @@ export function ViewsPane({
   const newViewMenu = (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Btn size="xs" variant="outline">
+        <Btn size="sm" variant="outline">
           <PlusIcon className="size-3.5" />
           New view
         </Btn>
@@ -267,64 +271,52 @@ export function ViewsPane({
   );
 
   return (
-    <SettingsPageContainer>
-      <section className="space-y-2">
-        <div className="flex min-h-7 items-start justify-between gap-4 px-1">
-          <h2 className="flex min-h-7 items-center text-[15px] font-medium text-foreground">
-            Views
-          </h2>
-          <div className="flex min-h-7 items-center">{newViewMenu}</div>
-        </div>
-        {sections.length === 0 ? (
-          <SettingsGroup>
-            <SettingsRow
-              title="No views yet"
-              description="A view is a saved filter — like “01 Action” across every account — that shows up in the sidebar."
-            />
-          </SettingsGroup>
-        ) : (
-          <div className="space-y-5">
-            {sections.map((section) => (
-              <div key={section.id} className="space-y-2">
-                <h3 className="flex items-center gap-2 px-1 text-[13px] text-muted-foreground">
-                  {section.color ? (
-                    <span
-                      className="size-2 rounded-full"
-                      style={{ backgroundColor: section.color }}
-                    />
-                  ) : (
-                    <LayersIcon className="size-3.5" />
-                  )}
-                  {section.title}
-                </h3>
-                <SettingsGroup>
-                  {section.views.map((view) => (
-                    <ViewRow
-                      key={view.id}
-                      view={view}
-                      accounts={accounts}
-                      lookup={lookup}
-                      showAccounts={section.id === COMBINED_MAILBOX}
-                      onEdit={() => onOpenView(view.id, section.id)}
-                      onDuplicate={() =>
-                        void saveView({
-                          name: `${view.name} copy`,
-                          rules: view.rules ?? [],
-                          mailbox: view.mailbox,
-                        })
-                      }
-                      onDelete={() => setConfirmDelete(view)}
-                    />
-                  ))}
-                </SettingsGroup>
-              </div>
+    <SettingsPageContainer
+      title="Views"
+      description="Saved filters, shown in the sidebar of the mailbox they belong to."
+      action={newViewMenu}
+    >
+      {sections.length === 0 ? (
+        <SettingsGroup>
+          <SettingsRow
+            title="No views yet"
+            description="A view is a saved filter — like “01 Action” across every account — that shows up in the sidebar."
+          />
+        </SettingsGroup>
+      ) : (
+        sections.map((section) => (
+          <SettingsSection
+            key={section.id}
+            title={section.title}
+            icon={
+              section.color ? (
+                <span className="size-2 rounded-full" style={{ backgroundColor: section.color }} />
+              ) : (
+                <LayersIcon className="size-3.5 text-muted-foreground" />
+              )
+            }
+          >
+            {section.views.map((view) => (
+              <ViewRow
+                key={view.id}
+                view={view}
+                accounts={accounts}
+                lookup={lookup}
+                showAccounts={section.id === COMBINED_MAILBOX}
+                onEdit={() => onOpenView(view.id, section.id)}
+                onDuplicate={() =>
+                  void saveView({
+                    name: `${view.name} copy`,
+                    rules: view.rules ?? [],
+                    mailbox: view.mailbox,
+                  })
+                }
+                onDelete={() => setConfirmDelete(view)}
+              />
             ))}
-          </div>
-        )}
-        <p className="px-1 pt-1 text-[13px] text-muted-foreground">
-          Views show up in the sidebar of the mailbox they belong to.
-        </p>
-      </section>
+          </SettingsSection>
+        ))
+      )}
       <Dialog
         open={confirmDelete !== null}
         onOpenChange={(o) => {

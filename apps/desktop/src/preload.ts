@@ -30,7 +30,6 @@ const bridge: DesktopBridge = {
     launchAtLogin: true,
     defaultMailApp: true,
     translation: true,
-    keybindingsFile: true,
     dragOut: true,
   },
   invoke: <T>(channel: string, params?: unknown) =>

@@ -1,11 +1,10 @@
 /**
- * Persists the user's keybindings to keybindings.json (the Otter Code model:
- * a hand-editable JSON array of `{ key, command, when? }` rules).
+ * Stores the user's keybindings (a JSON array of `{ key, command, when? }`
+ * rules), edited in Settings → Keybindings and synced with the Otter account.
  *
- * The backend is plain storage: it reads leniently (bad entries are skipped
- * and reported as issues) and writes atomically. The desktop app also watches
- * the file so hand edits apply live. The renderer owns the command list,
- * defaults, merge, and grammar validation.
+ * The backend is plain storage: it skips entries it can't read and writes
+ * atomically. The renderer owns the command list, defaults, merge, and
+ * grammar validation.
  */
 
 import { utf8Decode } from "../bytes.js";
@@ -15,11 +14,9 @@ import { platform } from "../platform.js";
 export const KEYBINDINGS_FILE = "keybindings.json";
 
 export type KeybindingRule = { key: string; command: string; when?: string };
-export type KeybindingsIssue = { kind: "invalid-entry"; index: number } | { kind: "malformed" };
 export type KeybindingsFile = {
-  /** null when the file doesn't exist yet (defaults only). */
+  /** null when none are saved yet (defaults only). */
   rules: KeybindingRule[] | null;
-  issues: KeybindingsIssue[];
 };
 
 const MAX_RULES = 256;
@@ -36,56 +33,23 @@ function asRule(value: unknown): KeybindingRule | null {
   return when ? { key, command, when } : { key, command };
 }
 
-/** Strips // and /* *\/ comments and trailing commas so JSONC edits still load. */
-function stripJsonc(text: string): string {
-  let out = "";
-  let inString = false;
-  for (let i = 0; i < text.length; i++) {
-    const c = text[i];
-    if (inString) {
-      out += c;
-      if (c === "\\") out += text[++i] ?? "";
-      else if (c === '"') inString = false;
-      continue;
-    }
-    if (c === '"') {
-      inString = true;
-      out += c;
-    } else if (c === "/" && text[i + 1] === "/") {
-      while (i < text.length && text[i] !== "\n") i++;
-      out += "\n";
-    } else if (c === "/" && text[i + 1] === "*") {
-      i += 2;
-      while (i < text.length && !(text[i] === "*" && text[i + 1] === "/")) i++;
-      i++;
-    } else {
-      out += c;
-    }
-  }
-  return out.replace(/,(\s*[\]}])/g, "$1");
-}
-
 export async function readKeybindings(): Promise<KeybindingsFile> {
   const bytes = await platform()
     .files.read(KEYBINDINGS_FILE)
     .catch(() => null);
-  if (!bytes) return { rules: null, issues: [] };
-  const text = utf8Decode(bytes);
+  if (!bytes) return { rules: null };
   let parsed: unknown;
   try {
-    parsed = JSON.parse(stripJsonc(text));
+    parsed = JSON.parse(utf8Decode(bytes));
   } catch {
-    return { rules: [], issues: [{ kind: "malformed" }] };
+    return { rules: [] };
   }
-  if (!Array.isArray(parsed)) return { rules: [], issues: [{ kind: "malformed" }] };
-  const rules: KeybindingRule[] = [];
-  const issues: KeybindingsIssue[] = [];
-  parsed.slice(0, MAX_RULES).forEach((entry, index) => {
-    const rule = asRule(entry);
-    if (rule) rules.push(rule);
-    else issues.push({ kind: "invalid-entry", index });
-  });
-  return { rules, issues };
+  if (!Array.isArray(parsed)) return { rules: [] };
+  const rules = parsed
+    .slice(0, MAX_RULES)
+    .map(asRule)
+    .filter((r): r is KeybindingRule => r !== null);
+  return { rules };
 }
 
 export async function writeKeybindings(rules: unknown): Promise<KeybindingsFile> {
@@ -96,5 +60,5 @@ export async function writeKeybindings(rules: unknown): Promise<KeybindingsFile>
     JSON.stringify(clean.slice(-MAX_RULES), null, 2) + "\n",
   );
   logger.info("keybindings", `wrote ${clean.length} rules`);
-  return { rules: clean, issues: [] };
+  return { rules: clean };
 }

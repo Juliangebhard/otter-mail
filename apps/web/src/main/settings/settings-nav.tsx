@@ -52,9 +52,9 @@ export function SettingsNav({
   return (
     <>
       <div className="flex min-h-0 flex-1 flex-col gap-0.5 scroll-fade-y overflow-y-auto px-(--sidebar-content-inset) pb-8 pt-3">
-        <div className="flex h-8 items-center px-(--sidebar-row-content-inset) text-[13px] text-sidebar-muted-foreground">
+        <h2 className="mb-1 flex h-8 items-center px-(--sidebar-row-content-inset) text-base font-semibold text-sidebar-foreground">
           Settings
-        </div>
+        </h2>
         {SETTINGS_SECTIONS.map((section) => {
           const Icon = section.icon;
           const active = section.id === pane;
@@ -77,7 +77,7 @@ export function SettingsNav({
           );
         })}
       </div>
-      <div className="shrink-0 px-(--sidebar-content-inset) py-1">
+      <div className="shrink-0 px-(--sidebar-content-inset) pt-1 pb-(--sidebar-content-inset)">
         <button type="button" onClick={onBack} className={cn(ROW, ROW_IDLE)}>
           <ArrowLeftIcon />
           <span className="truncate">Back</span>
