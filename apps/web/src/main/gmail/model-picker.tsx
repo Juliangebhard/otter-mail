@@ -148,9 +148,13 @@ function ModelPickerRail({
   onSelect: (value: ProviderKind | "favorites") => void;
 }) {
   return (
-    <div className="w-11 shrink-0 overflow-hidden" data-model-picker-sidebar aria-label="Providers">
+    <div
+      className="w-12 shrink-0 overflow-hidden border-e border-foreground/10"
+      data-model-picker-sidebar
+      aria-label="Providers"
+    >
       <div className="h-full overflow-y-auto overscroll-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        <div className="flex min-h-full flex-col gap-1 p-1.5 pe-0">
+        <div className="flex min-h-full flex-col gap-1 p-1.5">
           <div className="relative w-full" data-model-picker-provider="favorites">
             <HintTooltip label="Favorites">
               <button
@@ -164,7 +168,7 @@ function ModelPickerRail({
               </button>
             </HintTooltip>
           </div>
-          <div className="mx-1.5 border-b border-border/50" aria-hidden />
+          <div className="mx-1.5 my-0.5 border-b border-foreground/10" aria-hidden />
           {providers.map((p) => {
             const locked = lockedKind !== null && lockedKind !== p.kind;
             const disabled = !isProviderUsable(p) || locked;
@@ -404,7 +408,7 @@ function ModelPickerContent({
         />
       ) : null}
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-        <div className="min-w-0 shrink-0 border-b border-border/50 px-3 py-2">
+        <div className="min-w-0 shrink-0 border-b border-foreground/10 px-3 py-2">
           <div className="relative">
             <SearchIcon
               aria-hidden

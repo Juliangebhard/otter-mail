@@ -738,8 +738,8 @@ function ChatTabs({
             className={cn(
               "group/tab flex h-7 max-w-44 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg pl-2.5 pr-1 text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-focus-ring",
               selected
-                ? "bg-accent-surface text-foreground"
-                : "text-muted-foreground hover:bg-accent-surface/60 hover:text-foreground",
+                ? "bg-foreground/10 text-foreground"
+                : "text-muted-foreground hover:bg-foreground/[0.06] hover:text-foreground",
             )}
           >
             <span className="relative flex size-3.5 shrink-0 items-center justify-center">
