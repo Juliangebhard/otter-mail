@@ -27,7 +27,7 @@ import {
   WindowTitle,
 } from "./gmail/top-bar";
 import { SettingsPage, type SettingsRoute } from "./settings/settings-page";
-import { SettingsNav, settingsSectionLabel } from "./settings/settings-nav";
+import { SettingsNav } from "./settings/settings-nav";
 import { OtterSignInOnboardingLink } from "./settings/otter-account-pane";
 import { isTypingTarget } from "./gmail/keyboard";
 import { cn } from "./gmail/ui";
@@ -1020,24 +1020,7 @@ export function HomeView() {
   const mainIsLeftmost = !sidebarOpen && !(hasListTarget && !settingsRoute);
   const titleControls = (
     <TitleControls
-      leading={
-        <>
-          {mainIsLeftmost ? <TitlebarInset /> : null}
-          {settingsRoute ? (
-            <nav aria-label="Settings" className="min-w-0">
-              <ol className="m-0 flex min-w-0 list-none items-center gap-2 p-0 text-sm">
-                <li className="shrink-0 font-medium text-muted-foreground">Settings</li>
-                <li aria-hidden="true" className="flex shrink-0 items-center text-icon-muted">
-                  /
-                </li>
-                <li className="min-w-0 truncate font-medium text-foreground">
-                  {settingsSectionLabel(settingsRoute.pane)}
-                </li>
-              </ol>
-            </nav>
-          ) : null}
-        </>
-      }
+      leading={mainIsLeftmost ? <TitlebarInset /> : null}
       syncing={globalSync.syncing}
       syncLabel={globalSync.label}
       // Room for the pinned panel toggle while the panel is closed; when
