@@ -137,14 +137,16 @@ struct SidebarView: View {
         .scrollIndicators(.hidden)
         .contentMargins(.top, 4, for: .scrollContent)
         .contentMargins(.bottom, 96, for: .scrollContent)
-        // Rows fade out under the chips and the Compose bar instead of stopping at a line.
+        // iOS's soft edge under the chips, only once rows scroll there.
+        .scrollEdgeEffectStyle(.soft, for: .top)
+        // Rows fade only as they slide under Compose (at rest the last one sits above it).
         .mask {
             VStack(spacing: 0) {
-                LinearGradient(colors: [.black.opacity(0.15), .black], startPoint: .top, endPoint: .bottom).frame(height: 12)
                 Color.black
-                LinearGradient(colors: [.black, .black.opacity(0.15)], startPoint: .top, endPoint: .bottom).frame(height: 24)
-                Color.clear.frame(height: 20)
+                LinearGradient(colors: [.black, .clear], startPoint: .top, endPoint: .bottom).frame(height: 28)
+                Color.clear.frame(height: 60)
             }
+            .ignoresSafeArea()
         }
     }
 
