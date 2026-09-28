@@ -18,7 +18,6 @@ import {
   XIcon,
   MessageSquareIcon,
   PlusIcon,
-  SquarePenIcon,
   CheckIcon,
   CornerUpRightIcon,
   ListPlusIcon,
@@ -1655,6 +1654,13 @@ export function AssistantChatPanel({
             onClose={closeTab}
           />
         ) : null}
+        {/* New chat right after the tabs, like a browser's new-tab button. */}
+        <HintTooltip label="New chat" shortcut="assistant.newChat" side="bottom">
+          <IconBtn label="New chat" className="size-8 shrink-0" onClick={() => newChat()}>
+            <PlusIcon className="size-4" />
+          </IconBtn>
+        </HintTooltip>
+        <span className="min-w-0 flex-1" />
         <HintTooltip label="Chat history" side="bottom">
           <IconBtn
             label="Chat history"
@@ -1665,12 +1671,6 @@ export function AssistantChatPanel({
             <HistoryIcon className="size-4" />
           </IconBtn>
         </HintTooltip>
-        <HintTooltip label="New chat" shortcut="assistant.newChat" side="bottom">
-          <IconBtn label="New chat" className="size-8 shrink-0" onClick={() => newChat()}>
-            <SquarePenIcon className="size-4" />
-          </IconBtn>
-        </HintTooltip>
-        <span className="min-w-0 flex-1" />
         {/* The pinned assistant toggle (home view) sits here. */}
         <PanelControlSlot />
       </div>
