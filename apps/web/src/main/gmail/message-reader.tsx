@@ -2374,7 +2374,18 @@ export function MessageReader({
         >
           {conversationLabelIds.includes("INBOX") ? <InboxChip onRemove={handleArchive} /> : null}
           {conversationLabelIds.filter(isCategoryLabelId).map((id) => (
-            <CategoryChip key={id} id={id} />
+            <CategoryChip
+              key={id}
+              id={id}
+              onRemove={() => {
+                console.log("[MessageReader:removeCategoryChip]", { labelId: id });
+                void modifyThread.mutateAsync({
+                  accountId,
+                  threadId: conversationId,
+                  removeLabelIds: [id],
+                });
+              }}
+            />
           ))}
           {messageLabels.map((label) => (
             <LabelChip

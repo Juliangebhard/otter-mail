@@ -21,8 +21,8 @@ function tint(color: string): CSSProperties {
   return { "--label": color } as CSSProperties;
 }
 
-/** Hover-revealed remove control: overlays the chip's right edge (bg-inherit
-    paints over the text below), so the chip never changes size. */
+/** Hover-revealed remove control, after the name: the chip is see-through,
+    so an overlay couldn't cover the text. */
 function RemoveButton({ label, onRemove }: { label: string; onRemove: () => void }) {
   return (
     <button
@@ -33,7 +33,7 @@ function RemoveButton({ label, onRemove }: { label: string; onRemove: () => void
         e.stopPropagation();
         onRemove();
       }}
-      className="absolute inset-y-0 right-0 hidden w-5 items-center justify-center rounded-r-full bg-inherit group-hover:flex"
+      className="-me-1 hidden size-3.5 shrink-0 cursor-pointer items-center justify-center rounded-full hover:bg-foreground/15 group-hover:flex focus-visible:flex"
     >
       <XIcon className="size-2.5" strokeWidth={3} />
     </button>
@@ -48,12 +48,13 @@ const CATEGORY_CHIPS: Record<string, { name: string; bg: string }> = {
   CATEGORY_FORUMS: { name: "Forums", bg: "#7627bb" },
 };
 
-export function CategoryChip({ id }: { id: string }) {
+export function CategoryChip({ id, onRemove }: { id: string; onRemove?: () => void }) {
   const meta = CATEGORY_CHIPS[id];
   if (!meta) return null;
   return (
     <span className={`${PILL} ${TINTED}`} style={tint(meta.bg)}>
       {meta.name}
+      {onRemove ? <RemoveButton label={`Remove "${meta.name}"`} onRemove={onRemove} /> : null}
     </span>
   );
 }
