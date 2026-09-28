@@ -49,7 +49,14 @@ export function SettingsSectionHeader({
   muted?: boolean;
 }) {
   return (
-    <div className={cn("flex min-h-7 items-center justify-between gap-4", muted ? "mb-1" : "mb-3")}>
+    // Text outside the cards lines up with the text inside them (Linear):
+    // the cards' 1px border + 16px padding.
+    <div
+      className={cn(
+        "flex min-h-7 items-center justify-between gap-4 px-[17px]",
+        muted ? "mb-1" : "mb-3",
+      )}
+    >
       <div className="min-w-0">
         <h2
           data-slot="settings-section-title"
@@ -203,7 +210,7 @@ export function SettingsPageContainer({
         className={cn("mx-auto w-full max-w-[47rem] space-y-10 px-6 pb-20 pt-14", className)}
       >
         {title ? (
-          <header className="flex items-end justify-between gap-4">
+          <header className="flex items-end justify-between gap-4 px-[17px]">
             <div className="min-w-0">
               <h1
                 data-slot="settings-page-title"

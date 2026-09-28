@@ -379,7 +379,7 @@ function KeybindingRow({ row, rows }: { row: Row; rows: Row[] }) {
     void save({ command: rule.command, key: keyDraft, when: whenDraft || undefined }, rule);
 
   return (
-    <div className="group/row flex min-h-14 items-center gap-6 py-2">
+    <div className="group/row flex min-h-14 items-center gap-6 px-[17px] py-2">
       <div className="min-w-0 flex-1">
         <div className="flex min-h-5 items-center gap-2 text-sm text-foreground">
           <HintTooltip label={rule.command}>
