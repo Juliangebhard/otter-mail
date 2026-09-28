@@ -8,6 +8,7 @@ import {
   type PointerEvent,
   type ReactNode,
 } from "react";
+import { Popover } from "radix-ui";
 import { Dialog } from "~/components/ui/dialog";
 import { EmptyState } from "~/components/ui/empty-state";
 import { Text } from "~/components/ui/text";
@@ -36,6 +37,7 @@ import {
   ShieldCheckIcon,
   Trash2Icon,
   XIcon,
+  ListIcon,
 } from "lucide-react";
 import { SenderHoverCard } from "./sender-hovercard";
 import { UnsubscribeLink } from "./unsubscribe-link";
@@ -65,6 +67,7 @@ import {
 import { gmailApi } from "./api";
 import { CategoryChip, InboxChip, LabelChip, isCategoryLabelId } from "./label-chip";
 import { SenderAvatar } from "./sender-avatar";
+import { ConversationSummary } from "./conversation-summary";
 import {
   CcBccToggles,
   ComposerCard,
@@ -1982,6 +1985,15 @@ export function MessageReader({
   }, []);
   const compactTitle = readerWidth < 44 * 16;
   const compactActions = readerWidth < 36 * 16;
+  // The summary (Codex's pinned card): in the top-right corner, the
+  // conversation re-centering in the room left of it, when the 48rem column
+  // and the card (16rem + 1rem margins) both fit; else a popover from the toggle.
+  const summaryFits = readerWidth >= 48 * 16 + 16 * 16 + 2 * 16;
+  const [summaryPinned, setSummaryPinned] = useState(
+    () => localStorage.getItem("gmail:summary-pinned") !== "0",
+  );
+  const [summaryOpen, setSummaryOpen] = useState(false);
+  const summaryShown = summaryFits && summaryPinned;
   const readerAction = (name: "reply" | "replyAll" | "forward" | "translate") => () => {
     const action = readerActions.current[name];
     if (!action) return false;
@@ -2351,6 +2363,17 @@ export function MessageReader({
   const groupDivider = <span className="mx-1 h-5 w-px shrink-0 bg-border" aria-hidden />;
 
   /** Subject + label chips: one truncated line in the band, or a wrapping heading. */
+  const summary = (
+    <ConversationSummary
+      accountId={accountId}
+      threadId={conversationId}
+      rows={rows}
+      onComposeTo={onComposeTo}
+      onSearchSender={onSearchSender}
+      onDownload={handleDownloadAttachment}
+    />
+  );
+
   const renderTitle = (wrap: boolean) => (
     <>
       <span
@@ -2409,7 +2432,7 @@ export function MessageReader({
 
   return (
     <ConversationTranslationContext.Provider value={conversationTranslation}>
-      <div ref={readerRef} className="flex h-full min-w-0 flex-col">
+      <div ref={readerRef} className="relative flex h-full min-w-0 flex-col">
         {/* Conversation header = the title band: subject + labels, the
             everyday actions, a "more" menu, then the window's panel toggle. */}
         <div
@@ -2607,6 +2630,42 @@ export function MessageReader({
             </DropdownMenuContent>
           </DropdownMenu>
 
+          {summaryFits ? (
+            <HintTooltip label={summaryPinned ? "Hide summary" : "Show summary"} side="bottom">
+              <IconBtn
+                label="Toggle summary"
+                active={summaryPinned}
+                onClick={() => {
+                  localStorage.setItem("gmail:summary-pinned", summaryPinned ? "0" : "1");
+                  setSummaryPinned(!summaryPinned);
+                }}
+              >
+                <ListIcon className="size-4" />
+              </IconBtn>
+            </HintTooltip>
+          ) : (
+            <Popover.Root open={summaryOpen} onOpenChange={setSummaryOpen}>
+              <HintTooltip label="Summary" side="bottom">
+                <Popover.Trigger asChild>
+                  <IconBtn label="Toggle summary" active={summaryOpen}>
+                    <ListIcon className="size-4" />
+                  </IconBtn>
+                </Popover.Trigger>
+              </HintTooltip>
+              <Popover.Portal>
+                <Popover.Content
+                  side="bottom"
+                  align="end"
+                  sideOffset={6}
+                  collisionPadding={8}
+                  className="z-[130] outline-none"
+                >
+                  {summary}
+                </Popover.Content>
+              </Popover.Portal>
+            </Popover.Root>
+          )}
+
           {titleTrailing ? (
             <span className="ml-1 flex items-center gap-1">{titleTrailing}</span>
           ) : null}
@@ -2663,9 +2722,13 @@ export function MessageReader({
 
         {/* Conversation */}
         <div
-          // The scrollbar's lane on both sides, always: the centered column
-          // doesn't slide when expanding a message makes the thread scroll.
-          className="min-h-0 flex-1 overflow-y-auto pb-6 [scrollbar-gutter:stable_both-edges]"
+          className={cn(
+            // The scrollbar's lane on both sides, always: the centered column
+            // doesn't slide when expanding a message makes the thread scroll.
+            "min-h-0 flex-1 overflow-y-auto pb-6 [scrollbar-gutter:stable_both-edges]",
+            // Room for the pinned summary, so the column centers beside it.
+            summaryShown && "pr-[18rem]",
+          )}
           onMouseUp={onParentMouseUp}
         >
           <div className="mx-auto w-full max-w-3xl">
@@ -2731,6 +2794,13 @@ export function MessageReader({
             })()}
           </div>
         </div>
+
+        {/* Pinned in the reader's top-right corner, still while the conversation scrolls. */}
+        {summaryShown ? (
+          <aside className="absolute right-4 top-[calc(var(--workspace-topbar-height)+0.75rem)] z-10">
+            {summary}
+          </aside>
+        ) : null}
 
         {/* In-thread composer, hidden until replying/forwarding */}
         {lastRow && inline ? (
