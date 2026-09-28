@@ -1997,8 +1997,9 @@ export function AssistantChatPanel({
                     ) : null}
                   </div>
                   {/* Codex's "Model Effort ⌄": the model reads as plain text,
-                      the traits follow it muted and carry the chevron. */}
-                  <div className="ms-auto flex min-w-0 shrink items-center">
+                      the traits follow it muted and carry the chevron, and
+                      one pill wraps both, as a single control. */}
+                  <div className="ms-auto flex min-w-0 shrink items-center rounded-full transition-colors hover:bg-accent-surface has-[[data-state=open]]:bg-accent-surface">
                     <ProviderModelPicker
                       providers={providersState?.providers ?? []}
                       activeKind={providerKind}
@@ -2006,14 +2007,17 @@ export function AssistantChatPanel({
                       onPick={pickModel}
                       returnFocus={focusComposer}
                       chevron={traitOptions.length === 0}
-                      className={traitOptions.length > 0 ? "pe-1" : undefined}
+                      className={cn(
+                        "hover:bg-transparent data-[state=open]:bg-transparent",
+                        traitOptions.length > 0 && "pe-1",
+                      )}
                     />
                     {traitOptions.length > 0 ? (
                       <TraitsPicker
                         returnFocus={focusComposer}
                         options={traitOptions}
                         values={traitValues}
-                        className="shrink-0 ps-1"
+                        className="shrink-0 ps-1 hover:bg-transparent data-[state=open]:bg-transparent"
                         onChange={(id, value) => {
                           updateSettings({ [providerKind]: { [id]: value } });
                         }}
