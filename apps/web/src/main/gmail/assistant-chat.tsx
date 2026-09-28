@@ -55,6 +55,7 @@ import {
 } from "./chat-context";
 import { ChatMarkdown } from "./chat-markdown";
 import {
+  AttachmentCard,
   ComposerAttachments,
   DropOverlay,
   SentAttachments,
@@ -1878,7 +1879,37 @@ export function AssistantChatPanel({
                 />
               ) : null}
               <div className={cn("relative", COMPOSER_SURFACE)}>
-                <ComposerAttachments items={files.items} onRemove={files.remove} />
+                <ComposerAttachments items={files.items} onRemove={files.remove}>
+                  {/* The mail this message is about: a card too; click to leave it out. */}
+                  {context ? (
+                    <AttachmentCard
+                      name={
+                        quote
+                          ? "Quote"
+                          : context.conversations.length > 1
+                            ? `${context.conversations.length} conversations`
+                            : context.conversations[0].subject || "(no subject)"
+                      }
+                      title={attach ? "Attached to this message" : "Not attached"}
+                      icon={<ContextKindIcon kind={attachKind} />}
+                      off={!attach}
+                      onClick={() => setAttach((a) => !a)}
+                      preview={
+                        <span className="flex w-full flex-col gap-1 self-start p-3 text-left text-[11px] leading-snug text-muted-foreground">
+                          {quote ? (
+                            <span className="line-clamp-4">“{quote.text}”</span>
+                          ) : (
+                            context.conversations.slice(0, 3).map((c, i) => (
+                              <span key={i} className="truncate">
+                                {c.subject || "(no subject)"}
+                              </span>
+                            ))
+                          )}
+                        </span>
+                      }
+                    />
+                  ) : null}
+                </ComposerAttachments>
                 {activeSkill ? (
                   <div className="px-4 pt-3">
                     <SkillBadge name={activeSkill.name} onRemove={() => setActiveSkill(null)} />
@@ -1971,29 +2002,6 @@ export function AssistantChatPanel({
                           });
                         }}
                       />
-                    ) : null}
-                    {context ? (
-                      <button
-                        type="button"
-                        aria-pressed={attach}
-                        onClick={() => setAttach((a) => !a)}
-                        title={attach ? "Attached to this message" : "Not attached"}
-                        className={cn(
-                          "relative inline-flex h-7 min-w-0 shrink cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-full border border-transparent px-2.5 text-sm outline-none transition-colors hover:bg-accent-surface focus-visible:ring-2 focus-visible:ring-focus-ring [&_svg]:shrink-0",
-                          attach
-                            ? "text-foreground/90"
-                            : "text-muted-foreground/70 line-through hover:text-foreground/80",
-                        )}
-                      >
-                        <ContextKindIcon kind={attachKind} className="size-3.5" />
-                        <span className="max-w-48 truncate">
-                          {quote
-                            ? `“${quote.text}”`
-                            : context.conversations.length > 1
-                              ? `${context.conversations.length} conversations`
-                              : context.conversations[0].subject}
-                        </span>
-                      </button>
                     ) : null}
                   </div>
                   {/* Codex's "Model Effort ⌄": the model reads as plain text,
