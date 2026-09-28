@@ -1397,10 +1397,11 @@ export function ExpandedRow({
         {/* The body takes the row's full width, not indented under the avatar. */}
         <div className="mt-4">
           {detailQuery.isLoading ? (
-            <div className="flex flex-col gap-2">
-              <div className="h-4 w-3/4 animate-skeleton rounded-full bg-secondary" />
-              <div className="h-4 w-1/2 animate-skeleton rounded-full bg-accent-surface" />
-            </div>
+            // The snippet stands in while the body loads: about the size of a
+            // short message, so the thread doesn't jump when it arrives.
+            <p className="animate-skeleton text-sm leading-6 text-muted-foreground">
+              {summary.snippet}
+            </p>
           ) : detail ? (
             <>
               {translation.banner}
@@ -2661,7 +2662,12 @@ export function MessageReader({
         ) : null}
 
         {/* Conversation */}
-        <div className="min-h-0 flex-1 overflow-y-auto pb-6" onMouseUp={onParentMouseUp}>
+        <div
+          // The scrollbar's lane on both sides, always: the centered column
+          // doesn't slide when expanding a message makes the thread scroll.
+          className="min-h-0 flex-1 overflow-y-auto pb-6 [scrollbar-gutter:stable_both-edges]"
+          onMouseUp={onParentMouseUp}
+        >
           <div className="mx-auto w-full max-w-3xl">
             {(() => {
               // Day dividers, expanded messages, and runs of collapsed messages
