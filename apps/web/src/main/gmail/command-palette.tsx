@@ -470,18 +470,18 @@ export function CommandPalette({
 
   return createPortal(
     <div className="no-drag fixed inset-0 z-[100]" role="presentation">
-      {/* Backdrop: clear while changing theme, so the preview shows. */}
-      <div
-        className={cn("absolute inset-0", page !== "theme" && "bg-canvas/40 backdrop-blur-[2px]")}
-        onPointerDown={close}
-        aria-hidden
-      />
+      {/* Backdrop: clear, like Linear's; a click outside closes. */}
+      <div className="absolute inset-0" onPointerDown={close} aria-hidden />
       <div className="pointer-events-none absolute inset-0 flex flex-col items-center px-4 pt-[10vh]">
         <div
           role="dialog"
           aria-modal="true"
           aria-label="Command palette"
-          className="dropdown-glass pointer-events-auto relative flex max-h-105 w-full max-w-xl flex-col overflow-hidden rounded-2xl text-foreground shadow-[0_24px_64px_-24px_rgb(0_0_0/45%)] dark:shadow-[0_24px_64px_-24px_rgb(0_0_0/80%)]"
+          className={cn(
+            "pointer-events-auto relative flex max-h-105 w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-foreground/10 text-foreground shadow-[0_24px_64px_-24px_rgb(0_0_0/45%)] transition-[background-color] dark:shadow-[0_24px_64px_-24px_rgb(0_0_0/80%)]",
+            // Changing theme: a see-through window, so the preview shows behind it.
+            page === "theme" ? "bg-popover/85 backdrop-blur-md" : "bg-popover",
+          )}
         >
           {/* Search field */}
           <div className="relative flex h-12 shrink-0 items-center gap-2.5 px-4">
