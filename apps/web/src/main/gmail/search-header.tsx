@@ -805,8 +805,9 @@ export function SearchHeader({
         <AdvancedSearch query={draft} onSearch={run} onClose={() => setAdvancedOpen(false)} />
       ) : null}
 
-      {/* Gmail's search chips. */}
-      <div className="flex flex-wrap items-center gap-1.5 px-3 pb-2">
+      {/* Gmail's search chips: one row inside the panel, 10px in like the list's
+          rows, scrolling sideways and fading out at the edge. */}
+      <div className="flex items-center gap-1.5 overflow-x-auto px-[10px] pb-1 pt-[10px] [mask-image:linear-gradient(to_right,black_calc(100%-2rem),transparent)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <ScopeChip accounts={accounts} scope={scope} onScope={onScope} />
         <PersonChip label="From" operator="from" query={query} onSearch={run} />
         <TimeChip query={query} onSearch={run} />
