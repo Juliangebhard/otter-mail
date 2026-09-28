@@ -73,6 +73,18 @@ struct SettingsView: View {
                     Text("Mail in other languages is translated on this iPhone, by Apple's Translation.")
                 }
 
+                Section("Assistant") {
+                    NavigationLink {
+                        AssistantSettings()
+                    } label: {
+                        LabeledContent {
+                            Text(session.assistant.status == .ready ? "Hermes" : "Off")
+                        } label: {
+                            Label("Assistant", systemImage: "sparkles")
+                        }
+                    }
+                }
+
                 Section("Appearance") {
                     Picker(selection: $preferences.scheme) {
                         ForEach(Preferences.Scheme.allCases) { Text($0.title).tag($0) }

@@ -25,6 +25,7 @@ final class Session {
     var opening: String?
 
     let preferences: Preferences
+    let assistant = Assistant()
     @ObservationIgnored let relay = Relay()
     @ObservationIgnored let google = GoogleAuth()
     @ObservationIgnored private var sync: MailSync?
@@ -51,6 +52,8 @@ final class Session {
         }
         relay.onSignedOut = { [weak self] in self?.endSession() }
         preferences.onChange = { [weak self] section in self?.preferenceChanged(section) }
+        assistant.onChange = { [weak self] section in self?.preferenceChanged(section) }
+        Task { [assistant] in await assistant.check() }
         if case .signedIn = state { startLive() }
     }
 
@@ -252,12 +255,13 @@ final class Session {
     // ── Preferences ──────────────────────────────────────────────────────────
 
     private func pullPreferences() async {
-        guard let sections = try? await relay.preferences() else { return }
+        guard let (sections, hermesKey) = try? await relay.preferences() else { return }
         let ui = sections["ui"] as? [String: Any]
         let settings = sections["settings"] as? [String: Any]
         remoteSections["ui"] = ui ?? [:]
         remoteSections["settings"] = settings ?? [:]
         preferences.apply(ui: ui ?? [:], settings: settings ?? [:])
+        assistant.apply(section: sections["assistant"] as? [String: Any], key: hermesKey)
         // A section the account doesn't have yet is seeded from here, as core does.
         if ui == nil { preferenceChanged("ui") }
         if settings == nil { preferenceChanged("settings") }
@@ -265,6 +269,15 @@ final class Session {
 
     private func preferenceChanged(_ section: String) {
         guard case .signedIn = state else { return }
+        if section == "hermesKey" {
+            let key = assistant.key
+            Task { try? await relay.putPreferences(["assistant": assistant.syncedSection], hermesKey: .some(key)) }
+            return
+        }
+        if section == "assistant" {
+            Task { try? await relay.putPreferences(["assistant": assistant.syncedSection]) }
+            return
+        }
         let ours: [String: Any] = section == "ui" ? preferences.uiSection : preferences.settingsSection
         let merged = (remoteSections[section] ?? [:]).merging(ours) { _, mine in mine }
         remoteSections[section] = merged
@@ -300,6 +313,8 @@ final class Session {
         UserDefaults.standard.set(false, forKey: Self.demoKey)
         store = MailStore(preferences: preferences)
         state = .welcome
+        assistant.newChat()
+        assistant.forgetKey()
         Task { try? await UNUserNotificationCenter.current().setBadgeCount(0) }
     }
 

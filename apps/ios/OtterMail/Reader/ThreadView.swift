@@ -8,6 +8,7 @@ import SwiftUI
 struct ThreadView: View {
     @Environment(MailStore.self) private var store
     @Environment(Preferences.self) private var preferences
+    @Environment(Session.self) private var session
     @Environment(\.palette) private var palette
 
     let threadID: String
@@ -18,6 +19,7 @@ struct ThreadView: View {
     /** The list as it was when this opened, to know what's next once this one leaves it. */
     @State private var siblings: [String] = []
     @State private var expanded: Set<String> = []
+    @State private var asking: [MailContext]?
 
     var body: some View {
         if let thread = store.thread(threadID), let mailbox = store.mailbox(thread.mailbox) {
@@ -61,6 +63,10 @@ struct ThreadView: View {
         .contentMargins(.bottom, 24, for: .scrollContent)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
+                Button("Ask the assistant", systemImage: "sparkles") { asking = [MailContext(thread)] }
+            }
+            ToolbarSpacer(.fixed, placement: .topBarTrailing)
+            ToolbarItem(placement: .topBarTrailing) {
                 Button(thread.starred ? "Unstar" : "Star", systemImage: thread.starred ? "star.fill" : "star") {
                     store.toggleStar(thread.id)
                 }
@@ -86,6 +92,12 @@ struct ThreadView: View {
         }
         .safeAreaBar(edge: .bottom) {
             replyBar(thread, mailbox)
+        }
+        .sheet(isPresented: Binding(get: { asking != nil }, set: { if !$0 { asking = nil } })) {
+            NavigationStack {
+                AssistantView(context: asking ?? [], sheet: true)
+            }
+            .onAppear { session.assistant.newChat() }
         }
         .toolbarTitleDisplayMode(.inline)
         .onAppear {

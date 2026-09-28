@@ -23,6 +23,7 @@ struct HomeView: View {
     @State private var drag: CGFloat = 0
     @State private var draft: Draft?
     @State private var settingsOpen = false
+    @State private var assistantOpen = false
 
     var body: some View {
         GeometryReader { geometry in
@@ -42,6 +43,7 @@ struct HomeView: View {
                 NavigationStack(path: $path) {
                     ThreadListView(
                         place: place,
+                        onAssistant: { assistantOpen = true },
                         onCompose: { compose() },
                         onSettings: { settingsOpen = true },
                         onResume: { draft = $0 }
@@ -85,6 +87,14 @@ struct HomeView: View {
         }
         .sheet(item: $draft) { draft in
             ComposeView(draft: draft)
+        }
+        .sheet(isPresented: $assistantOpen) {
+            NavigationStack {
+                AssistantView(sheet: true, onSettings: {
+                    assistantOpen = false
+                    settingsOpen = true
+                })
+            }
         }
         .sheet(isPresented: $settingsOpen) {
             SettingsView()

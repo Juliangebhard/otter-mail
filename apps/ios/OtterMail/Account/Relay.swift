@@ -129,17 +129,18 @@ final class Relay {
 
     // ── Preferences ──────────────────────────────────────────────────────────
 
-    /** The account's preference sections (`ui`, `settings`, …), as JSON. */
-    func preferences() async throws -> [String: Any] {
+    /** The account's preference sections (`ui`, `settings`, `assistant`, …) as JSON, and the Hermes key. */
+    func preferences() async throws -> (sections: [String: Any], hermesKey: String?) {
         let (data, _) = try await send("GET", "/v1/preferences")
         let object = try JSONSerialization.jsonObject(with: data) as? [String: Any]
-        return object?["preferences"] as? [String: Any] ?? [:]
+        return (object?["preferences"] as? [String: Any] ?? [:], object?["hermesKey"] as? String)
     }
 
-    /** Replaces the sections given; the others stay. */
-    func putPreferences(_ sections: [String: Any]) async throws {
-        let body = try JSONSerialization.data(withJSONObject: ["preferences": sections])
-        _ = try await send("PUT", "/v1/preferences", data: body)
+    /** Replaces the sections given (the others stay); sets or clears the Hermes key when given. */
+    func putPreferences(_ sections: [String: Any], hermesKey: String?? = nil) async throws {
+        var body: [String: Any] = ["preferences": sections]
+        if let hermesKey { body["hermesKey"] = hermesKey ?? NSNull() }
+        _ = try await send("PUT", "/v1/preferences", data: try JSONSerialization.data(withJSONObject: body))
     }
 
     // ── Events ───────────────────────────────────────────────────────────────

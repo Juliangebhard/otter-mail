@@ -11,7 +11,7 @@ their code.
   with its folders and labels, then Compose and Settings. Settings is ChatGPT's grouped sheet.
 - **Otter Code's rows.** Who and when, the subject, a line of the latest message; the mailbox's mark
   in All mailboxes. Swipe for read, archive and trash; long-press for the rest.
-- **iOS's own bars.** The list's bottom bar (search, compose) and the reader's buttons are
+- **iOS's own bars.** The list's bottom bar (assistant, search, compose) and the reader's buttons are
   the system's glass toolbar. Replying starts from a glass field at the bottom, like ChatGPT's
   composer.
 - **Every theme.** The themes are the desktop's (`Resources/Themes.json`), light and dark, blended
@@ -34,6 +34,11 @@ never sees its mail or tokens.
 - `Gmail/`: the Gmail API (`GmailAPI.swift`), messages out (`MIME.swift`), and sync
   (`MailSync.swift`): history-based, local-first, cached on disk, changes shown at once then
   written to Gmail. `users.watch` is renewed daily so pushes reach the relay.
+- `Assistant/`: the assistant, as on the desktop. Hermes (`Hermes.swift`) runs anywhere, so it
+  runs here: the same server-side chats, model and key (the `assistant` preferences section and
+  the sealed `hermesKey` follow the Otter account). Conversations go to it as pointers, the
+  desktop's "context from Otter Mail" block; the agent reads the mail itself. Codex and Claude are
+  local agents on the Mac, listed but off.
 - `Mail/`: the model and `MailStore`, which screens render from. `DemoMail.swift` loads the demo.
 - `Home/`, `Reader/`, `Compose/`, `Settings/`: the screens.
 
