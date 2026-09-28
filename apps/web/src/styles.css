@@ -375,6 +375,13 @@ html[data-platform="web"] {
   background-size: 256px 256px;
 }
 
+/* While a theme is being applied (theme/apply-theme.ts), nothing fades. */
+html[data-theme-switching] *,
+html[data-theme-switching] *::before,
+html[data-theme-switching] *::after {
+  transition: none !important;
+}
+
 /* Micro-label: 11px medium sans (metadata, field labels, section captions). */
 .te-label {
   font-size: 0.6875rem;

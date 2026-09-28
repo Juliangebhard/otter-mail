@@ -149,6 +149,21 @@ export function previewTheme(themeId: string | null): void {
   window.dispatchEvent(new Event(CHANGE_EVENT));
 }
 
+let settleFrame = 0;
+
+/**
+ * Switching themes repaints everything in one frame: without this, elements
+ * with color transitions fade at their own pace while the rest snap.
+ */
+function withoutTransitions(root: HTMLElement): void {
+  root.setAttribute("data-theme-switching", "");
+  cancelAnimationFrame(settleFrame);
+  // Two frames: the new colors paint with transitions off, then they're back.
+  settleFrame = requestAnimationFrame(() => {
+    settleFrame = requestAnimationFrame(() => root.removeAttribute("data-theme-switching"));
+  });
+}
+
 /** Applies the theme for the current system/app appearance to this window. */
 export function applyAppTheme(): void {
   const mode = appearance();
@@ -157,6 +172,7 @@ export function applyAppTheme(): void {
   const exact = APP_THEMES.find((t) => t.id === themeId)?.exact ?? false;
 
   const root = document.documentElement;
+  withoutTransitions(root);
   root.classList.toggle("dark", mode === "dark");
   let style = document.getElementById(STYLE_ID);
   if (themeId === DEFAULT_THEME_ID) {
