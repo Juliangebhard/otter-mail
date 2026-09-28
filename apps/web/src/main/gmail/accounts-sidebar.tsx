@@ -2,9 +2,11 @@ import {
   Fragment,
   createContext,
   useContext,
+  useRef,
   useState,
   type CSSProperties,
   type DragEvent as ReactDragEvent,
+  type WheelEvent as ReactWheelEvent,
   type ReactNode,
 } from "react";
 import { Dialog } from "~/components/ui/dialog";
@@ -64,8 +66,8 @@ import { labelMoveName } from "../keybindings/commands";
 import { renameLabelKeybindings, useKeybindingsState } from "../keybindings/store";
 import { formatShortcut, parseShortcut } from "../keybindings/keys";
 import { LabelShortcutDialog } from "../settings/keybindings-pane";
-import { UnreadPill, HintTooltip, IconBtn } from "./ui";
-import { MailboxSwitcher, WindowTitle } from "./top-bar";
+import { UnreadPill, HintTooltip, IconBtn, cn } from "./ui";
+import { MailboxDots, MailboxSwitcher, WindowTitle, useMailboxOptions } from "./top-bar";
 import { useOtterAccount } from "../otter-account";
 import { UpdateCard } from "../updates";
 
@@ -848,158 +850,205 @@ export function AccountsSidebar({
         />
       ));
 
+  // Dia's profile switching: the sidebar's pages slide toward the mailbox
+  // you move to, and a two-finger horizontal swipe moves to the neighbor.
+  const mailboxIds = useMailboxOptions(accounts).map((o) => o.id);
+  const mailboxIndex = mailboxIds.indexOf(selectedAccountId ?? "");
+  const [page, setPage] = useState<{ index: number; slide: "next" | "prev" | null }>({
+    index: mailboxIndex,
+    slide: null,
+  });
+  if (page.index !== mailboxIndex) {
+    setPage({ index: mailboxIndex, slide: mailboxIndex > page.index ? "next" : "prev" });
+  }
+  const slide = page.slide;
+  const swipe = useRef({ dx: 0, fired: false, idle: 0 });
+  const onWheel = (e: ReactWheelEvent) => {
+    if (Math.abs(e.deltaX) <= Math.abs(e.deltaY) || mailboxIds.length < 2) return;
+    const s = swipe.current;
+    // One switch per gesture: wait for the wheel (and its momentum) to go quiet.
+    window.clearTimeout(s.idle);
+    s.idle = window.setTimeout(() => {
+      s.dx = 0;
+      s.fired = false;
+    }, 200);
+    if (s.fired) return;
+    s.dx += e.deltaX;
+    if (Math.abs(s.dx) < 60) return;
+    const next = mailboxIndex + (s.dx > 0 ? 1 : -1);
+    s.fired = true;
+    if (next >= 0 && next < mailboxIds.length) onSelectAccount(mailboxIds[next]!);
+  };
+
   return (
     <SearchRowsContext.Provider value={renderSearchRows}>
-      <div className="flex h-full min-w-0 flex-col">
+      <div className="flex h-full min-w-0 flex-col overscroll-x-none" onWheel={onWheel}>
         <WindowTitle />
 
-        {/* Mailbox switcher, the sidebar's heading (Codex's "Codex ⌄"). */}
-        <div className="shrink-0 px-(--sidebar-content-inset) pb-2">
-          <MailboxSwitcher
-            accounts={accounts}
-            selectedAccountId={selectedAccountId}
-            onSelectAccount={onSelectAccount}
-          />
-        </div>
-
-        {/* New message (Codex's "New chat"), then Search, which is a mailbox:
-            selecting it opens Gmail search in the list. */}
-        <div className="flex shrink-0 flex-col gap-0.5 px-(--sidebar-content-inset)">
-          <HintTooltip label="New message" shortcut="compose.new">
-            <button
-              type="button"
-              onClick={onCompose}
-              className={`${SIDEBAR_ROW} bg-sidebar-control-surface px-(--sidebar-row-content-inset) text-sidebar-foreground hover:bg-sidebar-row-hover`}
-            >
-              <SquarePenIcon className="size-4 shrink-0 text-sidebar-muted-foreground group-hover:text-sidebar-foreground" />
-              <span className="truncate">New message</span>
-            </button>
-          </HintTooltip>
-          <SkRow
-            icon={<SearchIcon className="size-4" />}
-            title="Search"
-            selected={searchSelected}
-            dot={searchPending}
-            onClick={onOpenSearch}
-          />
-        </div>
-
-        <div className="min-h-0 flex-1 scroll-fade-y overflow-y-auto px-(--sidebar-content-inset) pb-8 pt-3">
-          {isCombined ? (
-            <>
-              {views
-                .filter((v) => v.kind !== "custom")
-                .map((view) => (
-                  <Fragment key={view.id}>
-                    {withEmptyMenu(
-                      <SkRow
-                        icon={viewIcon(view)}
-                        title={view.name}
-                        selected={selectedLabelId === view.id}
-                        badge={viewUnreadCounts[view.id] ?? 0}
-                        onClick={() => {
-                          console.log("[AccountsSidebar:selectView]", { viewId: view.id });
-                          onSelectLabel(view.id);
-                        }}
-                      />,
-                      viewFolder(view).labelId,
-                      viewFolder(view).accountIds,
-                    )}
-                    <SearchRows parent={view.id} />
-                  </Fragment>
-                ))}
-
-              <Section
-                title="Views"
-                action={<SectionAddButton label="Add view" onClick={() => openViewEditor("new")} />}
-              >
-                {combinedViews.map(viewRow)}
-              </Section>
-            </>
-          ) : (
-            <>
-              {(labels.length > 0
-                ? systemLabels.map((l) => ({
-                    id: l.id,
-                    unread: l.unread ?? 0,
-                    total: l.total ?? 0,
-                  }))
-                : Object.keys(SYSTEM_LABEL_MAP).map((id) => ({ id, unread: 0, total: 0 }))
-              ).map(({ id, unread, total }) => {
-                const meta = SYSTEM_LABEL_MAP[id];
-                if (!meta) return null;
-                // Drafts is a raw count of drafts, not an unread signal.
-                const isDrafts = id === "DRAFT";
-                return (
-                  <Fragment key={id}>
-                    {withEmptyMenu(
-                      <SkRow
-                        icon={meta.icon}
-                        title={meta.name}
-                        selected={selectedLabelId === id}
-                        badge={isDrafts ? total : unread}
-                        onClick={() => {
-                          console.log("[AccountsSidebar:selectLabel]", { labelId: id });
-                          onSelectLabel(id);
-                        }}
-                      />,
-                      id,
-                      selectedAccountId ? [selectedAccountId] : [],
-                    )}
-                    <SearchRows parent={id} />
-                  </Fragment>
-                );
-              })}
-
-              <Section
-                title="Views"
-                action={<SectionAddButton label="Add view" onClick={() => openViewEditor("new")} />}
-              >
-                {accountViews.map(viewRow)}
-              </Section>
-
-              {selectedAccountId ? (
-                <Section
-                  title="Labels"
-                  action={
-                    <SectionAddButton label="Add label" onClick={() => setCreateLabelOpen(true)} />
-                  }
-                  dropZone={{
-                    active: rootDropActive,
-                    onDragOver: (e) => {
-                      if (!e.dataTransfer.types.includes(LABEL_DRAG_MIME)) return;
-                      e.preventDefault();
-                      e.dataTransfer.dropEffect = "move";
-                      setRootDropActive(true);
-                    },
-                    onDragLeave: () => setRootDropActive(false),
-                    onDrop: (e) => {
-                      setRootDropActive(false);
-                      const raw = e.dataTransfer.getData(LABEL_DRAG_MIME);
-                      if (!raw) return;
-                      e.preventDefault();
-                      handleMoveLabel(JSON.parse(raw) as LabelDragPayload, null);
-                    },
-                  }}
-                >
-                  {userLabelTree.map((node) => (
-                    <LabelNode
-                      key={node.key}
-                      node={node}
-                      depth={0}
-                      selectedLabelId={selectedLabelId}
-                      onSelectLabel={onSelectLabel}
-                      actions={labelActions}
-                    />
-                  ))}
-                </Section>
-              ) : null}
-
-              {accounts.length === 0 ? (
-                <AddRow label="Add Gmail account" onClick={() => void handleAddAccount()} />
-              ) : null}
-            </>
+        {/* One page per mailbox (keyed), sliding in from the side you moved toward. */}
+        <div
+          key={selectedAccountId ?? ""}
+          className={cn(
+            "flex min-h-0 flex-1 flex-col",
+            slide === "next" && "[[data-panel-animations=true]_&]:animate-page-from-right",
+            slide === "prev" && "[[data-panel-animations=true]_&]:animate-page-from-left",
           )}
+        >
+          {/* Mailbox switcher, the sidebar's heading (Codex's "Codex ⌄"). */}
+          <div className="shrink-0 px-(--sidebar-content-inset) pb-2">
+            <MailboxSwitcher
+              accounts={accounts}
+              selectedAccountId={selectedAccountId}
+              onSelectAccount={onSelectAccount}
+            />
+          </div>
+
+          {/* New message (Codex's "New chat"), then Search, which is a mailbox:
+            selecting it opens Gmail search in the list. */}
+          <div className="flex shrink-0 flex-col gap-0.5 px-(--sidebar-content-inset)">
+            <HintTooltip label="New message" shortcut="compose.new">
+              <button
+                type="button"
+                onClick={onCompose}
+                className={`${SIDEBAR_ROW} bg-sidebar-control-surface px-(--sidebar-row-content-inset) text-sidebar-foreground hover:bg-sidebar-row-hover`}
+              >
+                <SquarePenIcon className="size-4 shrink-0 text-sidebar-muted-foreground group-hover:text-sidebar-foreground" />
+                <span className="truncate">New message</span>
+              </button>
+            </HintTooltip>
+            <SkRow
+              icon={<SearchIcon className="size-4" />}
+              title="Search"
+              selected={searchSelected}
+              dot={searchPending}
+              onClick={onOpenSearch}
+            />
+          </div>
+
+          <div className="min-h-0 flex-1 scroll-fade-y overflow-y-auto px-(--sidebar-content-inset) pb-8 pt-3">
+            {isCombined ? (
+              <>
+                {views
+                  .filter((v) => v.kind !== "custom")
+                  .map((view) => (
+                    <Fragment key={view.id}>
+                      {withEmptyMenu(
+                        <SkRow
+                          icon={viewIcon(view)}
+                          title={view.name}
+                          selected={selectedLabelId === view.id}
+                          badge={viewUnreadCounts[view.id] ?? 0}
+                          onClick={() => {
+                            console.log("[AccountsSidebar:selectView]", { viewId: view.id });
+                            onSelectLabel(view.id);
+                          }}
+                        />,
+                        viewFolder(view).labelId,
+                        viewFolder(view).accountIds,
+                      )}
+                      <SearchRows parent={view.id} />
+                    </Fragment>
+                  ))}
+
+                <Section
+                  title="Views"
+                  action={
+                    <SectionAddButton label="Add view" onClick={() => openViewEditor("new")} />
+                  }
+                >
+                  {combinedViews.map(viewRow)}
+                </Section>
+              </>
+            ) : (
+              <>
+                {(labels.length > 0
+                  ? systemLabels.map((l) => ({
+                      id: l.id,
+                      unread: l.unread ?? 0,
+                      total: l.total ?? 0,
+                    }))
+                  : Object.keys(SYSTEM_LABEL_MAP).map((id) => ({ id, unread: 0, total: 0 }))
+                ).map(({ id, unread, total }) => {
+                  const meta = SYSTEM_LABEL_MAP[id];
+                  if (!meta) return null;
+                  // Drafts is a raw count of drafts, not an unread signal.
+                  const isDrafts = id === "DRAFT";
+                  return (
+                    <Fragment key={id}>
+                      {withEmptyMenu(
+                        <SkRow
+                          icon={meta.icon}
+                          title={meta.name}
+                          selected={selectedLabelId === id}
+                          badge={isDrafts ? total : unread}
+                          onClick={() => {
+                            console.log("[AccountsSidebar:selectLabel]", { labelId: id });
+                            onSelectLabel(id);
+                          }}
+                        />,
+                        id,
+                        selectedAccountId ? [selectedAccountId] : [],
+                      )}
+                      <SearchRows parent={id} />
+                    </Fragment>
+                  );
+                })}
+
+                <Section
+                  title="Views"
+                  action={
+                    <SectionAddButton label="Add view" onClick={() => openViewEditor("new")} />
+                  }
+                >
+                  {accountViews.map(viewRow)}
+                </Section>
+
+                {selectedAccountId ? (
+                  <Section
+                    title="Labels"
+                    action={
+                      <SectionAddButton
+                        label="Add label"
+                        onClick={() => setCreateLabelOpen(true)}
+                      />
+                    }
+                    dropZone={{
+                      active: rootDropActive,
+                      onDragOver: (e) => {
+                        if (!e.dataTransfer.types.includes(LABEL_DRAG_MIME)) return;
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = "move";
+                        setRootDropActive(true);
+                      },
+                      onDragLeave: () => setRootDropActive(false),
+                      onDrop: (e) => {
+                        setRootDropActive(false);
+                        const raw = e.dataTransfer.getData(LABEL_DRAG_MIME);
+                        if (!raw) return;
+                        e.preventDefault();
+                        handleMoveLabel(JSON.parse(raw) as LabelDragPayload, null);
+                      },
+                    }}
+                  >
+                    {userLabelTree.map((node) => (
+                      <LabelNode
+                        key={node.key}
+                        node={node}
+                        depth={0}
+                        selectedLabelId={selectedLabelId}
+                        onSelectLabel={onSelectLabel}
+                        actions={labelActions}
+                      />
+                    ))}
+                  </Section>
+                ) : null}
+
+                {accounts.length === 0 ? (
+                  <AddRow label="Add Gmail account" onClick={() => void handleAddAccount()} />
+                ) : null}
+              </>
+            )}
+          </div>
         </div>
 
         <UpdateCard />
@@ -1011,7 +1060,12 @@ export function AccountsSidebar({
               <SettingsIcon className="size-4" />
             </IconBtn>
           </HintTooltip>
-          <span className="flex-1" />
+          <MailboxDots
+            accounts={accounts}
+            selectedAccountId={selectedAccountId}
+            onSelectAccount={onSelectAccount}
+            className="min-w-0 flex-1 justify-center"
+          />
           {/* With Gmail pushing changes (Otter account connected) there's nothing to sync by
               hand; ⌘R and the command palette still do. */}
           {otter?.realtime === "live" ? null : (

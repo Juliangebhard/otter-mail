@@ -131,6 +131,73 @@ function MailboxMark({ account, className }: { account: GmailAccount | null; cla
   );
 }
 
+type MailboxOption = { id: string; account: GmailAccount | null; name: string; shortcut: string };
+
+/** The mailboxes to switch between, in ⌘1… order: All mailboxes (with two or more), then each account. */
+export function useMailboxOptions(accounts: GmailAccount[]): MailboxOption[] {
+  const { resolved: keybindings } = useKeybindingsState();
+  const jump = (digit: number) =>
+    shortcutLabelFor(keybindings, `mailbox.jump.${digit}` as KeybindingCommand) ?? "";
+  return [
+    ...(accounts.length > 1
+      ? [{ id: COMBINED_ACCOUNT_ID, account: null, name: "All mailboxes", shortcut: jump(1) }]
+      : []),
+    ...accounts.map((account, i) => ({
+      id: account.id,
+      account,
+      name: getAccountDisplayName(account),
+      shortcut: jump(accounts.length > 1 ? i + 2 : 1),
+    })),
+  ];
+}
+
+/**
+ * Dia's profile dots for the sidebar's footer: one dot per mailbox, the
+ * current one lit; click one to switch. Empty with a single mailbox.
+ */
+export function MailboxDots({
+  accounts,
+  selectedAccountId,
+  onSelectAccount,
+  className,
+}: {
+  accounts: GmailAccount[];
+  selectedAccountId: string | null;
+  onSelectAccount: (accountId: string) => void;
+  className?: string;
+}) {
+  const options = useMailboxOptions(accounts);
+  if (options.length < 2) return <span className={className} />;
+  return (
+    <div role="tablist" aria-label="Mailboxes" className={cn("flex items-center", className)}>
+      {options.map((option) => {
+        const selected = option.id === selectedAccountId;
+        return (
+          <HintTooltip key={option.id} label={option.name} hint={option.shortcut}>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={selected}
+              aria-label={option.name}
+              onClick={() => onSelectAccount(option.id)}
+              className="group/dot flex size-5 cursor-pointer items-center justify-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
+            >
+              <span
+                className={cn(
+                  "size-2 rounded-full transition-colors",
+                  selected
+                    ? "bg-sidebar-foreground"
+                    : "bg-sidebar-muted-foreground/40 group-hover/dot:bg-sidebar-muted-foreground/80",
+                )}
+              />
+            </button>
+          </HintTooltip>
+        );
+      })}
+    </div>
+  );
+}
+
 /** Mailbox switcher, the sidebar's heading; aligned with the rows below it. */
 export function MailboxSwitcher({
   accounts,
@@ -143,9 +210,7 @@ export function MailboxSwitcher({
   onSelectAccount: (accountId: string) => void;
   className?: string;
 }) {
-  const { resolved: keybindings } = useKeybindingsState();
-  const jump = (digit: number) =>
-    shortcutLabelFor(keybindings, `mailbox.jump.${digit}` as KeybindingCommand) ?? "";
+  const options = useMailboxOptions(accounts);
   const isCombined = selectedAccountId === COMBINED_ACCOUNT_ID;
   const selectedAccount = isCombined
     ? null
@@ -155,18 +220,6 @@ export function MailboxSwitcher({
     : selectedAccount
       ? getAccountDisplayName(selectedAccount)
       : "Mailbox";
-  const options: { id: string; account: GmailAccount | null; name: string; shortcut: string }[] = [
-    ...(accounts.length > 1
-      ? [{ id: COMBINED_ACCOUNT_ID, account: null, name: "All mailboxes", shortcut: jump(1) }]
-      : []),
-    ...accounts.map((account, i) => ({
-      id: account.id,
-      account,
-      name: getAccountDisplayName(account),
-      shortcut: jump(accounts.length > 1 ? i + 2 : 1),
-    })),
-  ];
-
   return (
     <RadixMenu.Root>
       <RadixMenu.Trigger asChild>
