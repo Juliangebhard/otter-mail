@@ -821,7 +821,7 @@ export function AccountsSidebar(props: AccountsSidebarProps) {
 
       {/* Footer, like Codex's: who you are (and the app's menu) on the
           left, the mailbox dots centered. */}
-      <div className="flex shrink-0 items-center gap-1 px-(--sidebar-content-inset) py-1">
+      <div className="flex shrink-0 items-center gap-1 px-(--sidebar-content-inset) pb-3 pt-1">
         <AccountMenu
           otter={otter}
           onOpenSettings={onOpenSettings}
