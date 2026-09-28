@@ -6,6 +6,7 @@
  * `initCore(platform)` once before using anything else.
  */
 
+import type { ChatProvider } from "./services/assistant/types.js";
 import type { GmailAccount } from "./types.js";
 
 export type SqlValue = string | number | bigint | null | Uint8Array;
@@ -44,6 +45,28 @@ export interface GoogleAuth {
    */
   signInForIdToken?(): Promise<string>;
   removeTokens(accountId: string): Promise<void>;
+}
+
+export type LanguageDetection = { language: string | null; confidence: number };
+
+/**
+ * `needsDownload`: the browser must download the language pack, which it
+ * only does after a click. `notInstalled`: the Mac's languages must be
+ * downloaded in System Settings.
+ */
+export type TranslationStatus =
+  | "ok"
+  | "notInstalled"
+  | "needsDownload"
+  | "unsupported"
+  | "unavailable";
+
+export type TranslationResult = { status: TranslationStatus; texts: string[] };
+
+/** On-device translation: Apple Translation on the Mac, Chrome's built-in Translator on the web. */
+export interface Translator {
+  detect(text: string): Promise<LanguageDetection>;
+  translate(texts: string[], source: string, target: string): Promise<TranslationResult>;
 }
 
 /** Tells background work (sync, prefetch) apart from the user's own requests. */
@@ -106,6 +129,10 @@ export interface Platform {
   asyncContext<T>(): AsyncContext<T>;
   /** Download bodies of all mail for offline reading (not in a browser's storage). */
   offlineDownloads: boolean;
+  /** Absent where there's no on-device translator (browsers other than Chrome). */
+  translator?: Translator;
+  /** Assistants beyond Hermes that run on this device (Codex and Claude, on the Mac). */
+  assistantProviders?: ChatProvider[];
 }
 
 let current: Platform | null = null;
