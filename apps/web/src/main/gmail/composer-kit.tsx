@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { ArrowUpIcon, PaperclipIcon, Trash2Icon, TypeIcon } from "lucide-react";
+import { PaperclipIcon, Trash2Icon, TypeIcon } from "lucide-react";
 import { matchesCommand } from "../keybindings/dispatch";
 import { ShortcutText } from "../keybindings/store";
 import { HintTooltip, IconBtn, cn } from "./ui";
@@ -108,10 +108,13 @@ export function SubjectInput({
   value,
   onChange,
   placeholder = "Subject",
+  title,
 }: {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
+  /** The page's headline (a full-page draft), not a field row. */
+  title?: boolean;
 }) {
   return (
     <input
@@ -119,7 +122,10 @@ export function SubjectInput({
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
       aria-label="Subject"
-      className="min-w-0 flex-1 bg-transparent text-sm font-medium text-foreground outline-none placeholder:font-normal placeholder:text-placeholder"
+      className={cn(
+        "min-w-0 flex-1 bg-transparent text-foreground outline-none placeholder:font-normal placeholder:text-placeholder",
+        title ? "w-full text-xl font-medium leading-8 tracking-tight" : "text-sm font-medium",
+      )}
     />
   );
 }
@@ -360,19 +366,14 @@ export function ComposerFooter({
         </span>
       ) : null}
       <span className="flex-1" />
-      {canSend ? (
-        <ShortcutText command="composer.send" className="pr-2 text-sm text-muted-foreground/70" />
-      ) : null}
       <button
         type="button"
         onClick={onSend}
         disabled={!canSend}
-        className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-full bg-primary pl-3.5 pr-1.5 text-sm font-medium text-primary-foreground outline-none transition-[background-color,scale,opacity] hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-1 focus-visible:ring-offset-canvas active:scale-[0.97] disabled:pointer-events-none disabled:opacity-30"
+        className="inline-flex h-8 cursor-pointer items-center gap-2 rounded-full bg-primary px-4 text-sm font-medium text-primary-foreground outline-none transition-[background-color,scale,opacity] hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-1 focus-visible:ring-offset-canvas active:scale-[0.97] disabled:pointer-events-none disabled:opacity-30"
       >
         Send
-        <span className="flex size-5 items-center justify-center rounded-full bg-primary-foreground/15">
-          <ArrowUpIcon className="size-3.5" strokeWidth={2.25} />
-        </span>
+        <ShortcutText command="composer.send" className="text-[13px] font-normal opacity-60" />
       </button>
     </div>
   );
@@ -384,11 +385,14 @@ export function ComposerFooter({
  */
 export function ComposeDocument({
   fields,
+  subject,
   editor,
   attachments,
   footer,
 }: {
   fields: ReactNode;
+  /** The subject as the page's headline, between the recipients and the body. */
+  subject?: ReactNode;
   editor: ReactNode;
   attachments?: ReactNode;
   footer: ReactNode;
@@ -398,6 +402,7 @@ export function ComposeDocument({
       <div className="te-scroll min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto flex min-h-full w-full max-w-3xl flex-col px-2 pt-2">
           {fields}
+          {subject ? <div className="px-5 pb-1 pt-6">{subject}</div> : null}
           <div className="flex min-h-0 flex-1 flex-col">{editor}</div>
           {attachments}
         </div>

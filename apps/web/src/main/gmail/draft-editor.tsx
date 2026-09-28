@@ -300,9 +300,11 @@ export function DraftEditor({
           <RecipientInput value={bcc} onChange={setBcc} ariaLabel="Bcc" />
         </ComposerField>
       ) : null}
-      <ComposerField label="Subject">
-        <SubjectInput value={subject} onChange={setSubject} />
-      </ComposerField>
+      {inThread ? (
+        <ComposerField label="Subject">
+          <SubjectInput value={subject} onChange={setSubject} />
+        </ComposerField>
+      ) : null}
     </>
   );
   const banner = (
@@ -373,9 +375,7 @@ export function DraftEditor({
         data-toolbar=""
         className="drag-region flex h-(--workspace-topbar-height) shrink-0 items-center gap-2 px-4"
       >
-        <div className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
-          {subject.trim() || "Draft"}
-        </div>
+        <div className="min-w-0 flex-1 truncate text-sm text-muted-foreground">Draft</div>
         <HintTooltip label="Close (keeps the draft)" hint="Esc" side="bottom">
           <IconBtn label="Close" onClick={onDone}>
             <XIcon className="size-4" />
@@ -433,6 +433,7 @@ export function DraftEditor({
                 {fields}
               </>
             }
+            subject={<SubjectInput title value={subject} onChange={setSubject} />}
             editor={editor}
             attachments={attachmentChips}
             footer={footer}

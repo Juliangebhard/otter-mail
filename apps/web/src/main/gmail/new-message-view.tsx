@@ -226,9 +226,7 @@ export function NewMessageView({
     <div className="relative flex h-full min-w-0 flex-col" {...dropProps}>
       <ComposeDropOverlay visible={isDragging} />
       <div className="drag-region flex h-(--workspace-topbar-height) shrink-0 items-center gap-2 px-4">
-        <div className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
-          {subject.trim() || "New message"}
-        </div>
+        <div className="min-w-0 flex-1 truncate text-sm text-muted-foreground">New message</div>
         <HintTooltip label="Close (keeps the draft)" hint="Esc" side="bottom">
           <IconBtn label="Close" onClick={onClose}>
             <XIcon className="size-4" />
@@ -275,11 +273,9 @@ export function NewMessageView({
                   <RecipientInput value={bcc} onChange={setBcc} ariaLabel="Bcc" />
                 </ComposerField>
               ) : null}
-              <ComposerField label="Subject">
-                <SubjectInput value={subject} onChange={setSubject} />
-              </ComposerField>
             </>
           }
+          subject={<SubjectInput title value={subject} onChange={setSubject} />}
           editor={
             <RichTextArea
               ref={editorRef}
