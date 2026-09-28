@@ -680,38 +680,18 @@ type AccountsSidebarProps = {
 
 /** How far a page must be dragged (of the sidebar's width) to switch when let go. */
 const SWITCH_AT = 0.4;
-/** A flick (px per wheel event) switches from any distance past FLICK_FROM. */
-const FLICK_SPEED = 14;
-const FLICK_FROM = 0.08;
 /** Past the first or last mailbox, the strip gives this fraction of the drag. */
 const EDGE_RESISTANCE = 0.3;
-/** Sideways movement it takes to start a drag, so vertical scrolling doesn't. */
-const START_AFTER_PX = 8;
-/** No wheel events for this long: the gesture is over. */
-const QUIET_MS = 120;
-/** Fingers resting mid-drag (no events) for this long: settle where it is. */
-const REST_MS = 220;
-
-type Swipe = {
-  phase: "idle" | "dragging" | "settling";
-  offset: number;
-  /** Sideways travel before the drag starts. */
-  pending: number;
-  lastAt: number;
-  lastVerticalAt: number;
-  /** Recent speeds (px per event), newest last: a steady fall means momentum. */
-  speeds: number[];
-  timer: number;
-  frame: number;
-};
+/** No wheel events for this long: the fingers stopped, so settle. */
+const SETTLE_AFTER_MS = 150;
+const SNAP_MS = 220;
 
 /**
  * The sidebar: a strip of mailbox pages (Dia's profiles) between the title
- * and the footer. The neighbors' pages are always there, off to the sides,
- * so a two-finger horizontal swipe drags the strip at once. Let go (the
- * swipe's momentum starts, or the fingers rest) past 40% or with a flick and
- * it switches, otherwise it springs back; the rest of that swipe's momentum
- * is ignored. Other switches (the dots, ⌘1…, the menu) slide the new page in.
+ * and the footer. A two-finger horizontal swipe drags the strip, the
+ * neighbor's page following the fingers; let go past 40% (or flick) and it
+ * switches, otherwise it springs back. Other switches (the dots, ⌘1…, the
+ * menu) slide the new page in from the side moved toward.
  */
 export function AccountsSidebar(props: AccountsSidebarProps) {
   const { onOpenSettings, onSync, syncing, selectedAccountId, onSelectAccount } = props;
@@ -731,130 +711,70 @@ export function AccountsSidebar(props: AccountsSidebarProps) {
 
   const viewport = useRef<HTMLDivElement>(null);
   const track = useRef<HTMLDivElement>(null);
-  const swipe = useRef<Swipe>({
-    phase: "idle",
-    offset: 0,
-    pending: 0,
-    lastAt: 0,
-    lastVerticalAt: 0,
-    speeds: [],
-    timer: 0,
-    frame: 0,
-  });
-
-  // At most one move per frame; the snap's length follows the distance left.
-  const moveTrack = (px: number, snapFrom?: number) => {
-    const s = swipe.current;
-    cancelAnimationFrame(s.frame);
-    s.frame = requestAnimationFrame(() => {
-      const el = track.current;
-      if (!el) return;
-      const ms =
-        snapFrom === undefined
-          ? 0
-          : Math.round(Math.min(300, Math.max(140, Math.abs(px - snapFrom) * 0.9)));
-      el.style.transition = ms ? `translate ${ms}ms var(--ease-drawer)` : "none";
-      el.style.translate = `${px}px 0`;
-    });
+  const drag = useRef({ active: false, offset: 0, timer: 0 });
+  // Neighbors are mounted only while a drag is on.
+  const [dragging, setDragging] = useState(false);
+  const moveTrack = (px: number, animate: boolean) => {
+    const el = track.current;
+    if (!el) return;
+    el.style.transition = animate ? `translate ${SNAP_MS}ms var(--ease-drawer)` : "none";
+    el.style.translate = `${px}px 0`;
   };
 
-  const settle = (speed: number) => {
-    const s = swipe.current;
-    window.clearTimeout(s.timer);
-    s.phase = "settling";
+  const settle = () => {
+    const d = drag.current;
     const width = viewport.current?.clientWidth ?? 1;
-    const direction = s.offset < 0 ? 1 : -1;
-    const target = index + direction;
-    const moved = Math.abs(s.offset) / width;
-    const flicked = speed >= FLICK_SPEED && moved > FLICK_FROM;
-    const go = (moved > SWITCH_AT || flicked) && target >= 0 && target < mailboxIds.length;
-    const to = go ? -direction * width : 0;
-    moveTrack(to, s.offset);
-    const ms = Math.round(Math.min(300, Math.max(140, Math.abs(to - s.offset) * 0.9)));
+    const target = index + (d.offset < 0 ? 1 : -1);
+    const go = Math.abs(d.offset) > width * SWITCH_AT && target >= 0 && target < mailboxIds.length;
+    moveTrack(go ? (d.offset < 0 ? -width : width) : 0, true);
     window.setTimeout(() => {
-      // The neighbor becomes the page in place; re-center under it.
-      if (go) {
-        flushSync(() => {
+      // Switch (the neighbor becomes the page, in place) and drop the
+      // neighbors in one go, then re-center the strip under the new page.
+      flushSync(() => {
+        if (go) {
           setPage({ index: target, slide: null });
           onSelectAccount(mailboxIds[target]!);
-        });
-      }
-      s.offset = 0;
-      const el = track.current;
-      if (el) {
-        el.style.transition = "none";
-        el.style.translate = "0px 0";
-      }
-      // Stay "settling" (ignoring the momentum) until the wheel goes quiet.
-      s.timer = window.setTimeout(() => (s.phase = "idle"), QUIET_MS);
-    }, ms + 16);
+        }
+        setDragging(false);
+      });
+      d.active = false;
+      d.offset = 0;
+      moveTrack(0, false);
+    }, SNAP_MS);
   };
 
   const onWheel = (e: ReactWheelEvent) => {
-    const s = swipe.current;
-    const now = e.timeStamp;
-    const quiet = now - s.lastAt > QUIET_MS;
-    s.lastAt = now;
-    const horizontal = Math.abs(e.deltaX) > Math.abs(e.deltaY) * 1.5;
-    if (!horizontal && Math.abs(e.deltaY) > 1) s.lastVerticalAt = now;
-    const speed = Math.abs(e.deltaX);
-
-    if (s.phase === "settling") {
-      // A new swipe (after a pause, or a speed-up out of the momentum) may start.
-      const last = s.speeds[s.speeds.length - 1] ?? 0;
-      if (!quiet && !(speed > 6 && speed > last * 1.5)) {
-        s.speeds = [...s.speeds.slice(-4), speed];
-        return;
-      }
-      s.phase = "idle";
+    const d = drag.current;
+    if (!d.active) {
+      if (Math.abs(e.deltaX) <= Math.abs(e.deltaY) || mailboxIds.length < 2 || index < 0) return;
+      d.active = true;
+      setDragging(true);
     }
-
-    if (s.phase === "idle") {
-      if (quiet) s.pending = 0;
-      if (!horizontal || mailboxIds.length < 2 || index < 0) return;
-      // Scrolling the list just now: this is the tail of that, not a swipe.
-      if (now - s.lastVerticalAt < 200) return;
-      s.pending += e.deltaX;
-      if (Math.abs(s.pending) < START_AFTER_PX) return;
-      s.phase = "dragging";
-      s.offset = 0;
-      s.speeds = [];
-    }
-
-    // Dragging: follow the fingers.
     const width = viewport.current?.clientWidth ?? 1;
-    const atEdge =
-      (s.offset - e.deltaX > 0 && index === 0) ||
-      (s.offset - e.deltaX < 0 && index === mailboxIds.length - 1);
-    const next = s.offset - e.deltaX * (atEdge ? EDGE_RESISTANCE : 1);
-    s.offset = Math.max(-width, Math.min(width, next));
-    moveTrack(s.offset);
-
-    // Fingers lifted: momentum is a long, smooth fall (each event a steady
-    // fraction of the last); fingers slowing down by hand are ragged.
-    s.speeds = [...s.speeds.slice(-4), speed];
-    const falling =
-      s.speeds.length === 5 &&
-      s.speeds[0]! >= 4 &&
-      s.speeds.every((v, i) => i === 0 || (v < s.speeds[i - 1]! && v >= s.speeds[i - 1]! * 0.7));
-    if (falling) {
-      settle(s.speeds[0]!);
-      return;
+    let offset = d.offset - e.deltaX;
+    // Nothing beyond the first or last mailbox: the strip resists.
+    if ((offset > 0 && index === 0) || (offset < 0 && index === mailboxIds.length - 1)) {
+      offset = d.offset - e.deltaX * EDGE_RESISTANCE;
     }
-    window.clearTimeout(s.timer);
-    s.timer = window.setTimeout(() => settle(0), REST_MS);
+    d.offset = Math.max(-width, Math.min(width, offset));
+    moveTrack(d.offset, false);
+    window.clearTimeout(d.timer);
+    d.timer = window.setTimeout(settle, SETTLE_AFTER_MS);
   };
 
-  // The page and its neighbors, side by side (the neighbors are inert).
   const pageIds =
-    index < 0 ? [selectedAccountId ?? ""] : mailboxIds.slice(Math.max(0, index - 1), index + 2);
+    index < 0
+      ? [selectedAccountId ?? ""]
+      : dragging
+        ? mailboxIds.slice(Math.max(0, index - 1), index + 2)
+        : [mailboxIds[index]!];
 
   return (
     <div className="flex h-full min-w-0 flex-col overscroll-x-none" onWheel={onWheel}>
       <WindowTitle />
 
       <div ref={viewport} className="relative min-h-0 flex-1 overflow-hidden">
-        <div ref={track} className="absolute inset-0 will-change-[translate]">
+        <div ref={track} className="absolute inset-0">
           {pageIds.map((id) => {
             const current = id === (selectedAccountId ?? "");
             return (
