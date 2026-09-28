@@ -74,6 +74,10 @@ export async function createMainWindow(): Promise<BrowserWindow> {
         nodeIntegration: false,
         sandbox: true,
         spellcheck: true,
+        // macOS rubber-banding, off in Electron by default: scrollers (the
+        // mailbox pages' swipe included) stretch past their ends, harder
+        // the further, like any Mac app.
+        scrollBounce: true,
       },
     });
     mainWindow = win;
