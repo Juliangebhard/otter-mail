@@ -3,8 +3,10 @@ import { ChevronsRightIcon, InboxIcon, XIcon } from "lucide-react";
 import type { GmailLabel } from "./types";
 
 /** Badge chrome shared by every chip (Otter Code's `Badge`, size sm). */
+// no-drag: in the reader's title band (a window-drag region in the Mac app)
+// the pill must get hover, or its remove button never shows.
 const PILL =
-  "group relative inline-flex h-5 w-fit max-w-32 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-full border px-2 text-2xs font-medium leading-none";
+  "no-drag group relative inline-flex h-5 w-fit max-w-32 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-full border px-2 text-2xs font-medium leading-none";
 
 /** Neutral outline chip. */
 const OUTLINE = "border-border/60 bg-transparent text-muted-foreground";
