@@ -2,14 +2,14 @@ import {
   Fragment,
   createContext,
   useContext,
+  useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type CSSProperties,
   type DragEvent as ReactDragEvent,
-  type WheelEvent as ReactWheelEvent,
   type ReactNode,
 } from "react";
-import { flushSync } from "react-dom";
 import { Dialog } from "~/components/ui/dialog";
 import { Field } from "~/components/ui/field";
 import { Input } from "~/components/ui/input";
@@ -73,7 +73,7 @@ import { labelMoveName } from "../keybindings/commands";
 import { renameLabelKeybindings, useKeybindingsState } from "../keybindings/store";
 import { formatShortcut, parseShortcut } from "../keybindings/keys";
 import { LabelShortcutDialog } from "../settings/keybindings-pane";
-import { UnreadPill, HintTooltip, cn } from "./ui";
+import { UnreadPill, HintTooltip } from "./ui";
 import { MailboxDots, MailboxSwitcher, WindowTitle, useMailboxOptions } from "./top-bar";
 import { useOtterAccount } from "../otter-account";
 import { useMailboxes } from "../mailboxes";
@@ -678,20 +678,13 @@ type AccountsSidebarProps = {
   onCloseSearch: (id: string) => void;
 };
 
-/** How far a page must be dragged (of the sidebar's width) to switch when let go. */
-const SWITCH_AT = 0.4;
-/** Past the first or last mailbox, the strip gives this fraction of the drag. */
-const EDGE_RESISTANCE = 0.3;
-/** No wheel events for this long: the fingers stopped, so settle. */
-const SETTLE_AFTER_MS = 150;
-const SNAP_MS = 220;
-
 /**
- * The sidebar: a strip of mailbox pages (Dia's profiles) between the title
- * and the footer. A two-finger horizontal swipe drags the strip, the
- * neighbor's page following the fingers; let go past 40% (or flick) and it
- * switches, otherwise it springs back. Other switches (the dots, ⌘1…, the
- * menu) slide the new page in from the side moved toward.
+ * The sidebar: its mailboxes' pages side by side (Dia's profiles) between the
+ * title and the footer, in a horizontal scroller that snaps a page at a time.
+ * The swipe is the platform's own scrolling: macOS follows the fingers,
+ * carries the momentum, rubber-bands at the ends and settles on a page with
+ * its own physics. Where it comes to rest picks the mailbox; the other
+ * switches (the dots, ⌘1…, the menu) scroll there.
  */
 export function AccountsSidebar(props: AccountsSidebarProps) {
   const { onOpenSettings, onSync, syncing, selectedAccountId, onSelectAccount } = props;
@@ -699,116 +692,83 @@ export function AccountsSidebar(props: AccountsSidebarProps) {
   const { accounts } = useMailboxes();
   const mailboxIds = useMailboxOptions(accounts).map((o) => o.id);
   const index = mailboxIds.indexOf(selectedAccountId ?? "");
+  const pageIds = index < 0 ? [selectedAccountId ?? ""] : mailboxIds;
 
-  // Switching slides the new page in (a drag's switch has already moved it).
-  const [page, setPage] = useState<{ index: number; slide: "next" | "prev" | null }>({
-    index,
-    slide: null,
-  });
-  if (page.index !== index) {
-    setPage({ index, slide: index > page.index ? "next" : "prev" });
-  }
+  const scroller = useRef<HTMLDivElement>(null);
+  // The page the scroller is at (or heading to), so its own resting doesn't
+  // pick a mailbox again, and a switch from elsewhere knows to scroll.
+  const shown = useRef(-1);
 
-  const viewport = useRef<HTMLDivElement>(null);
-  const track = useRef<HTMLDivElement>(null);
-  const drag = useRef({ active: false, offset: 0, timer: 0 });
-  // Neighbors are mounted only while a drag is on.
-  const [dragging, setDragging] = useState(false);
-  const moveTrack = (px: number, animate: boolean) => {
-    const el = track.current;
+  // A switch from elsewhere scrolls to its page (at once the first time).
+  useLayoutEffect(() => {
+    const el = scroller.current;
+    if (!el || index < 0 || shown.current === index) return;
+    const first = shown.current < 0;
+    shown.current = index;
+    el.scrollTo({ left: index * el.clientWidth, behavior: first ? "instant" : "smooth" });
+  }, [index]);
+  // Resizing the sidebar keeps the page in place.
+  useEffect(() => {
+    const el = scroller.current;
     if (!el) return;
-    el.style.transition = animate ? `translate ${SNAP_MS}ms var(--ease-drawer)` : "none";
-    el.style.translate = `${px}px 0`;
-  };
+    const observer = new ResizeObserver(() => {
+      if (shown.current >= 0) el.scrollLeft = shown.current * el.clientWidth;
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
-  const settle = () => {
-    const d = drag.current;
-    const width = viewport.current?.clientWidth ?? 1;
-    const target = index + (d.offset < 0 ? 1 : -1);
-    const go = Math.abs(d.offset) > width * SWITCH_AT && target >= 0 && target < mailboxIds.length;
-    moveTrack(go ? (d.offset < 0 ? -width : width) : 0, true);
-    window.setTimeout(() => {
-      // Switch (the neighbor becomes the page, in place) and drop the
-      // neighbors in one go, then re-center the strip under the new page.
-      flushSync(() => {
-        if (go) {
-          setPage({ index: target, slide: null });
-          onSelectAccount(mailboxIds[target]!);
-        }
-        setDragging(false);
-      });
-      d.active = false;
-      d.offset = 0;
-      moveTrack(0, false);
-    }, SNAP_MS);
+  // Where a swipe comes to rest picks the mailbox.
+  const settleTimer = useRef(0);
+  const settled = () => {
+    const el = scroller.current;
+    if (!el || !el.clientWidth) return;
+    const at = Math.round(el.scrollLeft / el.clientWidth);
+    if (at === shown.current || !mailboxIds[at]) return;
+    shown.current = at;
+    onSelectAccount(mailboxIds[at]);
   };
-
-  const onWheel = (e: ReactWheelEvent) => {
-    const d = drag.current;
-    if (!d.active) {
-      if (Math.abs(e.deltaX) <= Math.abs(e.deltaY) || mailboxIds.length < 2 || index < 0) return;
-      d.active = true;
-      setDragging(true);
-    }
-    const width = viewport.current?.clientWidth ?? 1;
-    let offset = d.offset - e.deltaX;
-    // Nothing beyond the first or last mailbox: the strip resists.
-    if ((offset > 0 && index === 0) || (offset < 0 && index === mailboxIds.length - 1)) {
-      offset = d.offset - e.deltaX * EDGE_RESISTANCE;
-    }
-    d.offset = Math.max(-width, Math.min(width, offset));
-    moveTrack(d.offset, false);
-    window.clearTimeout(d.timer);
-    d.timer = window.setTimeout(settle, SETTLE_AFTER_MS);
-  };
-
-  const pageIds =
-    index < 0
-      ? [selectedAccountId ?? ""]
-      : dragging
-        ? mailboxIds.slice(Math.max(0, index - 1), index + 2)
-        : [mailboxIds[index]!];
+  useEffect(() => {
+    const el = scroller.current;
+    if (!el) return;
+    el.addEventListener("scrollend", settled);
+    return () => el.removeEventListener("scrollend", settled);
+  });
 
   return (
-    <div className="flex h-full min-w-0 flex-col overscroll-x-none" onWheel={onWheel}>
+    <div className="flex h-full min-w-0 flex-col">
       <WindowTitle />
 
-      <div ref={viewport} className="relative min-h-0 flex-1 overflow-hidden">
-        <div ref={track} className="absolute inset-0">
-          {pageIds.map((id) => {
-            const current = id === (selectedAccountId ?? "");
-            return (
-              <div
-                key={id}
-                className={cn(
-                  "absolute inset-0",
-                  current &&
-                    page.slide === "next" &&
-                    "[[data-panel-animations=true]_&]:animate-page-from-right",
-                  current &&
-                    page.slide === "prev" &&
-                    "[[data-panel-animations=true]_&]:animate-page-from-left",
-                )}
-                style={{ translate: `${(mailboxIds.indexOf(id) - index) * 100}% 0` }}
-              >
-                {current ? (
-                  <SidebarPage {...props} active />
-                ) : (
-                  // A neighbor as it will look once switched to: its inbox.
-                  <SidebarPage
-                    {...props}
-                    active={false}
-                    selectedAccountId={id}
-                    selectedLabelId={id === COMBINED_ACCOUNT_ID ? INBOX_VIEW_ID : "INBOX"}
-                    searchSelected={false}
-                    searchPending={false}
-                    searches={[]}
-                  />
-                )}
-              </div>
-            );
-          })}
-        </div>
+      <div
+        ref={scroller}
+        // Where there's no scrollend (older Safari), a pause in scrolling stands in.
+        onScroll={() => {
+          window.clearTimeout(settleTimer.current);
+          settleTimer.current = window.setTimeout(settled, 150);
+        }}
+        className="flex min-h-0 flex-1 snap-x snap-mandatory overflow-x-auto overflow-y-hidden overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
+        {pageIds.map((id) => {
+          const current = id === (selectedAccountId ?? "");
+          return (
+            <div key={id} className="h-full w-full shrink-0 snap-start snap-always">
+              {current ? (
+                <SidebarPage {...props} active />
+              ) : (
+                // Another mailbox as it looks once switched to: its inbox.
+                <SidebarPage
+                  {...props}
+                  active={false}
+                  selectedAccountId={id}
+                  selectedLabelId={id === COMBINED_ACCOUNT_ID ? INBOX_VIEW_ID : "INBOX"}
+                  searchSelected={false}
+                  searchPending={false}
+                  searches={[]}
+                />
+              )}
+            </div>
+          );
+        })}
       </div>
 
       <UpdateCard />

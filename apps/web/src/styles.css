@@ -212,10 +212,6 @@ html[data-platform="web"] {
   --shadow-composer-dark: 0 14px 32px -18px rgb(0 0 0 / 75%);
   --animate-skeleton: skeleton 2.4s infinite;
   --animate-status-pulse: status-pulse 2s infinite;
-  /* Sidebar pages when switching mailboxes (Dia's profiles). */
-  --animate-page-from-right: page-from-right var(--panel-animation-duration, 200ms)
-    var(--ease-drawer);
-  --animate-page-from-left: page-from-left var(--panel-animation-duration, 200ms) var(--ease-drawer);
 
   --color-canvas: var(--canvas);
   --color-background: var(--canvas);
@@ -286,18 +282,6 @@ html[data-platform="web"] {
     }
     100% {
       opacity: 1;
-    }
-  }
-  @keyframes page-from-right {
-    from {
-      translate: 40% 0;
-      opacity: 0;
-    }
-  }
-  @keyframes page-from-left {
-    from {
-      translate: -40% 0;
-      opacity: 0;
     }
   }
   @keyframes status-pulse {
