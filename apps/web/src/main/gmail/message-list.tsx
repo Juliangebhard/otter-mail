@@ -397,7 +397,7 @@ function MessageRow({
   return (
     // Off-screen rows skip layout/paint (long scrolls load thousands of rows);
     // `auto` remembers each row's real height once it has rendered.
-    <div className="px-2 py-px [contain-intrinsic-size:auto_84px] [content-visibility:auto]">
+    <div className="px-1 py-px [contain-intrinsic-size:auto_84px] [content-visibility:auto]">
       <ContextMenu>
         <ContextMenuTrigger asChild>
           <button
@@ -1520,7 +1520,7 @@ export function MessageList({
         ref={scrollRef}
         onScroll={maybeLoadMore}
         className={[
-          "min-h-0 flex-1 overflow-y-auto pb-1 pt-2",
+          "min-h-0 flex-1 overflow-y-auto pb-1 pt-[9px] [scrollbar-gutter:stable_both-edges]",
           checked.size > 0 ? "pb-16" : "",
         ].join(" ")}
       >
