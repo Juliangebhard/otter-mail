@@ -447,7 +447,7 @@ export function CommandPalette({
     <div className="no-drag fixed inset-0 z-[100]" role="presentation">
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-canvas/60 backdrop-blur-[4px]"
+        className="absolute inset-0 bg-canvas/40 backdrop-blur-[2px]"
         onPointerDown={close}
         aria-hidden
       />
@@ -456,7 +456,7 @@ export function CommandPalette({
           role="dialog"
           aria-modal="true"
           aria-label="Command palette"
-          className="dialog-glass pointer-events-auto relative flex max-h-105 w-full max-w-xl flex-col overflow-hidden rounded-2xl border text-foreground"
+          className="dropdown-glass pointer-events-auto relative flex max-h-105 w-full max-w-xl flex-col overflow-hidden rounded-2xl text-foreground shadow-[0_24px_64px_-24px_rgb(0_0_0/45%)] dark:shadow-[0_24px_64px_-24px_rgb(0_0_0/80%)]"
         >
           {/* Search field */}
           <div className="relative flex h-12 shrink-0 items-center gap-2.5 px-4">
@@ -479,7 +479,7 @@ export function CommandPalette({
           {/* Results */}
           <div
             ref={listRef}
-            className="min-h-0 flex-1 scroll-py-2 overflow-y-auto border-t border-border/60 p-2"
+            className="min-h-0 flex-1 scroll-py-1.5 overflow-y-auto border-t border-border/50 p-1.5"
           >
             {flat.length === 0 ? (
               <div className="py-10 text-center text-sm text-muted-foreground">
@@ -488,7 +488,7 @@ export function CommandPalette({
             ) : (
               groups.map((group) => (
                 <div key={group.id} className="[&+&]:mt-1.5" role="group" aria-label={group.label}>
-                  <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
+                  <div className="px-2.5 pt-2 pb-1 text-[13px] text-muted-foreground">
                     {group.label}
                   </div>
                   {group.items.map((item) => {
@@ -505,15 +505,15 @@ export function CommandPalette({
                         onMouseDown={(e) => e.preventDefault()}
                         onClick={() => execute(item)}
                         className={cn(
-                          "flex min-h-7 cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none [&_svg:not([class*='text-'])]:text-muted-foreground",
-                          active && "bg-foreground/[0.09] text-foreground",
+                          "flex min-h-8 cursor-pointer select-none items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm outline-none [&_svg:not([class*='text-'])]:text-muted-foreground",
+                          active && "bg-foreground/[0.07] text-foreground",
                         )}
                       >
                         {item.icon}
                         {item.description ? (
                           <span className="flex min-w-0 flex-1 flex-col">
                             <span className="truncate text-sm text-foreground">{item.title}</span>
-                            <span className="truncate text-xs text-muted-foreground/70">
+                            <span className="truncate text-xs text-muted-foreground">
                               {item.description}
                             </span>
                           </span>
@@ -547,7 +547,7 @@ export function CommandPalette({
           </div>
 
           {/* Key hints */}
-          <div className="flex shrink-0 items-center gap-3 bg-foreground/[0.025] px-4 py-2.5 text-sm font-medium text-muted-foreground">
+          <div className="flex shrink-0 items-center gap-3 border-t border-border/50 px-4 py-2.5 text-[13px] text-muted-foreground">
             <span className="flex items-center gap-1">
               <Kbd>
                 <ArrowUpIcon />

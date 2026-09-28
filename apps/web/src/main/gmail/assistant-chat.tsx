@@ -18,12 +18,13 @@ import {
   XIcon,
   MessageSquareIcon,
   PlusIcon,
+  SquarePenIcon,
   CheckIcon,
   CornerUpRightIcon,
   ListPlusIcon,
-  PaperclipIcon,
 } from "lucide-react";
 import { IconBtn, HintTooltip, buttonClass, cn } from "./ui";
+import { COMPOSER_SURFACE } from "./composer-kit";
 import { PanelControlSlot } from "./top-bar";
 import {
   gmailApi,
@@ -37,12 +38,7 @@ import {
   type ProviderKind,
   type Skill,
 } from "./api";
-import {
-  ComposerControlSeparator,
-  ProviderModelPicker,
-  RuntimeModePicker,
-  TraitsPicker,
-} from "./model-picker";
+import { ProviderModelPicker, RuntimeModePicker, TraitsPicker } from "./model-picker";
 import { ApprovalBanner } from "./approval-banner";
 import {
   ProviderIcon,
@@ -428,7 +424,7 @@ function WorkingTimer({ startedAt }: { startedAt: number }) {
 /** Bottom-of-turn activity row while Hermes is still running. */
 function WorkingRow({ startedAt }: { startedAt?: number }) {
   return (
-    <div className="border-b border-border/60 pb-2 pt-1">
+    <div className="border-b border-border/40 pb-2 pt-1">
       <div className="flex h-6 min-w-0 items-baseline gap-2 px-1 text-sm leading-relaxed text-muted-foreground tabular-nums">
         <span className="relative shrink-0 whitespace-nowrap animate-status-pulse">
           {startedAt ? (
@@ -456,7 +452,7 @@ function WorkFoldRow({
 }) {
   const Icon = expanded ? ChevronDownIcon : ChevronRightIcon;
   return (
-    <div className="relative flex items-center gap-1 border-b border-border/60 pb-2 pe-0.5 pt-1">
+    <div className="relative flex items-center gap-1 border-b border-border/40 pb-2 pe-0.5 pt-1">
       <button
         type="button"
         aria-expanded={expanded}
@@ -464,7 +460,7 @@ function WorkFoldRow({
         className="flex cursor-pointer select-none items-center gap-1 rounded-md px-1 text-sm leading-relaxed text-muted-foreground tabular-nums transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus-ring/70"
       >
         <span>{label}</span>
-        <Icon className="size-3.5" />
+        <Icon className="size-3.5 opacity-70" />
       </button>
     </div>
   );
@@ -530,7 +526,7 @@ function ToolRow({ name, output }: { name: string; output?: string }) {
       {open && output ? (
         <pre
           onClick={(e) => e.stopPropagation()}
-          className="ms-7 mt-1 max-h-64 select-text overflow-auto rounded-lg border border-border bg-code px-3 py-2 font-mono text-2xs leading-relaxed text-muted-foreground"
+          className="ms-7 mt-1 max-h-64 select-text overflow-auto rounded-xl bg-code px-3.5 py-2.5 font-mono text-xs leading-relaxed text-muted-foreground"
         >
           {output}
         </pre>
@@ -604,7 +600,7 @@ function HistoryList({
         onClick={onClose}
         aria-hidden
       />
-      <div className="dropdown-glass absolute left-2 top-[calc(var(--workspace-topbar-height)+2px)] z-20 max-h-[70%] w-[calc(100%-1rem)] overflow-y-auto rounded-lg p-1 shadow-[0_16px_40px_-18px_rgb(0_0_0/55%)] dark:shadow-[0_18px_44px_-18px_rgb(0_0_0/80%)]">
+      <div className="dropdown-glass absolute left-2 top-[calc(var(--workspace-topbar-height)+2px)] z-20 max-h-[70%] w-[calc(100%-1rem)] overflow-y-auto rounded-xl p-1.5 shadow-[0_16px_40px_-18px_rgb(0_0_0/55%)] dark:shadow-[0_18px_44px_-18px_rgb(0_0_0/80%)]">
         {showServer ? (
           <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">Recent</div>
         ) : null}
@@ -617,7 +613,7 @@ function HistoryList({
             <div
               key={c.id}
               className={[
-                "group flex items-center gap-1 rounded-md px-1",
+                "group flex items-center gap-1 rounded-lg px-1",
                 c.id === activeId ? "bg-accent-surface" : "hover:bg-accent-surface",
               ].join(" ")}
             >
@@ -650,7 +646,7 @@ function HistoryList({
                 key={s.id}
                 type="button"
                 onClick={() => onPickServer(s)}
-                className="flex w-full min-w-0 flex-col items-start rounded-md px-2.5 py-1.5 text-left hover:bg-accent-surface"
+                className="flex w-full min-w-0 flex-col items-start rounded-lg px-2.5 py-1.5 text-left hover:bg-accent-surface"
               >
                 <span className="w-full truncate text-sm text-foreground/90">
                   {s.title || s.preview || s.id}
@@ -697,10 +693,10 @@ const TAB_STATE_LABEL: Record<ChatTab["state"], string | null> = {
 };
 
 /**
- * Otter Code's tab strip for chats open side by side — always shown, so
- * the current chat is named even when it's the only one. The icon slot doubles as the close button on hover
- * (Otter Code's PanelTabCloseButton) and carries the chat's state: working,
- * waiting on an approval, or finished while you were elsewhere.
+ * Codex-style pill tabs for chats open side by side — always shown, so the
+ * current chat is named even when it's the only one. The icon carries the
+ * chat's state (working, waiting on an approval, or finished while you were
+ * elsewhere); the × closes it (always on the active tab, on hover otherwise).
  */
 function ChatTabs({
   tabs,
@@ -741,12 +737,26 @@ function ChatTabs({
               }
             }}
             className={cn(
-              "group/tab flex h-6 max-w-36 shrink-0 cursor-pointer items-center gap-1 rounded-md pl-1 pr-2 text-xs outline-none transition-colors focus-visible:ring-2 focus-visible:ring-focus-ring",
+              "group/tab flex h-7 max-w-44 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg pl-2.5 pr-1 text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-focus-ring",
               selected
                 ? "bg-accent-surface text-foreground"
                 : "text-muted-foreground hover:bg-accent-surface/60 hover:text-foreground",
             )}
           >
+            <span className="relative flex size-3.5 shrink-0 items-center justify-center">
+              <MessageSquareIcon className="size-3.5" />
+              {tab.state !== "idle" ? (
+                <span
+                  aria-hidden
+                  className={cn(
+                    "absolute -bottom-0.5 -right-0.5 size-1.5 rounded-full ring-1 ring-canvas",
+                    tab.state === "approval" ? "bg-warning" : "bg-primary",
+                    tab.state === "working" && "animate-status-pulse",
+                  )}
+                />
+              ) : null}
+            </span>
+            <span className="min-w-0 truncate">{tab.title}</span>
             <button
               type="button"
               aria-label={`Close ${tab.title}`}
@@ -754,24 +764,13 @@ function ChatTabs({
                 e.stopPropagation();
                 onClose(tab.id);
               }}
-              className="group/close relative flex size-4 shrink-0 cursor-pointer items-center justify-center rounded-sm hover:bg-accent-surface"
+              className={cn(
+                "flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground outline-none hover:bg-foreground/8 hover:text-foreground focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-focus-ring",
+                selected ? "opacity-100" : "opacity-0 group-hover/tab:opacity-100",
+              )}
             >
-              <span className="relative flex size-3 items-center justify-center group-hover/tab:hidden group-focus-visible/close:hidden">
-                <MessageSquareIcon className="size-3" />
-                {tab.state !== "idle" ? (
-                  <span
-                    aria-hidden
-                    className={cn(
-                      "absolute -bottom-0.5 -right-0.5 size-1.5 rounded-full ring-1 ring-canvas",
-                      tab.state === "approval" ? "bg-warning" : "bg-primary",
-                      tab.state === "working" && "animate-status-pulse",
-                    )}
-                  />
-                ) : null}
-              </span>
-              <XIcon className="hidden size-3 group-hover/tab:block group-focus-visible/close:block" />
+              <XIcon className="size-3.5" />
             </button>
-            <span className="min-w-0 truncate">{tab.title}</span>
           </div>
         );
       })}
@@ -1593,7 +1592,7 @@ export function AssistantChatPanel({
     (p) => p.kind !== providerKind && isProviderUsable(p) && p.checkedAt !== null,
   );
 
-  // An empty chat is a centered draft: headline + composer (T3's draft hero).
+  // An empty chat shows a centered headline above the pinned composer (Codex).
   const hero = turns.length === 0 && hydrating !== activeId;
   const heroHeadline = quote
     ? "What should we do with this excerpt?"
@@ -1633,7 +1632,7 @@ export function AssistantChatPanel({
       {drop.active ? <DropOverlay /> : null}
       {/* Header: chat actions on the left; the panel toggle stays at the
           window's top-right, exactly where it sits while the panel is closed. */}
-      <div className="drag-region flex h-(--workspace-topbar-height) shrink-0 items-center gap-1 px-4">
+      <div className="drag-region flex h-(--workspace-topbar-height) shrink-0 items-center gap-1 px-3">
         {store.tabs.length > 0 ? (
           <ChatTabs
             tabs={store.tabs.map((id) => {
@@ -1660,15 +1659,15 @@ export function AssistantChatPanel({
           <IconBtn
             label="Chat history"
             active={historyOpen}
-            className="shrink-0"
+            className="size-8 shrink-0"
             onClick={() => setHistoryOpen((o) => !o)}
           >
             <HistoryIcon className="size-4" />
           </IconBtn>
         </HintTooltip>
         <HintTooltip label="New chat" shortcut="assistant.newChat" side="bottom">
-          <IconBtn label="New chat" className="shrink-0" onClick={() => newChat()}>
-            <PlusIcon className="size-4" />
+          <IconBtn label="New chat" className="size-8 shrink-0" onClick={() => newChat()}>
+            <SquarePenIcon className="size-4" />
           </IconBtn>
         </HintTooltip>
         <span className="min-w-0 flex-1" />
@@ -1728,7 +1727,7 @@ export function AssistantChatPanel({
         <MessageScroller.Provider autoScroll defaultScrollPosition="end">
           <MessageScroller.Root className="relative min-h-0 flex-1">
             <MessageScroller.Viewport className="topbar-scroll-fade h-full overflow-y-auto px-3 pb-3 pt-(--workspace-titlebar-scroll-fade-height)">
-              <MessageScroller.Content className="mx-auto flex w-full max-w-3xl flex-col gap-1">
+              <MessageScroller.Content className="mx-auto flex w-full max-w-3xl flex-col gap-2 px-2">
                 {turns.length === 0 && hydrating === activeId ? (
                   <div className="px-2 pt-6 text-center text-sm text-placeholder">
                     Loading this session from {providerName}…
@@ -1738,10 +1737,10 @@ export function AssistantChatPanel({
                   if (turn.role === "user") {
                     return (
                       <MessageScroller.Item key={turn.id} messageId={turn.id} scrollAnchor>
-                        <div className="group flex flex-col items-end gap-1 py-2">
+                        <div className="group flex flex-col items-end gap-1 py-3">
                           {turn.intent ? <IntentMarker intent={turn.intent} /> : null}
                           {turn.context ? <ContextRecap context={turn.context} /> : null}
-                          <div className="relative max-w-[80%] whitespace-pre-wrap rounded-2xl bg-message p-3 text-sm leading-relaxed text-message-foreground">
+                          <div className="relative max-w-[80%] whitespace-pre-wrap rounded-2xl bg-message px-4 py-2.5 text-sm leading-relaxed text-message-foreground">
                             {turn.skill ? (
                               <span className="mb-1 mr-1.5 inline-flex align-middle">
                                 <SkillBadge name={turn.skill} onAccent />
@@ -1783,7 +1782,7 @@ export function AssistantChatPanel({
                           </div>
                         ) : null}
                         {turn.text ? (
-                          <div className="min-w-0 px-1 py-1">
+                          <div className="min-w-0 px-1 py-2">
                             <ChatMarkdown text={turn.text} />
                           </div>
                         ) : null}
@@ -1805,34 +1804,34 @@ export function AssistantChatPanel({
                     {...props}
                     type="button"
                     aria-label="Jump to latest"
-                    className="surface-glass absolute bottom-3 left-1/2 flex size-7 -translate-x-1/2 items-center justify-center rounded-full border border-border/60 text-muted-foreground shadow-sm hover:border-border hover:text-foreground"
+                    className="surface-glass absolute bottom-3 left-1/2 flex size-8 -translate-x-1/2 items-center justify-center rounded-full border border-border/40 text-muted-foreground shadow-sm hover:text-foreground"
                   >
                     <ArrowDownIcon className="size-3.5" />
                   </button>
                 ) : null
               }
             />
+            {/* An empty chat shows its headline in the middle of the column. */}
+            {hero ? (
+              <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-4 px-6">
+                <MailIcon
+                  aria-hidden
+                  strokeWidth={1.25}
+                  className="size-10 text-muted-foreground"
+                />
+                <h1 className="w-full max-w-3xl text-balance text-center text-2xl font-normal tracking-tight text-foreground">
+                  {heroHeadline}
+                </h1>
+              </div>
+            ) : null}
           </MessageScroller.Root>
 
-          {/* Composer: glass card with the prompt on top and controls below. An
-              empty chat centers it under a hero headline, like T3's draft hero. */}
-          <div
-            className={
-              hero
-                ? "pointer-events-none absolute inset-x-0 bottom-0 top-(--workspace-topbar-height) z-20 flex items-center px-3"
-                : "relative shrink-0 px-3 pb-3 pt-1"
-            }
-          >
-            <div className="pointer-events-auto relative mx-auto w-full max-w-3xl">
-              {hero ? (
-                <div className="absolute inset-x-0 bottom-full pb-6">
-                  <h1 className="mx-auto w-full text-balance text-center text-xl font-normal tracking-tight text-foreground">
-                    {heroHeadline}
-                  </h1>
-                </div>
-              ) : null}
+          {/* Composer: glass card with the prompt on top and controls below,
+              pinned to the bottom like Codex's. */}
+          <div className="relative shrink-0 px-3 pb-3 pt-1">
+            <div className="relative mx-auto w-full max-w-3xl">
               {slashOpen ? (
-                <div className="dropdown-glass absolute inset-x-0 bottom-full z-20 mb-1 max-h-64 overflow-y-auto rounded-lg p-1 shadow-[0_16px_40px_-18px_rgb(0_0_0/55%)] dark:shadow-[0_18px_44px_-18px_rgb(0_0_0/80%)]">
+                <div className="dropdown-glass absolute inset-x-0 bottom-full z-20 mb-1 max-h-64 overflow-y-auto rounded-xl p-1.5 shadow-[0_16px_40px_-18px_rgb(0_0_0/55%)] dark:shadow-[0_18px_44px_-18px_rgb(0_0_0/80%)]">
                   <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
                     Skills
                   </div>
@@ -1847,12 +1846,12 @@ export function AssistantChatPanel({
                       }}
                       onMouseEnter={() => setSlashIndex(i)}
                       className={cn(
-                        "flex w-full flex-col items-start rounded-md px-2 py-1.5 text-left",
+                        "flex w-full flex-col items-start rounded-lg px-2.5 py-1.5 text-left",
                         i === slashIndex && "bg-accent-surface",
                       )}
                     >
-                      <span className="text-xs font-semibold text-foreground">/{s.name}</span>
-                      <span className="w-full truncate text-2xs text-muted-foreground">
+                      <span className="text-sm font-medium text-foreground">/{s.name}</span>
+                      <span className="w-full truncate text-xs text-muted-foreground">
                         {s.description}
                       </span>
                     </button>
@@ -1878,7 +1877,7 @@ export function AssistantChatPanel({
                   onCancel={stop}
                 />
               ) : null}
-              <div className="relative rounded-3xl border border-(--chat-composer-outline) bg-(--chat-composer-surface) shadow-composer transition-colors focus-within:border-input dark:shadow-none dark:inset-shadow-2xs dark:inset-shadow-(color:--chat-composer-highlight)">
+              <div className={cn("relative", COMPOSER_SURFACE)}>
                 <ComposerAttachments items={files.items} onRemove={files.remove} />
                 {activeSkill ? (
                   <div className="px-4 pt-3">
@@ -1936,67 +1935,42 @@ export function AssistantChatPanel({
                   placeholder="Ask anything, / for skills"
                   aria-label={`Message ${providerName}`}
                   rows={2}
-                  className="w-full resize-none bg-transparent px-4 pb-1 pt-3.5 text-sm leading-relaxed text-foreground outline-none placeholder:text-placeholder"
+                  className="w-full resize-none bg-transparent px-4.5 pb-1 pt-4 text-sm leading-relaxed text-foreground outline-none placeholder:text-placeholder"
                 />
-                <div className="flex min-w-0 items-center justify-between gap-2 px-3 pb-3">
-                  <div className="-ms-1 flex min-w-0 flex-1 items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                    <HintTooltip label="Attach files">
-                      <IconBtn
-                        label="Attach files"
-                        onPointerDown={(e) => e.preventDefault()}
-                        onClick={() => filePickerRef.current?.click()}
-                      >
-                        <PaperclipIcon className="size-4" />
-                      </IconBtn>
-                    </HintTooltip>
-                    <input
-                      ref={filePickerRef}
-                      type="file"
-                      multiple
-                      className="hidden"
-                      onChange={(e) => {
-                        const picked = Array.from(e.currentTarget.files ?? []);
-                        e.currentTarget.value = "";
-                        void files.add(picked);
-                        focusComposer();
-                      }}
-                    />
-                    <ProviderModelPicker
-                      providers={providersState?.providers ?? []}
-                      activeKind={providerKind}
-                      lockedKind={active && active.turns.length > 0 ? active.provider : null}
-                      onPick={pickModel}
-                      returnFocus={focusComposer}
-                    />
+                <div className="flex min-w-0 items-center gap-1 px-3 pb-3">
+                  <HintTooltip label="Attach files">
+                    <IconBtn
+                      label="Attach files"
+                      className="-ms-0.5 size-8 rounded-full"
+                      onPointerDown={(e) => e.preventDefault()}
+                      onClick={() => filePickerRef.current?.click()}
+                    >
+                      <PlusIcon className="size-4.5" />
+                    </IconBtn>
+                  </HintTooltip>
+                  <input
+                    ref={filePickerRef}
+                    type="file"
+                    multiple
+                    className="hidden"
+                    onChange={(e) => {
+                      const picked = Array.from(e.currentTarget.files ?? []);
+                      e.currentTarget.value = "";
+                      void files.add(picked);
+                      focusComposer();
+                    }}
+                  />
+                  <div className="flex min-w-0 shrink items-center gap-0.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                     {runtimeMode ? (
-                      <>
-                        <ComposerControlSeparator />
-                        <RuntimeModePicker
-                          returnFocus={focusComposer}
-                          value={runtimeMode}
-                          onChange={(mode) => {
-                            updateSettings({
-                              [providerKind]: { runtimeMode: mode },
-                            });
-                          }}
-                        />
-                      </>
-                    ) : null}
-                    {traitOptions.length > 0 ? (
-                      <>
-                        <ComposerControlSeparator />
-                        <TraitsPicker
-                          returnFocus={focusComposer}
-                          options={traitOptions}
-                          values={traitValues}
-                          onChange={(id, value) => {
-                            updateSettings({ [providerKind]: { [id]: value } });
-                          }}
-                        />
-                      </>
-                    ) : null}
-                    {context ? (
-                      <span className="mx-0.5 h-4 w-px shrink-0 bg-border" aria-hidden />
+                      <RuntimeModePicker
+                        returnFocus={focusComposer}
+                        value={runtimeMode}
+                        onChange={(mode) => {
+                          updateSettings({
+                            [providerKind]: { runtimeMode: mode },
+                          });
+                        }}
+                      />
                     ) : null}
                     {context ? (
                       <button
@@ -2005,9 +1979,9 @@ export function AssistantChatPanel({
                         onClick={() => setAttach((a) => !a)}
                         title={attach ? "Attached to this message" : "Not attached"}
                         className={cn(
-                          "relative inline-flex h-6 shrink-0 cursor-pointer items-center gap-1 whitespace-nowrap rounded-[var(--control-radius)] border border-transparent px-1.75 text-xs outline-none transition-colors hover:bg-accent-surface focus-visible:ring-2 focus-visible:ring-focus-ring [&_svg]:shrink-0",
+                          "relative inline-flex h-7 min-w-0 shrink cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-full border border-transparent px-2.5 text-sm outline-none transition-colors hover:bg-accent-surface focus-visible:ring-2 focus-visible:ring-focus-ring [&_svg]:shrink-0",
                           attach
-                            ? "bg-accent-surface text-foreground"
+                            ? "text-foreground/90"
                             : "text-muted-foreground/70 line-through hover:text-foreground/80",
                         )}
                       >
@@ -2022,7 +1996,31 @@ export function AssistantChatPanel({
                       </button>
                     ) : null}
                   </div>
-                  <div className="flex shrink-0 items-center gap-2">
+                  {/* Codex's "Model Effort ⌄": the model reads as plain text,
+                      the traits follow it muted and carry the chevron. */}
+                  <div className="ms-auto flex min-w-0 shrink items-center">
+                    <ProviderModelPicker
+                      providers={providersState?.providers ?? []}
+                      activeKind={providerKind}
+                      lockedKind={active && active.turns.length > 0 ? active.provider : null}
+                      onPick={pickModel}
+                      returnFocus={focusComposer}
+                      chevron={traitOptions.length === 0}
+                      className={traitOptions.length > 0 ? "pe-1" : undefined}
+                    />
+                    {traitOptions.length > 0 ? (
+                      <TraitsPicker
+                        returnFocus={focusComposer}
+                        options={traitOptions}
+                        values={traitValues}
+                        className="shrink-0 ps-1"
+                        onChange={(id, value) => {
+                          updateSettings({ [providerKind]: { [id]: value } });
+                        }}
+                      />
+                    ) : null}
+                  </div>
+                  <div className="flex shrink-0 items-center">
                     {/* Running + empty composer → Stop; with a draft the button
                         queues or steers it (Otter Code's primary actions). */}
                     {busy && !hasDraft && !editing ? (

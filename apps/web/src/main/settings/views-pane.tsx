@@ -92,12 +92,12 @@ function ViewRow({
           onEdit();
         }
       }}
-      className="group/row flex w-full cursor-pointer items-center gap-3 px-3 py-3 text-left outline-none transition-colors first:rounded-t-xl last:rounded-b-xl hover:bg-accent-surface/40 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus-ring sm:px-4"
+      className="group/row flex w-full cursor-pointer items-center gap-3 px-4 py-3.5 text-left outline-none transition-colors first:rounded-t-2xl last:rounded-b-2xl hover:bg-foreground/[0.03] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus-ring"
     >
       <LayersIcon className="size-4 shrink-0 text-muted-foreground" />
       <div className="min-w-0 flex-1 space-y-1">
         <div className="flex items-baseline gap-2">
-          <span className="truncate text-sm font-medium text-foreground">{view.name}</span>
+          <span className="truncate text-sm text-foreground">{view.name}</span>
           {counts.data ? (
             <span className="shrink-0 text-xs tabular-nums text-muted-foreground/70">
               {counts.data.total.toLocaleString()}
@@ -268,9 +268,9 @@ export function ViewsPane({
 
   return (
     <SettingsPageContainer>
-      <section className="space-y-2.5">
-        <div className="flex min-h-7 items-start justify-between gap-4 px-3 sm:px-4">
-          <h2 className="flex min-h-7 items-center text-sm font-normal text-foreground/70">
+      <section className="space-y-2">
+        <div className="flex min-h-7 items-start justify-between gap-4 px-1">
+          <h2 className="flex min-h-7 items-center text-[15px] font-medium text-foreground">
             Views
           </h2>
           <div className="flex min-h-7 items-center">{newViewMenu}</div>
@@ -286,7 +286,7 @@ export function ViewsPane({
           <div className="space-y-5">
             {sections.map((section) => (
               <div key={section.id} className="space-y-2">
-                <h3 className="flex items-center gap-2 px-3 text-xs font-medium text-muted-foreground sm:px-4">
+                <h3 className="flex items-center gap-2 px-1 text-[13px] text-muted-foreground">
                   {section.color ? (
                     <span
                       className="size-2 rounded-full"
@@ -321,7 +321,7 @@ export function ViewsPane({
             ))}
           </div>
         )}
-        <p className="px-3 pt-1 text-xs text-muted-foreground/80 sm:px-4">
+        <p className="px-1 pt-1 text-[13px] text-muted-foreground">
           Views show up in the sidebar of the mailbox they belong to.
         </p>
       </section>

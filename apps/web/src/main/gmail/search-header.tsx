@@ -51,14 +51,14 @@ const FIELD =
   "h-7.5 w-full min-w-0 rounded-lg border border-input bg-canvas px-2.5 text-sm text-foreground shadow-xs/5 outline-none placeholder:text-placeholder focus-visible:border-focus-ring focus-visible:ring-[3px] focus-visible:ring-focus-ring/24 dark:bg-input/32";
 
 const CHIP =
-  "inline-flex h-7 shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 text-xs outline-none transition-colors focus-visible:ring-2 focus-visible:ring-focus-ring";
+  "inline-flex h-7 shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-full border px-3 text-[13px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-focus-ring";
 
 function chipClass(active: boolean) {
   return cn(
     CHIP,
     active
       ? "border-transparent bg-accent-surface text-foreground"
-      : "border-border text-muted-foreground hover:bg-accent-surface/60 hover:text-foreground",
+      : "border-border/60 text-muted-foreground hover:bg-accent-surface/60 hover:text-foreground",
   );
 }
 
@@ -114,7 +114,7 @@ function SuggestionRow({
   onHover: () => void;
 }) {
   const base = cn(
-    "flex w-full min-w-0 cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-sm",
+    "flex w-full min-w-0 cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm",
     highlighted && "bg-accent-surface",
   );
   const body = (() => {
@@ -713,8 +713,8 @@ export function SearchHeader({
   return (
     <div ref={boxRef} className="relative shrink-0">
       <div className="drag-region flex h-(--workspace-topbar-height) items-center gap-2 px-3">
-        <div className="no-drag relative flex h-8 min-w-0 flex-1 items-center gap-2 rounded-full bg-muted/50 px-3 transition-colors focus-within:bg-muted/80">
-          <SearchIcon className="size-3.5 shrink-0 text-muted-foreground" />
+        <div className="no-drag relative flex h-8 min-w-0 flex-1 items-center gap-2 rounded-full bg-accent-surface px-3 transition-colors focus-within:bg-secondary">
+          <SearchIcon className="size-4 shrink-0 text-muted-foreground" />
           <input
             autoCorrect="off"
             autoCapitalize="off"
@@ -783,9 +783,7 @@ export function SearchHeader({
           className="dropdown-glass absolute inset-x-3 top-[calc(var(--workspace-topbar-height)-2px)] z-30 flex max-h-96 flex-col overflow-y-auto rounded-xl p-1 shadow-[0_16px_40px_-18px_rgb(0_0_0/55%)] dark:shadow-[0_18px_44px_-18px_rgb(0_0_0/80%)]"
         >
           {!draft.trim() ? (
-            <div className="px-2.5 pb-1 pt-1.5 text-xs font-medium text-muted-foreground">
-              Recent searches
-            </div>
+            <div className="px-2.5 pb-1 pt-1.5 text-sm text-muted-foreground">Recent searches</div>
           ) : null}
           {suggestions.map((s, i) => (
             <SuggestionRow
@@ -848,7 +846,7 @@ export function SearchHeader({
       </div>
 
       {query ? (
-        <div className="flex h-7 items-center gap-2 border-b border-border px-4 text-xs text-muted-foreground">
+        <div className="flex h-7 items-center gap-2 px-5 text-xs text-muted-foreground">
           {offline ? (
             <span className="text-warning">Offline — showing matches saved on this device</span>
           ) : loading ? (
@@ -861,9 +859,7 @@ export function SearchHeader({
             </span>
           ) : null}
         </div>
-      ) : (
-        <div className="border-b border-border" />
-      )}
+      ) : null}
     </div>
   );
 }

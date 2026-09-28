@@ -81,6 +81,10 @@ type RowDragProps = {
   onDrop?: (e: ReactDragEvent<HTMLButtonElement>) => void;
 };
 
+/** A sidebar row's box (Settings' nav mirrors it). */
+const SIDEBAR_ROW =
+  "group flex h-8 w-full cursor-pointer items-center gap-2.5 rounded-lg text-left text-sm font-normal outline-none transition-[background-color,color] focus-visible:ring-2 focus-visible:ring-focus-ring active:bg-sidebar-row-active";
+
 /** Gmail's labels API only accepts colors from its fixed palette. */
 const GMAIL_LABEL_COLORS: { backgroundColor: string; textColor: string }[] = [
   { backgroundColor: "#fb4c2f", textColor: "#ffffff" },
@@ -121,26 +125,26 @@ const SIDEBAR_SYSTEM_ORDER = [
 ];
 
 const SYSTEM_LABEL_MAP: Record<string, { name: string; icon: ReactNode }> = {
-  INBOX: { name: "Inbox", icon: <InboxIcon className="size-3.5" /> },
-  STARRED: { name: "Starred", icon: <StarIcon className="size-3.5" /> },
-  SENT: { name: "Sent", icon: <SendIcon className="size-3.5" /> },
-  DRAFT: { name: "Drafts", icon: <FileIcon className="size-3.5" /> },
-  IMPORTANT: { name: "Important", icon: <BookmarkIcon className="size-3.5" /> },
-  [ALL_MAIL_LABEL_ID]: { name: "All Mail", icon: <MailsIcon className="size-3.5" /> },
-  SPAM: { name: "Junk", icon: <ArchiveXIcon className="size-3.5" /> },
-  TRASH: { name: "Trash", icon: <Trash2Icon className="size-3.5" /> },
+  INBOX: { name: "Inbox", icon: <InboxIcon className="size-4" /> },
+  STARRED: { name: "Starred", icon: <StarIcon className="size-4" /> },
+  SENT: { name: "Sent", icon: <SendIcon className="size-4" /> },
+  DRAFT: { name: "Drafts", icon: <FileIcon className="size-4" /> },
+  IMPORTANT: { name: "Important", icon: <BookmarkIcon className="size-4" /> },
+  [ALL_MAIL_LABEL_ID]: { name: "All Mail", icon: <MailsIcon className="size-4" /> },
+  SPAM: { name: "Junk", icon: <ArchiveXIcon className="size-4" /> },
+  TRASH: { name: "Trash", icon: <Trash2Icon className="size-4" /> },
 };
 
 function viewIcon(view: MailView): ReactNode {
-  if (view.kind === "inbox") return <InboxIcon className="size-3.5" />;
-  if (view.kind === "starred") return <StarIcon className="size-3.5" />;
-  if (view.kind === "sent") return <SendIcon className="size-3.5" />;
-  if (view.kind === "drafts") return <FileIcon className="size-3.5" />;
-  if (view.kind === "important") return <BookmarkIcon className="size-3.5" />;
-  if (view.kind === "allmail") return <MailsIcon className="size-3.5" />;
-  if (view.kind === "junk") return <ArchiveXIcon className="size-3.5" />;
-  if (view.kind === "trash") return <Trash2Icon className="size-3.5" />;
-  return <LayersIcon className="size-3.5" />;
+  if (view.kind === "inbox") return <InboxIcon className="size-4" />;
+  if (view.kind === "starred") return <StarIcon className="size-4" />;
+  if (view.kind === "sent") return <SendIcon className="size-4" />;
+  if (view.kind === "drafts") return <FileIcon className="size-4" />;
+  if (view.kind === "important") return <BookmarkIcon className="size-4" />;
+  if (view.kind === "allmail") return <MailsIcon className="size-4" />;
+  if (view.kind === "junk") return <ArchiveXIcon className="size-4" />;
+  if (view.kind === "trash") return <Trash2Icon className="size-4" />;
+  return <LayersIcon className="size-4" />;
 }
 
 /** An open search, listed under the view it was started from. */
@@ -166,7 +170,7 @@ function SearchRow({
 }) {
   return (
     <SkRow
-      icon={<SearchIcon className="size-3.5" />}
+      icon={<SearchIcon className="size-4" />}
       title={search.title}
       depth={depth + 1}
       selected={search.selected}
@@ -189,7 +193,8 @@ function SearchRow({
   );
 }
 
-/** Sidebar row: muted at rest, inverted block when selected; counts live in the badge only. */
+/** Sidebar row (Codex): 14px regular text, muted icon, a rounded pill on hover
+    and when selected; counts live in the badge only. */
 function SkRow({
   icon,
   title,
@@ -222,19 +227,20 @@ function SkRow({
       style={style}
       {...dragProps}
       className={[
-        "group flex h-8 w-full cursor-pointer items-center gap-(--sidebar-control-gap) rounded-[var(--control-radius)] pr-(--sidebar-row-content-inset) text-left text-sm font-medium outline-none transition-[background-color,color] focus-visible:ring-2 focus-visible:ring-focus-ring active:bg-sidebar-row-active",
+        SIDEBAR_ROW,
+        "pr-(--sidebar-row-content-inset)",
         selected
           ? "bg-sidebar-row-selected text-sidebar-foreground"
-          : "text-sidebar-muted-foreground/80 hover:bg-sidebar-row-hover hover:text-sidebar-foreground",
+          : "text-sidebar-foreground/90 hover:bg-sidebar-row-hover hover:text-sidebar-foreground",
         dropActive ? "bg-sidebar-row-hover ring-1 ring-inset ring-primary/70" : "",
       ].join(" ")}
     >
       <span
         className={[
-          "shrink-0",
+          "flex shrink-0 items-center",
           selected
             ? "text-sidebar-foreground"
-            : "text-(--sidebar-icon-color) group-hover:text-sidebar-foreground",
+            : "text-sidebar-muted-foreground group-hover:text-sidebar-foreground",
         ].join(" ")}
       >
         {icon}
@@ -280,29 +286,36 @@ function Section({
 }) {
   const [open, setOpen] = useState(true);
   return (
-    <div className="mt-3">
+    <div className="mt-4">
       <div
         className={[
-          "group flex h-7 items-center gap-1 rounded-md pr-1",
+          "group flex h-8 items-center gap-1 rounded-lg pr-1",
           dropZone?.active ? "bg-sidebar-row-hover ring-1 ring-inset ring-primary/70" : "",
         ].join(" ")}
         onDragOver={dropZone?.onDragOver}
         onDragLeave={dropZone?.onDragLeave}
         onDrop={dropZone?.onDrop}
       >
+        {/* A plain muted heading (Codex's "Projects"); the chevron shows on
+            hover, or while the section is collapsed. */}
         <button
           type="button"
           onClick={() => setOpen((o) => !o)}
-          className="flex h-7 items-center gap-1 rounded-md px-2.5 text-xs font-medium text-sidebar-muted-foreground/70 hover:text-sidebar-foreground"
+          className="flex h-8 items-center gap-1 rounded-lg px-(--sidebar-row-content-inset) text-[13px] font-normal text-sidebar-muted-foreground outline-none hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-focus-ring"
           aria-label={`Toggle ${title}`}
         >
-          <ChevronDownIcon
-            className={["size-3 transition-transform", open ? "" : "-rotate-90"].join(" ")}
-          />
           {title}
+          <ChevronDownIcon
+            className={[
+              "size-3.5 transition-[opacity,transform]",
+              open ? "opacity-0 group-hover:opacity-100" : "-rotate-90",
+            ].join(" ")}
+          />
         </button>
         <span className="flex-1" />
-        <span className="opacity-0 group-hover:opacity-100">{action}</span>
+        <span className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100">
+          {action}
+        </span>
       </div>
       {open ? children : null}
     </div>
@@ -316,9 +329,9 @@ function SectionAddButton({ label, onClick }: { label: string; onClick: () => vo
         type="button"
         aria-label={label}
         onClick={onClick}
-        className="flex size-6 items-center justify-center rounded-md text-muted-foreground hover:bg-sidebar-row-hover hover:text-sidebar-foreground"
+        className="flex size-6 items-center justify-center rounded-md text-sidebar-muted-foreground outline-none hover:bg-sidebar-row-hover hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-focus-ring"
       >
-        <PlusIcon className="size-3.5" />
+        <PlusIcon className="size-4" />
       </button>
     </HintTooltip>
   );
@@ -330,11 +343,9 @@ function AddRow({ label, onClick }: { label: string; onClick: () => void }) {
     <button
       type="button"
       onClick={onClick}
-      className="flex h-8 w-full items-center gap-2 rounded-[var(--control-radius)] px-2.5 text-left text-sm font-medium text-sidebar-muted-foreground/80 hover:bg-sidebar-row-hover hover:text-sidebar-foreground"
+      className={`${SIDEBAR_ROW} px-(--sidebar-row-content-inset) text-sidebar-foreground/90 hover:bg-sidebar-row-hover hover:text-sidebar-foreground`}
     >
-      <span className="flex size-4 items-center justify-center rounded-sm border border-sidebar-line">
-        <PlusIcon className="size-3" />
-      </span>
+      <PlusIcon className="size-4 shrink-0 text-sidebar-muted-foreground" />
       <span className="truncate">{label}</span>
     </button>
   );
@@ -842,8 +853,8 @@ export function AccountsSidebar({
       <div className="flex h-full min-w-0 flex-col">
         <WindowTitle />
 
-        {/* Mailbox switcher row (All mailboxes / an account). */}
-        <div className="shrink-0 px-(--sidebar-content-inset) pb-1">
+        {/* Mailbox switcher, the sidebar's heading (Codex's "Codex ⌄"). */}
+        <div className="shrink-0 px-(--sidebar-content-inset) pb-2">
           <MailboxSwitcher
             accounts={accounts}
             selectedAccountId={selectedAccountId}
@@ -851,26 +862,29 @@ export function AccountsSidebar({
           />
         </div>
 
-        {/* Search row + compose, like the workspace sidebar. */}
-        <div className="flex h-10 shrink-0 items-center gap-1 px-(--sidebar-content-inset)">
-          {/* Search is a mailbox: selecting it opens Gmail search in the list. */}
-          <div className="min-w-0 flex-1">
-            <SkRow
-              icon={<SearchIcon className="size-4" />}
-              title="Search"
-              selected={searchSelected}
-              dot={searchPending}
-              onClick={onOpenSearch}
-            />
-          </div>
+        {/* New message (Codex's "New chat"), then Search, which is a mailbox:
+            selecting it opens Gmail search in the list. */}
+        <div className="flex shrink-0 flex-col gap-0.5 px-(--sidebar-content-inset)">
           <HintTooltip label="New message" shortcut="compose.new">
-            <IconBtn label="New message" onClick={onCompose}>
-              <SquarePenIcon className="size-4" />
-            </IconBtn>
+            <button
+              type="button"
+              onClick={onCompose}
+              className={`${SIDEBAR_ROW} bg-sidebar-control-surface px-(--sidebar-row-content-inset) text-sidebar-foreground hover:bg-sidebar-row-hover`}
+            >
+              <SquarePenIcon className="size-4 shrink-0 text-sidebar-muted-foreground group-hover:text-sidebar-foreground" />
+              <span className="truncate">New message</span>
+            </button>
           </HintTooltip>
+          <SkRow
+            icon={<SearchIcon className="size-4" />}
+            title="Search"
+            selected={searchSelected}
+            dot={searchPending}
+            onClick={onOpenSearch}
+          />
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-(--sidebar-content-inset) pb-4 pt-1">
+        <div className="min-h-0 flex-1 scroll-fade-y overflow-y-auto px-(--sidebar-content-inset) pb-8 pt-3">
           {isCombined ? (
             <>
               {views

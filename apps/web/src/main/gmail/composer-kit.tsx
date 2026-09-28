@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { PaperclipIcon, SendHorizontalIcon, Trash2Icon, TypeIcon } from "lucide-react";
+import { ArrowUpIcon, PaperclipIcon, Trash2Icon, TypeIcon } from "lucide-react";
 import { matchesCommand } from "../keybindings/dispatch";
 import { ShortcutText } from "../keybindings/store";
 import { HintTooltip, IconBtn, cn } from "./ui";
@@ -15,6 +15,13 @@ import type { GmailMessageDetail } from "./types";
  * labelled field rows, and one footer (attach · formatting · discard · status
  * · ⌘↩ · Send).
  */
+
+/**
+ * Codex's composer card: a big soft surface. Light themes keep a faint outline
+ * and shadow; dark themes let the raised tone carry it.
+ */
+export const COMPOSER_SURFACE =
+  "rounded-3xl border border-(--chat-composer-outline) bg-(--chat-composer-surface) shadow-composer transition-colors focus-within:border-input/70 dark:border-transparent dark:shadow-none dark:inset-shadow-2xs dark:inset-shadow-(color:--chat-composer-highlight) dark:focus-within:border-transparent";
 
 /**
  * The composer surface; ⌘↩ inside it sends. `card` is Otter Code's floating
@@ -34,12 +41,7 @@ export function ComposerCard({
 }) {
   return (
     <div
-      className={cn(
-        "flex min-w-0 flex-col",
-        variant === "card" &&
-          "rounded-2xl border border-(--chat-composer-outline) bg-(--chat-composer-surface) shadow-composer transition-colors focus-within:border-input dark:shadow-none dark:inset-shadow-2xs dark:inset-shadow-(color:--chat-composer-highlight)",
-        className,
-      )}
+      className={cn("flex min-w-0 flex-col", variant === "card" && COMPOSER_SURFACE, className)}
       onKeyDown={(e) => {
         if (matchesCommand(e.nativeEvent, "composer.send")) {
           e.preventDefault();
@@ -63,8 +65,8 @@ export function ComposerField({
   children: ReactNode;
 }) {
   return (
-    <div className="flex min-h-9 items-center gap-3 border-b border-border/50 px-4 py-1">
-      <span className="w-12 shrink-0 text-xs text-muted-foreground">{label}</span>
+    <div className="flex min-h-10 items-center gap-3 border-b border-border/40 px-5 py-1 text-sm">
+      <span className="w-14 shrink-0 text-sm text-muted-foreground">{label}</span>
       <div className="flex min-w-0 flex-1 items-center">{children}</div>
       {trailing ? <div className="flex shrink-0 items-center gap-2">{trailing}</div> : null}
     </div>
@@ -84,7 +86,7 @@ export function CcBccToggles({
   onShowBcc: () => void;
 }) {
   const btn =
-    "cursor-pointer rounded-sm px-1 text-xs text-muted-foreground/70 outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-focus-ring";
+    "cursor-pointer rounded-md px-1.5 py-0.5 text-sm text-muted-foreground/80 outline-none transition-colors hover:bg-accent-surface hover:text-foreground focus-visible:ring-2 focus-visible:ring-focus-ring";
   return (
     <>
       {!showCc ? (
@@ -289,6 +291,9 @@ export function draftStatusText(state: DraftSaveState): string | null {
   return null;
 }
 
+/** Codex-size icon buttons for the composer footer. */
+const FOOTER_ICON = "size-8 rounded-lg";
+
 /** Attach · formatting · discard on the left; status, ⌘↩ hint and Send on the right. */
 export function ComposerFooter({
   onAttach,
@@ -314,14 +319,24 @@ export function ComposerFooter({
   className?: string;
 }) {
   return (
-    <div className={cn("flex items-center gap-0.5 px-2 py-2", className)}>
+    <div className={cn("flex items-center gap-1 px-3 py-2.5", className)}>
       <HintTooltip label="Attach files">
-        <IconBtn label="Attach files" disabled={attachDisabled} onClick={onAttach}>
+        <IconBtn
+          label="Attach files"
+          disabled={attachDisabled}
+          onClick={onAttach}
+          className={FOOTER_ICON}
+        >
           <PaperclipIcon className="size-4" />
         </IconBtn>
       </HintTooltip>
       <HintTooltip label={formatting ? "Hide formatting" : "Formatting"}>
-        <IconBtn label="Formatting" active={formatting} onClick={onToggleFormatting}>
+        <IconBtn
+          label="Formatting"
+          active={formatting}
+          onClick={onToggleFormatting}
+          className={FOOTER_ICON}
+        >
           <TypeIcon className="size-4" />
         </IconBtn>
       </HintTooltip>
@@ -329,7 +344,7 @@ export function ComposerFooter({
         <IconBtn
           label="Discard draft"
           onClick={onDiscard}
-          className="hover:text-destructive-foreground"
+          className={cn(FOOTER_ICON, "hover:text-destructive-foreground")}
         >
           <Trash2Icon className="size-4" />
         </IconBtn>
@@ -337,7 +352,7 @@ export function ComposerFooter({
       {status ? (
         <span
           className={cn(
-            "min-w-0 truncate pl-2 text-xs",
+            "min-w-0 truncate pl-2 text-sm",
             statusTone === "error" ? "text-destructive-foreground" : "text-muted-foreground/70",
           )}
         >
@@ -346,16 +361,18 @@ export function ComposerFooter({
       ) : null}
       <span className="flex-1" />
       {canSend ? (
-        <ShortcutText command="composer.send" className="pr-2 text-xs text-muted-foreground/70" />
+        <ShortcutText command="composer.send" className="pr-2 text-sm text-muted-foreground/70" />
       ) : null}
       <button
         type="button"
         onClick={onSend}
         disabled={!canSend}
-        className="inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-full border border-primary bg-primary pl-3 pr-2.5 text-xs font-medium text-primary-foreground shadow-xs shadow-primary/24 outline-none transition-[box-shadow,scale,opacity] not-disabled:inset-shadow-[0_1px_rgb(255_255_255/16%)] hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-1 focus-visible:ring-offset-canvas active:scale-[0.97] disabled:pointer-events-none disabled:opacity-50"
+        className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-full bg-primary pl-3.5 pr-1.5 text-sm font-medium text-primary-foreground outline-none transition-[background-color,scale,opacity] hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-1 focus-visible:ring-offset-canvas active:scale-[0.97] disabled:pointer-events-none disabled:opacity-30"
       >
         Send
-        <SendHorizontalIcon className="size-3.5" />
+        <span className="flex size-5 items-center justify-center rounded-full bg-primary-foreground/15">
+          <ArrowUpIcon className="size-3.5" strokeWidth={2.25} />
+        </span>
       </button>
     </div>
   );
@@ -385,7 +402,7 @@ export function ComposeDocument({
           {attachments}
         </div>
       </div>
-      <div className="shrink-0 border-t border-border/60">
+      <div className="shrink-0 border-t border-border/40">
         <div className="mx-auto w-full max-w-3xl px-2">{footer}</div>
       </div>
     </div>

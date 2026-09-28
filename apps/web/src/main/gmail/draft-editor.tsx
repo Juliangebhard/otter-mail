@@ -371,7 +371,7 @@ export function DraftEditor({
       <ComposeDropOverlay visible={isDragging} />
       <div
         data-toolbar=""
-        className="drag-region flex h-(--workspace-topbar-height) shrink-0 items-center gap-2 border-b border-border px-4"
+        className="drag-region flex h-(--workspace-topbar-height) shrink-0 items-center gap-2 px-4"
       >
         <div className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
           {subject.trim() || "Draft"}

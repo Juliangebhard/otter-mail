@@ -36,7 +36,7 @@ export function UnsubscribeLink({
   const who = senderName || senderEmail;
 
   if (info.unsubscribed) {
-    return <span className="shrink-0 text-xs text-muted-foreground/60">Unsubscribed</span>;
+    return <span className="shrink-0 text-[13px] text-muted-foreground/70">Unsubscribed</span>;
   }
 
   const run = async () => {
@@ -76,7 +76,7 @@ export function UnsubscribeLink({
           e.stopPropagation();
           setConfirming(true);
         }}
-        className="shrink-0 cursor-pointer text-xs text-muted-foreground underline decoration-muted-foreground/40 underline-offset-2 hover:text-foreground"
+        className="shrink-0 cursor-pointer text-[13px] text-muted-foreground underline decoration-muted-foreground/40 underline-offset-2 hover:text-foreground"
       >
         Unsubscribe
       </button>

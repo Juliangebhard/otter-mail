@@ -4,17 +4,17 @@ import { cn } from "~/lib/utils";
 
 /**
  * Inline text in the app's type scale. `variant` pairs a size with a weight
- * (13px `regular` is the macOS body size); `color` picks a foreground role.
+ * (14px `regular` is the body size); `color` picks a foreground role.
  */
 const VARIANTS = {
   large: "text-base leading-[22px] font-normal",
   "large-strong": "text-base leading-[22px] font-medium",
-  regular: "text-[13px] leading-[18px] font-normal",
-  strong: "text-[13px] leading-[18px] font-medium",
-  small: "text-2xs leading-[14px] font-normal",
-  "small-strong": "text-2xs leading-[14px] font-medium",
-  mini: "text-3xs leading-[13px] font-normal",
-  "mini-strong": "text-3xs leading-[13px] font-medium",
+  regular: "text-sm leading-5 font-normal",
+  strong: "text-sm leading-5 font-medium",
+  small: "text-[13px] leading-[18px] font-normal",
+  "small-strong": "text-[13px] leading-[18px] font-medium",
+  mini: "text-2xs leading-[14px] font-normal",
+  "mini-strong": "text-2xs leading-[14px] font-medium",
 } as const;
 
 const COLORS = {

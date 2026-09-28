@@ -248,13 +248,13 @@ export function ComposerAttachments({
   const files = items.filter((a) => a.kind === "file");
   if (items.length === 0) return null;
   return (
-    <div className="px-4 pt-3">
+    <div className="px-4.5 pt-3.5">
       {images.length > 0 ? (
         <div className="mb-2 flex max-w-full flex-wrap gap-2">
           {images.map((image) => (
             <div
               key={image.key}
-              className="group/attachment relative h-16 w-16 shrink-0 overflow-hidden rounded-lg border border-border/80 bg-background"
+              className="group/attachment relative h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-border/60 bg-background"
             >
               {image.previewUrl ? (
                 <img
@@ -332,7 +332,7 @@ export function SentAttachments({ attachments }: { attachments: SentAttachment[]
           {images.map((image, i) => (
             <div
               key={i}
-              className="aspect-[4/3] overflow-hidden rounded-lg border border-border/80 bg-background/70"
+              className="aspect-[4/3] overflow-hidden rounded-xl border border-border/60 bg-background/70"
               title={image.name}
             >
               {image.thumb ? (

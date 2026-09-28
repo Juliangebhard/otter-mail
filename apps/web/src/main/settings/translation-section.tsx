@@ -68,7 +68,7 @@ export function TranslationSection() {
           {readLanguages.map((code, i) => (
             <li
               key={code}
-              className="group/lang flex h-8 items-center gap-2 rounded-md pr-1 pl-2 hover:bg-accent-surface/50"
+              className="group/lang flex h-8 items-center gap-2 rounded-lg pr-1 pl-2.5 hover:bg-foreground/[0.04]"
             >
               <span className="min-w-0 flex-1 truncate text-sm text-foreground">
                 {languageName(code)}

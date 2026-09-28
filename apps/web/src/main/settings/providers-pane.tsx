@@ -96,8 +96,8 @@ function ProviderListRow({
     <div
       data-slot="settings-row"
       className={cn(
-        "group flex min-h-18 items-center gap-3 px-3 py-3 transition-colors sm:px-4",
-        selected ? "bg-muted/45" : "hover:bg-muted/25",
+        "group flex min-h-16 items-center gap-3 rounded-xl px-3 py-2.5 transition-colors",
+        selected ? "bg-foreground/[0.06]" : "hover:bg-foreground/[0.03]",
       )}
     >
       <div
@@ -118,9 +118,7 @@ function ProviderListRow({
         </span>
         <span className="min-w-0 flex-1">
           <span className="flex min-w-0 items-center gap-2">
-            <span className="truncate text-sm font-medium text-foreground">
-              {provider.displayName}
-            </span>
+            <span className="truncate text-sm text-foreground">{provider.displayName}</span>
             {version ? (
               <code className="max-w-24 shrink-0 truncate text-xs text-muted-foreground">
                 {version}
@@ -132,7 +130,7 @@ function ProviderListRow({
               </span>
             ) : null}
           </span>
-          <span className="mt-0.5 flex items-start gap-1.5 text-xs leading-normal text-muted-foreground/80">
+          <span className="mt-0.5 flex items-start gap-1.5 text-xs leading-normal text-muted-foreground">
             {needsAttention ? (
               <span className="flex h-[1.45em] shrink-0 items-center">
                 <StatusDot status={provider.status} />
@@ -288,7 +286,7 @@ function ModelsSection({
                 <div
                   data-model-slug={m.slug}
                   className={cn(
-                    "grid h-7 grid-cols-[1.5rem_minmax(0,1fr)_auto_auto] items-center gap-2 rounded-md px-2 transition-colors hover:bg-muted/30",
+                    "grid h-8 grid-cols-[1.5rem_minmax(0,1fr)_auto_auto] items-center gap-2 rounded-lg px-2 transition-colors hover:bg-foreground/[0.04]",
                     isHidden && "opacity-50",
                   )}
                 >
@@ -643,8 +641,8 @@ export function ProvidersPane() {
   return (
     <div className="min-h-0 flex-1 overflow-y-auto">
       <div className="@container/providers mx-auto w-full max-w-5xl space-y-2.5 px-4 pb-16 pt-4 sm:px-6">
-        <div className="flex min-h-11 min-w-0 items-center gap-2 px-3 sm:px-4">
-          <h2 className="text-sm font-normal text-foreground/70">Providers</h2>
+        <div className="flex min-h-11 min-w-0 items-center gap-2 px-1">
+          <h2 className="text-[15px] font-medium text-foreground">Providers</h2>
           <div className="ml-auto flex min-w-0 shrink-0 items-center gap-2">
             <Btn
               size="xs"
@@ -679,8 +677,8 @@ export function ProvidersPane() {
             "overflow-hidden @min-[48rem]/providers:grid @min-[48rem]/providers:grid-cols-[17rem_minmax(0,1fr)]",
           )}
         >
-          <div className="border-b border-border/60 bg-muted/10 @min-[48rem]/providers:flex @min-[48rem]/providers:min-h-0 @min-[48rem]/providers:flex-col @min-[48rem]/providers:border-r @min-[48rem]/providers:border-b-0">
-            <div className="divide-y divide-border/50 @min-[48rem]/providers:min-h-0 @min-[48rem]/providers:flex-1 @min-[48rem]/providers:overflow-y-auto">
+          <div className="border-b border-border/40 @min-[48rem]/providers:flex @min-[48rem]/providers:min-h-0 @min-[48rem]/providers:flex-col @min-[48rem]/providers:border-r @min-[48rem]/providers:border-b-0">
+            <div className="space-y-0.5 p-1.5 @min-[48rem]/providers:min-h-0 @min-[48rem]/providers:flex-1 @min-[48rem]/providers:overflow-y-auto">
               {providers.map((p) => (
                 <ProviderListRow
                   key={p.kind}

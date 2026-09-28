@@ -131,7 +131,7 @@ function MailboxMark({ account, className }: { account: GmailAccount | null; cla
   );
 }
 
-/** Mailbox switcher row for the sidebar; aligned with the rows below it. */
+/** Mailbox switcher, the sidebar's heading; aligned with the rows below it. */
 export function MailboxSwitcher({
   accounts,
   selectedAccountId,
@@ -174,16 +174,19 @@ export function MailboxSwitcher({
           type="button"
           aria-label="Switch mailbox"
           className={cn(
-            "group/switcher flex h-8 w-full min-w-0 cursor-pointer items-center gap-(--sidebar-control-gap) rounded-[var(--control-radius)] px-(--sidebar-row-content-inset) text-left text-sm font-medium text-sidebar-foreground outline-none transition-colors hover:bg-sidebar-row-hover focus-visible:ring-2 focus-visible:ring-focus-ring data-[state=open]:bg-sidebar-row-hover",
+            "group/switcher flex h-9 w-full min-w-0 cursor-pointer items-center gap-2 rounded-lg px-(--sidebar-row-content-inset) text-left text-sidebar-foreground outline-none transition-colors hover:bg-sidebar-row-hover focus-visible:ring-2 focus-visible:ring-focus-ring data-[state=open]:bg-sidebar-row-hover",
             className,
           )}
         >
           <span className="flex size-4 shrink-0 items-center justify-center">
-            <MailboxMark account={selectedAccount} className="text-(--sidebar-icon-color)" />
+            <MailboxMark account={selectedAccount} className="text-sidebar-muted-foreground" />
           </span>
-          <span className="min-w-0 flex-1 truncate">{mailboxName}</span>
+          {/* A heading, like Codex's "Codex ⌄": the name, then its chevron. */}
+          <span className="min-w-0 truncate text-base font-semibold tracking-tight">
+            {mailboxName}
+          </span>
           <ChevronDownIcon
-            className="size-3.5 shrink-0 text-(--sidebar-icon-color) transition-transform group-data-[state=open]/switcher:rotate-180"
+            className="size-4 shrink-0 text-sidebar-muted-foreground transition-transform group-data-[state=open]/switcher:rotate-180"
             aria-hidden
           />
         </button>
@@ -202,7 +205,7 @@ export function MailboxSwitcher({
                 key={option.id}
                 onSelect={() => onSelectAccount(option.id)}
                 className={cn(
-                  "flex min-h-7 cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1 text-sm outline-none data-[highlighted]:bg-accent-surface data-[highlighted]:text-foreground",
+                  "flex min-h-8 cursor-pointer select-none items-center gap-2 rounded-md px-2 py-1 text-sm outline-none data-[highlighted]:bg-accent-surface data-[highlighted]:text-foreground",
                   selected && "bg-foreground/[0.08]",
                 )}
               >

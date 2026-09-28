@@ -4,10 +4,10 @@ import type { GmailLabel } from "./types";
 
 /** Badge chrome shared by every chip (Otter Code's `Badge`, size sm). */
 const PILL =
-  "group relative inline-flex h-4.5 w-fit max-w-32 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-sm border px-1 text-2xs font-medium leading-none";
+  "group relative inline-flex h-5 w-fit max-w-32 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-full border px-2 text-2xs font-medium leading-none";
 
 /** Neutral outline chip. */
-const OUTLINE = "border-input bg-canvas text-muted-foreground dark:bg-input/32";
+const OUTLINE = "border-border/60 bg-transparent text-muted-foreground";
 
 /**
  * Tinted chip driven by a `--label` color: a faint wash of the label over the
@@ -33,7 +33,7 @@ function RemoveButton({ label, onRemove }: { label: string; onRemove: () => void
         e.stopPropagation();
         onRemove();
       }}
-      className="absolute inset-y-0 right-0 hidden w-4 items-center justify-center rounded-r-sm bg-inherit group-hover:flex"
+      className="absolute inset-y-0 right-0 hidden w-5 items-center justify-center rounded-r-full bg-inherit group-hover:flex"
     >
       <XIcon className="size-2.5" strokeWidth={3} />
     </button>

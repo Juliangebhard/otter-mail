@@ -14,12 +14,10 @@ export function SettingsGroup({
       {...props}
       className={cn(
         "relative overflow-visible text-foreground",
-        variant === "grouped"
-          ? "rounded-xl border border-border/60 bg-card/40 shadow-xs/5"
-          : "space-y-1",
+        variant === "grouped" ? "rounded-2xl border border-border/60 bg-card" : "space-y-1",
         variant === "grouped" &&
           divided &&
-          "[&>*+*]:border-t [&>*+*]:border-border/50 [&>[data-slot=settings-row]]:rounded-none",
+          "[&>*+*]:border-t [&>*+*]:border-border/40 [&>[data-slot=settings-row]]:rounded-none",
         className,
       )}
     />
@@ -43,10 +41,10 @@ export function SettingsSection({
   children: ReactNode;
 }) {
   return (
-    <section {...props} className={cn("space-y-2.5", className)}>
-      <div className="flex min-h-7 items-start justify-between gap-4 px-3 sm:px-4">
+    <section {...props} className={cn("space-y-2", className)}>
+      <div className="flex min-h-7 items-start justify-between gap-4 px-1">
         <div className="min-w-0">
-          <h2 className="flex min-h-7 items-center gap-2 text-sm font-normal text-foreground/70">
+          <h2 className="flex min-h-7 items-center gap-2 text-[15px] font-medium text-foreground">
             {icon}
             {title}
           </h2>
@@ -85,15 +83,15 @@ export function SettingsRow({
       {...props}
       data-slot="settings-row"
       className={cn(
-        "@container/settings-row rounded-xl px-3 sm:px-4",
-        children ? "pt-3 pb-1" : "py-3",
+        "@container/settings-row rounded-2xl px-4",
+        children ? "pt-3.5 pb-1" : "py-3.5",
         className,
       )}
     >
       <div className="flex flex-col gap-3 @min-[32rem]/settings-row:grid @min-[32rem]/settings-row:grid-cols-[minmax(0,1fr)_minmax(10rem,auto)] @min-[32rem]/settings-row:items-center @min-[32rem]/settings-row:gap-8">
-        <div className="min-w-0 flex-1 space-y-1">
+        <div className="min-w-0 flex-1 space-y-0.5">
           <div className="flex min-h-5 items-center gap-1.5">
-            <h3 className="text-sm font-medium text-foreground">{title}</h3>
+            <h3 className="text-sm font-normal text-foreground">{title}</h3>
             {resetAction ? (
               <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center">
                 {resetAction}
@@ -101,7 +99,7 @@ export function SettingsRow({
             ) : null}
           </div>
           {description ? (
-            <p className="max-w-xl text-xs leading-normal text-muted-foreground/80">
+            <p className="max-w-xl text-[13px] leading-[18px] text-muted-foreground">
               {description}
             </p>
           ) : null}
@@ -159,7 +157,7 @@ export const TextInput = forwardRef<HTMLInputElement, ComponentProps<"input">>(f
       ref={ref}
       {...props}
       className={cn(
-        "h-7.5 w-full min-w-0 rounded-lg border border-input bg-canvas px-[calc(--spacing(2.5)-1px)] text-sm text-foreground shadow-xs/5 outline-none transition-shadow placeholder:text-placeholder focus-visible:border-focus-ring focus-visible:ring-[3px] focus-visible:ring-focus-ring/24 disabled:opacity-64 dark:bg-input/32",
+        "h-8 w-full min-w-0 rounded-lg border border-border/70 bg-surface-raised/60 px-[calc(--spacing(2.75)-1px)] text-sm text-foreground outline-none transition-[box-shadow,border-color,background-color] placeholder:text-placeholder focus-visible:border-focus-ring/60 focus-visible:bg-canvas focus-visible:ring-[3px] focus-visible:ring-focus-ring/16 disabled:opacity-64",
         className,
       )}
     />

@@ -19,7 +19,7 @@ import {
 
 export const DEFAULT_THEME_ID = "otter";
 /** What a fresh install wears (both appearances) until the user picks a theme. */
-export const INITIAL_THEME_ID = "ocean";
+export const INITIAL_THEME_ID = "codex";
 
 /** The stock palette as a definition, for previews (it is never written as overrides). */
 export const OTTER_THEME: ThemeDefinition = {
@@ -70,12 +70,13 @@ export function themeColors(themeId: string, mode: ThemeAppearance): ThemeColors
  * toward the surface it sits on so themes keep their hue but match the stock
  * palette's quiet contrast. Text and accent roles are left as designed.
  */
-function soften(color: string, over: string, keep: number): string {
+function softenColor(color: string, over: string, keep: number): string {
   return `color-mix(in oklab, ${color} ${keep}%, ${over})`;
 }
 
 /** Theme role → the app's CSS variables (mirrors Otter Code's index.css mapping). */
-function cssVariables(c: ThemeColors): string {
+function cssVariables(c: ThemeColors, exact: boolean): string {
+  const soften = exact ? (color: string) => color : softenColor;
   const vars: Record<string, string> = {
     "--canvas": c.canvas,
     "--app-chrome-background": c.chrome,
@@ -143,6 +144,7 @@ export function applyAppTheme(): void {
   const mode = appearance();
   const themeId = getThemeChoice()[mode];
   const colors = themeColors(themeId, mode);
+  const exact = APP_THEMES.find((t) => t.id === themeId)?.exact ?? false;
 
   const root = document.documentElement;
   root.classList.toggle("dark", mode === "dark");
@@ -159,7 +161,7 @@ export function applyAppTheme(): void {
   }
   // Appended last in <head>, and the attribute selectors out-rank both the
   // stock `.dark` tokens and the sidebar's own [data-app-sidebar] scope.
-  style.textContent = `html[data-theme-id],\nhtml[data-theme-id] [data-app-sidebar] {\n${cssVariables(colors)}\n}`;
+  style.textContent = `html[data-theme-id],\nhtml[data-theme-id] [data-app-sidebar] {\n${cssVariables(colors, exact)}\n}`;
   document.head.appendChild(style);
 }
 
@@ -178,6 +180,30 @@ export function startAppTheme(): () => void {
     window.removeEventListener(CHANGE_EVENT, applyAppTheme);
     window.removeEventListener("storage", onStorage);
   };
+}
+
+/** Whether the theme this window wears keeps its own primary (no per-account color). */
+function isMonochrome(): boolean {
+  const id = getThemeChoice()[appearance()];
+  return APP_THEMES.find((t) => t.id === id)?.monochrome ?? false;
+}
+
+/** `isMonochrome`, re-read on theme picks and appearance switches. */
+export function useMonochromeTheme(): boolean {
+  const [monochrome, setMonochrome] = useState(isMonochrome);
+  useEffect(() => {
+    const update = () => setMonochrome(isMonochrome());
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    mq.addEventListener("change", update);
+    window.addEventListener(CHANGE_EVENT, update);
+    window.addEventListener("storage", update);
+    return () => {
+      mq.removeEventListener("change", update);
+      window.removeEventListener(CHANGE_EVENT, update);
+      window.removeEventListener("storage", update);
+    };
+  }, []);
+  return monochrome;
 }
 
 /** Current theme choice, re-read whenever it changes (for the settings UI). */

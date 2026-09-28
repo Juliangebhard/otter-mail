@@ -148,7 +148,7 @@ function KeyControl({
         type="button"
         onClick={() => onRecordingChange(true)}
         aria-label="Change shortcut"
-        className="-mr-1.5 inline-flex h-7 cursor-pointer items-center rounded-md border border-transparent px-1.5 outline-none transition-colors hover:border-border/70 hover:bg-accent-surface focus-visible:border-focus-ring focus-visible:ring-[3px] focus-visible:ring-focus-ring/24"
+        className="-mr-1.5 inline-flex h-7 cursor-pointer items-center rounded-lg border border-transparent px-1.5 outline-none transition-colors hover:border-border/70 hover:bg-accent-surface focus-visible:border-focus-ring focus-visible:ring-[3px] focus-visible:ring-focus-ring/24"
       >
         {value ? (
           <KeyChips value={value} />
@@ -196,7 +196,7 @@ function KeyControl({
           }
           finish(stroke);
         }}
-        className="h-7 w-44 rounded-lg border border-focus-ring bg-canvas px-2.5 font-mono text-xs text-foreground shadow-xs/5 outline-none ring-[3px] ring-focus-ring/24 placeholder:font-sans placeholder:text-placeholder dark:bg-input/32"
+        className="h-8 w-44 rounded-lg border border-focus-ring/60 bg-canvas px-2.5 font-mono text-xs text-foreground outline-none ring-[3px] ring-focus-ring/16 placeholder:font-sans placeholder:text-placeholder"
       />
     </div>
   );
@@ -240,7 +240,7 @@ function WhenControl({ value, onChange }: { value: string; onChange: (when: stri
           <button
             type="button"
             className={cn(
-              "inline-flex h-6 min-w-0 shrink cursor-pointer items-center gap-1 rounded-md px-1.5 text-xs outline-none transition-colors hover:bg-accent-surface focus-visible:ring-2 focus-visible:ring-focus-ring",
+              "inline-flex h-6 min-w-0 shrink cursor-pointer items-center gap-1 rounded-lg px-1.5 text-xs outline-none transition-colors hover:bg-accent-surface focus-visible:ring-2 focus-visible:ring-focus-ring",
               value ? "text-foreground" : "text-muted-foreground",
             )}
           >
@@ -254,10 +254,10 @@ function WhenControl({ value, onChange }: { value: string; onChange: (when: stri
             sideOffset={6}
             collisionPadding={8}
             onCloseAutoFocus={restoreFocusForKeyboardOnly}
-            className="dropdown-glass z-[130] w-[min(30rem,calc(100vw-2rem))] space-y-3 rounded-xl p-3 text-foreground shadow-[0_16px_40px_-18px_rgb(0_0_0/55%)] outline-none dark:shadow-[0_18px_44px_-18px_rgb(0_0_0/80%)]"
+            className="dropdown-glass z-[130] w-[min(30rem,calc(100vw-2rem))] space-y-3 rounded-2xl p-3.5 text-foreground shadow-[0_16px_40px_-18px_rgb(0_0_0/55%)] outline-none dark:shadow-[0_18px_44px_-18px_rgb(0_0_0/80%)]"
           >
             <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-muted-foreground">When</span>
+              <span className="text-[13px] text-muted-foreground">When</span>
               <div className="flex items-center gap-1">
                 {(["!", "&&", "||"] as const).map((op) => (
                   <Btn
@@ -285,7 +285,7 @@ function WhenControl({ value, onChange }: { value: string; onChange: (when: stri
                 }
               }}
               className={cn(
-                "h-8 w-full rounded-lg border bg-canvas px-2.5 font-mono text-xs text-foreground shadow-xs/5 outline-none placeholder:text-placeholder focus-visible:ring-[3px] dark:bg-input/32",
+                "h-8 w-full rounded-lg border bg-surface-raised/60 px-2.5 font-mono text-xs text-foreground outline-none placeholder:text-placeholder focus-visible:bg-canvas focus-visible:ring-[3px]",
                 valid
                   ? "border-input focus-visible:border-focus-ring focus-visible:ring-focus-ring/24"
                   : "border-destructive focus-visible:ring-destructive/20",
@@ -306,7 +306,7 @@ function WhenControl({ value, onChange }: { value: string; onChange: (when: stri
                   key={name}
                   type="button"
                   onClick={() => insertVariable(name)}
-                  className="inline-flex h-6 cursor-pointer items-center rounded-md border border-border/70 px-1.5 font-mono text-2xs text-muted-foreground transition-colors hover:bg-accent-surface hover:text-foreground"
+                  className="inline-flex h-6 cursor-pointer items-center rounded-lg border border-border/70 px-1.5 font-mono text-2xs text-muted-foreground transition-colors hover:bg-accent-surface hover:text-foreground"
                 >
                   {name}
                 </button>
@@ -561,7 +561,7 @@ function NewKeybindingRow({ rows, onDone }: { rows: Row[]; onDone: () => void })
 
   return (
     <SettingsRow
-      className="rounded-none bg-muted/15"
+      className="rounded-none bg-foreground/[0.02]"
       title="New keybinding"
       description={<WhenControl value={when} onChange={setWhen} />}
       control={
@@ -669,7 +669,7 @@ export function KeybindingsPane() {
                 setSearchOpen(false);
               }
             }}
-            className="h-7 w-full rounded-lg border border-input bg-canvas ps-7 pe-2 text-xs text-foreground shadow-xs/5 outline-none placeholder:text-placeholder focus-visible:border-focus-ring focus-visible:ring-[3px] focus-visible:ring-focus-ring/24 dark:bg-input/32"
+            className="h-7 w-full rounded-lg border border-border/70 bg-surface-raised/60 ps-7 pe-2 text-[13px] text-foreground outline-none placeholder:text-placeholder focus-visible:border-focus-ring/60 focus-visible:bg-canvas focus-visible:ring-[3px] focus-visible:ring-focus-ring/16"
           />
         </div>
       ) : (

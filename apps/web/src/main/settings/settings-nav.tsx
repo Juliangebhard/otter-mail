@@ -34,11 +34,12 @@ export function settingsSectionLabel(pane: SettingsPane): string {
   return SETTINGS_SECTIONS.find((s) => s.id === pane)?.label ?? "Settings";
 }
 
+/** The mail sidebar's row (Codex): 14px regular text, muted icon, rounded pill. */
 const ROW =
-  "flex h-8 w-full cursor-pointer items-center gap-(--sidebar-control-gap) rounded-[var(--control-radius)] px-(--sidebar-row-content-inset) text-left text-sm font-medium outline-none transition-[background-color,color] focus-visible:ring-2 focus-visible:ring-focus-ring active:bg-sidebar-row-active [&>svg]:size-4 [&>svg]:shrink-0";
+  "flex h-8 w-full cursor-pointer items-center gap-2.5 rounded-lg px-(--sidebar-row-content-inset) text-left text-sm font-normal outline-none transition-[background-color,color] focus-visible:ring-2 focus-visible:ring-focus-ring active:bg-sidebar-row-active [&>svg]:size-4 [&>svg]:shrink-0";
 
 const ROW_IDLE =
-  "text-sidebar-muted-foreground/80 hover:bg-sidebar-row-hover hover:text-sidebar-foreground [&>svg]:text-(--sidebar-icon-color) hover:[&>svg]:text-sidebar-foreground";
+  "text-sidebar-foreground/90 hover:bg-sidebar-row-hover hover:text-sidebar-foreground [&>svg]:text-sidebar-muted-foreground hover:[&>svg]:text-sidebar-foreground";
 
 /**
  * Sidebar contents while the settings page is open: sections, then Back and
@@ -56,8 +57,8 @@ export function SettingsNav({
   const otter = useOtterAccount();
   return (
     <>
-      <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-(--sidebar-content-inset) pb-4 pt-1">
-        <div className="px-(--sidebar-row-content-inset) pb-1 pt-1 text-xs font-medium text-sidebar-muted-foreground/70">
+      <div className="flex min-h-0 flex-1 flex-col gap-0.5 scroll-fade-y overflow-y-auto px-(--sidebar-content-inset) pb-8 pt-3">
+        <div className="flex h-8 items-center px-(--sidebar-row-content-inset) text-[13px] text-sidebar-muted-foreground">
           Settings
         </div>
         {SETTINGS_SECTIONS.map((section) => {
@@ -83,7 +84,7 @@ export function SettingsNav({
         })}
       </div>
       {/* Bottom rows, like Otter Code's settings sidebar. */}
-      <div className="flex shrink-0 flex-col gap-1 px-(--sidebar-content-inset) py-1">
+      <div className="flex shrink-0 flex-col gap-0.5 px-(--sidebar-content-inset) py-1">
         {otter && !otter.user ? (
           <button
             type="button"
@@ -112,7 +113,7 @@ export function SettingsNav({
                 aria-current={pane === "otter" ? "page" : undefined}
                 onClick={() => onSelect("otter")}
                 className={cn(
-                  "relative flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-[var(--control-radius)] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-focus-ring",
+                  "relative flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-lg outline-none transition-colors focus-visible:ring-2 focus-visible:ring-focus-ring",
                   pane === "otter" ? "bg-sidebar-row-selected" : "hover:bg-sidebar-row-hover",
                 )}
               >

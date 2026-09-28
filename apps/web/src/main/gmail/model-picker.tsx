@@ -43,14 +43,15 @@ import { shortcutLabelFor, useKeybindingsState } from "../keybindings/store";
 // Composer control look (T3's ComposerControl, size "sm")
 // ---------------------------------------------------------------------------
 
+// Codex's composer controls: quiet, muted text pills that brighten on hover.
 export const COMPOSER_CONTROL =
-  "relative inline-flex shrink-0 cursor-pointer items-center justify-center whitespace-nowrap rounded-(--control-radius) border border-transparent outline-none hover:bg-accent-surface data-[state=open]:bg-accent-surface focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-1 focus-visible:ring-offset-canvas disabled:pointer-events-none disabled:opacity-64 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg]:-mx-0.5 [&_svg[data-composer-control-icon]]:mx-0 h-7 gap-1.5 px-2.5 text-sm font-medium text-secondary-label [&_svg:not([class*='text-'])]:text-muted-foreground hover:text-foreground [&_svg:not([class*='size-'])]:size-4";
+  "relative inline-flex shrink-0 cursor-pointer items-center justify-center whitespace-nowrap rounded-full border border-transparent outline-none transition-colors hover:bg-accent-surface data-[state=open]:bg-accent-surface focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-1 focus-visible:ring-offset-canvas disabled:pointer-events-none disabled:opacity-64 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg]:-mx-0.5 [&_svg[data-composer-control-icon]]:mx-0 h-7 gap-1.5 px-2.5 text-sm font-normal text-muted-foreground [&_svg:not([class*='text-'])]:text-muted-foreground hover:text-foreground [&_svg:not([class*='size-'])]:size-4";
 
 export function ComposerControlChevron() {
   return (
     <ChevronDownIcon
       aria-hidden
-      className="size-3.5 shrink-0 text-icon-muted"
+      className="size-3 shrink-0 text-icon-muted"
       data-composer-control-chevron
       strokeWidth={2.25}
     />
@@ -62,10 +63,6 @@ function closeFocus(event: Event, returnFocus?: () => void): void {
   if (!returnFocus) return restoreFocusForKeyboardOnly(event);
   event.preventDefault();
   returnFocus();
-}
-
-export function ComposerControlSeparator() {
-  return <span className="mx-0.5 h-4 w-px shrink-0 bg-border" aria-hidden />;
 }
 
 // ---------------------------------------------------------------------------
@@ -496,6 +493,8 @@ export function ProviderModelPicker({
   lockedKind,
   onPick,
   returnFocus,
+  chevron = true,
+  className,
 }: {
   providers: ProviderSnapshot[];
   activeKind: ProviderKind;
@@ -504,6 +503,9 @@ export function ProviderModelPicker({
   onPick: (kind: ProviderKind, slug: string) => void;
   /** Where focus goes when the popover closes (the composer). */
   returnFocus?: () => void;
+  /** Off when the traits picker follows and carries the chevron (Codex's "Model Medium ⌄"). */
+  chevron?: boolean;
+  className?: string;
 }) {
   const [open, setOpen] = useState(false);
   useCommandHandlers({ "modelPicker.toggle": () => setOpen((o) => !o) });
@@ -519,15 +521,21 @@ export function ProviderModelPicker({
             type="button"
             aria-label={label}
             data-chat-provider-model-picker
-            className={cn(COMPOSER_CONTROL, "min-w-0 max-w-48 shrink justify-between sm:max-w-56")}
+            className={cn(
+              COMPOSER_CONTROL,
+              "min-w-0 max-w-48 shrink justify-between text-foreground/90 sm:max-w-56",
+              className,
+            )}
           >
             <span className="flex min-w-0 flex-1 items-center gap-1.5">
-              <ProviderIcon kind={activeKind} className="size-4" />
+              <ProviderIcon kind={activeKind} className="size-3.5 opacity-80" />
               <span className="min-w-0 flex-1 truncate">{label}</span>
             </span>
-            <span aria-hidden className="flex items-center">
-              <ComposerControlChevron />
-            </span>
+            {chevron ? (
+              <span aria-hidden className="flex items-center">
+                <ComposerControlChevron />
+              </span>
+            ) : null}
           </button>
         </Popover.Trigger>
       </HintTooltip>
@@ -580,11 +588,13 @@ export function TraitsPicker({
   values,
   onChange,
   returnFocus,
+  className,
 }: {
   options: ProviderModelOption[];
   values: Partial<Record<ProviderModelOption["id"], string>>;
   onChange: (id: ProviderModelOption["id"], value: string) => void;
   returnFocus?: () => void;
+  className?: string;
 }) {
   if (options.length === 0) return null;
   // Like T3: the Fast service tier is a bolt, not text; efforts are the label.
@@ -612,6 +622,7 @@ export function TraitsPicker({
             className={cn(
               COMPOSER_CONTROL,
               "min-w-0 max-w-40 shrink justify-start overflow-hidden sm:max-w-48",
+              className,
             )}
           >
             <span className="flex w-full min-w-0 items-center gap-1.5">

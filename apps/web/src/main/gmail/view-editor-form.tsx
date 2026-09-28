@@ -167,7 +167,7 @@ function ChipRow({
   const byId = new Map(labels.map((l) => [l.id, l]));
   return (
     <div className="flex items-start gap-3">
-      <span className="w-24 shrink-0 pt-0.5 text-xs text-muted-foreground">{title}</span>
+      <span className="w-24 shrink-0 pt-0.5 text-[13px] text-muted-foreground">{title}</span>
       <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1">
         {labelIds.map((id) => (
           <RuleChip
@@ -248,19 +248,19 @@ export function ViewEditorForm({
 
   return (
     <div className="space-y-6">
-      <div className="space-y-1 px-3 sm:px-4">
+      <div className="space-y-1 px-1">
         <button
           type="button"
           onClick={onDone}
-          className="-ms-1 inline-flex cursor-pointer items-center gap-1 rounded-sm px-1 text-xs text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-focus-ring"
+          className="-ms-1 inline-flex cursor-pointer items-center gap-1 rounded-md px-1 text-[13px] text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-focus-ring"
         >
           <ChevronLeftIcon className="size-3.5" />
           Views
         </button>
-        <h2 className="text-base font-medium text-foreground">
+        <h2 className="text-xl font-normal tracking-[-0.01em] text-foreground">
           {view ? `Edit “${view.name}”` : "New view"}
         </h2>
-        <p className="text-xs text-muted-foreground">
+        <p className="text-[13px] text-muted-foreground">
           {mailboxName === "All mailboxes"
             ? "Shown under Views in All mailboxes."
             : `Shown under Views in ${mailboxName}.`}
@@ -268,7 +268,7 @@ export function ViewEditorForm({
       </div>
 
       <SettingsSection title="Name">
-        <div className="px-3 py-3 sm:px-4">
+        <div className="p-4">
           <TextInput
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -302,16 +302,16 @@ export function ViewEditorForm({
           const usedIds = new Set([...p.allOf, ...p.noneOf]);
           const included = p.allOf.length > 0 || p.noneOf.length > 0;
           return (
-            <div key={account.id} className="space-y-2.5 px-3 py-3 sm:px-4">
+            <div key={account.id} className="space-y-2.5 px-4 py-3.5">
               <div className="flex min-w-0 items-center gap-2">
                 <span
                   className="size-2 shrink-0 rounded-full"
                   style={{ backgroundColor: getAccountColor(account) }}
                 />
-                <span className="shrink-0 text-sm font-medium text-foreground">
+                <span className="shrink-0 text-sm text-foreground">
                   {getAccountDisplayName(account)}
                 </span>
-                <span className="truncate text-xs text-muted-foreground/70">{account.email}</span>
+                <span className="truncate text-[13px] text-muted-foreground">{account.email}</span>
                 {!included ? (
                   <span className="ms-auto shrink-0 text-2xs text-muted-foreground/60">
                     Not included
@@ -360,12 +360,12 @@ export function ViewEditorForm({
           );
         })}
       </SettingsSection>
-      <p className="-mt-3 px-3 text-xs text-muted-foreground/80 sm:px-4">
+      <p className="-mt-3 px-1 text-[13px] text-muted-foreground">
         Mail must carry every “must have” label and none of the “must not have” ones. Results from
         each account are combined.
       </p>
 
-      <div className="flex items-center gap-2 px-3 sm:px-4">
+      <div className="flex items-center gap-2 px-1">
         {view && view.kind === "custom" ? (
           <Btn
             size="sm"

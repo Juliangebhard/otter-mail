@@ -62,7 +62,7 @@ function InboxRow({
             onOpen();
           }
         }}
-        className="group relative flex w-full cursor-pointer select-none flex-col gap-px rounded-md px-(--sidebar-row-content-inset) py-2 text-left outline-none transition-colors hover:bg-sidebar-row-hover focus-visible:ring-2 focus-visible:ring-focus-ring"
+        className="group relative flex w-full cursor-pointer select-none flex-col gap-px rounded-lg px-(--sidebar-row-content-inset) py-2 text-left outline-none transition-colors hover:bg-sidebar-row-hover focus-visible:ring-2 focus-visible:ring-focus-ring"
       >
         <div className="flex h-5 min-w-0 items-center gap-1.5">
           {unread ? (
@@ -71,7 +71,7 @@ function InboxRow({
           <span
             className={cn(
               "min-w-0 flex-1 truncate text-sm leading-snug",
-              unread ? "font-semibold text-foreground" : "font-medium text-foreground/90",
+              unread ? "font-medium text-foreground" : "font-normal text-foreground",
             )}
           >
             {message.fromName || message.fromEmail}
@@ -87,7 +87,7 @@ function InboxRow({
                   {accountName}
                 </span>
               ) : null}
-              <span className="text-xs tabular-nums text-muted-foreground/55">
+              <span className="text-xs tabular-nums text-muted-foreground">
                 {formatRelativeDate(message.date)}
               </span>
             </span>
@@ -122,12 +122,12 @@ function InboxRow({
         <div
           className={cn(
             "truncate text-sm leading-snug",
-            unread ? "font-medium text-foreground/90" : "text-muted-foreground",
+            unread ? "text-foreground" : "text-muted-foreground",
           )}
         >
           {message.subject || "(no subject)"}
         </div>
-        <div className="truncate text-xs leading-snug text-muted-foreground/70">
+        <div className="truncate text-[13px] leading-snug text-muted-foreground/80">
           {decodeEntities(message.snippet) || " "}
         </div>
       </div>
@@ -247,9 +247,9 @@ export function TrayPopoverView() {
     runAction("trash", () => gmailApi.trashThread(accountId, threadId));
 
   return (
-    <div className="flex h-full flex-col overflow-hidden rounded-xl border border-border bg-canvas text-foreground">
+    <div className="flex h-full flex-col overflow-hidden rounded-2xl border border-border/60 bg-canvas text-foreground">
       {/* Header: mailbox switcher, unread toggle, compose. */}
-      <div className="flex h-11 shrink-0 items-center gap-1 border-b border-border px-(--sidebar-content-inset)">
+      <div className="flex h-11 shrink-0 items-center gap-1 border-b border-border/50 px-(--sidebar-content-inset)">
         <div className="min-w-0 flex-1">
           {accounts.length > 0 ? (
             <MailboxSwitcher
@@ -271,7 +271,7 @@ export function TrayPopoverView() {
             onClick={() => setUnreadOnly((v) => !v)}
             className={cn(
               buttonClass("ghost-muted", "xs"),
-              "gap-1 font-medium tabular-nums",
+              "gap-1 tabular-nums",
               unreadOnly && "bg-accent-surface text-foreground",
             )}
           >
@@ -292,18 +292,18 @@ export function TrayPopoverView() {
 
       <div className="min-h-0 flex-1 overflow-y-auto px-(--sidebar-content-inset) py-1">
         {snapshotQuery.isLoading ? null : accounts.length === 0 ? (
-          <div className="flex h-full flex-col items-center justify-center gap-1 px-6 text-center">
-            <span className="text-sm font-medium text-foreground">No accounts yet</span>
-            <span className="text-xs text-muted-foreground">
+          <div className="flex h-full flex-col items-center justify-center gap-1.5 px-6 text-center">
+            <span className="text-base text-foreground">No accounts yet</span>
+            <span className="text-[13px] text-muted-foreground">
               Open Otter Mail to connect a Gmail account.
             </span>
           </div>
         ) : rows.length === 0 ? (
-          <div className="flex h-full flex-col items-center justify-center gap-1 px-6 text-center">
-            <span className="text-sm font-medium text-foreground">
+          <div className="flex h-full flex-col items-center justify-center gap-1.5 px-6 text-center">
+            <span className="text-base text-foreground">
               {unreadOnly ? "All caught up" : "No mail"}
             </span>
-            <span className="text-xs text-muted-foreground">
+            <span className="text-[13px] text-muted-foreground">
               {unreadOnly ? "Nothing unread in the inbox." : "This inbox is empty."}
             </span>
           </div>
@@ -324,7 +324,7 @@ export function TrayPopoverView() {
       </div>
 
       {/* Footer utilities, like the main sidebar's bottom row. */}
-      <div className="flex shrink-0 items-center gap-1 border-t border-border px-(--sidebar-content-inset) py-1">
+      <div className="flex shrink-0 items-center gap-1 border-t border-border/50 px-(--sidebar-content-inset) py-1">
         <HintTooltip label="Open Otter Mail">
           <IconBtn
             label="Open Otter Mail"
