@@ -9,7 +9,7 @@ struct Place: Hashable {
 
 /**
  * The app's frame, ChatGPT's: the mail list, with the sidebar drawer under
- * it. A swipe from the left slides the list aside.
+ * it. A swipe in from the left edge slides the list aside.
  */
 struct HomeView: View {
     @Environment(MailStore.self) private var store
@@ -54,16 +54,28 @@ struct HomeView: View {
                 }
                 .clipShape(.rect(cornerRadius: offset > 0 ? 44 : 0))
                 .overlay {
-                    if offset > 0 {
+                    // Open, the list dims; a tap or a drag closes the drawer.
+                    if drawerOpen {
                         Color.black.opacity((colorScheme == .dark ? 0.3 : 0.08) * offset / width)
                             .clipShape(.rect(cornerRadius: 44))
                             .onTapGesture { setDrawer(open: false) }
+                            .gesture(drawerGesture(width: width))
                     }
                 }
                 .offset(x: offset)
                 .ignoresSafeArea()
-                // The list slides the drawer; the drawer's own swipes page through mailboxes.
-                .simultaneousGesture(drawerGesture(width: width), including: path.isEmpty ? .all : .subviews)
+
+                // Closed, only a swipe in from the left edge opens it, so swipes on the
+                // rows stay theirs (read, archive, trash). Not in a conversation, where
+                // that swipe goes back.
+                if !drawerOpen && path.isEmpty {
+                    Color.clear
+                        .frame(width: 20)
+                        .frame(maxHeight: .infinity)
+                        .contentShape(.rect)
+                        .gesture(drawerGesture(width: width))
+                        .ignoresSafeArea()
+                }
             }
             .background(palette.sidebar)
         }
@@ -123,19 +135,17 @@ struct HomeView: View {
 
     /** Horizontal drags slide the drawer, following the finger and settling by where and how fast it let go. */
     private func drawerGesture(width: CGFloat) -> some Gesture {
-        DragGesture(minimumDistance: 16)
-            .onChanged { value in
-                guard abs(value.translation.width) > abs(value.translation.height) else { return }
-                drag = value.translation.width
-            }
-            .onEnded { value in
-                let base = drawerOpen ? width : 0
-                let projected = base + value.predictedEndTranslation.width
-                let open = drag == 0 ? drawerOpen : projected > width / 2
-                withAnimation(.interpolatingSpring(duration: 0.35, bounce: 0, initialVelocity: 0)) {
-                    drawerOpen = open
-                    drag = 0
-                }
-            }
+        DragGesture(minimumDistance: 8)
+            .onChanged { value in drag = value.translation.width }
+            .onEnded { value in settle(width: width, predicted: value.predictedEndTranslation.width) }
+    }
+
+    /** Where the drawer settles once the finger lifts: by where it was headed. */
+    private func settle(width: CGFloat, predicted: CGFloat) {
+        let open = drag == 0 ? drawerOpen : (drawerOpen ? width : 0) + predicted > width / 2
+        withAnimation(.interpolatingSpring(duration: 0.35, bounce: 0, initialVelocity: 0)) {
+            drawerOpen = open
+            drag = 0
+        }
     }
 }
