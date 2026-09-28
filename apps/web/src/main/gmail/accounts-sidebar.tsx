@@ -952,21 +952,29 @@ export function AccountsSidebar({
     setPage({ index: mailboxIndex, slide: mailboxIndex > page.index ? "next" : "prev" });
   }
   const slide = page.slide;
-  const swipe = useRef({ dx: 0, fired: false, idle: 0 });
+  const swipe = useRef({ dx: 0, fired: false, lastAt: 0, lastDx: 0 });
   const onWheel = (e: ReactWheelEvent) => {
     if (Math.abs(e.deltaX) <= Math.abs(e.deltaY) || mailboxIds.length < 2) return;
     const s = swipe.current;
-    // One switch per gesture: wait for the wheel (and its momentum) to go quiet.
-    window.clearTimeout(s.idle);
-    s.idle = window.setTimeout(() => {
+    // One switch per swipe. A swipe's momentum only slows down, so a new one
+    // shows as a pause, a turn, or a sudden speed-up; waiting for the wheel
+    // to go quiet instead would swallow quick successive swipes.
+    const speed = Math.abs(e.deltaX);
+    const newSwipe =
+      e.timeStamp - s.lastAt > 100 ||
+      Math.sign(e.deltaX) !== Math.sign(s.lastDx) ||
+      (s.fired && speed > 6 && speed > Math.abs(s.lastDx) * 1.5);
+    if (newSwipe) {
       s.dx = 0;
       s.fired = false;
-    }, 200);
+    }
+    s.lastAt = e.timeStamp;
+    s.lastDx = e.deltaX;
     if (s.fired) return;
     s.dx += e.deltaX;
-    if (Math.abs(s.dx) < 60) return;
-    const next = mailboxIndex + (s.dx > 0 ? 1 : -1);
+    if (Math.abs(s.dx) < 50) return;
     s.fired = true;
+    const next = mailboxIndex + (s.dx > 0 ? 1 : -1);
     if (next >= 0 && next < mailboxIds.length) onSelectAccount(mailboxIds[next]!);
   };
 
