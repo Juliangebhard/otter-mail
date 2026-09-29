@@ -20,7 +20,9 @@ import {
   type PreferencesResponse,
   type RelayEvent,
   type RelayUser,
+  TUNNEL_CLOSE,
 } from "@otter-mail/contracts/relay";
+import type { MailProviderKind } from "@otter-mail/contracts/mail";
 
 import { createAuth, googleClientIds, googleKeys, type Auth } from "./auth.ts";
 import * as gmail from "./gmail.ts";
@@ -61,6 +63,10 @@ export interface Env {
   GOOGLE_JWKS_URL?: string;
   /** Google's OAuth token endpoint; only tests change it. */
   GOOGLE_TOKEN_URL?: string;
+  /** Tunnels a minute per user to the servers of their IMAP mailboxes (wrangler.jsonc). */
+  TUNNEL_LIMIT: RateLimit;
+  /** Tunnels a minute per user to any other host: adding a mailbox, before it's linked. */
+  TUNNEL_UNLINKED_LIMIT: RateLimit;
   /** A "host:port" the tunnel may reach despite its rules; only tests set it (a local server). */
   TUNNEL_TEST_TARGET?: string;
   /**
@@ -188,8 +194,24 @@ authed.get("/me", (c) =>
   c.json({ user: c.var.session.user, pushTopic: c.env.PUSH_TOPIC } satisfies MeResponse),
 );
 
-authed.get("/accounts", async (c) => {
-  const accounts = await store.listAccounts(c.var.db, c.var.session.user.id);
+/**
+ * `?providers=gmail,imap`: the providers the client knows. Builds from before
+ * IMAP don't send it, and would take an IMAP mailbox for a Gmail account.
+ */
+const providersQuery = z.object({
+  providers: z
+    .string()
+    .optional()
+    .transform((list) =>
+      (list ?? "gmail")
+        .split(",")
+        .filter((p): p is MailProviderKind => p === "gmail" || p === "imap"),
+    ),
+});
+
+authed.get("/accounts", zValidator("query", providersQuery, rejectInvalid), async (c) => {
+  const { providers } = c.req.valid("query");
+  const accounts = await store.listAccounts(c.var.db, c.var.session.user.id, providers);
   return c.json({ accounts } satisfies ListAccountsResponse);
 });
 
@@ -252,9 +274,11 @@ authed.put(
 authed.delete(
   "/accounts/:email",
   zValidator("param", z.object({ email: mailbox }), rejectInvalid),
+  zValidator("query", providersQuery, rejectInvalid),
   async (c) => {
     const userId = c.var.session.user.id;
-    if (await store.deleteAccount(c.var.db, userId, c.req.valid("param").email)) {
+    const { email } = c.req.valid("param");
+    if (await store.deleteAccount(c.var.db, userId, email, c.req.valid("query").providers)) {
       await hub(c.env, userId).publish({ type: "accounts" });
     }
     return c.body(null, 204);
@@ -307,11 +331,23 @@ authed.get("/events", async (c) => {
   return hub(c.env, user.id).fetch(new Request(c.req.raw, { headers }));
 });
 
-/** A TCP connection to a mail server, for the web app (tunnel.ts). */
+/**
+ * What a tunnel may carry each way (tunnel.ts). The servers of the user's
+ * IMAP mailboxes get enough for mail; any other host, only enough to check a
+ * password before the mailbox is linked.
+ */
+const TUNNEL_BYTES = { linked: 200 * 2 ** 20, unlinked: 2 ** 20 };
+
+/**
+ * A TCP connection to a mail server, for the web app (tunnel.ts). Rate
+ * limited per user with Workers' rate limiting bindings (wrangler.jsonc),
+ * counted in memory at each Cloudflare location: no Durable Object or KV per
+ * tunnel.
+ */
 authed.get(
   "/tunnel",
   zValidator("query", z.object({ host: z.string(), port: z.coerce.number().int() }), rejectInvalid),
-  (c) => {
+  async (c) => {
     if (c.req.header("upgrade")?.toLowerCase() !== "websocket") {
       throw new HTTPException(426, { message: "Expected a WebSocket upgrade." });
     }
@@ -325,7 +361,14 @@ authed.get(
     if (!anywhere && !tunnel.allowed(host, port, c.env.TUNNEL_TEST_TARGET)) {
       throw new HTTPException(400, { message: "Only mail ports on public hosts." });
     }
-    return tunnel.open(host, port);
+    const userId = c.var.session.user.id;
+    const servers = await store.imapServers(c.var.db, userId);
+    const linked = servers.has(`${host.toLowerCase()}:${port}`);
+    const limiter = linked ? c.env.TUNNEL_LIMIT : c.env.TUNNEL_UNLINKED_LIMIT;
+    if (!(await limiter.limit({ key: userId })).success) {
+      return tunnel.refuse(TUNNEL_CLOSE.rateLimited, "Too many connections: try again in a minute");
+    }
+    return tunnel.open(host, port, linked ? TUNNEL_BYTES.linked : TUNNEL_BYTES.unlinked);
   },
 );
 
