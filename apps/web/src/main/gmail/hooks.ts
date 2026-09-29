@@ -811,14 +811,12 @@ export function useRemoveAccount() {
   });
 }
 
-/** The action toast's summary of a label change, or undefined for changes an
-    undo made (they announce themselves as "Undone"). */
+/** The action toast's summary of a label change. */
 function labelChangeSummary(
   qc: ReturnType<typeof useQueryClient>,
   params: { accountId: string; addLabelIds?: string[]; removeLabelIds?: string[] },
   noun: ActionSummary["noun"],
 ): ActionSummary | undefined {
-  if (isQuiet(params)) return undefined;
   const labels = qc.getQueryData<GmailLabel[]>(queryKeys.labels(params.accountId)) ?? [];
   const nameOf = (id: string) => labels.find((l) => l.id === id && l.type === "user")?.name;
   return summarizeLabelChange(params.addLabelIds ?? [], params.removeLabelIds ?? [], noun, nameOf);
@@ -833,7 +831,7 @@ export function useModifyMessage() {
     },
     onMutate: async (params) => {
       const { accountId, messageId, addLabelIds = [], removeLabelIds = [] } = params;
-      if (!isPureMarkRead(params.addLabelIds, params.removeLabelIds)) {
+      if (!isQuiet(params) && !isPureMarkRead(params.addLabelIds, params.removeLabelIds)) {
         registerUndo(
           {
             kind: "modifyMessage",
@@ -977,10 +975,12 @@ export function useTrashMessage() {
     },
     onMutate: async (params) => {
       const { accountId, messageId } = params;
-      registerUndo(
-        { kind: "untrashMessage", params: { accountId, messageId } },
-        isQuiet(params) ? undefined : { verb: "Moved", suffix: " to Trash", noun: "message" },
-      );
+      if (!isQuiet(params)) {
+        registerUndo(
+          { kind: "untrashMessage", params: { accountId, messageId } },
+          { verb: "Moved", suffix: " to Trash", noun: "message" },
+        );
+      }
       const labelsKey = queryKeys.labels(accountId);
       const messageKey = queryKeys.message(accountId, messageId);
       const threadsKey = ["gmail:thread", accountId];
@@ -1103,7 +1103,7 @@ export function useModifyThread() {
     },
     onMutate: async (params) => {
       const { accountId, threadId, addLabelIds = [], removeLabelIds = [] } = params;
-      if (!isPureMarkRead(params.addLabelIds, params.removeLabelIds)) {
+      if (!isQuiet(params) && !isPureMarkRead(params.addLabelIds, params.removeLabelIds)) {
         registerUndo(
           {
             kind: "modifyThread",
@@ -1268,10 +1268,12 @@ export function useTrashThread() {
     },
     onMutate: async (params) => {
       const { accountId, threadId } = params;
-      registerUndo(
-        { kind: "untrashThread", params: { accountId, threadId } },
-        isQuiet(params) ? undefined : { verb: "Moved", suffix: " to Trash", noun: "conversation" },
-      );
+      if (!isQuiet(params)) {
+        registerUndo(
+          { kind: "untrashThread", params: { accountId, threadId } },
+          { verb: "Moved", suffix: " to Trash", noun: "conversation" },
+        );
+      }
       const threadKey = queryKeys.thread(accountId, threadId);
       const labelsKey = queryKeys.labels(accountId);
 

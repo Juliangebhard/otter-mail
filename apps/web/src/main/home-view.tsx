@@ -49,14 +49,17 @@ import {
   useExternalMailChanges,
   useModifyMessage,
   useModifyThread,
+  useTrashMessage,
+  useTrashThread,
   useUntrashThread,
   useUntrashMessage,
 } from "./gmail/hooks";
 import {
   beginUndoGroup,
   onUndoableAction,
-  peekUndo,
   quietParams,
+  registerRedo,
+  takeRedo,
   takeUndo,
   type UndoAction,
 } from "./gmail/undo";
@@ -364,83 +367,112 @@ export function HomeView() {
   const undoModifyThread = useModifyThread();
   const undoUntrashThread = useUntrashThread();
   const undoUntrashMessage = useUntrashMessage();
+  const redoTrashThread = useTrashThread();
+  const redoTrashMessage = useTrashMessage();
   const undoRunner = useRef<(action: UndoAction) => void>(() => {});
-  const runUndo = (action: UndoAction): Promise<unknown> => {
-    // quietParams: the inverse re-registers (so z redoes) without its own toast.
+  const redoRunner = useRef<() => boolean>(() => false);
+  // An undo runs quietly (quietParams: no undo or toast of its own). A redo is
+  // the action again: it registers its undo and shows its toast, so a bulk
+  // redo regroups to announce itself once.
+  const runAction = (action: UndoAction, quiet: boolean): Promise<unknown> => {
+    const params = <T extends object>(p: T) => (quiet ? quietParams(p) : p);
     switch (action.kind) {
       case "modifyMessage":
-        return undoModifyMessage.mutateAsync(quietParams(action.params));
+        return undoModifyMessage.mutateAsync(params(action.params));
       case "modifyThread":
-        return undoModifyThread.mutateAsync(quietParams(action.params));
+        return undoModifyThread.mutateAsync(params(action.params));
       case "untrashThread":
-        return undoUntrashThread.mutateAsync(quietParams(action.params));
+        return undoUntrashThread.mutateAsync(params(action.params));
       case "untrashMessage":
-        return undoUntrashMessage.mutateAsync(quietParams(action.params));
+        return undoUntrashMessage.mutateAsync(params(action.params));
+      case "trashThread":
+        return redoTrashThread.mutateAsync(params(action.params));
+      case "trashMessage":
+        return redoTrashMessage.mutateAsync(params(action.params));
       case "callback":
         action.run();
         return Promise.resolve();
       case "batch":
-        // Their redo registrations regroup, so z again redoes the whole batch.
-        beginUndoGroup(action.actions.length);
-        return Promise.all(action.actions.map(runUndo));
+        if (!quiet) beginUndoGroup(action.actions.length);
+        return Promise.all(action.actions.map((a) => runAction(a, quiet)));
     }
   };
-  // ⌘Z (Edit › Undo in the app menu): text undo while typing, else the last
-  // mail action, like z.
-  useEffect(
-    () =>
-      window.desktopBridge.on("edit:undo", () => {
-        const context = keybindingContext();
-        if (context.editableFocus) {
-          void window.desktopBridge.invoke("edit:nativeUndo");
-          return;
-        }
-        if (context.dialogOpen) return;
+  // ⌘Z / ⇧⌘Z (Edit › Undo and Redo in the app menu): text undo while typing,
+  // else the mail action, like z and ⇧Z.
+  useEffect(() => {
+    const onEdit = (native: "edit:nativeUndo" | "edit:nativeRedo", run: () => void) => () => {
+      const context = keybindingContext();
+      if (context.editableFocus) {
+        void window.desktopBridge.invoke(native);
+        return;
+      }
+      if (context.dialogOpen) return;
+      run();
+    };
+    const offUndo = window.desktopBridge.on(
+      "edit:undo",
+      onEdit("edit:nativeUndo", () => {
         const action = takeUndo();
         if (action) undoRunner.current(action);
       }),
-    [],
-  );
-  // The latest action's toast (its Undo is what z would undo); a newer action
-  // or an undo replaces it.
-  const actionToastRef = useRef<ToastId | null>(null);
-  const closeActionToast = () => {
-    if (actionToastRef.current) toast.close(actionToastRef.current);
-    actionToastRef.current = null;
-  };
+    );
+    const offRedo = window.desktopBridge.on(
+      "edit:redo",
+      onEdit("edit:nativeRedo", () => redoRunner.current()),
+    );
+    return () => {
+      offUndo();
+      offRedo();
+    };
+  }, []);
+  // Each action's toast, stacked; undoing an action (z or its Undo) closes it.
+  const actionToasts = useRef(new Map<UndoAction, ToastId>());
   undoRunner.current = (action) => {
     console.log("[HomeView:undo]", {
       kind: action.kind,
       count: action.kind === "batch" ? action.actions.length : 1,
     });
-    closeActionToast();
-    runUndo(action).then(
-      // Callbacks (e.g. holding back a send) say what happened themselves.
-      () => (action.kind === "callback" ? undefined : toast.success("Undone")),
+    const toastId = actionToasts.current.get(action);
+    if (toastId) toast.close(toastId);
+    actionToasts.current.delete(action);
+    runAction(action, true).then(
+      () => {
+        registerRedo(action);
+        // Callbacks (e.g. holding back a send) say what happened themselves.
+        if (action.kind !== "callback") toast.success("Undone");
+      },
       () => toast.error("Could not undo"),
     );
   };
+  redoRunner.current = () => {
+    const action = takeRedo();
+    if (!action) return false;
+    console.log("[HomeView:redo]", {
+      kind: action.kind,
+      count: action.kind === "batch" ? action.actions.length : 1,
+    });
+    runAction(action, false).catch(() => toast.error("Could not redo"));
+    return true;
+  };
   useEffect(
     () =>
-      onUndoableAction((title) => {
-        closeActionToast();
-        // This toast undoes this action only — not whatever came after it
-        // (e.g. a message sent since, which has its own Undo).
-        const action = peekUndo();
-        actionToastRef.current = toast.success(title, {
+      onUndoableAction((title, action) => {
+        // This toast undoes this action only, whatever came after it.
+        const toastId = toast.success(title, {
           action: {
             label: "Undo",
             onClick: () => {
-              actionToastRef.current = null;
-              if (!action || peekUndo() !== action) {
+              if (!takeUndo(action)) {
+                actionToasts.current.delete(action);
                 toast.info("That can no longer be undone");
                 return;
               }
-              takeUndo();
               undoRunner.current(action);
             },
           },
+          onRemove: () => actionToasts.current.delete(action),
         });
+        actionToasts.current.set(action, toastId);
       }),
     [],
   );
@@ -474,6 +506,7 @@ export function HomeView() {
       if (!action) return false;
       undoRunner.current(action);
     },
+    "mail.redo": () => redoRunner.current(),
     "go.inbox": () => goTo(INBOX_VIEW_ID, "INBOX"),
     "go.sent": () => goTo(SENT_VIEW_ID, "SENT"),
     "go.starred": () => goTo(STARRED_VIEW_ID, "STARRED"),
