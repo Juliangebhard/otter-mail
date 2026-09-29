@@ -56,13 +56,17 @@ async function start(
   // come up after the plain ones.
   const greets = async ({ port, tls }: { port: number; tls: boolean }) => {
     const stream = await nodeConnect(container.host, container.port(port), { tls });
-    const greeting = await stream.read();
-    stream.close();
-    return Boolean(greeting?.length);
+    try {
+      return Boolean((await stream.read())?.length);
+    } finally {
+      stream.close();
+    }
   };
   for (let attempt = 0; ; attempt++) {
     try {
-      if ((await Promise.all(ready.map(greets))).every(Boolean)) return container;
+      let all = true;
+      for (const listener of ready) all &&= await greets(listener);
+      if (all) return container;
     } catch {
       // Not listening yet.
     }

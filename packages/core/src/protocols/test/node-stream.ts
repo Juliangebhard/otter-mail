@@ -16,10 +16,16 @@ export async function nodeConnect(
   const socket = opts.tls
     ? tls.connect({ host, port, rejectUnauthorized: false })
     : net.connect({ host, port });
-  await new Promise<void>((resolve, reject) => {
-    socket.once(opts.tls ? "secureConnect" : "connect", resolve);
-    socket.once("error", reject);
-  });
+  try {
+    await new Promise<void>((resolve, reject) => {
+      socket.once(opts.tls ? "secureConnect" : "connect", resolve);
+      // `on`, not `once`: a failing socket can error twice (a TLS handshake reset).
+      socket.on("error", reject);
+    });
+  } catch (err) {
+    socket.destroy();
+    throw err;
+  }
   return new NodeStream(socket);
 }
 
