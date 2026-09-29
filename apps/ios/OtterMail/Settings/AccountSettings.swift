@@ -86,7 +86,9 @@ struct AccountSettings: View {
     /** A device's name from its session's user agent, as core's otter-account.ts reads it. */
     static func name(_ userAgent: String?) -> String {
         let ua = userAgent ?? ""
-        if let match = ua.firstMatch(of: /^Otter Mail\/\S+ \((.+)\)$/) { return String(match.1) }
+        if let match = ua.firstMatch(of: /^Otter Mail\/\S+ \((.+)\)$/) {
+            return String(match.1).removingPercentEncoding ?? String(match.1)
+        }
         if ua.contains("Edg/") { return "Edge" }
         if ua.contains("Firefox/") { return "Firefox" }
         if ua.contains("Chrome/") { return "Chrome" }
