@@ -39,6 +39,12 @@ let history: HistoryEntry[];
 let historyFloor: number;
 /** Message fetches, by id and format. */
 let fetches: { id: string; format: string }[];
+/** Listings of the whole mailbox (no label), by the page asked for. */
+let listings: (string | null)[];
+/** Gmail answers pages of at most this many ids. */
+let pageSize: number;
+/** Messages whose next fetch Gmail refuses (once). */
+let refuse: Set<string>;
 /** While set, the first fetch of each of `ids` answers as of the request, but only once `until` resolves. */
 let hold: { ids: string[]; until: Promise<void> } | null;
 const held = new Set<string>();
@@ -94,10 +100,11 @@ async function fakeFetch(input: string | URL | Request): Promise<Response> {
   }
   if (path === "/messages") {
     const labelIds = url.searchParams.getAll("labelIds");
+    if (labelIds.length === 0) listings.push(url.searchParams.get("pageToken"));
     const all = [...mail.values()]
       .filter((m) => labelIds.every((l) => m.labelIds.includes(l)))
       .sort((a, b) => b.date - a.date);
-    const size = Number(url.searchParams.get("maxResults") ?? 100);
+    const size = Math.min(pageSize, Number(url.searchParams.get("maxResults") ?? 100));
     const offset = Number(url.searchParams.get("pageToken") ?? 0);
     const page = all.slice(offset, offset + size);
     return json({
@@ -111,6 +118,7 @@ async function fakeFetch(input: string | URL | Request): Promise<Response> {
     const id = message[1]!;
     const format = url.searchParams.get("format") ?? "full";
     fetches.push({ id, format });
+    if (refuse.delete(id)) return json({ error: { message: "Not now." } }, 403);
     const m = mail.get(id);
     if (!m) return json({ error: { message: "Not Found" } }, 404);
     // Answered as the message is now, delivered later.
@@ -241,6 +249,9 @@ beforeEach(() => {
   history = [];
   historyFloor = 0;
   fetches = [];
+  listings = [];
+  pageSize = 500;
+  refuse = new Set();
   hold = null;
   held.clear();
   notified = [];
@@ -248,6 +259,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
 });
 
@@ -261,21 +273,54 @@ describe("Gmail sync", () => {
     await until(() => fetches.length > 0, "the fill to start");
     expect(status()).toMatchObject({ syncing: true, phase: "full", fullSyncDone: false });
 
-    // Mail arrives mid-fill; a push syncs it in at once.
-    deliver("new", ["INBOX", "UNREAD"]);
-    mailSync.syncAccount(account.id, { force: true, trigger: "push" });
-    await until(() => mailStore.getMessageDetail(account.id, "new") !== null, "the new mail");
-    expect(notified).toEqual(["Subject new"]);
-    expect(status()).toMatchObject({ syncing: true, phase: "full" });
+    // Mail arrives mid-fill, a few times; each push syncs it in at once, and
+    // the fill carries on where it is: not listed again, its progress kept.
+    const progress = status().total;
+    for (const id of ["new1", "new2", "new3"]) {
+      deliver(id, ["INBOX", "UNREAD"]);
+      mailSync.syncAccount(account.id, { force: true, trigger: "push" });
+      await until(() => mailStore.getMessageDetail(account.id, id) !== null, `mail ${id}`);
+      expect(status()).toMatchObject({ syncing: true, phase: "full", total: progress });
+    }
+    expect(notified).toEqual(["Subject new1", "Subject new2", "Subject new3"]);
 
     release();
     await until(() => status().fullSyncDone && !status().syncing, "the fill to finish");
     await until(() => status().download === null, "the downloads to finish");
-    expect(mailStore.countAllMessages(account.id)).toBe(9);
+    expect(listings).toEqual([null]);
+    expect(mailStore.countAllMessages(account.id)).toBe(11);
     // Every message fetched once, whole: no metadata pass, no body pass after it.
     expect(fetches.every((f) => f.format === "full")).toBe(true);
     expect(new Set(fetches.map((f) => f.id)).size).toBe(fetches.length);
     expect(mailStore.getMessageDetail(account.id, "old8")?.bodyText).toBe("Body of old8");
+  });
+
+  it("picks a stopped first sync up where it was when new mail comes in, not from the start", async () => {
+    for (let i = 1; i <= 7; i++) deliver(`old${i}`, ["INBOX"], Date.now() - i * 60_000);
+    pageSize = 3;
+    // The second page fails: the fill stops there, the first page kept.
+    refuse.add("old5");
+
+    const { mailSync, mailStore, status } = await boot();
+    await until(() => status().error !== null && !status().syncing, "the fill to stop");
+    expect(listings).toEqual([null, "3"]);
+    expect(mailStore.countAllMessages(account.id)).toBe(3);
+
+    // New mail comes in: synced at once, while the fill waits out its retry delay.
+    deliver("new", ["INBOX", "UNREAD"]);
+    mailSync.syncAccount(account.id, { force: true, trigger: "push" });
+    await until(() => mailStore.getMessageDetail(account.id, "new") !== null, "the new mail");
+    expect(listings).toEqual([null, "3"]);
+
+    // Later mail finds the delay over: the fill goes on from the second page.
+    vi.useFakeTimers({ toFake: ["Date"], now: Date.now() + 60_000 });
+    deliver("later", ["INBOX", "UNREAD"]);
+    mailSync.syncAccount(account.id, { force: true, trigger: "push" });
+    await until(() => status().fullSyncDone && !status().syncing, "the fill to finish");
+    expect(listings).toEqual([null, "3", "3", "6"]);
+    expect(mailStore.countAllMessages(account.id)).toBe(9);
+    // The first page was never fetched again.
+    expect(fetches.filter((f) => f.id === "old1")).toHaveLength(1);
   });
 
   it("replays what changed during the first sync over what it wrote", async () => {
