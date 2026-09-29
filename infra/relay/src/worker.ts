@@ -1,7 +1,7 @@
 /**
- * The Otter Mail relay: Otter accounts (better-auth, auth.ts), the Gmail
- * accounts linked to them, realtime mail notifications, and the web app's
- * Gmail sign-in (gmail.ts). Gmail publishes mailbox changes to a Pub/Sub
+ * The Otter Mail relay: Otter accounts (better-auth, auth.ts), the mailboxes
+ * (Gmail, IMAP) linked to them, realtime mail notifications, the web app's
+ * Gmail sign-in (gmail.ts) and its tunnel to IMAP/SMTP servers (tunnel.ts). Gmail publishes mailbox changes to a Pub/Sub
  * topic, Pub/Sub pushes them here, and the relay forwards them to the
  * signed-in devices over WebSocket. The API is described in
  * packages/contracts/src/relay.ts.
@@ -27,6 +27,7 @@ import * as gmail from "./gmail.ts";
 import { InvalidTokenError, verifyGoogleJwt } from "./google-jwt.ts";
 import * as preferences from "./preferences.ts";
 import * as store from "./store.ts";
+import * as tunnel from "./tunnel.ts";
 import { SESSION_HEADER, type UserHub } from "./user-hub.ts";
 
 export { UserHub } from "./user-hub.ts";
@@ -60,6 +61,8 @@ export interface Env {
   GOOGLE_JWKS_URL?: string;
   /** Google's OAuth token endpoint; only tests change it. */
   GOOGLE_TOKEN_URL?: string;
+  /** A "host:port" the tunnel may reach despite its rules; only tests set it (a local server). */
+  TUNNEL_TEST_TARGET?: string;
 }
 
 type Session = { id: string; user: RelayUser };
@@ -185,9 +188,16 @@ authed.get("/accounts", async (c) => {
   return c.json({ accounts } satisfies ListAccountsResponse);
 });
 
+const mailServer = z.object({
+  host: z.string().trim().min(1).max(253),
+  port: z.number().int().min(1).max(65535),
+  security: z.enum(["tls", "starttls"]),
+});
+
 /**
- * Link a Gmail account, or update its profile. Linking needs an ID token
- * for that address (the caller signed in to it); later edits don't.
+ * Link a mailbox, or update its profile. Linking a Gmail account needs an ID
+ * token for that address (the caller signed in to it); linking an IMAP one
+ * needs its settings. Later edits need neither, and can't change the provider.
  */
 authed.put(
   "/accounts/:email",
@@ -196,6 +206,10 @@ authed.put(
     "json",
     z.object({
       idToken: z.string().optional(),
+      provider: z.enum(["gmail", "imap"]).optional(),
+      imap: z
+        .object({ username: z.string().min(1).max(320), imap: mailServer, smtp: mailServer })
+        .optional(),
       name: profileField,
       picture: profileField,
       displayName: profileField,
@@ -207,7 +221,18 @@ authed.put(
     const { email } = c.req.valid("param");
     const { idToken, ...patch } = c.req.valid("json");
     const { db, session } = c.var;
-    if (!(await store.isLinked(db, session.user.id, email))) {
+    const linked = await store.linkedProvider(db, session.user.id, email);
+    const provider = patch.provider ?? linked ?? "gmail";
+    if (linked && linked !== provider) {
+      throw new HTTPException(409, { message: `Linked as ${linked}: unlink it first.` });
+    }
+    if (provider === "gmail" && patch.imap) {
+      throw new HTTPException(400, { message: "IMAP settings are for IMAP mailboxes." });
+    }
+    if (!linked && provider === "imap" && !patch.imap) {
+      throw new HTTPException(400, { message: "Linking an IMAP mailbox needs its settings." });
+    }
+    if (!linked && provider === "gmail") {
       if (!idToken) throw new HTTPException(403, { message: "Linking needs an ID token." });
       if ((await verifyIdToken(c.env, idToken)).email !== email) {
         throw new HTTPException(403, { message: "The ID token is for another address." });
@@ -277,6 +302,27 @@ authed.get("/events", async (c) => {
   return hub(c.env, user.id).fetch(new Request(c.req.raw, { headers }));
 });
 
+/** A TCP connection to a mail server, for the web app (tunnel.ts). */
+authed.get(
+  "/tunnel",
+  zValidator("query", z.object({ host: z.string(), port: z.coerce.number().int() }), rejectInvalid),
+  (c) => {
+    if (c.req.header("upgrade")?.toLowerCase() !== "websocket") {
+      throw new HTTPException(426, { message: "Expected a WebSocket upgrade." });
+    }
+    // Browsers send the session cookie from any page on the site: only the web app's count.
+    const origin = c.req.header("origin");
+    if (origin && origin !== c.env.APP_ORIGIN) {
+      throw new HTTPException(403, { message: "Not from the web app." });
+    }
+    const { host, port } = c.req.valid("query");
+    if (!tunnel.allowed(host, port, c.env.TUNNEL_TEST_TARGET)) {
+      throw new HTTPException(400, { message: "Only mail ports on public hosts." });
+    }
+    return tunnel.open(host, port);
+  },
+);
+
 app.route("/v1", authed);
 
 // ── Gmail push ──────────────────────────────────────────────────────────────
@@ -318,7 +364,7 @@ app.post(
 
     const email = parsed.data.emailAddress.toLowerCase();
     const event: RelayEvent = { type: "mail", email, historyId: parsed.data.historyId };
-    const users = await store.usersWithMailbox(c.var.db, email);
+    const users = await store.usersWithGmail(c.var.db, email);
     await Promise.all(users.map((userId) => hub(c.env, userId).publish(event)));
     return c.body(null, 204);
   },
