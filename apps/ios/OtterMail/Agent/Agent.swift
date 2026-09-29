@@ -2,14 +2,14 @@ import Foundation
 import Observation
 
 /**
- * The assistant, as on the desktop (core's assistant/service.ts and the
- * renderer's assistant-chat.tsx). Hermes runs anywhere, so it runs here, with
- * the same chats (they live on the Hermes server) and the same settings and
- * key (they follow the Otter account). Codex and Claude are local agents on
- * the Mac; the phone lists them, off.
+ * The agent, as on the desktop (core's agent service and the renderer's
+ * chat). Hermes runs anywhere, so it runs here, with the same chats (they
+ * live on the Hermes server) and the same settings and key (they follow the
+ * Otter account). Codex and Claude are local agents on the Mac; the phone
+ * lists them, off.
  */
 @Observable
-final class Assistant {
+final class Agent {
     /** The account's `assistant.hermes` settings, under the desktop's names. */
     struct HermesSettings: Codable, Equatable {
         var enabled = true
@@ -58,7 +58,7 @@ final class Assistant {
     }
 
     struct Turn: Identifiable {
-        enum Role { case user, assistant }
+        enum Role { case user, agent }
         let id = UUID()
         var role: Role
         var text: String
@@ -79,7 +79,7 @@ final class Assistant {
     @ObservationIgnored private var section: [String: Any]
     @ObservationIgnored private var applying = false
 
-    private static let settingsKey = "assistant"
+    private static let settingsKey = "assistant" // stored and synced under its old name
     private static let keychainKey = "hermes-key"
 
     init() {
@@ -126,7 +126,7 @@ final class Assistant {
 
     var key: String? { Keychain.get(Self.keychainKey) }
 
-    /** Connects to a Hermes server (from Settings › Assistant), for every device. */
+    /** Connects to a Hermes server (from Settings › Agents), for every device. */
     func connect(url: String, key: String) async {
         Keychain.set(Self.keychainKey, key)
         hasKey = true
@@ -224,7 +224,7 @@ final class Assistant {
             return
         }
         turns.append(Turn(role: .user, text: question, context: context.map(\.subject)))
-        turns.append(Turn(role: .assistant, text: ""))
+        turns.append(Turn(role: .agent, text: ""))
         running = true
         let message = MailContext.handoff(question, context)
         let fields = modelFields
@@ -261,7 +261,7 @@ final class Assistant {
     }
 
     private func updateLast(_ change: (inout Turn) -> Void) {
-        guard let i = turns.lastIndex(where: { $0.role == .assistant }) else { return }
+        guard let i = turns.lastIndex(where: { $0.role == .agent }) else { return }
         change(&turns[i])
     }
 
@@ -302,11 +302,11 @@ final class Assistant {
                 let text = message.text.components(separatedBy: MailContext.marker).first ?? message.text
                 turns.append(Turn(role: .user, text: text.trimmingCharacters(in: .whitespacesAndNewlines)))
             case "assistant":
-                if let last = turns.last, last.role == .assistant {
+                if let last = turns.last, last.role == .agent {
                     turns[turns.count - 1].text += (last.text.isEmpty ? "" : "\n\n") + message.text
                     turns[turns.count - 1].tools += message.tools.map { Tool(name: $0) }
                 } else {
-                    turns.append(Turn(role: .assistant, text: message.text, tools: message.tools.map { Tool(name: $0) }))
+                    turns.append(Turn(role: .agent, text: message.text, tools: message.tools.map { Tool(name: $0) }))
                 }
             default:
                 break
@@ -324,7 +324,7 @@ final class Assistant {
 }
 
 /**
- * A conversation handed to the assistant as a pointer (apps/web's
+ * A conversation handed to the agent as a pointer (apps/web's
  * chat-context.ts): the agent reads mail itself, with gog, so only ids and a
  * subject leave the app.
  */

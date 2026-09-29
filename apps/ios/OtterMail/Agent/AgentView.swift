@@ -1,11 +1,11 @@
 import SwiftUI
 
 /**
- * The assistant, ChatGPT's way: the model as the title (tap to switch), the
+ * The agent, ChatGPT's way: the model as the title (tap to switch), the
  * conversation, and a glass composer at the bottom. Conversations it's asked
  * about ride along as a chip, and go to the agent as pointers.
  */
-struct AssistantView: View {
+struct AgentView: View {
     @Environment(Session.self) private var session
     @Environment(\.palette) private var palette
     @Environment(\.dismiss) private var dismiss
@@ -20,7 +20,7 @@ struct AssistantView: View {
     @State private var showHistory = false
     @FocusState private var focused: Bool
 
-    private var assistant: Assistant { session.assistant }
+    private var agent: Agent { session.agent }
 
     var body: some View {
         content
@@ -34,21 +34,21 @@ struct AssistantView: View {
                 ToolbarItem(placement: .principal) { modelMenu }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Chats", systemImage: "clock.arrow.circlepath") { showHistory = true }
-                        .disabled(assistant.status != .ready)
+                        .disabled(agent.status != .ready)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("New chat", systemImage: "square.and.pencil") { assistant.newChat() }
-                        .disabled(assistant.turns.isEmpty)
+                    Button("New chat", systemImage: "square.and.pencil") { agent.newChat() }
+                        .disabled(agent.turns.isEmpty)
                 }
             }
             .toolbarTitleDisplayMode(.inline)
             .sheet(isPresented: $showHistory) { ChatHistory() }
-            .task { if assistant.status == .notConfigured || assistant.models.isEmpty { await assistant.check() } }
+            .task { if agent.status == .notConfigured || agent.models.isEmpty { await agent.check() } }
     }
 
     @ViewBuilder
     private var content: some View {
-        switch assistant.status {
+        switch agent.status {
         case .notConfigured:
             unavailable(
                 "Connect Hermes",
@@ -63,14 +63,14 @@ struct AssistantView: View {
 
     private func unavailable(_ title: String, _ message: String) -> some View {
         ContentUnavailableView {
-            Label(title, systemImage: "sparkles")
+            Label(title, systemImage: "cursorarrow")
         } description: {
             Text(message)
         } actions: {
             Button("Open Settings") { onSettings() }
                 .buttonStyle(.glass)
-            if case .failed = assistant.status {
-                Button("Try again") { Task { await assistant.check() } }
+            if case .failed = agent.status {
+                Button("Try again") { Task { await agent.check() } }
             }
         }
         .foregroundStyle(palette.text)
@@ -82,7 +82,7 @@ struct AssistantView: View {
         ScrollViewReader { reader in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 18) {
-                    ForEach(assistant.turns) { turn in
+                    ForEach(agent.turns) { turn in
                         TurnView(turn: turn).id(turn.id)
                     }
                 }
@@ -91,12 +91,12 @@ struct AssistantView: View {
                 .padding(.bottom, 12)
             }
             .overlay {
-                if assistant.turns.isEmpty { welcome }
+                if agent.turns.isEmpty { welcome }
             }
             .scrollDismissesKeyboard(.interactively)
             .defaultScrollAnchor(.bottom)
-            .onChange(of: assistant.turns.last?.text) {
-                if let last = assistant.turns.last { reader.scrollTo(last.id, anchor: .bottom) }
+            .onChange(of: agent.turns.last?.text) {
+                if let last = agent.turns.last { reader.scrollTo(last.id, anchor: .bottom) }
             }
             .safeAreaBar(edge: .bottom) { composer }
         }
@@ -152,14 +152,14 @@ struct AssistantView: View {
                 .scrollIndicators(.hidden)
             }
             HStack(alignment: .bottom, spacing: 10) {
-                TextField(assistant.running ? "Steer Hermes…" : "Ask Hermes", text: $draft, axis: .vertical)
+                TextField(agent.running ? "Steer Hermes…" : "Ask Hermes", text: $draft, axis: .vertical)
                     .lineLimit(1...6)
                     .focused($focused)
                     .foregroundStyle(palette.text)
                     .padding(.vertical, 8)
                     .onSubmit { send(draft) }
-                if assistant.running && draft.isEmpty {
-                    Button("Stop", systemImage: "stop.fill") { assistant.stop() }
+                if agent.running && draft.isEmpty {
+                    Button("Stop", systemImage: "stop.fill") { agent.stop() }
                         .labelStyle(.iconOnly)
                         .font(.system(size: 13))
                         .foregroundStyle(palette.actionText)
@@ -189,8 +189,8 @@ struct AssistantView: View {
         let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
         // The context goes with the first question of a chat.
-        assistant.send(text, context: assistant.turns.isEmpty ? context : [])
-        if assistant.turns.count <= 2 { context = [] }
+        agent.send(text, context: agent.turns.isEmpty ? context : [])
+        if agent.turns.count <= 2 { context = [] }
         draft = ""
     }
 
@@ -198,15 +198,15 @@ struct AssistantView: View {
 
     /** "Hermes · GPT-5 ⌄", ChatGPT's title menu: the model, its reasoning and speed. */
     private var modelMenu: some View {
-        @Bindable var assistant = session.assistant
-        let model = assistant.model
+        @Bindable var agent = session.agent
+        let model = agent.model
         return Menu {
-            let groups = Dictionary(grouping: assistant.models) { $0.subProvider ?? "Hermes" }
+            let groups = Dictionary(grouping: agent.models) { $0.subProvider ?? "Hermes" }
             ForEach(groups.keys.sorted(), id: \.self) { group in
                 Section(group) {
                     ForEach(groups[group] ?? []) { m in
                         Button {
-                            assistant.hermes.model = m.slug
+                            agent.hermes.model = m.slug
                         } label: {
                             if m.id == model?.id { Label(m.name, systemImage: "checkmark") } else { Text(m.name) }
                         }
@@ -214,15 +214,15 @@ struct AssistantView: View {
                 }
             }
             if let model, model.reasoning {
-                Picker("Reasoning", systemImage: "brain", selection: $assistant.hermes.reasoningEffort) {
+                Picker("Reasoning", systemImage: "brain", selection: $agent.hermes.reasoningEffort) {
                     ForEach(Self.efforts(model), id: \.0) { Text($0.1).tag($0.0) }
                 }
                 .pickerStyle(.menu)
             }
             if let model, model.fast {
                 Toggle("Fast", systemImage: "hare", isOn: Binding(
-                    get: { assistant.hermes.serviceTier == "priority" },
-                    set: { assistant.hermes.serviceTier = $0 ? "priority" : "default" }
+                    get: { agent.hermes.serviceTier == "priority" },
+                    set: { agent.hermes.serviceTier = $0 ? "priority" : "default" }
                 ))
             }
         } label: {
@@ -236,7 +236,7 @@ struct AssistantView: View {
             .font(.headline)
             .frame(maxWidth: 230)
         }
-        .disabled(assistant.models.isEmpty)
+        .disabled(agent.models.isEmpty)
     }
 
     static func efforts(_ model: Hermes.Model) -> [(String, String)] {
@@ -249,7 +249,7 @@ struct AssistantView: View {
 private struct TurnView: View {
     @Environment(Session.self) private var session
     @Environment(\.palette) private var palette
-    let turn: Assistant.Turn
+    let turn: Agent.Turn
 
     var body: some View {
         switch turn.role {
@@ -273,7 +273,7 @@ private struct TurnView: View {
             }
             .frame(maxWidth: .infinity, alignment: .trailing)
             .padding(.leading, 48)
-        case .assistant:
+        case .agent:
             VStack(alignment: .leading, spacing: 10) {
                 if !turn.tools.isEmpty {
                     DisclosureGroup {
@@ -295,7 +295,7 @@ private struct TurnView: View {
                     }
                     .tint(palette.muted)
                 }
-                if turn.text.isEmpty && turn.error == nil && turn.approval == nil && session.assistant.running {
+                if turn.text.isEmpty && turn.error == nil && turn.approval == nil && session.agent.running {
                     ProgressView().controlSize(.small)
                 }
                 if !turn.text.isEmpty {
@@ -328,7 +328,7 @@ private struct TurnView: View {
 private struct ApprovalCard: View {
     @Environment(Session.self) private var session
     @Environment(\.palette) private var palette
-    let approval: Assistant.Approval
+    let approval: Agent.Approval
 
     private static let labels = ["once": "Allow once", "session": "Allow for this chat", "always": "Always allow", "deny": "Deny"]
 
@@ -350,7 +350,7 @@ private struct ApprovalCard: View {
             }
             HStack {
                 ForEach(approval.choices, id: \.self) { choice in
-                    Button(Self.labels[choice] ?? choice) { session.assistant.answer(approval, choice) }
+                    Button(Self.labels[choice] ?? choice) { session.agent.answer(approval, choice) }
                         .font(.footnote.weight(.medium))
                         .buttonStyle(.bordered)
                         .tint(choice == "deny" ? palette.error : palette.text)
@@ -370,15 +370,15 @@ private struct ChatHistory: View {
     @State private var query = ""
 
     var body: some View {
-        let assistant = session.assistant
-        let chats = assistant.history.filter {
+        let agent = session.agent
+        let chats = agent.history.filter {
             query.isEmpty || ($0.title ?? "").localizedCaseInsensitiveContains(query) || ($0.preview ?? "").localizedCaseInsensitiveContains(query)
         }
         NavigationStack {
             List {
                 ForEach(chats) { chat in
                     Button {
-                        Task { await assistant.open(chat) }
+                        Task { await agent.open(chat) }
                         dismiss()
                     } label: {
                         VStack(alignment: .leading, spacing: 3) {
@@ -399,7 +399,7 @@ private struct ChatHistory: View {
                     .listRowBackground(palette.canvas)
                     .swipeActions {
                         Button("Delete", systemImage: "trash", role: .destructive) {
-                            Task { await assistant.delete(chat) }
+                            Task { await agent.delete(chat) }
                         }
                     }
                 }
@@ -418,7 +418,7 @@ private struct ChatHistory: View {
                     Button("Close", systemImage: "xmark") { dismiss() }
                 }
             }
-            .task { await assistant.loadHistory() }
+            .task { await agent.loadHistory() }
         }
     }
 }

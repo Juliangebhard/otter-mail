@@ -117,16 +117,16 @@ Swift code (`apps/ios`). Gmail and IMAP are noted where they differ.
 
 ## Settings & customization
 
-| Feature                                                  | Mac | Web | iPhone                                                                         |
-| -------------------------------------------------------- | --- | --- | ------------------------------------------------------------------------------ |
-| 7 themes, a light and a dark pick; System / Light / Dark | ✓   | ✓   | ✓                                                                              |
-| Panel animations                                         | ✓   | ✓   | —                                                                              |
-| Keyboard shortcuts, rebindable (incl. move to label)     | ✓   | ✓   | —                                                                              |
-| Command palette (⌘K)                                     | ✓   | ✓   | —                                                                              |
-| Custom views (rules across mailboxes)                    | ✓   | ✓   | —                                                                              |
-| Preferences synced through the Otter account             | ✓   | ✓   | ✓ (theme, advance, mailboxes, notifications, languages, assistant, signatures) |
+| Feature                                                  | Mac | Web | iPhone                                                                     |
+| -------------------------------------------------------- | --- | --- | -------------------------------------------------------------------------- |
+| 7 themes, a light and a dark pick; System / Light / Dark | ✓   | ✓   | ✓                                                                          |
+| Panel animations                                         | ✓   | ✓   | —                                                                          |
+| Keyboard shortcuts, rebindable (incl. move to label)     | ✓   | ✓   | —                                                                          |
+| Command palette (⌘K)                                     | ✓   | ✓   | —                                                                          |
+| Custom views (rules across mailboxes)                    | ✓   | ✓   | —                                                                          |
+| Preferences synced through the Otter account             | ✓   | ✓   | ✓ (theme, advance, mailboxes, notifications, languages, agent, signatures) |
 
-## Assistant
+## Agents
 
 | Feature                                            | Mac                         | Web                        | iPhone       |
 | -------------------------------------------------- | --------------------------- | -------------------------- | ------------ |

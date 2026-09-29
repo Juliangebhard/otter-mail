@@ -74,8 +74,8 @@ export function QueuedRunsControl({
   const [expanded, setExpanded] = useState(true);
   const [drag, setDrag] = useState<{ id: string; insertIndex: number } | null>(null);
   const armed = useRef<string | null>(null);
-  const steerShortcut = useShortcutLabel("assistant.sendQueuedNow");
-  const editShortcut = useShortcutLabel("assistant.editQueued");
+  const steerShortcut = useShortcutLabel("agent.sendQueuedNow");
+  const editShortcut = useShortcutLabel("agent.editQueued");
   const listId = useId();
   if (items.length === 0) return null;
 

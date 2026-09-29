@@ -15,7 +15,7 @@ import { MessageList } from "./gmail/message-list";
 import { MessageReader } from "./gmail/message-reader";
 import { NewMessageView } from "./gmail/new-message-view";
 import { CommandPalette } from "./gmail/command-palette";
-import { AssistantChatPanel } from "./gmail/assistant-chat";
+import { AgentChatPanel } from "./gmail/agent-chat";
 import { SEARCH_MAILBOX } from "./gmail/gmail-query";
 import { ImapAccountDialog } from "./gmail/add-mailbox";
 import { searchTabId, searchTitle, type SearchTab } from "./gmail/search-tabs";
@@ -241,7 +241,7 @@ export function HomeView() {
     return window.desktopBridge.on("settings:open", () => void pull());
   }, []);
 
-  // ⌘W (File ▸ Close): the assistant's active chat tab closes first; with no
+  // ⌘W (File ▸ Close): the agent's active chat tab closes first; with no
   // tab left to close, the window does (Otter Code).
   const closeChatTabRef = useRef<(() => boolean) | null>(null);
   useEffect(
@@ -464,7 +464,7 @@ export function HomeView() {
   useCommandHandlers({
     "commandPalette.toggle": () => setPaletteOpen((o) => !o),
     "sidebar.toggle": () => toggleSidebar(),
-    "assistant.toggle": () => toggleChat(),
+    "agent.toggle": () => toggleChat(),
     "search.focus": () => searchFromView(),
     "compose.new": () => setComposeOpen(true),
     "keybindings.show": () =>
@@ -1241,7 +1241,7 @@ export function HomeView() {
                     style={{ width: chatPane.width }}
                     className={`${PANE_CHAT} shrink-0`}
                   >
-                    <AssistantChatPanel
+                    <AgentChatPanel
                       closeTabRef={closeChatTabRef}
                       onClosePanel={closeChat}
                       accountId={selectedMessageId ? readerAccount : null}

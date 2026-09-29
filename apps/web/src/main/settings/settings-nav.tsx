@@ -1,7 +1,6 @@
 import { useEffect, useState, type ComponentType } from "react";
 import {
   ArrowLeftIcon,
-  BotIcon,
   CircleUserRoundIcon,
   KeyboardIcon,
   LayersIcon,
@@ -9,6 +8,7 @@ import {
   Settings2Icon,
   MailIcon,
   MailCheckIcon,
+  MousePointer2Icon,
 } from "lucide-react";
 import { gmailApi, type SettingsPane } from "../gmail/api";
 import { HintTooltip, cn } from "../gmail/ui";
@@ -27,7 +27,7 @@ export const SETTINGS_SECTIONS: ReadonlyArray<SettingsSection> = [
   { id: "keybindings", label: "Keybindings", icon: KeyboardIcon },
   { id: "accounts", label: "Mailboxes", icon: MailIcon },
   { id: "views", label: "Views", icon: LayersIcon },
-  { id: "assistant", label: "Assistant", icon: BotIcon },
+  { id: "agents", label: "Agents", icon: MousePointer2Icon },
 ];
 
 export function settingsSectionLabel(pane: SettingsPane): string {

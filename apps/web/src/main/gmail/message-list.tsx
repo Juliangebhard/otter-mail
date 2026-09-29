@@ -18,7 +18,7 @@ import {
   ArchiveIcon,
   RotateCwIcon,
   ArchiveXIcon,
-  BotMessageSquareIcon,
+  MousePointer2Icon,
   FlagIcon,
   MailIcon,
   MailOpenIcon,
@@ -106,7 +106,7 @@ type MessageListProps = {
   advanceRef: React.MutableRefObject<(fromMessageId: string) => boolean>;
   /** Reports the multi-selected rows so the chat panel can attach them. */
   onSelectionChange?: (rows: GmailMessageSummary[]) => void;
-  /** Opens the in-app assistant chat panel. */
+  /** Opens the in-app agent chat panel. */
   onOpenChat?: () => void;
   /** Opens the Search mailbox prefilled with this mailbox (search icon, ⌘F). */
   onSearchView?: () => void;
@@ -230,8 +230,8 @@ type MessageRowProps = {
   viewLabelIds: ReadonlySet<string>;
   /** Opens the permanent-delete confirm (offered on trashed/junk rows only). */
   onDeleteForever: () => void;
-  /** Opens this conversation in the in-app assistant chat panel. */
-  onChatAssistant: () => void;
+  /** Opens this conversation in the in-app agent chat panel. */
+  onChatAgent: () => void;
   /** Closes the reader — used after marking the open row unread, so the
       reader's auto mark-read doesn't immediately undo it (Gmail does this too). */
   onDeselect: () => void;
@@ -253,7 +253,7 @@ function MessageRow({
   showInboxChip,
   viewLabelIds,
   onDeleteForever,
-  onChatAssistant,
+  onChatAgent,
   onDeselect,
   expanded,
   onToggleExpanded,
@@ -539,8 +539,8 @@ function MessageRow({
             {message.starred ? "Unflag" : "Flag"}
           </ContextMenuItem>
           <ContextMenuSeparator />
-          <ContextMenuItem icon="bubble.left" onSelect={onChatAssistant}>
-            Open in assistant chat
+          <ContextMenuItem icon="cursorarrow" onSelect={onChatAgent}>
+            Open in agent chat
           </ContextMenuItem>
           <ContextMenuSeparator />
           <ContextMenuSub label={labelChoices.folders ? "Move to folder" : "Label"}>
@@ -1596,7 +1596,7 @@ export function MessageList({
                   showInboxChip={!inInboxContext}
                   onDeleteForever={() => setConfirmDeleteRows([message])}
                   onDeselect={onDeselect}
-                  onChatAssistant={() => {
+                  onChatAgent={() => {
                     // Open this conversation in the reader so it becomes the
                     // chat panel's attached context, then reveal the panel.
                     onSelectMessage(message.id, message.accountId ?? accountId);
@@ -1712,13 +1712,9 @@ export function MessageList({
               </IconBtn>
             </HintTooltip>
             <span className="mx-1 h-5 w-px shrink-0 bg-border" aria-hidden />
-            <HintTooltip label="Chat about the selection with the assistant">
-              <IconBtn
-                label="Open in assistant chat"
-                className="size-7"
-                onClick={() => onOpenChat?.()}
-              >
-                <BotMessageSquareIcon className="size-3.5" />
+            <HintTooltip label="Chat about the selection with the agent">
+              <IconBtn label="Open in agent chat" className="size-7" onClick={() => onOpenChat?.()}>
+                <MousePointer2Icon className="size-3.5" />
               </IconBtn>
             </HintTooltip>
             <span className="mx-1 h-5 w-px shrink-0 bg-border" aria-hidden />

@@ -1,5 +1,5 @@
 /**
- * Attachments in the assistant chat, as Otter Code does them: paste an image
+ * Attachments in the agent chat, as Otter Code does them: paste an image
  * (or files), drop files anywhere on the panel ("Drop files to attach"), or
  * pick them with the paperclip. Files dropped from Finder travel by path;
  * pasted bytes are copied by the backend. Images show as thumbnails, other
@@ -117,7 +117,7 @@ export function useChatAttachments() {
           };
           const [thumb, result] = await Promise.all([
             previewUrl ? thumbnail(previewUrl) : Promise.resolve(undefined),
-            gmailApi.assistantStageAttachments([item]),
+            gmailApi.agentStageAttachments([item]),
           ]);
           const staged = result.attachments[0];
           if (!staged) throw new Error(result.errors[0] ?? `'${name}' could not be attached.`);

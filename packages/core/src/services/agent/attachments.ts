@@ -1,5 +1,5 @@
 /**
- * Files attached to an assistant chat turn (pasted, dropped, or picked).
+ * Files attached to an agent chat turn (pasted, dropped, or picked).
  * Each is copied into the app's assistant-attachments folder, so the agent
  * reads a stable copy that outlives the original (a dragged Downloads file, a
  * pasted screenshot that only ever existed in memory).
@@ -13,6 +13,7 @@ import type { ChatAttachment } from "./types.js";
 export const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 export const MAX_FILE_BYTES = 50 * 1024 * 1024;
 
+// Named when agents were "assistants"; staged paths in saved chats point here.
 export const ATTACHMENTS_DIR = "assistant-attachments";
 
 function limitFor(mime: string): number {

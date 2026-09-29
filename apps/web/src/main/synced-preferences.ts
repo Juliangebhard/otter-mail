@@ -16,6 +16,7 @@ const SYNCED_KEYS = [
   "otter:theme:dark",
   "gmail:panel-animation-duration",
   "gmail:advance-direction",
+  // The agent's, under their old names: other devices sync these keys.
   "assistant:favorite-models",
   "assistant:hidden-models",
   "assistant:follow-up-behavior",
