@@ -28,6 +28,7 @@ import { focusMainWindow } from "./windows/main-window.js";
 
 const home = () => app.getPath("userData");
 
+const MAX_HELD_NOTIFICATIONS = 50;
 const shownNotifications = new Set<Notification>();
 
 /** Writes through a temp file, so a crash never leaves half a file. */
@@ -198,9 +199,13 @@ export function desktopPlatform(): Platform {
     notify({ open, ...options }) {
       if (!Notification.isSupported()) return;
       const notification = new Notification(options);
-      // Held until it's done with: a collected notification's click never fires.
+      // Held until clicked (or the oldest of many): a collected notification's
+      // click never fires, and "close" also comes when the banner times out into
+      // Notification Center, where it can still be clicked.
       shownNotifications.add(notification);
-      notification.on("close", () => shownNotifications.delete(notification));
+      if (shownNotifications.size > MAX_HELD_NOTIFICATIONS) {
+        shownNotifications.delete(shownNotifications.values().next().value!);
+      }
       notification.on("click", () => {
         shownNotifications.delete(notification);
         // The same handoff as a click in the menu-bar popover.
