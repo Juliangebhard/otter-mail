@@ -9,7 +9,7 @@
   },
   "scripts": {
     "test": "vp test run --passWithNoTests",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p src/protocols/test && tsc --noEmit -p src/providers/imap/test"
+    "typecheck": "tsc --noEmit && tsc --noEmit -p src/protocols/test && tsc --noEmit -p src/providers/imap/test && tsc --noEmit -p src/services/test"
   },
   "dependencies": {
     "@otter-mail/contracts": "workspace:*",
