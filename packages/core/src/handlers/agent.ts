@@ -1,12 +1,12 @@
 /**
- * Assistant handlers: provider state/settings plus chat routing. Every call
+ * Agent handlers: provider state/settings plus chat routing. Every call
  * answers well inside the 5s IPC budget — health checks and turns run in the
- * background and report via `assistant:providersChanged` / `assistant:chatEvent`.
+ * background and report via `agent:providersChanged` / `agent:chatEvent`.
  */
 
 import { handle } from "../ipc.js";
-import { ATTACHMENTS_DIR, stageAttachment } from "../services/assistant/attachments.js";
-import * as assistant from "../services/assistant/service.js";
+import { ATTACHMENTS_DIR, stageAttachment } from "../services/agent/attachments.js";
+import * as agent from "../services/agent/service.js";
 import { preferenceChanged } from "../services/preferences.js";
 import {
   PROVIDER_KINDS,
@@ -15,7 +15,7 @@ import {
   type ProviderKind,
   type RuntimeMode,
   type ChatAttachment,
-} from "../services/assistant/types.js";
+} from "../services/agent/types.js";
 
 type Params = Record<string, unknown> | undefined;
 
@@ -27,7 +27,7 @@ function providerOf(p: Params): ProviderKind {
   const kind = p?.provider;
   if (typeof kind === "string" && PROVIDER_KINDS.includes(kind as ProviderKind))
     return kind as ProviderKind;
-  throw new Error("Unknown assistant provider.");
+  throw new Error("Unknown agent provider.");
 }
 
 function sessionIdOf(p: Params): string {
@@ -51,13 +51,13 @@ function agentPatch<K extends string>(
 }
 
 /** Only known fields of the right type make it into the patch. */
-function settingsPatch(p: Params): assistant.SettingsPatch {
-  const patch: assistant.SettingsPatch = {};
+function settingsPatch(p: Params): agent.SettingsPatch {
+  const patch: agent.SettingsPatch = {};
   if (typeof p?.selected === "string" && PROVIDER_KINDS.includes(p.selected as ProviderKind))
     patch.selected = p.selected as ProviderKind;
   const hermes = p?.hermes as Params;
   if (hermes) {
-    const h: NonNullable<assistant.SettingsPatch["hermes"]> = {};
+    const h: NonNullable<agent.SettingsPatch["hermes"]> = {};
     if (bool(hermes.enabled) !== undefined) h.enabled = bool(hermes.enabled);
     for (const key of ["model", "reasoningEffort", "serviceTier"] as const) {
       if (typeof hermes[key] === "string") h[key] = str(hermes[key]);
@@ -97,32 +97,32 @@ function attachmentsOf(raw: unknown): ChatAttachment[] {
     }));
 }
 
-export function registerAssistantHandlers(): void {
-  handle("assistant:providers", async () => assistant.providersState());
+export function registerAgentHandlers(): void {
+  handle("agent:providers", async () => agent.providersState());
 
-  handle("assistant:refreshProviders", async () => {
-    void assistant.refreshProviders();
+  handle("agent:refreshProviders", async () => {
+    void agent.refreshProviders();
     return { ok: true };
   });
 
-  handle("assistant:updateSettings", async (params: unknown) => {
-    const state = await assistant.updateProviderSettings(settingsPatch(params as Params));
+  handle("agent:updateSettings", async (params: unknown) => {
+    const state = await agent.updateProviderSettings(settingsPatch(params as Params));
     preferenceChanged("assistant");
     return state;
   });
 
-  handle("assistant:connectHermes", async (params: unknown) => {
+  handle("agent:connectHermes", async (params: unknown) => {
     const p = params as Params;
     const baseUrl = str(p?.baseUrl);
     const apiKey = str(p?.apiKey);
     if (!baseUrl || !apiKey) throw new Error("Base URL and API key are both required.");
-    const state = await assistant.connectHermes(baseUrl, apiKey);
+    const state = await agent.connectHermes(baseUrl, apiKey);
     preferenceChanged("assistant");
     preferenceChanged("hermesKey");
     return state;
   });
 
-  handle("assistant:send", async (params: unknown) => {
+  handle("agent:send", async (params: unknown) => {
     const p = params as Params;
     const requestId = str(p?.requestId);
     const input = typeof p?.input === "string" ? p.input : "";
@@ -131,7 +131,7 @@ export function registerAssistantHandlers(): void {
     const attachments = attachmentsOf(p?.attachments);
     if (!requestId || (!input.trim() && !skillName && attachments.length === 0))
       throw new Error("Nothing to send.");
-    await assistant.sendTurn(providerOf(p), {
+    await agent.sendTurn(providerOf(p), {
       requestId,
       input,
       sessionId: str(p?.sessionId) || undefined,
@@ -145,7 +145,7 @@ export function registerAssistantHandlers(): void {
 
   // Dropped, picked or pasted files are copied into the attachments folder;
   // the renderer sends the returned records with a turn.
-  handle("assistant:stageAttachments", async (params: unknown) => {
+  handle("agent:stageAttachments", async (params: unknown) => {
     const p = params as Params;
     const items = Array.isArray(p?.items) ? (p.items as Params[]) : [];
     const staged: ChatAttachment[] = [];
@@ -163,48 +163,46 @@ export function registerAssistantHandlers(): void {
     return { attachments: staged, errors };
   });
 
-  handle("assistant:respondApproval", async (params: unknown) => {
+  handle("agent:respondApproval", async (params: unknown) => {
     const p = params as Params;
     const decision = p?.decision as ApprovalDecision;
     if (!["once", "session", "always", "deny"].includes(decision))
       throw new Error("Unknown decision.");
-    await assistant.respondApproval(providerOf(p), str(p?.requestId), str(p?.approvalId), decision);
+    await agent.respondApproval(providerOf(p), str(p?.requestId), str(p?.approvalId), decision);
     return { ok: true };
   });
 
-  handle("assistant:steer", async (params: unknown) => {
+  handle("agent:steer", async (params: unknown) => {
     const p = params as Params;
     const input = typeof p?.input === "string" ? p.input : "";
     if (!input.trim()) throw new Error("Nothing to send.");
     return {
-      accepted: await assistant.steerTurn(providerOf(p), str(p?.requestId), input),
+      accepted: await agent.steerTurn(providerOf(p), str(p?.requestId), input),
     };
   });
 
-  handle("assistant:cancel", async (params: unknown) => {
+  handle("agent:cancel", async (params: unknown) => {
     const p = params as Params;
-    assistant.cancelTurn(providerOf(p), str(p?.requestId));
+    agent.cancelTurn(providerOf(p), str(p?.requestId));
     return { ok: true };
   });
 
-  handle("assistant:skills", async (params: unknown) =>
-    assistant.listSkills(providerOf(params as Params)),
-  );
+  handle("agent:skills", async (params: unknown) => agent.listSkills(providerOf(params as Params)));
 
-  handle("assistant:sessions", async (params: unknown) => {
+  handle("agent:sessions", async (params: unknown) => {
     const p = params as Params;
     const limit = typeof p?.limit === "number" && Number.isFinite(p.limit) ? p.limit : 40;
-    return assistant.listSessions(providerOf(p), limit);
+    return agent.listSessions(providerOf(p), limit);
   });
 
-  handle("assistant:sessionMessages", async (params: unknown) => {
+  handle("agent:sessionMessages", async (params: unknown) => {
     const p = params as Params;
-    return assistant.readSession(providerOf(p), sessionIdOf(p));
+    return agent.readSession(providerOf(p), sessionIdOf(p));
   });
 
-  handle("assistant:deleteSession", async (params: unknown) => {
+  handle("agent:deleteSession", async (params: unknown) => {
     const p = params as Params;
-    await assistant.deleteSession(providerOf(p), sessionIdOf(p));
+    await agent.deleteSession(providerOf(p), sessionIdOf(p));
     return { ok: true };
   });
 }

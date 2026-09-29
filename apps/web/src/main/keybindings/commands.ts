@@ -8,7 +8,7 @@
  * - dialogOpen:    a dialog, popover, or menu is open
  * - settingsOpen:  the settings page is showing
  * - messageOpen:   a conversation is open in the reader
- * - assistantOpen:  the assistant chat panel is showing
+ * - agentOpen:     the agent chat panel is showing
  * - modelPickerOpen: the composer's model picker is open
  *
  * Besides the closed set, `label.move:<label name>` rules move the selection
@@ -44,12 +44,12 @@ export const MODEL_PICKER_JUMP_COMMANDS = [
 export const KEYBINDING_COMMANDS = [
   "commandPalette.toggle",
   "sidebar.toggle",
-  "assistant.toggle",
-  "assistant.newChat",
+  "agent.toggle",
+  "agent.newChat",
   "modelPicker.toggle",
   "composer.mode",
-  "assistant.sendQueuedNow",
-  "assistant.editQueued",
+  "agent.sendQueuedNow",
+  "agent.editQueued",
   "modelPicker.previousProvider",
   "modelPicker.nextProvider",
   ...MODEL_PICKER_JUMP_COMMANDS,
@@ -58,6 +58,7 @@ export const KEYBINDING_COMMANDS = [
   "composer.send",
   "keybindings.show",
   "mail.undo",
+  "mail.redo",
   "go.inbox",
   "go.sent",
   "go.starred",
@@ -124,7 +125,7 @@ export const WHEN_VARIABLES = [
   "dialogOpen",
   "settingsOpen",
   "messageOpen",
-  "assistantOpen",
+  "agentOpen",
   "modelPickerOpen",
   "true",
   "false",
@@ -138,19 +139,19 @@ export const DEFAULT_KEYBINDINGS: ReadonlyArray<KeybindingRule> = [
   { key: "mod+k", command: "commandPalette.toggle" },
   // ⌘B / ⌘I mean bold / italic while typing.
   { key: "mod+b", command: "sidebar.toggle", when: OUTSIDE_FIELDS },
-  { key: "mod+i", command: "assistant.toggle", when: OUTSIDE_FIELDS },
-  { key: "mod+shift+o", command: "assistant.newChat", when: "!dialogOpen" },
-  { key: "mod+shift+m", command: "modelPicker.toggle", when: "assistantOpen" },
-  { key: "mod+shift+a", command: "composer.mode", when: "assistantOpen" },
+  { key: "mod+i", command: "agent.toggle", when: OUTSIDE_FIELDS },
+  { key: "mod+shift+o", command: "agent.newChat", when: "!dialogOpen" },
+  { key: "mod+shift+m", command: "modelPicker.toggle", when: "agentOpen" },
+  { key: "mod+shift+a", command: "composer.mode", when: "agentOpen" },
   {
     key: "mod+shift+enter",
-    command: "assistant.sendQueuedNow",
-    when: "assistantOpen",
+    command: "agent.sendQueuedNow",
+    when: "agentOpen",
   },
   {
     key: "alt+arrowup",
-    command: "assistant.editQueued",
-    when: "assistantOpen && editableFocus",
+    command: "agent.editQueued",
+    when: "agentOpen && editableFocus",
   },
   {
     key: "mod+shift+arrowup",
@@ -173,6 +174,7 @@ export const DEFAULT_KEYBINDINGS: ReadonlyArray<KeybindingRule> = [
   { key: "mod+enter", command: "composer.send" },
   { key: "?", command: "keybindings.show", when: OUTSIDE_FIELDS },
   { key: "z", command: "mail.undo", when: OUTSIDE_FIELDS },
+  { key: "shift+z", command: "mail.redo", when: OUTSIDE_FIELDS },
   { key: "g i", command: "go.inbox", when: IN_MAIL },
   { key: "g t", command: "go.sent", when: IN_MAIL },
   { key: "g s", command: "go.starred", when: IN_MAIL },

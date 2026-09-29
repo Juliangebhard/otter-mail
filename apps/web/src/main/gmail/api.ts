@@ -112,7 +112,7 @@ export type MailApp = { bundleId: string; name: string; path: string };
 export type MailAppsResult = { apps: MailApp[]; defaultBundleId: string | null };
 
 /*
- * Assistant providers (mirrors main/services/assistant/types.ts). A snapshot
+ * Agent providers (mirrors main/services/agent/types.ts). A snapshot
  * is one provider's health; every provider streams the same ChatEvents.
  */
 export type ProviderKind = "hermes" | "codex" | "claude";
@@ -211,7 +211,7 @@ export type ProvidersState = {
   selected: ProviderKind;
   settings: ProviderSettingsView;
 };
-export type AssistantSettingsPatch = {
+export type AgentSettingsPatch = {
   selected?: ProviderKind;
   hermes?: { enabled?: boolean; model?: string; reasoningEffort?: string; serviceTier?: string };
   codex?: Partial<ProviderSettingsView["codex"]>;
@@ -229,7 +229,7 @@ export type ChatEvent =
   | { requestId: string; type: "done"; responseId: string | null }
   | { requestId: string; type: "error"; message: string };
 
-/** A file attached to an assistant turn (staged by the backend). */
+/** A file attached to an agent turn (staged by the backend). */
 export type ChatAttachment = {
   id: string;
   name: string;
@@ -379,7 +379,7 @@ export type SettingsPane =
   | "keybindings"
   | "accounts"
   | "views"
-  | "assistant"
+  | "agents"
   /** The Otter account page, opened from the user button at the bottom of the nav. */
   | "otter";
 export type SettingsTarget = {
@@ -635,23 +635,23 @@ export const gmailApi = {
 
   listMailApps: (): Promise<MailAppsResult> => ipc("app:listMailApps"),
 
-  /** Cached provider snapshots; stale ones re-check and arrive as `assistant:providersChanged`. */
-  assistantProviders: (): Promise<ProvidersState> => ipc("assistant:providers"),
+  /** Cached provider snapshots; stale ones re-check and arrive as `agent:providersChanged`. */
+  agentProviders: (): Promise<ProvidersState> => ipc("agent:providers"),
 
-  refreshAssistantProviders: (): Promise<{ ok: boolean }> => ipc("assistant:refreshProviders"),
+  refreshAgentProviders: (): Promise<{ ok: boolean }> => ipc("agent:refreshProviders"),
 
-  updateAssistantSettings: (patch: AssistantSettingsPatch): Promise<ProvidersState> =>
-    ipc("assistant:updateSettings", patch),
+  updateAgentSettings: (patch: AgentSettingsPatch): Promise<ProvidersState> =>
+    ipc("agent:updateSettings", patch),
 
   connectHermes: (params: { baseUrl: string; apiKey: string }): Promise<ProvidersState> =>
-    ipc("assistant:connectHermes", params),
+    ipc("agent:connectHermes", params),
 
   /**
-   * Starts a turn and returns at once; it streams as `assistant:chatEvent`.
+   * Starts a turn and returns at once; it streams as `agent:chatEvent`.
    * Without `sessionId` the provider opens a session and reports it in a
    * `session` event; Hermes legacy chats chain via `previousResponseId`.
    */
-  assistantSend: (params: {
+  agentSend: (params: {
     provider: ProviderKind;
     requestId: string;
     input: string;
@@ -660,42 +660,41 @@ export const gmailApi = {
     skill?: { name: string; path?: string };
     attachments?: ChatAttachment[];
     previousResponseId?: string;
-  }): Promise<{ ok: boolean }> => ipc("assistant:send", params),
+  }): Promise<{ ok: boolean }> => ipc("agent:send", params),
 
   /** Copies dropped, picked or pasted files into the attachments folder. */
-  assistantStageAttachments: (
+  agentStageAttachments: (
     items: { name: string; mime: string; bytes: Uint8Array }[],
   ): Promise<{ attachments: ChatAttachment[]; errors: string[] }> =>
-    ipc("assistant:stageAttachments", { items }),
+    ipc("agent:stageAttachments", { items }),
 
-  assistantRespondApproval: (params: {
+  agentRespondApproval: (params: {
     provider: ProviderKind;
     requestId: string;
     approvalId: string;
     decision: ApprovalDecision;
-  }): Promise<{ ok: boolean }> => ipc("assistant:respondApproval", params),
+  }): Promise<{ ok: boolean }> => ipc("agent:respondApproval", params),
 
   /** Adds a message to the running turn; `accepted: false` → queue it instead. */
-  assistantSteer: (
+  agentSteer: (
     provider: ProviderKind,
     requestId: string,
     input: string,
-  ): Promise<{ accepted: boolean }> => ipc("assistant:steer", { provider, requestId, input }),
+  ): Promise<{ accepted: boolean }> => ipc("agent:steer", { provider, requestId, input }),
 
-  assistantCancel: (provider: ProviderKind, requestId: string): Promise<{ ok: boolean }> =>
-    ipc("assistant:cancel", { provider, requestId }),
+  agentCancel: (provider: ProviderKind, requestId: string): Promise<{ ok: boolean }> =>
+    ipc("agent:cancel", { provider, requestId }),
 
-  assistantSkills: (provider: ProviderKind): Promise<Skill[]> =>
-    ipc("assistant:skills", { provider }),
+  agentSkills: (provider: ProviderKind): Promise<Skill[]> => ipc("agent:skills", { provider }),
 
-  assistantSessions: (provider: ProviderKind, limit = 40): Promise<ChatSession[]> =>
-    ipc("assistant:sessions", { provider, limit }),
+  agentSessions: (provider: ProviderKind, limit = 40): Promise<ChatSession[]> =>
+    ipc("agent:sessions", { provider, limit }),
 
-  assistantSessionMessages: (
+  agentSessionMessages: (
     provider: ProviderKind,
     sessionId: string,
-  ): Promise<ChatSessionMessage[]> => ipc("assistant:sessionMessages", { provider, sessionId }),
+  ): Promise<ChatSessionMessage[]> => ipc("agent:sessionMessages", { provider, sessionId }),
 
-  assistantDeleteSession: (provider: ProviderKind, sessionId: string): Promise<{ ok: boolean }> =>
-    ipc("assistant:deleteSession", { provider, sessionId }),
+  agentDeleteSession: (provider: ProviderKind, sessionId: string): Promise<{ ok: boolean }> =>
+    ipc("agent:deleteSession", { provider, sessionId }),
 };

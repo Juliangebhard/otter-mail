@@ -8,7 +8,7 @@
  *  - runtime modes → permissionMode; `canUseTool` surfaces approvals.
  *  - stop closes the query (T3: a hard session boundary); the next turn
  *    resumes the session by id.
- * Sessions run in the app's assistant workspace, so listing it yields exactly
+ * Sessions run in the app's agent workspace, so listing it yields exactly
  * the chats started from Otter Mail.
  */
 
@@ -33,13 +33,8 @@ import {
 } from "@anthropic-ai/claude-agent-sdk";
 import { logger } from "../../logger.js";
 import fs from "node:fs/promises";
-import {
-  attachmentPath,
-  attachmentsDir,
-  assistantWorkspace,
-  withAttachmentPaths,
-} from "./local.js";
-import { ASSISTANT_INSTRUCTIONS } from "./instructions.js";
+import { attachmentPath, attachmentsDir, agentWorkspace, withAttachmentPaths } from "./local.js";
+import { AGENT_INSTRUCTIONS } from "./instructions.js";
 import { ensureShellPath } from "./shell-path.js";
 import type {
   ApprovalDecision,
@@ -417,7 +412,7 @@ async function openSession(
   if (existing) closeSession(existing);
 
   await ensureShellPath();
-  const cwd = await assistantWorkspace();
+  const cwd = await agentWorkspace();
   const id = sessionId ?? randomUUID();
   const prompts = new PromptQueue();
   const mode = settings.runtimeMode;
@@ -470,7 +465,7 @@ async function openSession(
     systemPrompt: {
       type: "preset",
       preset: "claude_code",
-      append: ASSISTANT_INSTRUCTIONS,
+      append: AGENT_INSTRUCTIONS,
     },
     settingSources: ["user", "project", "local"],
     ...(settings.model ? { model: settings.model } : {}),
@@ -485,7 +480,7 @@ async function openSession(
     canUseTool,
     stderr: (line: string) => {
       if (/error|auth|login|keychain|credential/i.test(line))
-        logger.info("assistant", "claude stderr", { line: line.slice(0, 300) });
+        logger.info("agent", "claude stderr", { line: line.slice(0, 300) });
     },
   };
 
@@ -509,7 +504,7 @@ async function openSession(
       if (!session.closed) closeSession(session, "unreachable");
     } catch (error) {
       if (!session.closed) {
-        logger.info("assistant", "claude session ended", {
+        logger.info("agent", "claude session ended", {
           error: String(error),
         });
         closeSession(session, "unreachable");
@@ -638,7 +633,7 @@ async function probe(settings: ClaudeSettings): Promise<ProbeResult> {
         CLAUDE_CODE_AUTO_CONNECT_IDE: "0",
         CLAUDE_CODE_IDE_SKIP_AUTO_INSTALL: "1",
       },
-      cwd: await assistantWorkspace(),
+      cwd: await agentWorkspace(),
       stderr: () => {},
     },
   });
@@ -719,7 +714,7 @@ export const claudeProvider: ChatProvider = {
         },
       };
     } catch (error) {
-      logger.info("assistant", "claude probe failed", { error: String(error) });
+      logger.info("agent", "claude probe failed", { error: String(error) });
       return {
         ...base,
         installed: true,
@@ -737,7 +732,7 @@ export const claudeProvider: ChatProvider = {
     try {
       session = await openSession(settings.claude, turn.sessionId);
     } catch (error) {
-      logger.info("assistant", "claude session failed", {
+      logger.info("agent", "claude session failed", {
         error: String(error),
       });
       return emit({ requestId, type: "error", message: "not_installed" });
@@ -837,7 +832,7 @@ export const claudeProvider: ChatProvider = {
 
   async listSessions(_settings, limit): Promise<ChatSession[]> {
     const sessionsInfo = await sdkListSessions({
-      dir: await assistantWorkspace(),
+      dir: await agentWorkspace(),
       limit,
     });
     return sessionsInfo.map((s) => ({
@@ -852,7 +847,7 @@ export const claudeProvider: ChatProvider = {
 
   async readSession(_settings, sessionId): Promise<ChatSessionMessage[]> {
     const messages = await getSessionMessages(sessionId, {
-      dir: await assistantWorkspace(),
+      dir: await agentWorkspace(),
     });
     const out: ChatSessionMessage[] = [];
     for (const m of messages) {
@@ -894,7 +889,7 @@ export const claudeProvider: ChatProvider = {
   async deleteSession(_settings, sessionId) {
     const live = sessions.get(sessionId);
     if (live) closeSession(live);
-    await sdkDeleteSession(sessionId, { dir: await assistantWorkspace() });
+    await sdkDeleteSession(sessionId, { dir: await agentWorkspace() });
   },
 
   shutdown() {

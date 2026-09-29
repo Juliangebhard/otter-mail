@@ -25,7 +25,7 @@ final class Session {
     var opening: String?
 
     let preferences: Preferences
-    let assistant = Assistant()
+    let agent = Agent()
     @ObservationIgnored let relay = Relay()
     @ObservationIgnored let google = GoogleAuth()
     @ObservationIgnored private var sync: MailSync?
@@ -52,8 +52,8 @@ final class Session {
         }
         relay.onSignedOut = { [weak self] in self?.endSession() }
         preferences.onChange = { [weak self] section in self?.preferenceChanged(section) }
-        assistant.onChange = { [weak self] section in self?.preferenceChanged(section) }
-        Task { [assistant] in await assistant.check() }
+        agent.onChange = { [weak self] section in self?.preferenceChanged(section) }
+        Task { [agent] in await agent.check() }
         if case .signedIn = state { startLive() }
     }
 
@@ -336,7 +336,7 @@ final class Session {
         remoteSections["ui"] = ui ?? [:]
         remoteSections["settings"] = settings ?? [:]
         preferences.apply(ui: ui ?? [:], settings: settings ?? [:])
-        assistant.apply(section: sections["assistant"] as? [String: Any], key: hermesKey)
+        agent.apply(section: sections["assistant"] as? [String: Any], key: hermesKey)
         let signatures = sections["signatures"] as? [String: String]
         remoteSections["signatures"] = signatures ?? [:]
         applySignatures()
@@ -371,12 +371,12 @@ final class Session {
     private func preferenceChanged(_ section: String) {
         guard case .signedIn = state else { return }
         if section == "hermesKey" {
-            let key = assistant.key
-            Task { try? await relay.putPreferences(["assistant": assistant.syncedSection], hermesKey: .some(key)) }
+            let key = agent.key
+            Task { try? await relay.putPreferences(["assistant": agent.syncedSection], hermesKey: .some(key)) }
             return
         }
         if section == "assistant" {
-            Task { try? await relay.putPreferences(["assistant": assistant.syncedSection]) }
+            Task { try? await relay.putPreferences(["assistant": agent.syncedSection]) }
             return
         }
         // Not pulled yet: writing now would drop the other devices' signatures.
@@ -420,8 +420,8 @@ final class Session {
         UserDefaults.standard.set(false, forKey: Self.demoKey)
         store = MailStore(preferences: preferences)
         state = .welcome
-        assistant.newChat()
-        assistant.forgetKey()
+        agent.newChat()
+        agent.forgetKey()
         Task { try? await UNUserNotificationCenter.current().setBadgeCount(0) }
     }
 

@@ -19,7 +19,7 @@ import { registerBackendHandlers } from "./handlers/backend.js";
 import { logger, sendLogsTo } from "./logger.js";
 import { postToMain, settleRequest, tellMain } from "./main-link.js";
 import { desktopPlatform, resumeListeners } from "./platform.js";
-import { migrateHermesKey } from "./services/assistant/local.js";
+import { migrateHermesKey } from "./services/agent/local.js";
 
 // One log: main writes this process's lines with its own.
 sendLogsTo((level, scope, message, data) => tellMain({ kind: "log", level, scope, message, data }));

@@ -18,7 +18,7 @@ import {
   ArchiveIcon,
   ArchiveRestoreIcon,
   ArchiveXIcon,
-  BotMessageSquareIcon,
+  MousePointer2Icon,
   ChevronDownIcon,
   DownloadIcon,
   EllipsisIcon,
@@ -135,7 +135,7 @@ type MessageReaderProps = {
   onDeselect?: () => void;
   /** Toolbar archive/trash move on to the next conversation through this. */
   onAdvance?: () => void;
-  /** Opens the in-app assistant chat panel (this conversation becomes its context). */
+  /** Opens the in-app agent chat panel (this conversation becomes its context). */
   onOpenChat?: () => void;
   /** A selected excerpt was sent to the chat panel as a quote. */
   onQuote?: (quote: QuoteContext) => void;
@@ -1357,7 +1357,7 @@ export function ExpandedRow({
                 onCompose={onComposeTo}
                 onSearch={onSearchSender}
               >
-                <span className="truncate text-sm font-medium leading-snug text-foreground">
+                <span className="select-text truncate text-sm font-medium leading-snug text-foreground">
                   {senderLabel(summary.fromName, summary.fromEmail, accountId)}
                 </span>
               </SenderHoverCard>
@@ -1400,7 +1400,7 @@ export function ExpandedRow({
         </div>
 
         {/* The body takes the row's full width, not indented under the avatar. */}
-        <div className="mt-4">
+        <div className="mt-4 select-text">
           {detailQuery.isLoading ? (
             // The snippet stands in while the body loads: about the size of a
             // short message, so the thread doesn't jump when it arrives.
@@ -2384,8 +2384,8 @@ export function MessageReader({
       <span
         className={
           wrap
-            ? "text-xl font-medium leading-snug tracking-[-0.01em] text-foreground"
-            : "truncate text-sm font-medium text-foreground"
+            ? "select-text text-xl font-medium leading-snug tracking-[-0.01em] text-foreground"
+            : "select-text truncate text-sm font-medium text-foreground"
         }
         title={isThread ? `${rows.length} messages` : formatFullDate(message.date)}
       >
@@ -2621,8 +2621,8 @@ export function MessageReader({
                 </DropdownMenuItem>
               )}
               <DropdownMenuSeparator />
-              <DropdownMenuItem icon={<BotMessageSquareIcon />} onSelect={() => onOpenChat?.()}>
-                Chat about this with the assistant
+              <DropdownMenuItem icon={<MousePointer2Icon />} onSelect={() => onOpenChat?.()}>
+                Chat about this with the agent
               </DropdownMenuItem>
               {isTrashed || isJunk ? (
                 <>

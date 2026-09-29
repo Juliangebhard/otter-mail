@@ -21,7 +21,7 @@ when a feature lands or goes.
   messages in `src/backend-protocol.ts`), so syncing never holds up the app itself.
   - `src/handlers/`: the Mac-only handlers (tray, default mail app, …); `backend.ts` there holds
     the ones the backend serves.
-  - `src/services/`: Google sign-in (loopback OAuth), tray, Apple's translator, the local assistants
+  - `src/services/`: Google sign-in (loopback OAuth), tray, Apple's translator, the local agents
     (Claude, Codex; Hermes is in core), default mail app.
   - `src/windows/`: the main window, the menu-bar popover, and where their pages load from.
   - `src/updates.ts`: electron-updater against GitHub Releases.

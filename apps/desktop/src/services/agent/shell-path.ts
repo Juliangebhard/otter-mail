@@ -21,7 +21,7 @@ function loginShellPath(): Promise<string | null> {
       (error, stdout) => {
         const match = String(stdout ?? "").match(new RegExp(`${MARKER}(.*?)${MARKER}`));
         if (error && !match)
-          logger.info("assistant", "login shell PATH failed", {
+          logger.info("agent", "login shell PATH failed", {
             error: String(error),
           });
         resolve(match?.[1] ?? null);

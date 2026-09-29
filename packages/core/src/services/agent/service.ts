@@ -2,11 +2,11 @@
  * The provider registry + routing layer (T3 Code's ProviderService in
  * miniature). Health snapshots are managed like T3's: served from cache at
  * once, re-checked in the background when stale or when settings change, and
- * pushed to the windows as `assistant:providersChanged`. Chat turns are
- * fire-and-forget; their events stream as `assistant:chatEvent`.
+ * pushed to the windows as `agent:providersChanged`. Chat turns are
+ * fire-and-forget; their events stream as `agent:chatEvent`.
  *
  * Hermes is a server, so it works everywhere; Codex and Claude are local
- * CLIs, which the Mac app hands over as `Platform.assistantProviders`. The
+ * CLIs, which the Mac app hands over as `Platform.agentProviders`. The
  * web app lists them, off (`macAppOnly`).
  */
 
@@ -46,14 +46,14 @@ let providers: Partial<Record<ProviderKind, ChatProvider>> | null = null;
 /** The providers this platform runs. */
 function available(): Partial<Record<ProviderKind, ChatProvider>> {
   providers ??= Object.fromEntries(
-    [hermesProvider, ...(platform().assistantProviders ?? [])].map((p) => [p.kind, p]),
+    [hermesProvider, ...(platform().agentProviders ?? [])].map((p) => [p.kind, p]),
   );
   return providers;
 }
 
 function provider(kind: ProviderKind): ChatProvider {
   const found = available()[kind];
-  if (!found) throw new Error("This assistant runs in the Mac app.");
+  if (!found) throw new Error("This agent runs in the Mac app.");
   return found;
 }
 
@@ -124,7 +124,7 @@ async function getState(): Promise<ProvidersState> {
 }
 
 async function broadcastState(): Promise<void> {
-  broadcast("assistant:providersChanged", await getState());
+  broadcast("agent:providersChanged", await getState());
 }
 
 /** Single-flight health check of one provider; broadcasts when it lands. */
@@ -137,14 +137,14 @@ function check(kind: ProviderKind): Promise<void> {
     if (!found || !settings[kind].enabled) return;
     const result = await found.checkStatus(settings);
     checked.set(kind, { ...result, enabled: true, checkedAt: Date.now() });
-    logger.info("assistant", "provider checked", {
+    logger.info("agent", "provider checked", {
       kind,
       status: result.status,
       version: result.version,
     });
   })()
     .catch((error: unknown) =>
-      logger.info("assistant", "provider check failed", {
+      logger.info("agent", "provider check failed", {
         kind,
         error: String(error),
       }),
@@ -204,7 +204,7 @@ export async function updateProviderSettings(patch: SettingsPatch): Promise<Prov
     } else if ("enabled" in changed && next[kind].enabled) void check(kind);
   }
   const state = await getState();
-  broadcast("assistant:providersChanged", state);
+  broadcast("agent:providersChanged", state);
   return state;
 }
 
@@ -226,20 +226,20 @@ export async function connectHermes(baseUrl: string, apiKey: string): Promise<Pr
       sessions,
     },
   });
-  logger.info("assistant", "hermes connected", { baseUrl: base, sessions });
+  logger.info("agent", "hermes connected", { baseUrl: base, sessions });
   checked.delete("hermes");
   void check("hermes");
   return getState();
 }
 
 function emit(event: ChatEvent): void {
-  broadcast("assistant:chatEvent", event);
+  broadcast("agent:chatEvent", event);
 }
 
 /** Starts a turn and returns at once; progress streams as chat events. */
 export async function sendTurn(kind: ProviderKind, turn: SendTurnInput): Promise<void> {
   const settings = await getProviderSettings();
-  logger.info("assistant", "send", {
+  logger.info("agent", "send", {
     provider: kind,
     requestId: turn.requestId,
     chars: turn.input.length,
@@ -257,7 +257,7 @@ export async function sendTurn(kind: ProviderKind, turn: SendTurnInput): Promise
   void provider(kind)
     .sendTurn(turn, settings, emit)
     .catch((error: unknown) => {
-      logger.info("assistant", "turn crashed", {
+      logger.info("agent", "turn crashed", {
         provider: kind,
         error: String(error),
       });
@@ -275,7 +275,7 @@ export async function respondApproval(
   approvalId: string,
   decision: ApprovalDecision,
 ): Promise<void> {
-  logger.info("assistant", "approval", { provider: kind, requestId, decision });
+  logger.info("agent", "approval", { provider: kind, requestId, decision });
   await provider(kind).respondApproval(requestId, approvalId, decision);
 }
 
@@ -286,7 +286,7 @@ export async function steerTurn(
   input: string,
 ): Promise<boolean> {
   const accepted = await provider(kind).steer(requestId, input);
-  logger.info("assistant", "steer", { provider: kind, requestId, accepted });
+  logger.info("agent", "steer", { provider: kind, requestId, accepted });
   return accepted;
 }
 

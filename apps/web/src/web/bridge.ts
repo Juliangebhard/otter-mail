@@ -215,6 +215,7 @@ const pageChannels: Record<string, (params: unknown) => unknown> = {
   "window:closeMain": () => {},
   "app:takePendingMailto": () => null,
   "edit:nativeUndo": () => document.execCommand("undo"),
+  "edit:nativeRedo": () => document.execCommand("redo"),
 };
 
 async function invoke<T>(channel: string, params?: unknown): Promise<T> {
@@ -308,6 +309,17 @@ export const webBridge: DesktopBridge = {
 
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") backend.resume();
+});
+
+// ⌘Z / ⇧⌘Z: the Mac app's Edit › Undo and Redo send edit:undo and edit:redo
+// (mail actions). Text fields keep the browser's own undo.
+window.addEventListener("keydown", (event) => {
+  if (event.key.toLowerCase() !== "z" || !(event.metaKey || event.ctrlKey)) return;
+  if (event.altKey || event.defaultPrevented) return;
+  const target = event.target;
+  if (target instanceof HTMLElement && target.closest("input, textarea, [contenteditable]")) return;
+  event.preventDefault();
+  emit(event.shiftKey ? "edit:redo" : "edit:undo");
 });
 
 // Notifications need permission, which browsers only ask for after a click.

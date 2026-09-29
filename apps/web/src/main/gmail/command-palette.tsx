@@ -23,7 +23,7 @@ import {
   MoonIcon,
   PaletteIcon,
   PanelLeftIcon,
-  PanelRightIcon,
+  MousePointer2Icon,
   PlusIcon,
   RotateCwIcon,
   SearchIcon,
@@ -255,10 +255,10 @@ export function CommandPalette({
       { id: "sync", icon: <RotateCwIcon className={ICON} />, title: "Sync now", run: onSync },
       {
         id: "chat",
-        icon: <PanelRightIcon className={ICON} />,
-        title: "Toggle assistant panel",
-        keywords: "chat assistant ai hermes codex",
-        shortcut: sc("assistant.toggle"),
+        icon: <MousePointer2Icon className={ICON} />,
+        title: "Toggle agent panel",
+        keywords: "chat agent assistant ai claude codex hermes",
+        shortcut: sc("agent.toggle"),
         run: onToggleChat,
       },
       {

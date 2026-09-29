@@ -9,7 +9,7 @@ Mac app works without it; the web app needs it):
   the relay never holds Gmail tokens or IMAP passwords. Linking a Gmail account needs a Google ID
   token for it; an IMAP link proves nothing, so it never receives Gmail pushes, and a mailbox
   can't switch between Gmail and IMAP without being unlinked first (409).
-- **Preferences that follow you.** Settings, views, keybindings, the assistant's settings and
+- **Preferences that follow you.** Settings, views, keybindings, the agent's settings and
   UI choices like the theme, as sections of JSON per Otter account, plus the Hermes API key,
   sealed with a key derived from the auth secret. A change is pushed to the account's other
   devices over the same WebSocket as mail. See `src/preferences.ts`.

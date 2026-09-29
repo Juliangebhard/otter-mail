@@ -16,7 +16,7 @@ import {
   Trash2Icon,
   WrenchIcon,
   XIcon,
-  MessageSquareIcon,
+  MousePointer2Icon,
   PlusIcon,
   CheckIcon,
   SearchIcon,
@@ -34,7 +34,7 @@ import {
   type ApprovalDecision,
   type ChatAttachment,
   type ApprovalRequest,
-  type AssistantSettingsPatch,
+  type AgentSettingsPatch,
   type ProviderKind,
   type Skill,
 } from "./api";
@@ -44,14 +44,14 @@ import {
   ProviderIcon,
   isProviderUsable,
   providerSummary,
-  useAssistantProviders,
+  useAgentProviders,
   useSetProvidersState,
-} from "./assistant-providers";
+} from "./agent-providers";
 import {
   buildHandoffText,
   contextFromMessages,
   contextFromQuote,
-  type AssistantContext,
+  type AgentContext,
   type QuoteContext,
 } from "./chat-context";
 import { ChatMarkdown } from "./chat-markdown";
@@ -103,7 +103,7 @@ function ContextKindIcon({ kind, className }: { kind: ContextKind; className?: s
   return <Icon className={className} />;
 }
 
-/** One transcript entry. Tool steps interleave into the assistant turn. */
+/** One transcript entry. Tool steps interleave into the agent turn. */
 type ChatTurn = {
   id: string;
   role: "user" | "assistant";
@@ -118,7 +118,7 @@ type ChatTurn = {
   /** Files sent with a user message (thumbnails for images). */
   attachments?: SentAttachment[];
   error?: string;
-  /** Assistant turns: when the run started / settled, for the "Worked for" fold. */
+  /** Agent turns: when the run started / settled, for the "Worked for" fold. */
   startedAt?: number;
   finishedAt?: number;
 };
@@ -262,7 +262,7 @@ function sourceLabel(source: string): string {
 
 /**
  * Rebuilds transcript turns from a session's stored messages: tool-call
- * assistant rows + tool rows fold into one assistant turn, closed by the final
+ * agent rows + tool rows fold into one agent turn, closed by the final
  * answer, mirroring how a live stream renders.
  */
 function turnsFromMessages(messages: ChatSessionMessage[]): ChatTurn[] {
@@ -374,11 +374,11 @@ function friendlyError(code: string, provider: ProviderKind): string {
   const name = provider === "codex" ? "Codex" : provider === "claude" ? "Claude" : "Hermes";
   switch (code) {
     case "not_configured":
-      return `${name} isn't set up — connect it in Settings → Assistant.`;
+      return `${name} isn't set up — connect it in Settings → Agents.`;
     case "not_installed":
-      return "The Codex CLI wasn't found — check it in Settings → Assistant.";
+      return "The Codex CLI wasn't found — check it in Settings → Agents.";
     case "provider_disabled":
-      return `${name} is turned off in Settings → Assistant.`;
+      return `${name} is turned off in Settings → Agents.`;
     case "unauthorized":
       return "The API key was rejected — update it in Settings.";
     case "unreachable":
@@ -706,7 +706,7 @@ function HistoryList({
 }
 
 /**
- * Right-side assistant chat. Each conversation is bound to a provider (Hermes,
+ * Right-side agent chat. Each conversation is bound to a provider (Hermes,
  * Codex); turns stream through the backend's provider layer as canonical chat
  * events. The local store mirrors transcripts for instant paint (history
  * dropdown); "attach" adds pointer-only context.
@@ -776,7 +776,7 @@ function ChatTabs({
             )}
           >
             <span className="relative flex size-3.5 shrink-0 items-center justify-center">
-              <MessageSquareIcon className="size-3.5" />
+              <MousePointer2Icon className="size-3.5" />
               {tab.state !== "idle" ? (
                 <span
                   aria-hidden
@@ -810,13 +810,14 @@ function ChatTabs({
   );
 }
 
-export function AssistantChatPanel({
+export function AgentChatPanel({
   accountId,
   messageId,
   selectedRows,
   quote,
   onClearQuote,
   closeTabRef,
+  onClosePanel,
 }: {
   /** Account of the open conversation (context attach), null when none. */
   accountId: string | null;
@@ -828,6 +829,8 @@ export function AssistantChatPanel({
   onClearQuote?: () => void;
   /** ⌘W: closes the active tab (true), or false when it's the only one. */
   closeTabRef?: MutableRefObject<(() => boolean) | null>;
+  /** Closing the last tab closes the panel. */
+  onClosePanel?: () => void;
 }) {
   const [store, setStore] = useState<Store>(() => loadStore());
   const { conversations, activeId } = store;
@@ -874,7 +877,7 @@ export function AssistantChatPanel({
 
   // Provider: a conversation keeps the one it started with; an empty one
   // follows the picker (the default for new chats).
-  const providersQuery = useAssistantProviders();
+  const providersQuery = useAgentProviders();
   const setProvidersState = useSetProvidersState();
   const providersState = providersQuery.data;
   const selectedKind = providersState?.selected ?? "hermes";
@@ -903,16 +906,16 @@ export function AssistantChatPanel({
 
   // Other sessions persisted on the provider (Hermes WebUI, Codex threads…), fetched when history opens.
   const serverSessionsQuery = useQuery<ChatSession[]>({
-    queryKey: ["assistant-sessions", providerKind],
-    queryFn: () => gmailApi.assistantSessions(providerKind, 40),
+    queryKey: ["agent-sessions", providerKind],
+    queryFn: () => gmailApi.agentSessions(providerKind, 40),
     enabled: historyOpen && sessionsAvailable,
     staleTime: 15_000,
   });
 
   // Skills for the "/" picker, from whichever provider this chat uses.
   const skillsQuery = useQuery<Skill[]>({
-    queryKey: ["assistant-skills", providerKind],
-    queryFn: () => gmailApi.assistantSkills(providerKind),
+    queryKey: ["agent-skills", providerKind],
+    queryFn: () => gmailApi.agentSkills(providerKind),
     enabled: usable,
     staleTime: 5 * 60_000,
   });
@@ -969,7 +972,7 @@ export function AssistantChatPanel({
   const openMessage = useMessage(accountId, messageId);
   const multiSelected = selectedRows && selectedRows.length > 0;
   // A highlighted excerpt wins over any auto-derived context.
-  const context: AssistantContext | null = quote
+  const context: AgentContext | null = quote
     ? contextFromQuote(quote)
     : multiSelected
       ? contextFromMessages(selectedRows, accountEmailById)
@@ -1016,7 +1019,7 @@ export function AssistantChatPanel({
       return next;
     });
   useEffect(() => {
-    const unsub = window.desktopBridge.on("assistant:chatEvent", (raw: unknown) => {
+    const unsub = window.desktopBridge.on("agent:chatEvent", (raw: unknown) => {
       const event = raw as ChatEvent;
       const s = event
         ? Object.values(runsRef.current).find((r) => r.requestId === event.requestId)
@@ -1131,7 +1134,7 @@ export function AssistantChatPanel({
     };
   };
 
-  /** The user bubble + an empty assistant turn that the stream fills in. */
+  /** The user bubble + an empty agent turn that the stream fills in. */
   const appendExchange = (
     convoId: string,
     msg: Outgoing,
@@ -1175,7 +1178,7 @@ export function AssistantChatPanel({
     const requestId = crypto.randomUUID();
     const kind = convo.turns.length > 0 ? convo.provider : providerKind;
     const firstTurn = convo.turns.length === 0;
-    console.log("[AssistantChat:send]", {
+    console.log("[AgentChat:send]", {
       requestId,
       provider: kind,
       attached: Boolean(msg.context),
@@ -1194,7 +1197,7 @@ export function AssistantChatPanel({
     setRuns((all) => ({ ...all, [msg.convoId]: started }));
     // Returns at once; the turn streams as chat events (incl. the new session id).
     gmailApi
-      .assistantSend({
+      .agentSend({
         provider: kind,
         requestId,
         input: msg.input,
@@ -1205,7 +1208,7 @@ export function AssistantChatPanel({
         previousResponseId: convo.sessionId ? undefined : (convo.lastResponseId ?? undefined),
       })
       .catch((error: unknown) => {
-        console.log("[AssistantChat:send] failed", { error: String(error) });
+        console.log("[AgentChat:send] failed", { error: String(error) });
         patchConversation(msg.convoId, (c) => ({
           ...c,
           turns: c.turns.map((t) =>
@@ -1229,7 +1232,7 @@ export function AssistantChatPanel({
   const steer = (msg: Outgoing, intent: "steer" | "promoted" = "steer") => {
     const target = runsRef.current[msg.convoId];
     if (!target) return startTurn(msg);
-    console.log("[AssistantChat:steer]", { provider: target.provider, intent });
+    console.log("[AgentChat:steer]", { provider: target.provider, intent });
     const key = `${target.requestId}-${msg.id}`;
     appendExchange(msg.convoId, msg, key, intent);
     const refused = () => {
@@ -1237,7 +1240,7 @@ export function AssistantChatPanel({
       setQueue((q) => [msg, ...q]);
     };
     gmailApi
-      .assistantSteer(target.provider, target.requestId, msg.input)
+      .agentSteer(target.provider, target.requestId, msg.input)
       .then(({ accepted }) => !accepted && refused(), refused);
   };
 
@@ -1351,7 +1354,7 @@ export function AssistantChatPanel({
       switchTo(existing.id);
       return;
     }
-    console.log("[AssistantChat:openServerSession]", {
+    console.log("[AgentChat:openServerSession]", {
       provider: providerKind,
       sessionId: session.id,
       source: session.source,
@@ -1378,7 +1381,7 @@ export function AssistantChatPanel({
     });
     setHydrating(convo.id);
     gmailApi
-      .assistantSessionMessages(providerKind, session.id)
+      .agentSessionMessages(providerKind, session.id)
       .then(
         (messages) => {
           const hydrated = turnsFromMessages(messages);
@@ -1387,7 +1390,7 @@ export function AssistantChatPanel({
           );
         },
         (error) =>
-          console.log("[AssistantChat:hydrate] failed", {
+          console.log("[AgentChat:hydrate] failed", {
             error: String(error),
           }),
       )
@@ -1400,10 +1403,10 @@ export function AssistantChatPanel({
     const owner = pending && Object.values(runs).find((r) => r.requestId === pending.requestId);
     if (!owner) return;
     const { provider: kind, requestId } = owner;
-    console.log("[AssistantChat:approval]", { kind, decision });
+    console.log("[AgentChat:approval]", { kind, decision });
     setRespondingApproval(approvalId);
     gmailApi
-      .assistantRespondApproval({
+      .agentRespondApproval({
         provider: kind,
         requestId,
         approvalId,
@@ -1412,7 +1415,7 @@ export function AssistantChatPanel({
       .then(
         () => setApprovals((list) => list.filter((a) => a.approval.id !== approvalId)),
         (error: unknown) =>
-          console.log("[AssistantChat:approval] failed", {
+          console.log("[AgentChat:approval] failed", {
             error: String(error),
           }),
       )
@@ -1421,7 +1424,7 @@ export function AssistantChatPanel({
 
   /** Interrupts the active run; the queue stays and its next message starts (Otter Code). */
   const stop = () => {
-    if (run) void gmailApi.assistantCancel(run.provider, run.requestId);
+    if (run) void gmailApi.agentCancel(run.provider, run.requestId);
   };
 
   const activeQueue = queue.filter((m) => m.convoId === activeId);
@@ -1430,12 +1433,12 @@ export function AssistantChatPanel({
   // Steer needs a running turn in this chat that isn't waiting on an approval.
   const canSteer = run != null && activeApprovals.length === 0;
   useCommandHandlers({
-    "assistant.sendQueuedNow": () => {
+    "agent.sendQueuedNow": () => {
       const next = activeQueue[0];
       if (!next || !canSteer) return false;
       steerQueued(next.id);
     },
-    "assistant.editQueued": () => {
+    "agent.editQueued": () => {
       const latest = activeQueue[activeQueue.length - 1];
       const caretAtStart = (inputRef.current?.selectionStart ?? 0) === 0;
       if (!latest || editing || !caretAtStart) return false;
@@ -1465,7 +1468,7 @@ export function AssistantChatPanel({
       inputRef.current?.focus();
       return;
     }
-    console.log("[AssistantChat:newChat]");
+    console.log("[AgentChat:newChat]");
     const fresh = newConversation(selectedKind);
     setStore((s) => {
       const at = s.tabs.indexOf(s.activeId);
@@ -1504,9 +1507,10 @@ export function AssistantChatPanel({
 
   /**
    * Closes a tab; the chat stays in history (a running turn finishes there).
-   * The last tab gives way to a fresh "New chat".
+   * The last tab closes the panel, leaving a fresh "New chat" for next time.
    */
   const closeTab = (id: string) => {
+    if (storeRef.current.tabs.length < 2) onClosePanel?.();
     setStore((s) => {
       if (s.tabs.length < 2) {
         const current = s.conversations.find((c) => c.id === id);
@@ -1528,13 +1532,13 @@ export function AssistantChatPanel({
   const deleteConversation = (id: string) => {
     const running = runsRef.current[id];
     if (running) {
-      void gmailApi.assistantCancel(running.provider, running.requestId);
+      void gmailApi.agentCancel(running.provider, running.requestId);
       endRun(running.requestId);
     }
     // Sessions this app created go with the chat; ones opened from the provider only unlink.
     const target = conversations.find((c) => c.id === id);
     if (target?.sessionId && target.sessionOwned) {
-      void gmailApi.assistantDeleteSession(target.provider, target.sessionId).catch(() => {});
+      void gmailApi.agentDeleteSession(target.provider, target.sessionId).catch(() => {});
     }
     setStore((s) => {
       const remaining = s.conversations.filter((c) => c.id !== id);
@@ -1555,7 +1559,7 @@ export function AssistantChatPanel({
     });
   };
 
-  useCommandHandlers({ "assistant.newChat": () => newChat() });
+  useCommandHandlers({ "agent.newChat": () => newChat() });
 
   const closeActiveTab = () => {
     if (storeRef.current.tabs.length < 2) return false;
@@ -1585,11 +1589,11 @@ export function AssistantChatPanel({
     shownIdRef.current = activeId;
   }, [activeId]);
 
-  useKeybindingContext("assistantOpen", true);
+  useKeybindingContext("agentOpen", true);
 
-  const updateSettings = (patch: AssistantSettingsPatch) => {
-    console.log("[AssistantChat:updateSettings]", patch);
-    gmailApi.updateAssistantSettings(patch).then(setProvidersState, () => {});
+  const updateSettings = (patch: AgentSettingsPatch) => {
+    console.log("[AgentChat:updateSettings]", patch);
+    gmailApi.updateAgentSettings(patch).then(setProvidersState, () => {});
   };
 
   /** Where composer menus return focus when they close. */
@@ -1688,7 +1692,7 @@ export function AssistantChatPanel({
           />
         ) : null}
         {/* New chat right after the tabs, like a browser's new-tab button. */}
-        <HintTooltip label="New chat" shortcut="assistant.newChat" side="bottom">
+        <HintTooltip label="New chat" shortcut="agent.newChat" side="bottom">
           <IconBtn label="New chat" className="size-8 shrink-0" onClick={() => newChat()}>
             <PlusIcon className="size-4" />
           </IconBtn>
@@ -1704,7 +1708,7 @@ export function AssistantChatPanel({
             <HistoryIcon className="size-4" />
           </IconBtn>
         </HintTooltip>
-        {/* The pinned assistant toggle (home view) sits here. */}
+        {/* The pinned agent toggle (home view) sits here. */}
         <PanelControlSlot />
       </div>
 
@@ -1740,7 +1744,7 @@ export function AssistantChatPanel({
           <div className="mt-1 flex items-center gap-2">
             <button
               type="button"
-              onClick={() => void gmailApi.openSettings({ pane: "assistant" })}
+              onClick={() => void gmailApi.openSettings({ pane: "agents" })}
               className={buttonClass("outline", "sm")}
             >
               Open Settings

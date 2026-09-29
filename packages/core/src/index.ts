@@ -4,7 +4,7 @@
  * Platform (platform.ts) and serves `registeredHandlers()` to the renderer.
  */
 
-import { registerAssistantHandlers } from "./handlers/assistant.js";
+import { registerAgentHandlers } from "./handlers/agent.js";
 import { registerCalendarHandlers } from "./handlers/calendar.js";
 import { registerGmailHandlers } from "./handlers/gmail.js";
 import { registerImapAccountHandlers } from "./handlers/imap-accounts.js";
@@ -39,7 +39,7 @@ export async function startCore(platform: Platform): Promise<void> {
   registerCalendarHandlers();
   registerOtterAccountHandlers();
   registerTranslationHandlers();
-  registerAssistantHandlers();
+  registerAgentHandlers();
   handle("keybindings:read", async () => readKeybindings());
   handle("preferences:getUi", async () => getUiPreferences());
   handle("preferences:setUi", async (params: unknown) => {
@@ -72,9 +72,9 @@ export type * from "./platform.js";
 export * as accountStore from "./services/account-store.js";
 export * as mailStore from "./services/mail-store.js";
 export { runAsTask } from "./handlers/ipc-budget.js";
-export { ATTACHMENTS_DIR, dataUrl, readAttachment } from "./services/assistant/attachments.js";
-export { shutdownProviders } from "./services/assistant/service.js";
-export * from "./services/assistant/types.js";
+export { ATTACHMENTS_DIR, dataUrl, readAttachment } from "./services/agent/attachments.js";
+export { shutdownProviders } from "./services/agent/service.js";
+export * from "./services/agent/types.js";
 export { getAttachmentBytes } from "./services/attachment-cache.js";
 export { KEYBINDINGS_FILE } from "./services/keybindings-store.js";
 export { syncAllAccounts, turnedOffMailboxes } from "./services/mail-sync.js";

@@ -1,7 +1,7 @@
 import { useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { toast } from "./toast";
-import { CopyIcon, SearchIcon, SparklesIcon, SquarePenIcon } from "lucide-react";
+import { CopyIcon, MousePointer2Icon, SearchIcon, SquarePenIcon } from "lucide-react";
 import { SenderAvatar } from "./sender-avatar";
 
 /**
@@ -126,8 +126,8 @@ export function SenderHoverCard({
                 ) : null}
                 {onAsk ? (
                   <Action
-                    icon={<SparklesIcon className="size-4" />}
-                    label="Ask the assistant about them"
+                    icon={<MousePointer2Icon className="size-4" />}
+                    label="Ask the agent about them"
                     onClick={() => {
                       onAsk(email, displayName);
                       setOpen(false);

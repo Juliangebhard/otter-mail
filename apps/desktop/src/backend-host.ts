@@ -185,7 +185,8 @@ async function answer(
 
 // ── What the backend has main do ──────────────────────────────────────────
 
-const shownNotifications = new Set<Notification>();
+const MAX_AWAITING_CLICK = 50;
+const notificationsAwaitingClick = new Set<Notification>();
 
 function carryOut(effect: MainEffect): void {
   switch (effect.kind) {
@@ -196,11 +197,12 @@ function carryOut(effect: MainEffect): void {
       const { kind: _kind, open, ...options } = effect;
       if (!Notification.isSupported()) return;
       const notification = new Notification(options);
-      // Held until it's done with: a collected notification's click never fires.
-      shownNotifications.add(notification);
-      notification.on("close", () => shownNotifications.delete(notification));
+      notificationsAwaitingClick.add(notification);
+      if (notificationsAwaitingClick.size > MAX_AWAITING_CLICK) {
+        notificationsAwaitingClick.delete(notificationsAwaitingClick.values().next().value!);
+      }
       notification.on("click", () => {
-        shownNotifications.delete(notification);
+        notificationsAwaitingClick.delete(notification);
         // The same handoff as a click in the menu-bar popover.
         if (open) setPendingOpenMessage(open);
         void focusMainWindow().then(() => open && broadcast("mail:open"));
