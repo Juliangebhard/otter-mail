@@ -112,8 +112,8 @@ export function DraftEditor({
           filename,
           mimeType,
         });
-        if (result.saved && result.path) toast.success(`Saved to ${result.path}`);
-        else toast.error("Failed to save attachment");
+        // Not saved: the save dialog was cancelled.
+        if (result.saved) toast.success(`Saved ${filename}`);
       } catch {
         toast.error("Could not download attachment");
       }

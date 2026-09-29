@@ -122,6 +122,7 @@ import type {
   GmailMessageSummary,
 } from "./types";
 import { features } from "../features";
+import { AttachmentPreview, attachmentPreview, type PreviewFile } from "./attachment-preview";
 
 type MessageReaderProps = {
   accountId: string;
@@ -905,8 +906,36 @@ async function withThumbnailSlot<T>(fn: () => Promise<T>): Promise<T> {
   }
 }
 
-function useAttachmentActions(accountId: string, messageId: string, attachment: MessageAttachment) {
+/** A message's attachment, for the in-app preview. */
+function previewFile(
+  accountId: string,
+  messageId: string,
+  attachment: MessageAttachment,
+  onSave: () => void,
+): PreviewFile {
+  const params = { accountId, messageId, attachmentId: attachment.id };
+  return {
+    name: attachment.filename,
+    mimeType: attachment.mimeType,
+    size: attachment.size,
+    load: async () => (await gmailApi.getAttachmentData(params)).base64,
+    onSave,
+    onOpen: () => {
+      void gmailApi
+        .openAttachment({ ...params, filename: attachment.filename })
+        .catch(() => toast.error("Could not open attachment"));
+    },
+  };
+}
+
+function useAttachmentActions(
+  accountId: string,
+  messageId: string,
+  attachment: MessageAttachment,
+  onDownload: DownloadAttachment,
+) {
   const [opening, setOpening] = useState(false);
+  const [previewing, setPreviewing] = useState(false);
   const pressRef = useRef<{ x: number; y: number } | null>(null);
   const draggedRef = useRef(false);
 
@@ -917,8 +946,11 @@ function useAttachmentActions(accountId: string, messageId: string, attachment: 
     filename: attachment.filename,
   };
 
-  const handleOpen = () => {
-    if (draggedRef.current || opening) return;
+  const save = () => onDownload(messageId, attachment.id, attachment.filename, attachment.mimeType);
+
+  // In the app's default app (the Mac), or downloaded (the web).
+  const openInApp = () => {
+    if (opening) return;
     console.log("[MessageReader:openAttachment]", { messageId, filename: attachment.filename });
     setOpening(true);
     void (async () => {
@@ -931,6 +963,21 @@ function useAttachmentActions(accountId: string, messageId: string, attachment: 
       }
     })();
   };
+
+  // What the app can show opens in place; the rest in its own app.
+  const previewable = attachmentPreview(attachment.filename, attachment.mimeType) !== null;
+  const handleOpen = () => {
+    if (draggedRef.current) return;
+    if (previewable) setPreviewing(true);
+    else openInApp();
+  };
+
+  const preview = (
+    <AttachmentPreview
+      file={previewing ? previewFile(accountId, messageId, attachment, save) : null}
+      onClose={() => setPreviewing(false)}
+    />
+  );
 
   // Native drag-out starts once the pointer travels past a small threshold with
   // the button held; a plain click (no travel) opens the file instead.
@@ -963,7 +1010,7 @@ function useAttachmentActions(accountId: string, messageId: string, attachment: 
     },
   };
 
-  return { handleOpen, dragProps, opening };
+  return { handleOpen, openInApp, previewable, save, preview, dragProps, opening };
 }
 
 function ImageAttachmentTile({
@@ -977,7 +1024,8 @@ function ImageAttachmentTile({
   attachment: MessageAttachment;
   onDownload: DownloadAttachment;
 }) {
-  const { handleOpen, dragProps, opening } = useAttachmentActions(accountId, messageId, attachment);
+  const { handleOpen, openInApp, previewable, save, preview, dragProps, opening } =
+    useAttachmentActions(accountId, messageId, attachment, onDownload);
   const [url, setUrl] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
 
@@ -1037,9 +1085,7 @@ function ImageAttachmentTile({
           </div>
           <button
             type="button"
-            onClick={() =>
-              onDownload(messageId, attachment.id, attachment.filename, attachment.mimeType)
-            }
+            onClick={save}
             aria-label={`Download ${attachment.filename}`}
             className="absolute right-1.5 top-1.5 flex size-7 items-center justify-center rounded-lg bg-black/60 text-white opacity-0 hover:bg-black/80 focus-visible:opacity-100 group-hover:opacity-100"
           >
@@ -1049,18 +1095,19 @@ function ImageAttachmentTile({
         </div>
       </ContextMenuTrigger>
       <ContextMenuContent>
-        <ContextMenuItem icon="arrow.up.forward.app" onSelect={handleOpen}>
+        <ContextMenuItem icon="eye" onSelect={handleOpen}>
           Open
         </ContextMenuItem>
-        <ContextMenuItem
-          icon="square.and.arrow.down"
-          onSelect={() =>
-            onDownload(messageId, attachment.id, attachment.filename, attachment.mimeType)
-          }
-        >
+        {previewable && features.openFiles ? (
+          <ContextMenuItem icon="arrow.up.forward.app" onSelect={openInApp}>
+            Open in default app
+          </ContextMenuItem>
+        ) : null}
+        <ContextMenuItem icon="square.and.arrow.down" onSelect={save}>
           Save…
         </ContextMenuItem>
       </ContextMenuContent>
+      {preview}
     </ContextMenu>
   );
 }
@@ -1076,7 +1123,8 @@ function FileAttachmentRow({
   attachment: MessageAttachment;
   onDownload: DownloadAttachment;
 }) {
-  const { handleOpen, dragProps, opening } = useAttachmentActions(accountId, messageId, attachment);
+  const { handleOpen, openInApp, previewable, save, preview, dragProps, opening } =
+    useAttachmentActions(accountId, messageId, attachment, onDownload);
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
@@ -1098,7 +1146,7 @@ function FileAttachmentRow({
             onPointerDown={(e) => e.stopPropagation()}
             onClick={(e) => {
               e.stopPropagation();
-              onDownload(messageId, attachment.id, attachment.filename, attachment.mimeType);
+              save();
             }}
             aria-label={`Download ${attachment.filename}`}
             className="-me-1.5 flex size-7 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent-surface hover:text-foreground"
@@ -1108,18 +1156,19 @@ function FileAttachmentRow({
         </div>
       </ContextMenuTrigger>
       <ContextMenuContent>
-        <ContextMenuItem icon="arrow.up.forward.app" onSelect={handleOpen}>
+        <ContextMenuItem icon="eye" onSelect={handleOpen}>
           Open
         </ContextMenuItem>
-        <ContextMenuItem
-          icon="square.and.arrow.down"
-          onSelect={() =>
-            onDownload(messageId, attachment.id, attachment.filename, attachment.mimeType)
-          }
-        >
+        {previewable && features.openFiles ? (
+          <ContextMenuItem icon="arrow.up.forward.app" onSelect={openInApp}>
+            Open in default app
+          </ContextMenuItem>
+        ) : null}
+        <ContextMenuItem icon="square.and.arrow.down" onSelect={save}>
           Save…
         </ContextMenuItem>
       </ContextMenuContent>
+      {preview}
     </ContextMenu>
   );
 }
@@ -1995,6 +2044,7 @@ export function MessageReader({
     () => localStorage.getItem("gmail:summary-pinned") !== "0",
   );
   const [summaryOpen, setSummaryOpen] = useState(false);
+  const [summaryFile, setSummaryFile] = useState<PreviewFile | null>(null);
   const summaryShown = summaryFits && summaryPinned;
   const readerAction = (name: "reply" | "replyAll" | "forward" | "translate") => () => {
     const action = readerActions.current[name];
@@ -2308,15 +2358,26 @@ export function MessageReader({
           filename,
           mimeType,
         });
-        if (result.saved && result.path) {
-          toast.success(`Saved to ${result.path}`);
-        } else {
-          toast.error("Failed to save attachment");
-        }
+        // Not saved: the save dialog was cancelled.
+        if (result.saved) toast.success(`Saved ${filename}`);
       } catch {
         toast.error("Could not download attachment");
       }
     })();
+  };
+
+  // The summary's files open here: its popover closes when the preview takes focus.
+  const handleOpenSummaryFile = (fileMessageId: string, attachment: MessageAttachment) => {
+    const save = () =>
+      handleDownloadAttachment(
+        fileMessageId,
+        attachment.id,
+        attachment.filename,
+        attachment.mimeType,
+      );
+    if (!attachmentPreview(attachment.filename, attachment.mimeType)) return save();
+    setSummaryOpen(false);
+    setSummaryFile(previewFile(accountId, fileMessageId, attachment, save));
   };
 
   const handleToggleTranslation = () => {
@@ -2375,7 +2436,7 @@ export function MessageReader({
       rows={rows}
       onComposeTo={onComposeTo}
       onSearchSender={onSearchSender}
-      onDownload={handleDownloadAttachment}
+      onOpenFile={handleOpenSummaryFile}
     />
   );
 
@@ -2835,6 +2896,7 @@ export function MessageReader({
       >
         <Text variant="small">Permanently delete this conversation? This cannot be undone.</Text>
       </Dialog>
+      <AttachmentPreview file={summaryFile} onClose={() => setSummaryFile(null)} />
     </ConversationTranslationContext.Provider>
   );
 }

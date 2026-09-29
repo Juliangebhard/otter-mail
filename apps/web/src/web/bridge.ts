@@ -281,6 +281,7 @@ export const webBridge: DesktopBridge = {
     defaultMailApp: false,
     translation: hasBuiltInTranslator,
     dragOut: false,
+    openFiles: false,
   },
   invoke,
   on(channel, listener) {
