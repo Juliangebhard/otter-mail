@@ -321,6 +321,16 @@ function providerScenario(
     expect(pathOf(cachedByHeader(accountId, b.id)!.id)).toBe("Sent");
   });
 
+  it("remembers where trashed mail came from across restarts", async () => {
+    await provider.trashMessage(accountId, cachedByHeader(accountId, w1.id)!.id);
+    const trashed = cachedByHeader(accountId, w1.id)!.id;
+    // Kept in the cache's kv (nothing in memory), so a restart doesn't send it to the Inbox.
+    expect(JSON.parse(store.getKv(`imapTrashedFrom:${accountId}`)!)).toEqual({ [trashed]: "Work" });
+    const restored = await provider.untrashMessage(accountId, trashed);
+    expect(restored.map((m) => pathOf(m.id))).toEqual(["Work"]);
+    expect(JSON.parse(store.getKv(`imapTrashedFrom:${accountId}`)!)).toEqual({});
+  });
+
   it("deletes forever, and empties the trash", async () => {
     await provider.trashMessage(accountId, cachedByHeader(accountId, c.id)!.id);
     const trashed = cachedByHeader(accountId, c.id)!;

@@ -79,6 +79,8 @@ nonisolated struct MailboxState: Codable {
     var watchedAt: Date?
     /** IMAP: each synced folder's cursor, by path. */
     var folders: [String: ImapFolderState]? = nil
+    /** IMAP: where trashed mail came from (its id in Trash → folder path), for Restore. */
+    var trashedFrom: [String: String]? = nil
 }
 
 /** Where an IMAP folder's copy got to (RFC 3501, CONDSTORE). */

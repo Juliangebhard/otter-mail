@@ -33,8 +33,23 @@ import { renameFolderState } from "./sync.js";
 
 type Row = { id: string; labelIds: string[]; fromEmail?: string };
 
-/** Where trashed mail came from, for putting it back: its id in Trash → folder path. */
-const trashedFrom = new Map<string, string>();
+/**
+ * Where trashed mail came from, for putting it back: its id in Trash → folder
+ * path. Kept in kv, so it outlives a restart.
+ */
+const trashedKey = (accountId: string) => `imapTrashedFrom:${accountId}`;
+
+function trashedFrom(accountId: string): Record<string, string> {
+  return JSON.parse(store.getKv(trashedKey(accountId)) ?? "{}") as Record<string, string>;
+}
+
+function editTrashedFrom(accountId: string, edit: (origins: Record<string, string>) => void) {
+  const origins = trashedFrom(accountId);
+  const before = JSON.stringify(origins);
+  edit(origins);
+  const after = JSON.stringify(origins);
+  if (after !== before) store.setKv(trashedKey(accountId), after);
+}
 
 const rowOf = (accountId: string, id: string): Row => {
   const current = currentId(id);
@@ -217,10 +232,7 @@ async function planMoves(
       });
       movable = shown.length > 0 ? shown : movable.slice(-1);
     }
-    for (const row of movable) {
-      moves.set(row.id, dest);
-      if (target === "TRASH") trashedFrom.set(row.id, parseMessageId(row.id).path);
-    }
+    for (const row of movable) moves.set(row.id, dest);
     return moves;
   }
 
@@ -236,6 +248,7 @@ async function planMoves(
 
   if (remove.includes("SPAM") || remove.includes("TRASH")) {
     const account = await getAccount(accountId);
+    const origins = trashedFrom(accountId);
     for (const row of rows) {
       const role = roleOfRow(folders, row);
       if (
@@ -243,7 +256,7 @@ async function planMoves(
         (role !== "TRASH" || !remove.includes("TRASH"))
       )
         continue;
-      const origin = role === "TRASH" ? folders.get(trashedFrom.get(row.id) ?? "") : undefined;
+      const origin = role === "TRASH" ? folders.get(origins[row.id] ?? "") : undefined;
       const own = row.fromEmail && row.fromEmail.toLowerCase() === account?.email.toLowerCase();
       const dest =
         origin ?? (own ? folders.withRole("SENT") : undefined) ?? folders.withRole("INBOX");
@@ -270,11 +283,13 @@ async function changeLabels(
     const moves = await planMoves(accountId, client, folders, rows, change, thread);
     const moved = await moveMessages(accountId, client, await foldersOf(accountId, client), moves);
     settleRows(accountId, folders, rows, moved);
-    for (const [from, to] of moved) {
-      const origin = trashedFrom.get(from);
-      trashedFrom.delete(from);
-      if (origin && change.addLabelIds?.includes("TRASH")) trashedFrom.set(to, origin);
-    }
+    editTrashedFrom(accountId, (origins) => {
+      for (const [from, to] of moved) {
+        const origin = origins[from] ?? parseMessageId(from).path;
+        delete origins[from];
+        if (change.addLabelIds?.includes("TRASH")) origins[to] = origin;
+      }
+    });
     return moved;
   });
 }
@@ -322,6 +337,9 @@ export async function deleteForever(accountId: string, ids: string[]): Promise<v
       await expungeOnly(client, uids);
     }
   });
+  editTrashedFrom(accountId, (origins) => {
+    for (const id of ids) delete origins[currentId(id)];
+  });
 }
 
 /** Empties Junk or Trash on the server; answers every id that went, cached ones included. */
@@ -342,6 +360,7 @@ export async function emptyFolder(
     // Everything in the folder goes, so a plain EXPUNGE takes nothing else.
     await client.expunge();
   });
+  if (labelId === "TRASH") store.setKv(trashedKey(accountId), "{}");
   return [...ids];
 }
 
