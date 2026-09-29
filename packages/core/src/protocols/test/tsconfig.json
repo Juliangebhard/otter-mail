@@ -1,0 +1,10 @@
+{
+  // The test helpers that open real sockets and start Docker need Node's
+  // types, which the rest of core must not see (it runs in a browser too).
+  "extends": "../../../tsconfig.json",
+  "compilerOptions": {
+    "types": ["node"]
+  },
+  "include": ["."],
+  "exclude": []
+}
