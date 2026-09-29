@@ -4,6 +4,8 @@
  * memory too, so "is this mailbox signed in?" answers without waiting.
  */
 
+import { broadcast } from "../ipc.js";
+import { logger } from "../logger.js";
 import { platform } from "../platform.js";
 import { listAccounts } from "./account-store.js";
 
@@ -39,4 +41,18 @@ export async function setImapPassword(accountId: string, password: string): Prom
 export async function deleteImapPassword(accountId: string): Promise<void> {
   passwords.delete(accountId);
   await platform().secrets.delete(secretName(accountId));
+}
+
+/**
+ * Stops using `password` until the user enters one again (gmail:signInImap):
+ * the mailbox reads as signed out, so sync and IDLE stop and the UI asks for
+ * it. For a password the server refused, whose retries would get the account
+ * locked or the relay's addresses banned. The stored copy stays, so a refusal
+ * that was the server's hiccup heals on the next launch (one more try).
+ */
+export function setAsideImapPassword(accountId: string, password: string, why: string): void {
+  if (passwords.get(accountId) !== password) return; // already set aside, or replaced
+  passwords.delete(accountId);
+  logger.warn("imap", `Not using ${accountId}'s password until it's entered again: ${why}`);
+  broadcast("gmail:accounts-changed");
 }

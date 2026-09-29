@@ -22,6 +22,7 @@ import * as store from "../../../services/mail-store.ts";
 import type { GmailMessageSummary } from "../../../types.ts";
 import type { SyncContext } from "../../provider.ts";
 import { imapProvider } from "../index.ts";
+import { threadIdOf } from "../messages.ts";
 import { useNodePlatform } from "./node-platform.ts";
 
 useNodePlatform();
@@ -118,6 +119,7 @@ function providerScenario(
   const w1 = mail({ subject: "Report" });
   const w2 = mail({ subject: "Old report" });
   const c = mail({ subject: "Tickets" });
+  const lunch = threadIdOf(undefined, null, a.id, "Lunch?")!;
 
   const serverSearch = async (path: string, header: string) => {
     await seed.select(path);
@@ -178,7 +180,7 @@ function providerScenario(
     const reply = cachedByHeader(accountId, b.id)!;
     expect(original.labels.sort()).toEqual(["INBOX", "UNREAD"]);
     expect(reply.labels).toEqual(["SENT"]);
-    const thread = store.getThreadMessages(accountId, a.id.slice(1, -1));
+    const thread = store.getThreadMessages(accountId, lunch);
     expect(thread.map((m) => m.id).sort()).toEqual([original.id, reply.id].sort());
     const summary = thread.find((m) => m.id === original.id)!;
     expect(summary).toMatchObject({
@@ -222,6 +224,38 @@ function providerScenario(
     expect(await sync(accountId)).toEqual([]);
   });
 
+  it("keeps a stranger naming the conversation out of it, and junks only what's shown", async () => {
+    const stranger = mail({ subject: "You won!", from: "Spam <spam@x.com>", inReplyTo: a.id });
+    const lookalike = mail({ subject: "RE: lunch?", from: "Spam <spam@x.com>", inReplyTo: a.id });
+    await seed.append("INBOX", stranger.raw);
+    await seed.append("Work", lookalike.raw);
+    await sync(accountId);
+    const thread = () => store.getThreadMessages(accountId, lunch).map((m) => m.id);
+    expect(thread()).not.toContain(cachedByHeader(accountId, stranger.id)!.id);
+    expect(thread()).toContain(cachedByHeader(accountId, lookalike.id)!.id);
+
+    // Reported from the Inbox: the Inbox's own go to Junk, the rest stays put.
+    await provider.modifyThread(accountId, lunch, {
+      addLabelIds: ["SPAM"],
+      removeLabelIds: ["INBOX"],
+    });
+    expect(pathOf(cachedByHeader(accountId, lookalike.id)!.id)).toBe("Work");
+    expect(pathOf(cachedByHeader(accountId, b.id)!.id)).toBe("Sent");
+    const junked = cachedByHeader(accountId, a.id)!;
+    expect(junked.labels).toContain("SPAM");
+    await provider.modifyThread(accountId, lunch, {
+      addLabelIds: ["INBOX"],
+      removeLabelIds: ["SPAM"],
+    });
+    expect(pathOf(cachedByHeader(accountId, a.id)!.id)).toBe("INBOX");
+    expect(pathOf(cachedByHeader(accountId, lookalike.id)!.id)).toBe("Work");
+    await provider.deleteForever(accountId, [
+      cachedByHeader(accountId, stranger.id)!.id,
+      cachedByHeader(accountId, lookalike.id)!.id,
+    ]);
+    await sync(accountId);
+  });
+
   it("marks read and unread", async () => {
     const { id } = cachedByHeader(accountId, c.id)!;
     await provider.modifyMessage(accountId, id, { removeLabelIds: ["UNREAD"] });
@@ -231,7 +265,7 @@ function providerScenario(
   });
 
   it("archives a conversation, leaving your reply in Sent", async () => {
-    const threadId = a.id.slice(1, -1);
+    const threadId = lunch;
     await provider.modifyThread(accountId, threadId, { removeLabelIds: ["INBOX"] });
     const original = cachedByHeader(accountId, a.id)!;
     expect(pathOf(original.id)).toBe("Archive");
@@ -246,7 +280,7 @@ function providerScenario(
   });
 
   it("moves to a folder, and back to the inbox", async () => {
-    const threadId = a.id.slice(1, -1);
+    const threadId = lunch;
     await provider.modifyThread(accountId, threadId, { addLabelIds: ["Work"] });
     const moved = cachedByHeader(accountId, a.id)!;
     expect(pathOf(moved.id)).toBe("Work");
@@ -262,7 +296,7 @@ function providerScenario(
   });
 
   it("trashes a conversation and restores it where it was", async () => {
-    const threadId = a.id.slice(1, -1);
+    const threadId = lunch;
     await provider.trashThread(accountId, threadId);
     expect(cachedByHeader(accountId, a.id)!.labels).toContain("TRASH");
     expect(pathOf(cachedByHeader(accountId, b.id)!.id)).toBe(
@@ -316,6 +350,30 @@ function providerScenario(
       messageId: second.messageId,
     });
     expect(await provider.getDraftVersion(accountId, first.draftId)).toBeNull();
+  });
+
+  it("replaces only the draft's own versions, whatever else mentions its id", async () => {
+    const saved = await provider.saveDraft(accountId, { to: "", subject: "Mine", body: "1" });
+    const drafts = pathOf(saved.messageId!);
+    // SEARCH HEADER matches substrings: this one's Message-ID contains the draft's.
+    const decoy = mail({ subject: "Decoy" }).raw.replace(
+      /^Message-ID: .*$/m,
+      `Message-ID: ${saved.draftId}x`,
+    );
+    await seed.append(drafts, decoy);
+    await provider.saveDraft(accountId, {
+      to: "",
+      subject: "Mine",
+      body: "2",
+      draftId: saved.draftId,
+    });
+    await seed.select(drafts);
+    expect(await seed.search({ header: { name: "Subject", value: "Decoy" } })).toHaveLength(1);
+    await provider.deleteDraft(accountId, saved.draftId);
+    expect(await seed.search({ header: { name: "Subject", value: "Decoy" } })).toHaveLength(1);
+    // Not a whole Message-ID: nothing to find (or delete).
+    expect(await provider.getDraftVersion(accountId, "")).toBeNull();
+    expect(await provider.getDraftVersion(accountId, saved.draftId.slice(1, -1))).toBeNull();
   });
 
   it("creates, renames and deletes folders, keeping their mail", async () => {
@@ -392,6 +450,29 @@ function providerScenario(
     expect(arrived).toMatchObject({ subject });
   });
 
+  it("sends a ready-made message without its Bcc", async ({ skip }) => {
+    if (!server().smtp) skip();
+    const subject = `Raw ${counter++}`;
+    await provider.sendRaw(
+      accountId,
+      [
+        `From: ${accountId}`,
+        `To: ${accountId}`,
+        "Bcc: bob@example.com,",
+        " carol@example.com",
+        `Subject: ${subject}`,
+        "",
+        "Hi",
+        "",
+      ].join("\r\n"),
+    );
+    await seed.select("Sent");
+    const [uid] = await seed.search({ header: { name: "Subject", value: subject } });
+    const [filed] = await seed.fetch([uid!], { headers: true });
+    expect(Object.keys(filed!.headers!)).not.toContain("bcc");
+    expect(filed!.headers!.subject).toBe(subject);
+  });
+
   it("says what's wrong with a wrong password", async () => {
     const { settings, password } = server();
     await provider.removeAccount(accountId); // drops the logged-in connection
@@ -400,10 +481,22 @@ function providerScenario(
       const err = await sync(accountId).catch((e: unknown) => e);
       expect(provider.errorKind(err)).toBeNull();
       expect(provider.describeError(err)).toBe(`Wrong password for ${settings.username}`);
+      // Set aside, so nothing logs in with it again until the user enters one.
+      expect(provider.isSignedIn(accountId)).toBe(false);
+      await expect(sync(accountId)).rejects.toThrow(/Enter the password/);
+
+      // IDLE gives up at once too, telling the engine (which then stops it).
+      await setImapPassword(accountId, "nope");
+      let told = 0;
+      const stop = provider.watch!(accountId, () => told++);
+      await waitFor(() => (told > 0 ? true : undefined));
+      stop();
+      expect(provider.isSignedIn(accountId)).toBe(false);
     } finally {
       await setImapPassword(accountId, password);
     }
-  });
+    // Servers take their time over a failed login (Dovecot: 2 seconds).
+  }, 30_000);
 }
 
 describe.skipIf(!docker)("IMAP provider on Dovecot (QRESYNC)", () => {

@@ -15,7 +15,7 @@ import * as store from "../../services/mail-store.js";
 import type { ImapClient } from "../../protocols/index.js";
 import type { GmailLabel, GmailMessageSummary } from "../../types.js";
 import type { LabelChange } from "../provider.js";
-import { FolderGone, selectFolder, withImap } from "./connection.js";
+import { findByMessageId, FolderGone, selectFolder, withImap } from "./connection.js";
 import {
   byFolder,
   ensureFolder,
@@ -111,7 +111,7 @@ async function moveMessages(
   for (const { from, dest } of lost) {
     const header = store.getStoredReplyHeaders(accountId, from).messageIdHeader;
     const mailbox = await selectFolder(client, dest.path);
-    const uids = header ? await client.search({ messageId: header }) : [];
+    const uids = header ? await findByMessageId(client, header) : [];
     if (uids.length > 0) moved.set(from, messageId(mailbox.uidValidity, uids.at(-1)!, dest.path));
     else store.deleteMessage(accountId, from);
   }
@@ -206,6 +206,16 @@ async function planMoves(
     // Only your own mail in it (a conversation you started): that moves.
     if (movable.length === 0 && thread) {
       movable = others.filter((r) => roleOfRow(folders, r) !== "DRAFT");
+    }
+    // Junk and Not junk take only what the user saw where they asked (the
+    // Inbox's messages, or Junk's), else just the latest: anyone can make
+    // their mail look like part of a conversation, and junk gets emptied.
+    if (thread && (target === "SPAM" || remove.includes("SPAM"))) {
+      const shown = movable.filter((r) => {
+        const label = folders.get(parseMessageId(r.id).path)?.labelId;
+        return !!label && remove.includes(label);
+      });
+      movable = shown.length > 0 ? shown : movable.slice(-1);
     }
     for (const row of movable) {
       moves.set(row.id, dest);

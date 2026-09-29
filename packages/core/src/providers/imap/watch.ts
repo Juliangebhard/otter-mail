@@ -3,18 +3,24 @@
  * server reports (new mail, expunges, flag changes) calls `onChange`, a
  * second's worth at a time; so does every (re)connect, to catch up on what
  * happened meanwhile. IDLE is renewed every 25 minutes (servers drop it
- * after 30); a dropped connection is retried with backoff. Servers without
- * IDLE are left to the sync timer.
+ * after 30); a dropped connection is retried with backoff, and a server that
+ * ends IDLE right away is asked again no sooner than every 30 seconds.
+ * Servers without IDLE are left to the sync timer. A missing or refused
+ * password ends the watch: retrying would only fail again.
  */
 
 import { logger } from "../../logger.js";
 import type { IdleSession, ImapClient } from "../../protocols/index.js";
-import { openImap } from "./connection.js";
+import { isSignInFailure, openImap } from "./connection.js";
 
 const RENEW_MS = 25 * 60_000;
 const DEBOUNCE_MS = 1_000;
 const RETRY_MIN_MS = 5_000;
 const RETRY_MAX_MS = 5 * 60_000;
+/** The least time from one IDLE to the next, however soon the server ends them. */
+const IDLE_GAP_MS = 30_000;
+/** An IDLE that lasted this long shows the connection works: backoff starts over. */
+const HEALTHY_MS = 60_000;
 
 export function watchInbox(accountId: string, onChange: () => void): () => void {
   const stopped = new AbortController();
@@ -49,9 +55,9 @@ export function watchInbox(accountId: string, onChange: () => void): () => void 
           return;
         }
         await client.select("INBOX");
-        attempt = 0;
         changed();
         while (!stopped.signal.aborted) {
+          const started = Date.now();
           session = await client.idle(changed);
           const renew = setTimeout(() => void session?.stop(), RENEW_MS);
           try {
@@ -59,15 +65,25 @@ export function watchInbox(accountId: string, onChange: () => void): () => void 
           } finally {
             clearTimeout(renew);
           }
+          const lasted = Date.now() - started;
+          if (lasted >= HEALTHY_MS) attempt = 0;
+          else if (!stopped.signal.aborted) await pause(Math.max(0, IDLE_GAP_MS - lasted));
         }
       } catch (err) {
         if (stopped.signal.aborted) break;
+        client?.close();
+        if (isSignInFailure(err)) {
+          // The password is missing or was refused (and set aside): the sync
+          // this triggers finds the mailbox signed out and stops the watch.
+          logger.info("imap-watch", `IDLE for ${accountId} stopped: ${String(err)}`);
+          changed();
+          return;
+        }
         const delay = Math.min(RETRY_MIN_MS * 2 ** attempt, RETRY_MAX_MS);
         logger.info(
           "imap-watch",
           `IDLE for ${accountId} dropped (${String(err)}); again in ${delay / 1000}s`,
         );
-        client?.close();
         await pause(delay);
       }
     }

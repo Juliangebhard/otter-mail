@@ -21,6 +21,9 @@ import {
 import type { DraftSave, OutgoingMail } from "../provider.js";
 import {
   accessFor,
+  findByMessageId,
+  isMessageIdHeader,
+  noteSignInFailure,
   selectFolder,
   smtpOptions,
   tagFailure,
@@ -28,7 +31,7 @@ import {
   type ImapAccess,
 } from "./connection.js";
 import { ensureFolder, foldersOf, messageId, parseMessageId } from "./folders.js";
-import { referencesFor } from "./messages.js";
+import { referencesFor, threadIdOf } from "./messages.js";
 import { expungeOnly } from "./writes.js";
 
 const newMessageIdHeader = (email: string) =>
@@ -59,11 +62,18 @@ async function sender(accountId: string) {
   };
 }
 
-async function submit(access: ImapAccess, from: string, to: string[], raw: string) {
+async function submit(
+  accountId: string,
+  access: ImapAccess,
+  from: string,
+  to: string[],
+  raw: string,
+) {
   if (to.length === 0) throw new Error("Add at least one recipient.");
   try {
     await sendMail(smtpOptions(access), { from, to }, raw);
   } catch (err) {
+    noteSignInFailure(accountId, access, err);
     throw tagFailure(err, access.settings.smtp.host, access.settings.username);
   }
 }
@@ -111,6 +121,7 @@ export async function send(accountId: string, mail: OutgoingMail): Promise<{ mes
   };
   // Bcc goes in the envelope only; the copy in Sent keeps it.
   await submit(
+    accountId,
     access,
     email,
     addressesIn(mail.to, mail.cc, mail.bcc),
@@ -120,16 +131,35 @@ export async function send(accountId: string, mail: OutgoingMail): Promise<{ mes
   return { messageId: await fileSent(accountId, access, sent) };
 }
 
+/** A header block without its Bcc (folded lines too): Bcc goes in the envelope only. */
+function withoutBcc(head: string): string {
+  const kept: string[] = [];
+  let dropping = false;
+  for (const line of head.split(/\r?\n/)) {
+    if (!/^[ \t]/.test(line)) dropping = /^bcc\s*:/i.test(line);
+    if (!dropping) kept.push(line);
+  }
+  return kept.join("\r\n");
+}
+
 /** A ready-made message (unsubscribe mail, invitation replies): its own headers say where. */
 export async function sendRaw(accountId: string, raw: string): Promise<void> {
   const access = await accessFor(accountId);
   const { email } = await sender(accountId);
-  const head = raw.split(/\r?\n\r?\n/, 1)[0] ?? "";
+  const split = /\r?\n\r?\n/.exec(raw);
+  const head = split ? raw.slice(0, split.index) : raw;
   const headers = parseHeaders(utf8Encode(head));
+  const hidden = withoutBcc(head) + raw.slice(head.length);
   const complete = headers["message-id"]
-    ? raw
-    : withIds(raw, newMessageIdHeader(email), new Date());
-  await submit(access, email, addressesIn(headers.to, headers.cc, headers.bcc), complete);
+    ? hidden
+    : withIds(hidden, newMessageIdHeader(email), new Date());
+  await submit(
+    accountId,
+    access,
+    email,
+    addressesIn(headers.to, headers.cc, headers.bcc),
+    complete,
+  );
   await fileSent(accountId, access, complete);
 }
 
@@ -141,7 +171,7 @@ async function draftVersions(accountId: string, draftId: string) {
     const drafts = (await foldersOf(accountId, client)).withRole("DRAFT");
     if (!drafts) return null;
     const mailbox = await selectFolder(client, drafts.path);
-    const uids = await client.search({ messageId: draftId, deleted: false });
+    const uids = await findByMessageId(client, draftId);
     return { path: drafts.path, uidValidity: mailbox.uidValidity, uids };
   });
 }
@@ -151,7 +181,7 @@ export async function saveDraft(
   draft: DraftSave,
 ): Promise<{ draftId: string; messageId?: string; threadId?: string }> {
   const { email, from } = await sender(accountId);
-  const draftId = draft.draftId ?? newMessageIdHeader(email);
+  const draftId = isMessageIdHeader(draft.draftId) ? draft.draftId : newMessageIdHeader(email);
   const raw = withIds(
     buildMime({
       from,
@@ -174,7 +204,7 @@ export async function saveDraft(
       const drafts = await ensureFolder(accountId, client, "DRAFT", "Drafts");
       const appended = await client.append(drafts.path, raw, { flags: ["\\Draft", "\\Seen"] });
       const mailbox = await selectFolder(client, drafts.path);
-      const versions = await client.search({ messageId: draftId, deleted: false });
+      const versions = await findByMessageId(client, draftId);
       const uid = appended?.uid ?? versions.at(-1);
       // The versions before this one go.
       const older = versions.filter((v) => v !== uid);
@@ -192,7 +222,7 @@ export async function saveDraft(
   return {
     draftId,
     messageId: saved.uid ? messageId(saved.uidValidity, saved.uid, saved.path) : undefined,
-    threadId: draft.threadId ?? draftId.slice(1, -1),
+    threadId: threadIdOf(referencesFor(draft.threadId), null, draftId, draft.subject) ?? undefined,
   };
 }
 
