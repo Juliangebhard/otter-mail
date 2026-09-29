@@ -301,8 +301,14 @@ function providerScenario(
       subject: "Draft",
       body: "Two",
       draftId: first.draftId,
+      threadId: first.threadId,
     });
     expect(second.draftId).toBe(first.draftId);
+    // A new message's draft doesn't reference itself.
+    expect(await provider.getReplyHeaders(accountId, second.messageId!)).toEqual({
+      messageIdHeader: first.draftId,
+      referencesHeader: null,
+    });
     expect(second.messageId).not.toBe(first.messageId);
     expect(await provider.getDraftVersion(accountId, first.draftId)).toBe(second.messageId);
     expect((await provider.getMessage(accountId, second.messageId!)).bodyText).toContain("Two");
