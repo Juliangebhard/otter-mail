@@ -1,0 +1,17 @@
+{
+  "name": "@otter-mail/shared",
+  "version": "0.1.0",
+  "private": true,
+  "description": "What every app shows the same, the iPhone app included: the color themes and the demo mailbox.",
+  "type": "module",
+  "exports": {
+    "./themes": "./src/theme-palettes.ts",
+    "./demo-mailboxes": "./src/demo-mailboxes.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "catalog:"
+  }
+}

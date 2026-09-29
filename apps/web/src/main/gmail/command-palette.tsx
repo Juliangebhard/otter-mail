@@ -40,12 +40,8 @@ import { getAccountColor, getAccountDisplayName } from "./account-style";
 import { senderLabel } from "./address";
 import { cn } from "./ui";
 import { COMBINED_ACCOUNT_ID } from "./custom-views";
-import {
-  APP_THEMES,
-  previewTheme,
-  setThemeForAppearance,
-  useThemeChoice,
-} from "../theme/apply-theme";
+import { APP_THEMES } from "@otter-mail/shared/themes";
+import { previewTheme, setThemeForAppearance, useThemeChoice } from "../theme/apply-theme";
 import type { GmailAccount, GmailMessageSummary, MailView } from "./types";
 import type { KeybindingCommand } from "../keybindings/commands";
 import { shortcutLabelFor, useKeybindingsState } from "../keybindings/store";

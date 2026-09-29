@@ -78,7 +78,10 @@ xcrun devicectl device install app --device <udid> "apps/ios/.build/Build/Produc
 `-authenticationKeyPath/-authenticationKeyID/-authenticationKeyIssuerID` with an App Store Connect
 API key.)
 
-Shipping: `pnpm release:ios` uploads a build to TestFlight; see `docs/release.md`.
+Shipping: the Release iPhone workflow builds and uploads to TestFlight (`pnpm release:ios` does
+the same from a Mac); see `docs/release.md`. The app has its own version, `MARKETING_VERSION` in
+the Xcode project, apart from the Mac app's.
 
-`Resources/Themes.json` and `Resources/DemoMailboxes.json` are exported from `apps/web` by
-`pnpm ios:resources` (`dev:ios` runs it); rerun it after changing the palettes or the demo seed.
+`Resources/Themes.json` and `Resources/DemoMailboxes.json` are exported from `packages/shared` by
+`pnpm ios:resources` (`dev:ios` and releases run it); rerun it after changing the palettes or the
+demo mailbox.

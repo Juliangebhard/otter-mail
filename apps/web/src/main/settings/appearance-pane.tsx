@@ -4,13 +4,13 @@ import { toast } from "../gmail/toast";
 import type { NativeThemeInfo } from "@otter-mail/contracts";
 import { MoonIcon, SunIcon } from "lucide-react";
 import { cn, HintTooltip } from "../gmail/ui";
+import { setThemeForAppearance, themeColors, useThemeChoice } from "../theme/apply-theme";
 import {
   APP_THEMES,
-  setThemeForAppearance,
-  themeColors,
-  useThemeChoice,
-} from "../theme/apply-theme";
-import type { ThemeAppearance, ThemeColors, ThemeDefinition } from "../theme/theme-palettes";
+  type ThemeAppearance,
+  type ThemeColors,
+  type ThemeDefinition,
+} from "@otter-mail/shared/themes";
 import {
   DEFAULT_PANEL_ANIMATION_DURATION_MS,
   MAX_PANEL_ANIMATION_DURATION_MS,

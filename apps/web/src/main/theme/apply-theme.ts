@@ -1,14 +1,14 @@
 import { setSyncedPreference } from "../synced-preferences";
 import { useEffect, useState } from "react";
 import {
-  BUILT_IN_THEMES,
+  APP_THEMES,
   OTTER_DARK_THEME_COLORS,
   OTTER_LIGHT_THEME_COLORS,
+  OTTER_THEME,
   getThemeColorsForAppearance,
   type ThemeAppearance,
   type ThemeColors,
-  type ThemeDefinition,
-} from "./theme-palettes";
+} from "@otter-mail/shared/themes";
 
 /**
  * App color themes, the Otter Code model: each appearance (light, dark)
@@ -17,20 +17,9 @@ import {
  * live. "otter" is the stock palette defined in styles.css.
  */
 
-export const DEFAULT_THEME_ID = "otter";
+export const DEFAULT_THEME_ID = OTTER_THEME.id;
 /** What a fresh install wears (both appearances) until the user picks a theme. */
 export const INITIAL_THEME_ID = "codex";
-
-/** The stock palette as a definition, for previews (it is never written as overrides). */
-export const OTTER_THEME: ThemeDefinition = {
-  id: DEFAULT_THEME_ID,
-  label: "Otter Code",
-  appearance: "light",
-  colors: OTTER_LIGHT_THEME_COLORS,
-  variants: { light: OTTER_LIGHT_THEME_COLORS, dark: OTTER_DARK_THEME_COLORS },
-};
-
-export const APP_THEMES: ReadonlyArray<ThemeDefinition> = [OTTER_THEME, ...BUILT_IN_THEMES];
 
 const STORAGE_KEY: Record<ThemeAppearance, "otter:theme:light" | "otter:theme:dark"> = {
   light: "otter:theme:light",

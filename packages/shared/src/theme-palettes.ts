@@ -1,8 +1,10 @@
 /**
  * Built-in color themes, ported verbatim from Otter Code (the T3 Code fork,
  * packages/shared/src/themePalettes.ts). Each theme is a set of product color
- * roles with light and dark variants; `apply-theme.ts` maps the roles onto
- * this app's CSS variables. The standard palette is "Otter Code".
+ * roles with light and dark variants. The web app maps the roles onto its CSS
+ * variables (apps/web's apply-theme.ts); the iPhone app reads them from
+ * Themes.json (scripts/export-ios-resources.ts). The standard palette is
+ * "Otter Code".
  */
 
 export type ThemeAppearance = "light" | "dark";
@@ -1001,3 +1003,15 @@ export function getThemeColorsForAppearance(
   if (theme.appearance === appearance) return theme.colors;
   return theme.variants?.[appearance] ?? null;
 }
+
+/** The stock palette ("otter", styles.css in the web app) as a definition. */
+export const OTTER_THEME: ThemeDefinition = {
+  id: "otter",
+  label: "Otter Code",
+  appearance: "light",
+  colors: OTTER_LIGHT_THEME_COLORS,
+  variants: { light: OTTER_LIGHT_THEME_COLORS, dark: OTTER_DARK_THEME_COLORS },
+};
+
+/** Every theme a user can pick, the stock one first. */
+export const APP_THEMES: ReadonlyArray<ThemeDefinition> = [OTTER_THEME, ...BUILT_IN_THEMES];

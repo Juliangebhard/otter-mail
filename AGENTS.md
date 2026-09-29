@@ -34,9 +34,12 @@ when a feature lands or goes.
   not the TypeScript core: it signs in to Google itself (the "iOS" OAuth client, PKCE), talks to
   Gmail directly, caches on disk, and follows the Otter account through the relay (mailboxes,
   preferences under the same keys, live events). `Resources/` holds the themes and demo mailbox,
-  exported from `apps/web` by `pnpm ios:resources`. See its README.
+  exported from `packages/shared` by `pnpm ios:resources`. See its README.
 - `packages/contracts`: types shared by both sides, including `DesktopBridge`, the
   `window.desktopBridge` API the preload exposes, and the relay's API (`src/relay.ts`).
+- `packages/shared`: what every app shows the same, the iPhone app included: the color themes
+  (`./themes`) and the demo mailbox (`./demo-mailboxes`). The web app imports it; the iPhone app
+  bundles it as JSON.
 - `infra/relay`: https://relay.mail.otterware.dev, a Cloudflare Worker (Hono, better-auth,
   Drizzle on D1, a Durable Object per user). Otter accounts, the Gmail accounts linked to them,
   the account's preferences (core's `services/preferences.ts` syncs them), and realtime mail: Gmail → Pub/Sub → relay → WebSocket to each signed-in device. It never sees
@@ -86,10 +89,15 @@ it; the web app needs it (the relay keeps its Gmail sign-ins alive).
 
 ## Releases
 
-Stable only (no nightlies): run the Release workflow from `main` with a patch/minor/major bump, or
-push a `vX.Y.Z` tag. Installed apps download updates on their own and offer "Restart to update" in
-the sidebar. The iPhone app follows with `pnpm release:ios` (TestFlight). `docs/runbook.md` is the
-short version of shipping each part; details in `docs/release.md`.
+Stable only (no nightlies). The Mac app (and web) and the iPhone app release separately, each with
+its own version:
+
+- Mac: run the Release workflow from `main` with a patch/minor/major bump, or push a `vX.Y.Z` tag.
+  Installed apps download updates on their own and offer "Restart to update" in the sidebar.
+- iPhone: run the Release iPhone workflow from `main` when `apps/ios` (or what it bundles from
+  `packages/shared`) has changed. It uploads to TestFlight and tags `ios-vX.Y.Z`.
+
+`docs/runbook.md` is the short version of shipping each part; details in `docs/release.md`.
 
 ## Verifying
 
