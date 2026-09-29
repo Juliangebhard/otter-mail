@@ -1,7 +1,15 @@
+import type { ImapSettings, MailCapabilities, MailProviderKind } from "@otter-mail/contracts";
+
 export type GmailAccount = {
   id: string;
   email: string;
   name: string;
+  /** Absent in accounts stored before IMAP: Gmail. */
+  provider?: MailProviderKind;
+  /** Where an IMAP mailbox lives (it signs in with a password). */
+  imap?: ImapSettings;
+  /** What the mailbox can do; gate UI on these, never on `provider`. */
+  capabilities?: MailCapabilities;
   picture?: string;
   /** User-set override for the Google profile name, edited in Settings. */
   displayName?: string;
@@ -9,7 +17,7 @@ export type GmailAccount = {
   color?: string;
   /** Rich-text HTML signature appended to new/reply/forward compose bodies. */
   signature?: string;
-  /** No usable Google sign-in: the account needs to sign in again. */
+  /** No usable sign-in (Google, or the IMAP password on this device): sign in again. */
   signedOut?: boolean;
 };
 

@@ -1,3 +1,4 @@
+import type { ImapSettings } from "@otter-mail/contracts";
 import type {
   ComposeAttachment,
   ContactSuggestion,
@@ -387,6 +388,13 @@ export type SettingsTarget = {
   mailbox?: string | null;
 };
 
+export type AddImapAccountParams = {
+  email: string;
+  name?: string;
+  password: string;
+  imap: ImapSettings;
+};
+
 export const gmailApi = {
   listAccounts: (): Promise<GmailAccount[]> => ipc("gmail:listAccounts"),
 
@@ -398,6 +406,16 @@ export const gmailApi = {
   refreshSignatures: (): Promise<void> => ipc("gmail:refreshSignatures"),
   /** Stops waiting for the browser sign-in; the pending addAccount resolves null. */
   cancelAddAccount: (): Promise<void> => ipc("gmail:cancelAddAccount"),
+
+  /** The servers an address's mail lives on, from its domain; null when unknown. */
+  discoverImap: (email: string): Promise<ImapSettings | null> =>
+    ipc("gmail:discoverImap", { email }),
+  /** Adds an IMAP mailbox once its login and SMTP work; rejects with a readable message. */
+  addImapAccount: (params: AddImapAccountParams): Promise<GmailAccount> =>
+    ipc("gmail:addImapAccount", params),
+  /** Signs an IMAP mailbox in on this device (its password never syncs). */
+  signInImap: (accountId: string, password: string): Promise<void> =>
+    ipc("gmail:signInImap", { accountId, password }),
 
   removeAccount: (accountId: string): Promise<{ ok: boolean }> =>
     ipc("gmail:removeAccount", { accountId }),

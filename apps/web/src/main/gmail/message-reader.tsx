@@ -78,6 +78,7 @@ import {
 } from "./composer-kit";
 import { decodeEntities, htmlToText } from "./text";
 import { LabelPickerMenu, LabelSubmenu } from "./label-picker-menu";
+import { useCapabilities } from "./capabilities";
 import {
   formatAddressEntry,
   normalizeAddressList,
@@ -2014,6 +2015,9 @@ export function MessageReader({
   const modifyMessage = useModifyMessage();
   const trashMessage = useTrashMessage();
   const modifyThread = useModifyThread();
+  // No inbox categories (IMAP): no category chips. One folder per message: a
+  // folder chip can't just come off.
+  const { categories, multipleLabels } = useCapabilities(accountId);
   const trashThread = useTrashThread();
   const untrashThread = useUntrashThread();
   const untrashMessage = useUntrashMessage();
@@ -2387,7 +2391,7 @@ export function MessageReader({
         {message.subject || "(no subject)"}
       </span>
       {conversationLabelIds.includes("INBOX") ||
-      conversationLabelIds.some(isCategoryLabelId) ||
+      (categories && conversationLabelIds.some(isCategoryLabelId)) ||
       messageLabels.length > 0 ? (
         <span
           className={
@@ -2397,7 +2401,7 @@ export function MessageReader({
           }
         >
           {conversationLabelIds.includes("INBOX") ? <InboxChip onRemove={handleArchive} /> : null}
-          {conversationLabelIds.filter(isCategoryLabelId).map((id) => (
+          {(categories ? conversationLabelIds.filter(isCategoryLabelId) : []).map((id) => (
             <CategoryChip
               key={id}
               id={id}
@@ -2415,14 +2419,18 @@ export function MessageReader({
             <LabelChip
               key={label.id}
               label={label}
-              onRemove={() => {
-                console.log("[MessageReader:removeLabelChip]", { labelId: label.id });
-                void modifyThread.mutateAsync({
-                  accountId,
-                  threadId: conversationId,
-                  removeLabelIds: [label.id],
-                });
-              }}
+              onRemove={
+                multipleLabels
+                  ? () => {
+                      console.log("[MessageReader:removeLabelChip]", { labelId: label.id });
+                      void modifyThread.mutateAsync({
+                        accountId,
+                        threadId: conversationId,
+                        removeLabelIds: [label.id],
+                      });
+                    }
+                  : undefined
+              }
             />
           ))}
         </span>
@@ -2520,7 +2528,7 @@ export function MessageReader({
                 threadId={conversationId}
                 labelIds={conversationLabelIds}
               >
-                <IconBtn label="Label">
+                <IconBtn label={multipleLabels ? "Label" : "Move to folder"}>
                   <FolderIcon className="size-4" />
                 </IconBtn>
               </LabelPickerMenu>

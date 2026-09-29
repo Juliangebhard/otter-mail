@@ -8,6 +8,7 @@
 import { useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "./toast";
+import { useCapabilities } from "./capabilities";
 import { CalendarIcon, CheckIcon, ExternalLinkIcon, MapPinIcon } from "lucide-react";
 import { gmailApi, type CalendarInvite, type RsvpResponse } from "./api";
 import { HintTooltip, IconBtn, cn } from "./ui";
@@ -68,6 +69,8 @@ const DONE: Record<RsvpResponse, string> = {
 
 export function InviteCard({ accountId, messageId }: { accountId: string; messageId: string }) {
   const qc = useQueryClient();
+  // Without a calendar (IMAP) answers always go out by email.
+  const { calendar } = useCapabilities(accountId);
   const query = useQuery({
     queryKey: inviteKey(accountId, messageId),
     queryFn: () => gmailApi.getCalendarInvite(accountId, messageId),
@@ -188,8 +191,9 @@ export function InviteCard({ accountId, messageId }: { accountId: string; messag
           </div>
           {!invite.calendarAccess ? (
             <span className="text-xs text-muted-foreground">
-              Answers are emailed to the organizer — re-add this account to update your calendar
-              too.
+              {calendar
+                ? "Answers are emailed to the organizer — re-add this account to update your calendar too."
+                : "Answers are emailed to the organizer."}
             </span>
           ) : null}
         </div>
