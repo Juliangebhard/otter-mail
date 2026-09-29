@@ -26,7 +26,7 @@ const remote = (email: string, extra: Partial<RelayAccount> = {}): RelayAccount 
   ...extra,
 });
 
-const none = { link: [], unlink: [], add: [], remove: [], update: [] };
+const none = { link: [], unlink: [], add: [], remove: [], update: [], moved: [] };
 
 describe("planReconcile", () => {
   it("does nothing when both sides agree", () => {
@@ -116,6 +116,24 @@ describe("IMAP mailboxes", () => {
       displayName: undefined,
       color: "#0a0",
     });
+  });
+
+  it("never adopts other servers for a mailbox signed in here; asks for the password", () => {
+    const here = { ...local("me@fastmail.com"), imap: imapSettings };
+    const elsewhere = (host: string) =>
+      remote("me@fastmail.com", {
+        provider: "imap",
+        imap: { ...imapSettings, imap: { ...imapSettings.imap, host } },
+      });
+    const linked = new Set(["me@fastmail.com"]);
+    expect(planReconcile([here], [elsewhere("IMAP.fastmail.com")], linked)).toEqual(none);
+    expect(planReconcile([here], [elsewhere("imap.evil.example")], linked)).toEqual({
+      ...none,
+      moved: ["me@fastmail.com"],
+    });
+    // Signed out here: nothing to protect (the prompt names the host).
+    const out = { ...here, signedIn: false };
+    expect(planReconcile([out], [elsewhere("imap.evil.example")], linked)).toEqual(none);
   });
 
   it("a Gmail account from the relay stays a plain Gmail account", () => {

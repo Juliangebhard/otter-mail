@@ -13,6 +13,7 @@
  * another device" apart from "removed on this one".
  */
 
+import type { ImapSettings } from "@otter-mail/contracts";
 import type {
   ListAccountsResponse,
   PutAccountRequest,
@@ -25,11 +26,12 @@ import * as accountStore from "./account-store.js";
 import { platform } from "../platform.js";
 import { isSignedIn } from "../providers/index.js";
 import * as mailStore from "./mail-store.js";
+import { getImapPassword, setAsideImapPassword } from "./imap-passwords.js";
 import { getOtterUser, relayRequest, RelayError } from "./otter-account.js";
 import { syncedSignature } from "./preferences.js";
 import type { GmailAccount } from "../types.js";
 
-export type LocalAccount = Pick<GmailAccount, "email" | "displayName" | "color"> & {
+export type LocalAccount = Pick<GmailAccount, "email" | "displayName" | "color" | "imap"> & {
   signedIn: boolean;
 };
 
@@ -44,9 +46,20 @@ export type ReconcilePlan = {
   remove: string[];
   /** Linked on both, with a profile edited elsewhere. */
   update: RelayAccount[];
+  /**
+   * IMAP mailboxes signed in here whose servers the relay lists differently.
+   * Not adopted: whoever holds the Otter session could point them at a server
+   * of theirs to collect the password. This device keeps its own settings and
+   * asks for the password again (naming the host); signing in re-links them.
+   */
+  moved: string[];
 };
 
 const key = (email: string) => email.toLowerCase();
+
+const sameServers = (a: ImapSettings, b: ImapSettings) =>
+  a.imap.host.toLowerCase() === b.imap.host.toLowerCase() &&
+  a.smtp.host.toLowerCase() === b.smtp.host.toLowerCase();
 
 /** What to do to bring both sides together. Addresses compare case-insensitively. */
 export function planReconcile(
@@ -54,7 +67,7 @@ export function planReconcile(
   remote: RelayAccount[],
   snapshot: ReadonlySet<string>,
 ): ReconcilePlan {
-  const plan: ReconcilePlan = { link: [], unlink: [], add: [], remove: [], update: [] };
+  const plan: ReconcilePlan = { link: [], unlink: [], add: [], remove: [], update: [], moved: [] };
   const localByKey = new Map(local.map((account) => [key(account.email), account]));
   const remoteKeys = new Set(remote.map((account) => key(account.email)));
 
@@ -63,11 +76,16 @@ export function planReconcile(
     if (!here) {
       if (snapshot.has(key(account.email))) plan.unlink.push(account.email);
       else plan.add.push(account);
-    } else if (
-      (here.displayName ?? null) !== account.displayName ||
-      (here.color ?? null) !== account.color
-    ) {
-      plan.update.push(account);
+    } else {
+      if (
+        (here.displayName ?? null) !== account.displayName ||
+        (here.color ?? null) !== account.color
+      ) {
+        plan.update.push(account);
+      }
+      if (here.signedIn && here.imap && account.imap && !sameServers(here.imap, account.imap)) {
+        plan.moved.push(account.email);
+      }
     }
   }
   for (const account of local) {
@@ -241,6 +259,13 @@ export async function reconcileAccounts(
       color: account.color ?? "",
     });
   }
+  for (const email of plan.moved) {
+    const here = byKey.get(key(email))!;
+    const password = getImapPassword(here.id);
+    if (password) {
+      setAsideImapPassword(here.id, password, "the Otter account lists other servers for it");
+    }
+  }
   writeSnapshot(linked);
 
   const changed = plan.add.length + plan.remove.length + plan.update.length > 0;
@@ -252,6 +277,7 @@ export async function reconcileAccounts(
       added: plan.add.length,
       removed: plan.remove.length,
       updated: plan.update.length,
+      moved: plan.moved.length,
     });
   }
 }

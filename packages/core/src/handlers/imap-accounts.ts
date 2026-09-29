@@ -115,8 +115,9 @@ export async function addImapAccount(params: unknown): Promise<GmailAccount> {
     signature: existing?.signature ?? syncedSignature(email),
   };
   await accountStore.addAccount(account);
+  // Linked first: on the web, the relay's tunnel only carries a sync to linked servers.
+  await accountAdded(account);
   mailSync.syncAccount(id, { force: true });
-  void accountAdded(account);
   broadcast("gmail:accounts-changed");
   return withCapabilities(account);
 }
@@ -133,8 +134,8 @@ export async function signInImap(params: unknown): Promise<void> {
   }
   await verifyLogin(account.imap, password);
   await setImapPassword(account.id, password);
+  await accountAdded(account);
   mailSync.syncAccount(account.id, { force: true });
-  void accountAdded(account);
   broadcast("gmail:accounts-changed");
 }
 

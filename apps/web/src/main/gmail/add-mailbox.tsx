@@ -335,7 +335,9 @@ function ServerFields({
 
 /**
  * Signs an IMAP mailbox in on this device: its password stays on the device
- * it was typed on, so a mailbox linked elsewhere asks for it here once.
+ * it was typed on, so a mailbox linked elsewhere asks for it here once. It
+ * names the server the password goes to: the settings came from the Otter
+ * account, and whoever holds that session could have changed them.
  */
 export function ImapPasswordForm({
   account,
@@ -349,6 +351,9 @@ export function ImapPasswordForm({
   const signIn = useSignInImap();
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const where = account.imap
+    ? `Password for ${account.imap.username} on ${account.imap.imap.host}`
+    : `Password for ${account.email}`;
   return (
     <form
       className={cn("flex flex-col gap-1.5", className)}
@@ -362,11 +367,12 @@ export function ImapPasswordForm({
         );
       }}
     >
+      <p className="text-xs text-muted-foreground">{where}</p>
       <div className="flex gap-2">
         <Input
           type="password"
           autoComplete="current-password"
-          aria-label={`Password for ${account.email}`}
+          aria-label={where}
           placeholder="Password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}

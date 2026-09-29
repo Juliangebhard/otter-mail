@@ -182,6 +182,10 @@ export async function saveDraft(
 ): Promise<{ draftId: string; messageId?: string; threadId?: string }> {
   const { email, from } = await sender(accountId);
   const draftId = isMessageIdHeader(draft.draftId) ? draft.draftId : newMessageIdHeader(email);
+  // Keeps a reply's draft in its conversation (threadId names its root Message-ID);
+  // a new message's draft is its own conversation, and references nothing.
+  const root = referencesFor(draft.threadId);
+  const references = root === draftId ? undefined : root;
   const raw = withIds(
     buildMime({
       from,
@@ -192,10 +196,7 @@ export async function saveDraft(
       body: draft.body,
       bodyHtml: draft.bodyHtml,
       attachments: draft.attachments,
-      // Keeps a reply's draft in its conversation (threadId is its root Message-ID);
-      // a new message's draft is its own conversation, and references nothing.
-      references:
-        draft.threadId === draftId.slice(1, -1) ? undefined : referencesFor(draft.threadId),
+      references,
     }),
     draftId,
     new Date(),
@@ -224,7 +225,7 @@ export async function saveDraft(
   return {
     draftId,
     messageId: saved.uid ? messageId(saved.uidValidity, saved.uid, saved.path) : undefined,
-    threadId: threadIdOf(referencesFor(draft.threadId), null, draftId, draft.subject) ?? undefined,
+    threadId: threadIdOf(references, null, draftId, draft.subject) ?? undefined,
   };
 }
 
