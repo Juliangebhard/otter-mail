@@ -106,6 +106,42 @@ export function setPushedAccounts(accountIds: Iterable<string>): void {
   pushedAccounts = new Set(accountIds);
 }
 
+// ── Watches ──────────────────────────────────────────────────────────────
+// Providers that watch the mailbox from the device (IMAP IDLE) instead of
+// through the relay: started with the account's first sync, stopped when
+// it's removed or turned off, restarted after sleep. Once a watch reports,
+// the account counts as pushed.
+
+const watches = new Map<string, () => void>();
+const watched = new Set<string>();
+let stopWatchingResume: (() => void) | null = null;
+
+function startWatch(accountId: string): void {
+  const watch = findProvider(accountId)?.watch;
+  if (!watch || watches.has(accountId)) return;
+  stopWatchingResume ??= platform().onResume(() => {
+    for (const id of Array.from(watches.keys())) {
+      stopWatch(id);
+      startWatch(id);
+    }
+  });
+  watches.set(
+    accountId,
+    watch(accountId, () => {
+      watched.add(accountId);
+      syncAccount(accountId, { force: true, trigger: "push" });
+    }),
+  );
+}
+
+function stopWatch(accountId: string): void {
+  watches.get(accountId)?.();
+  watches.delete(accountId);
+  watched.delete(accountId);
+}
+
+const isPushed = (accountId: string) => pushedAccounts.has(accountId) || watched.has(accountId);
+
 /**
  * Kick off a background sync for one account (no-op if one is already running).
  * `force` skips the post-sync cooldown (launch, timer, push, user); non-forced
@@ -131,6 +167,7 @@ export function followMailboxArrangement(value: string | undefined): void {
   }
   const was = turnedOff;
   turnedOff = new Set(off);
+  for (const id of turnedOff) stopWatch(id);
   for (const id of was) if (!turnedOff.has(id)) syncAccount(id, { force: true });
 }
 
@@ -148,13 +185,15 @@ export function syncAccount(
   if (turnedOff.has(accountId)) return;
   // Nothing to sync with until the account signs in again (Settings → Accounts).
   if (!isSignedIn(accountId)) {
+    stopWatch(accountId);
     update(accountId, { syncing: false, error: signedOutMessage(accountId) });
     return;
   }
+  startWatch(accountId);
   if (!explicit && Date.now() < (failures.get(accountId)?.retryAt ?? 0)) return;
   if (
     opts?.trigger === "timer" &&
-    pushedAccounts.has(accountId) &&
+    isPushed(accountId) &&
     Date.now() - (lastFinishedAt.get(accountId) ?? 0) < PUSHED_POLL_MS
   ) {
     return;
@@ -224,6 +263,7 @@ function assertActive(accountId: string): void {
 /** Stops syncing a removed account and drops its in-memory sync state. */
 export function forgetAccount(accountId: string): void {
   removed.add(accountId);
+  stopWatch(accountId);
   statuses.delete(accountId);
   lastFinishedAt.delete(accountId);
   failures.delete(accountId);

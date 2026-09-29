@@ -52,7 +52,7 @@ export function formatAddress(name: string, email: string): string {
  * collapsed to spaces — a raw newline in an entry would otherwise terminate
  * the To/Cc/Bcc header line mid-value (header injection).
  */
-function splitAddressList(value: string): string[] {
+export function splitAddressList(value: string): string[] {
   const parts: string[] = [];
   let current = "";
   let inQuotes = false;

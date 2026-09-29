@@ -50,6 +50,9 @@ setPlatform({
   connect: nodeConnect,
   broadcast: (channel) => broadcasts.push(channel),
   setUnreadCount: () => {},
+  // Adding a mailbox starts its sync and IDLE watch.
+  onResume: () => () => {},
+  asyncContext: () => ({ run: (_value, fn) => fn(), get: () => undefined }),
 } as Partial<Platform> as Platform);
 
 describe.skipIf(!docker)("IMAP accounts on GreenMail", () => {
