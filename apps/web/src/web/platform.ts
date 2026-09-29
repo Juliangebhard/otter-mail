@@ -9,6 +9,8 @@ import sqlite3InitModule from "@sqlite.org/sqlite-wasm";
 import type { AsyncContext, FileInfo, Platform, SqlDatabase, SqlValue } from "@otter-mail/core";
 
 import { webGoogleAuth } from "./google";
+import { connectMailSocket } from "./mail-socket";
+import { webSecrets } from "./secrets";
 import type { PageEffect, PageRequests } from "./protocol";
 
 export type Page = {
@@ -107,14 +109,6 @@ const files: Platform["files"] = {
   },
 };
 
-// The origin's private storage; the only secrets kept here are Gmail refresh
-// tokens, which the relay seals (only it can use them).
-const SECRETS_FILE = "secrets.json";
-async function readSecrets(): Promise<Record<string, string>> {
-  const bytes = await files.read(SECRETS_FILE);
-  return bytes ? (JSON.parse(new TextDecoder().decode(bytes)) as Record<string, string>) : {};
-}
-
 const noContext = <T>(): AsyncContext<T> => ({ run: (_value, fn) => fn(), get: () => undefined });
 
 export async function webPlatform(page: Page): Promise<Platform> {
@@ -132,20 +126,13 @@ export async function webPlatform(page: Page): Promise<Platform> {
       console[level === "debug" ? "log" : level](`[${scope}] ${message}`, data ?? ""),
 
     database: () => database,
+    // The relay's tunnel (mail-socket.ts); the demo has no relay.
+    connect: demo
+      ? () => Promise.reject(new Error("The demo can't connect to mail servers."))
+      : (host, port, opts) => connectMailSocket(relayUrl, host, port, opts),
     files,
-    secrets: {
-      get: async (name) => (await readSecrets())[name] ?? null,
-      async set(name, value) {
-        await files.write(
-          SECRETS_FILE,
-          JSON.stringify({ ...(await readSecrets()), [name]: value }),
-        );
-      },
-      async delete(name) {
-        const { [name]: _removed, ...rest } = await readSecrets();
-        await files.write(SECRETS_FILE, JSON.stringify(rest));
-      },
-    },
+    // IMAP passwords and the like, encrypted in the origin's files (secrets.ts).
+    secrets: webSecrets(files),
     userFiles: {
       open: async (name, bytes) => page.effect({ kind: "open", name, bytes }),
       save: async (name, bytes) => {

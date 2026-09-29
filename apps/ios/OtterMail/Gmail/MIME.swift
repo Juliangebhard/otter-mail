@@ -1,6 +1,10 @@
 import Foundation
 
-/** An RFC 5322 message to hand Gmail (`raw`): plain text and HTML, UTF-8, replies threaded. */
+/**
+ * An RFC 5322 message to hand Gmail (`raw`) or an SMTP server: plain text and
+ * HTML, UTF-8, replies threaded. `stamped` adds the Date and Message-ID that
+ * Gmail would add itself (an IMAP copy keeps the message as written).
+ */
 nonisolated enum MIME {
     static func message(
         from: Person,
@@ -10,7 +14,8 @@ nonisolated enum MIME {
         text: String,
         html: String,
         inReplyTo: String? = nil,
-        references: String? = nil
+        references: String? = nil,
+        stamped: Bool = false
     ) -> Data {
         let boundary = "otter-\(UUID().uuidString)"
         var headers = [
@@ -18,6 +23,11 @@ nonisolated enum MIME {
             "To: \(to.map(address).joined(separator: ", "))",
         ]
         if !cc.isEmpty { headers.append("Cc: \(cc.map(address).joined(separator: ", "))") }
+        if stamped {
+            headers.append("Date: \(rfc5322Date.string(from: .now))")
+            let domain = from.email.split(separator: "@").last.map(String.init) ?? "otterware.dev"
+            headers.append("Message-ID: <\(UUID().uuidString.lowercased())@\(domain)>")
+        }
         headers.append("Subject: \(encoded(subject))")
         if let inReplyTo {
             headers.append("In-Reply-To: \(inReplyTo)")
@@ -41,6 +51,13 @@ nonisolated enum MIME {
             + part("text/plain", text) + part("text/html", html) + "--\(boundary)--\r\n"
         return Data(message.utf8)
     }
+
+    private static let rfc5322Date = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "EEE, dd MMM yyyy HH:mm:ss Z"
+        return formatter
+    }()
 
     private static func address(_ person: Person) -> String {
         person.name.isEmpty ? person.email : "\(encoded(person.name, quoted: true)) <\(person.email)>"

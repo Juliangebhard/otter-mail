@@ -105,7 +105,7 @@ final class Session {
         if pushTopic == nil { pushTopic = try? await relay.me().pushTopic }
         connect()
         await sync?.syncAll()
-        if let pushTopic { await sync?.watch(topic: pushTopic) }
+        await sync?.watch(pushTopic: pushTopic)
         await updateBadge()
     }
 
@@ -127,7 +127,11 @@ final class Session {
         }
     }
 
-    func disconnect() { relay.disconnect() }
+    /** The app went to the background: the relay's events and IMAP's IDLE stop. */
+    func disconnect() {
+        relay.disconnect()
+        sync?.stopWatching()
+    }
 
     /** A background refresh: catch up and say what's new. */
     func backgroundRefresh() async {
@@ -162,6 +166,52 @@ final class Session {
         await sync?.sync(email)
     }
 
+    /**
+     * Adds an IMAP mailbox: checks the settings by logging in, keeps the
+     * password in the Keychain (never synced), and links the mailbox with its
+     * settings so it follows the Otter account (other devices ask for the
+     * password once).
+     */
+    func addImapMailbox(_ email: String, settings: ImapSettings, password: String) async throws {
+        busy = "Checking…"
+        defer { busy = nil }
+        try await ImapProvider.verify(settings, password: password)
+        busy = "Adding the mailbox…"
+        let existing = store.mailbox(email)
+        // IMAP says nothing of who's there: the address stands for the name until it's set in Settings.
+        let name = existing?.name ?? ""
+        try await relay.putAccount(email, profile: .init(
+            email: email, imap: settings, displayName: existing?.displayName, color: existing?.color
+        ))
+        ImapProvider.setPassword(password, for: email)
+        store.upsert(mailbox: Mailbox(
+            email: email,
+            name: name,
+            displayName: existing?.displayName ?? email,
+            color: existing?.color ?? Self.defaultColor(email),
+            signature: existing?.signature ?? "",
+            labels: existing?.labels ?? [],
+            imap: settings
+        ))
+        saveMailboxes()
+        busy = "Loading your mail…"
+        await sync?.sync(email)
+        await sync?.watch(pushTopic: pushTopic)
+    }
+
+    /** Enters the password for an IMAP mailbox linked on another device (or whose password changed). */
+    func signIn(mailbox email: String, password: String) async throws {
+        guard let settings = store.mailbox(email)?.imap else { return }
+        busy = "Signing in…"
+        defer { busy = nil }
+        try await ImapProvider.verify(settings, password: password)
+        ImapProvider.setPassword(password, for: email)
+        store.setSignedOut(false, email)
+        saveMailboxes()
+        await sync?.sync(email)
+        await sync?.watch(pushTopic: pushTopic)
+    }
+
     private func link(_ profile: GoogleAuth.Profile, idToken: String) async throws {
         let existing = store.mailbox(profile.email)
         let mailbox = Mailbox(
@@ -194,24 +244,37 @@ final class Session {
         }
     }
 
-    /** Saves the signature in Gmail (the demo just keeps it). */
+    /** Saves the signature in Gmail, or here and on the Otter account for IMAP (the demo just keeps it). */
     func setSignature(_ html: String, for email: String) async throws {
         if let sync {
             try await sync.setSignature(html, for: email)
+            if store.mailbox(email)?.capabilities.serverSignatures == false {
+                saveMailboxes()
+                preferenceChanged("signatures")
+            }
         } else if var mailbox = store.mailbox(email) {
             mailbox.signature = html
             store.upsert(mailbox: mailbox)
         }
     }
 
-    /** Removes the mailbox from the Otter account (every device) and signs it out of Google here. */
+    /** Removes the mailbox from the Otter account (every device) and signs it out here. */
     func remove(_ mailbox: Mailbox) async {
         store.remove(mailbox: mailbox.email)
         saveMailboxes()
         guard !store.isDemo else { return }
         sync?.forget(mailbox.email)
-        await google.signOut(mailbox.email)
+        await signOut(mailbox)
         try? await relay.unlink(mailbox.email)
+    }
+
+    /** Forgets the mailbox's sign-in here: Google's (and asks Google to end it), or the IMAP password. */
+    private func signOut(_ mailbox: Mailbox) async {
+        if mailbox.imap != nil {
+            ImapProvider.setPassword(nil, for: mailbox.email)
+        } else {
+            await google.signOut(mailbox.email)
+        }
     }
 
     private func pullAccounts() async {
@@ -219,24 +282,36 @@ final class Session {
         let linked = Set(accounts.map { $0.email.lowercased() })
         for account in accounts {
             let existing = store.mailbox(account.email)
+            let imap = account.provider == .imap ? account.imap : nil
+            if let before = existing?.imap, let imap, Self.hosts(before) != Self.hosts(imap) {
+                // Moved to other servers on another device: the password isn't sent there until it's entered again for them.
+                ImapProvider.setPassword(nil, for: account.email)
+                sync?.stop(account.email)
+            }
             store.upsert(mailbox: Mailbox(
                 email: account.email,
-                name: account.name ?? account.email,
+                name: account.name ?? (imap == nil ? account.email : ""),
                 displayName: account.displayName ?? account.name ?? account.email,
                 color: account.color ?? Self.defaultColor(account.email),
-                signature: existing?.signature ?? "",
+                // New here: an IMAP mailbox's signature as the account keeps it.
+                signature: existing?.signature ?? (imap == nil ? "" : remoteSignatures[account.email.lowercased()] ?? ""),
                 labels: existing?.labels ?? [],
                 picture: account.picture,
-                signedOut: !google.isSignedIn(account.email)
+                signedOut: imap == nil ? !google.isSignedIn(account.email) : ImapProvider.password(account.email) == nil,
+                imap: imap
             ))
         }
         // Unlinked on another device: gone here too.
         for mailbox in store.mailboxes where !linked.contains(mailbox.email.lowercased()) {
             store.remove(mailbox: mailbox.email)
             sync?.forget(mailbox.email)
-            await google.signOut(mailbox.email)
+            await signOut(mailbox)
         }
         saveMailboxes()
+    }
+
+    private static func hosts(_ settings: ImapSettings) -> [String] {
+        [settings.imap.host.lowercased(), settings.smtp.host.lowercased()]
     }
 
     private func saveMailboxes() {
@@ -262,9 +337,35 @@ final class Session {
         remoteSections["settings"] = settings ?? [:]
         preferences.apply(ui: ui ?? [:], settings: settings ?? [:])
         assistant.apply(section: sections["assistant"] as? [String: Any], key: hermesKey)
+        let signatures = sections["signatures"] as? [String: String]
+        remoteSections["signatures"] = signatures ?? [:]
+        applySignatures()
         // A section the account doesn't have yet is seeded from here, as core does.
         if ui == nil { preferenceChanged("ui") }
         if settings == nil { preferenceChanged("settings") }
+        if signatures == nil { preferenceChanged("signatures") }
+    }
+
+    /** The account's IMAP signatures (by lower-cased address), as last pulled or written. */
+    private var remoteSignatures: [String: String] {
+        (remoteSections["signatures"] as? [String: String]) ?? [:]
+    }
+
+    /** IMAP servers keep no signatures: the account's (core's `signatures` section) are theirs. */
+    private func applySignatures() {
+        var changed = false
+        for var mailbox in store.mailboxes where !mailbox.capabilities.serverSignatures {
+            guard let signature = remoteSignatures[mailbox.email.lowercased()], signature != mailbox.signature else { continue }
+            mailbox.signature = signature
+            store.upsert(mailbox: mailbox)
+            changed = true
+        }
+        if changed { saveMailboxes() }
+    }
+
+    /** This device's IMAP signatures, written over the account's; mailboxes it doesn't have keep theirs. */
+    private var signaturesSection: [String: Any] {
+        Dictionary(store.mailboxes.filter { !$0.capabilities.serverSignatures }.map { ($0.email.lowercased(), $0.signature) }) { a, _ in a }
     }
 
     private func preferenceChanged(_ section: String) {
@@ -278,7 +379,13 @@ final class Session {
             Task { try? await relay.putPreferences(["assistant": assistant.syncedSection]) }
             return
         }
-        let ours: [String: Any] = section == "ui" ? preferences.uiSection : preferences.settingsSection
+        // Not pulled yet: writing now would drop the other devices' signatures.
+        if section == "signatures", remoteSections["signatures"] == nil { return }
+        let ours: [String: Any] = switch section {
+        case "ui": preferences.uiSection
+        case "signatures": signaturesSection
+        default: preferences.settingsSection
+        }
         let merged = (remoteSections[section] ?? [:]).merging(ours) { _, mine in mine }
         remoteSections[section] = merged
         pushingPreferences?.cancel()
@@ -303,11 +410,11 @@ final class Session {
 
     /** Back to the welcome screen, with nothing of the account left here. */
     private func endSession() {
-        let emails = store.mailboxes.map(\.email)
+        let mailboxes = store.mailboxes
         relay.disconnect()
         sync?.forgetAll()
         sync = nil
-        Task { for email in emails { await google.signOut(email) } }
+        Task { for mailbox in mailboxes { await signOut(mailbox) } }
         UserDefaults.standard.removeObject(forKey: Self.userKey)
         UserDefaults.standard.removeObject(forKey: "otter:mailboxes")
         UserDefaults.standard.set(false, forKey: Self.demoKey)

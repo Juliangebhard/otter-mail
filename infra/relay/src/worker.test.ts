@@ -8,6 +8,7 @@
 import { execFileSync } from "node:child_process";
 import * as http from "node:http";
 import * as fs from "node:fs";
+import * as net from "node:net";
 import * as os from "node:os";
 import * as path from "node:path";
 
@@ -20,6 +21,7 @@ import type {
   PreferencesResponse,
   RelayEvent,
 } from "@otter-mail/contracts/relay";
+import { TUNNEL_CLOSE } from "@otter-mail/contracts/relay";
 
 const CLIENT_ID = "test-client.apps.googleusercontent.com";
 const WEB_CLIENT_ID = "test-web-client.apps.googleusercontent.com";
@@ -35,6 +37,9 @@ let jwks: http.Server;
 let worker: Awaited<ReturnType<typeof unstable_startWorker>>;
 let base: string;
 let persistDir: string;
+/** A mail server for the tunnel: greets, then echoes; `bye` makes it hang up, `stall` stop reading. */
+let mailServer: net.Server;
+let mailTarget: string;
 
 beforeAll(async () => {
   const pair = await generateKeyPair("RS256");
@@ -60,6 +65,18 @@ beforeAll(async () => {
   });
   await new Promise<void>((resolve) => jwks.listen(0, "127.0.0.1", resolve));
   const { port } = jwks.address() as { port: number };
+
+  mailServer = net.createServer((socket) => {
+    socket.write("* OK hello\r\n");
+    socket.on("error", () => {}); // The relay resets connections it cuts off.
+    socket.on("data", (data) => {
+      if (String(data) === "bye\r\n") socket.end();
+      else if (String(data) === "stall\r\n") socket.pause();
+      else socket.write(data);
+    });
+  });
+  await new Promise<void>((resolve) => mailServer.listen(0, "127.0.0.1", resolve));
+  mailTarget = `127.0.0.1:${(mailServer.address() as net.AddressInfo).port}`;
 
   persistDir = fs.mkdtempSync(path.join(os.tmpdir(), "otter-relay-test-"));
   execFileSync(
@@ -92,6 +109,7 @@ beforeAll(async () => {
       GOOGLE_WEB_CLIENT_SECRET: { type: "plain_text", value: "web-secret" },
       APP_ORIGIN: { type: "plain_text", value: APP_ORIGIN },
       COOKIE_DOMAIN: { type: "plain_text", value: "" },
+      TUNNEL_TEST_TARGET: { type: "plain_text", value: mailTarget },
       PUSH_AUDIENCE: { type: "plain_text", value: PUSH_AUDIENCE },
       PUSH_SERVICE_ACCOUNT: { type: "plain_text", value: PUSH_SERVICE_ACCOUNT },
       BETTER_AUTH_SECRET: {
@@ -113,6 +131,7 @@ beforeAll(async () => {
 afterAll(async () => {
   await worker?.dispose();
   jwks?.close();
+  mailServer?.close();
   fs.rmSync(persistDir, { recursive: true, force: true });
 });
 
@@ -194,8 +213,9 @@ async function link(token: string, email: string, profile: Record<string, unknow
   });
 }
 
-async function listAccounts(token: string) {
-  const response = await call("GET", "/v1/accounts", token);
+/** The linked mailboxes, as a build that knows IMAP asks for them (`query` "" for older ones). */
+async function listAccounts(token: string, query = "?providers=gmail,imap") {
+  const response = await call("GET", `/v1/accounts${query}`, token);
   expect(response.status).toBe(200);
   return ((await response.json()) as ListAccountsResponse).accounts;
 }
@@ -368,9 +388,24 @@ describe("linked accounts", () => {
     });
     expect(edit.status).toBe(204);
 
+    const gmail = { provider: "gmail", imap: null };
     expect(await listAccounts(token)).toEqual([
-      { email: "work@example.com", name: "Work", picture: null, displayName: "Job", color: "#f00" },
-      { email: "home@example.com", name: null, picture: null, displayName: null, color: null },
+      {
+        email: "work@example.com",
+        ...gmail,
+        name: "Work",
+        picture: null,
+        displayName: "Job",
+        color: "#f00",
+      },
+      {
+        email: "home@example.com",
+        ...gmail,
+        name: null,
+        picture: null,
+        displayName: null,
+        color: null,
+      },
     ]);
   });
 
@@ -405,6 +440,123 @@ describe("linked accounts", () => {
     await link(token, "new@example.com");
     await until(() => device.events.length > 0, "the accounts event");
     expect(device.events).toEqual([{ type: "accounts" }]);
+    device.socket.close();
+  });
+});
+
+describe("IMAP mailboxes", () => {
+  const settings = {
+    username: "me@fastmail.test",
+    imap: { host: "imap.fastmail.test", port: 993, security: "tls" },
+    smtp: { host: "smtp.fastmail.test", port: 587, security: "starttls" },
+  };
+  const put = (token: string, email: string, body: unknown) =>
+    call("PUT", `/v1/accounts/${encodeURIComponent(email)}`, token, body);
+
+  it("links with settings and no ID token, and updates them", async () => {
+    const { token } = await signIn("imap-owner@example.com");
+    expect(
+      (await put(token, "me@fastmail.test", { provider: "imap", imap: settings })).status,
+    ).toBe(204);
+    const moved = { ...settings, imap: { ...settings.imap, host: "mail.fastmail.test" } };
+    expect((await put(token, "me@fastmail.test", { provider: "imap", imap: moved })).status).toBe(
+      204,
+    );
+    // Profile edits may leave the provider out.
+    expect((await put(token, "me@fastmail.test", { displayName: "Fastmail" })).status).toBe(204);
+    expect(await listAccounts(token)).toEqual([
+      {
+        email: "me@fastmail.test",
+        provider: "imap",
+        imap: moved,
+        name: null,
+        picture: null,
+        displayName: "Fastmail",
+        color: null,
+      },
+    ]);
+  });
+
+  it("refuses missing or invalid settings, and settings on a Gmail account", async () => {
+    const { token } = await signIn("imap-invalid@example.com");
+    const server = settings.imap;
+    for (const imap of [
+      undefined,
+      { ...settings, username: "" },
+      { ...settings, imap: { ...server, host: " " } },
+      { ...settings, imap: { ...server, port: 0 } },
+      { ...settings, imap: { ...server, port: 70000 } },
+      { ...settings, imap: { ...server, security: "ssl" } },
+      { username: "x", imap: server },
+    ]) {
+      expect((await put(token, "bad@fastmail.test", { provider: "imap", imap })).status).toBe(400);
+    }
+    const gmail = await put(token, "g@example.com", {
+      idToken: await idToken("g@example.com"),
+      imap: settings,
+    });
+    expect(gmail.status).toBe(400);
+    expect(await listAccounts(token)).toEqual([]);
+  });
+
+  it("doesn't switch a mailbox between Gmail and IMAP without unlinking it", async () => {
+    const { token } = await signIn("imap-switch@example.com");
+    await link(token, "both@gmail.test");
+    expect((await put(token, "both@gmail.test", { provider: "imap", imap: settings })).status).toBe(
+      409,
+    );
+    await put(token, "imap-only@fastmail.test", { provider: "imap", imap: settings });
+    const relink = await put(token, "imap-only@fastmail.test", {
+      provider: "gmail",
+      idToken: await idToken("imap-only@fastmail.test"),
+    });
+    expect(relink.status).toBe(409);
+    expect((await listAccounts(token)).map((a) => a.provider)).toEqual(["gmail", "imap"]);
+
+    await call("DELETE", "/v1/accounts/both%40gmail.test", token);
+    expect((await put(token, "both@gmail.test", { provider: "imap", imap: settings })).status).toBe(
+      204,
+    );
+  });
+
+  it("tells every device when an IMAP mailbox is linked", async () => {
+    const { token } = await signIn("imap-multi@example.com", "imap-multi-sub");
+    const other = await signIn("imap-multi@example.com", "imap-multi-sub");
+    const device = await connect(other.token);
+    await put(token, "live@fastmail.test", { provider: "imap", imap: settings });
+    await until(() => device.events.length > 0, "the accounts event");
+    expect(device.events).toEqual([{ type: "accounts" }]);
+    device.socket.close();
+  });
+
+  it("shows IMAP mailboxes only to builds that ask, and only they unlink them", async () => {
+    const { token } = await signIn("imap-old-build@example.com");
+    await link(token, "old@gmail.test");
+    await put(token, "new@fastmail.test", { provider: "imap", imap: settings });
+    expect((await listAccounts(token, "")).map((a) => a.email)).toEqual(["old@gmail.test"]);
+    expect((await listAccounts(token, "?providers=gmail")).length).toBe(1);
+    expect((await listAccounts(token, "?providers=imap,outlook")).map((a) => a.email)).toEqual([
+      "new@fastmail.test",
+    ]);
+
+    // An old build's unlink leaves the IMAP mailbox alone.
+    expect((await call("DELETE", "/v1/accounts/new%40fastmail.test", token)).status).toBe(204);
+    expect((await listAccounts(token)).length).toBe(2);
+    const route = "/v1/accounts/new%40fastmail.test?providers=gmail,imap";
+    expect((await call("DELETE", route, token)).status).toBe(204);
+    expect((await listAccounts(token)).map((a) => a.email)).toEqual(["old@gmail.test"]);
+  });
+
+  it("gets no Gmail pushes for an address linked over IMAP", async () => {
+    const { token } = await signIn("imap-eavesdropper@example.com");
+    await put(token, "victim@gmail.test", {
+      provider: "imap",
+      imap: { ...settings, username: "victim@gmail.test" },
+    });
+    const device = await connect(token);
+    expect((await push({ emailAddress: "victim@gmail.test", historyId: "7" })).status).toBe(204);
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(device.events).toEqual([]);
     device.socket.close();
   });
 });
@@ -640,5 +792,270 @@ describe("realtime", () => {
 
   it("acknowledges pushes that aren't Gmail notifications", async () => {
     expect((await push({ hello: "world" })).status).toBe(204);
+  });
+});
+
+describe("tunnel", () => {
+  /** The status the relay answers a WebSocket upgrade with (101 when it accepts it). */
+  function upgradeStatus(query: string, headers: Record<string, string> = {}) {
+    return new Promise<number>((resolve, reject) => {
+      const request = http.get(`${base}/v1/tunnel?${query}`, {
+        headers: {
+          connection: "Upgrade",
+          upgrade: "websocket",
+          "sec-websocket-version": "13",
+          "sec-websocket-key": "dGhlIHNhbXBsZSBub25jZQ==",
+          ...headers,
+        },
+      });
+      request.on("response", (response) => {
+        response.resume();
+        resolve(response.statusCode!);
+      });
+      request.on("upgrade", (_response, socket) => {
+        socket.destroy();
+        resolve(101);
+      });
+      request.on("error", reject);
+    });
+  }
+
+  /** Opens a tunnel and collects what comes through it. */
+  function tunnel(token: string, target: string) {
+    const [host, port] = target.split(":");
+    const url = `${base.replace(/^http/, "ws")}/v1/tunnel?host=${host}&port=${port}`;
+    const socket = new WebSocket(url, {
+      headers: { authorization: `Bearer ${token}` },
+    } as unknown as string[]);
+    socket.binaryType = "arraybuffer";
+    const frames: string[] = [];
+    socket.addEventListener("message", (e) =>
+      frames.push(
+        typeof e.data === "string"
+          ? `text:${e.data}`
+          : Buffer.from(e.data as ArrayBuffer).toString(),
+      ),
+    );
+    const closed = new Promise<{ code: number; reason: string }>((resolve) =>
+      socket.addEventListener("close", (e) => resolve({ code: e.code, reason: e.reason })),
+    );
+    return { socket, frames, closed };
+  }
+
+  it("needs a session, a WebSocket and the web app's origin", async () => {
+    const { token } = await signIn("tunnel-auth@example.com");
+    expect(await upgradeStatus("host=imap.example.com&port=993")).toBe(401);
+    const bearer = { authorization: `Bearer ${token}` };
+    const plain = await fetch(`${base}/v1/tunnel?host=imap.example.com&port=993`, {
+      headers: bearer,
+    });
+    expect(plain.status).toBe(426);
+    const origin = "https://evil.example";
+    expect(await upgradeStatus("host=imap.example.com&port=993", { ...bearer, origin })).toBe(403);
+  });
+
+  it("only reaches mail ports on public hosts", async () => {
+    const { token } = await signIn("tunnel-rules@example.com");
+    const bearer = { authorization: `Bearer ${token}` };
+    for (const query of [
+      "host=imap.example.com&port=80",
+      "host=imap.example.com&port=22",
+      "host=imap.example.com",
+      "host=localhost&port=993",
+      "host=mail.localhost&port=993",
+      "host=127.0.0.1&port=993",
+      "host=127.1&port=993",
+      "host=2130706433&port=993",
+      "host=0x7f.1&port=993",
+      "host=10.1.2.3&port=993",
+      "host=172.20.0.1&port=993",
+      "host=192.168.1.1&port=993",
+      "host=169.254.169.254&port=993",
+      "host=100.64.0.1&port=993",
+      "host=0.0.0.0&port=993",
+      "host=%5B%3A%3A1%5D&port=993",
+      "host=a%20b&port=993",
+    ]) {
+      expect(await upgradeStatus(query, bearer), query).toBe(400);
+    }
+  });
+
+  it("pipes bytes both ways once the server is connected", async () => {
+    const { token } = await signIn("tunnel-pipe@example.com");
+    const { socket, frames, closed } = tunnel(token, mailTarget);
+    await until(() => frames.length >= 2, "the greeting");
+    expect(frames).toEqual(["text:open", "* OK hello\r\n"]);
+
+    socket.send(new TextEncoder().encode("a1 NOOP\r\n"));
+    await until(() => frames.join("").includes("a1 NOOP"), "the echo");
+
+    // The server hanging up closes the tunnel.
+    socket.send(new TextEncoder().encode("bye\r\n"));
+    expect((await closed).code).toBe(1000);
+  });
+
+  it("closes the server's connection when the client closes", async () => {
+    const { token } = await signIn("tunnel-close@example.com");
+    let ended = 0;
+    mailServer.once("connection", (connection) => connection.on("close", () => ended++));
+    const { socket, frames } = tunnel(token, mailTarget);
+    await until(() => frames.length >= 2, "the greeting");
+    socket.close();
+    await until(() => ended === 1, "the server's connection to close");
+  });
+
+  /** Links an IMAP mailbox on the test server, making its tunnels the linked kind. */
+  async function linkTestServer(token: string, email: string) {
+    const [host, port] = mailTarget.split(":");
+    const server = { host: host!, port: Number(port), security: "tls" };
+    const response = await call("PUT", `/v1/accounts/${encodeURIComponent(email)}`, token, {
+      provider: "imap",
+      imap: { username: email, imap: server, smtp: { ...server, host: "smtp.example.com" } },
+    });
+    expect(response.status).toBe(204);
+  }
+
+  /** Sends `total` bytes in 256 KB frames, once the tunnel is open. */
+  async function flood(open: ReturnType<typeof tunnel>, total: number) {
+    await until(() => open.frames.length >= 2, "the greeting");
+    const frame = new Uint8Array(256 * 1024).fill(120);
+    for (let sent = 0; sent < total && open.socket.readyState === WebSocket.OPEN;) {
+      open.socket.send(frame);
+      sent += frame.byteLength;
+    }
+  }
+
+  /** Rate limits count per wall-clock minute (locally): start away from its end. */
+  async function startOfMinute() {
+    const into = Date.now() % 60_000;
+    if (into > 40_000) await new Promise((resolve) => setTimeout(resolve, 60_000 - into));
+  }
+
+  it("carries 1 MB each way to a host that isn't the user's mailbox's", async () => {
+    const { token } = await signIn("tunnel-unlinked@example.com");
+    const open = tunnel(token, mailTarget);
+    await flood(open, 1.25 * 2 ** 20);
+    expect((await open.closed).code).toBe(TUNNEL_CLOSE.limit);
+  });
+
+  it("carries more to the servers of the user's IMAP mailboxes", async () => {
+    const { token } = await signIn("tunnel-linked@example.com");
+    await linkTestServer(token, "linked@tunnel.test");
+    const open = tunnel(token, mailTarget);
+    await flood(open, 1.25 * 2 ** 20);
+    await until(() => open.frames.join("").length > 1.25 * 2 ** 20, "the echo");
+    expect(open.socket.readyState).toBe(WebSocket.OPEN);
+    open.socket.close();
+  });
+
+  it("cuts off a client far ahead of the server", { timeout: 20_000 }, async () => {
+    const { token } = await signIn("tunnel-backlog@example.com");
+    await linkTestServer(token, "backlog@tunnel.test");
+    const open = tunnel(token, mailTarget);
+    await until(() => open.frames.length >= 2, "the greeting");
+    open.socket.send(new TextEncoder().encode("stall\r\n"));
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    await flood(open, 64 * 2 ** 20);
+    expect((await open.closed).code).toBe(TUNNEL_CLOSE.backlog);
+  });
+
+  it("limits tunnels a minute per user, fewer to other hosts", { timeout: 90_000 }, async () => {
+    await startOfMinute();
+    const { token } = await signIn("tunnel-rate@example.com");
+    const opened = async () => {
+      const open = tunnel(token, mailTarget);
+      let code: number | undefined;
+      void open.closed.then((closed) => (code = closed.code));
+      await until(() => open.frames.length >= 2 || code !== undefined, "the greeting or a close");
+      open.socket.close();
+      return open.frames[0] === "text:open" ? "open" : code;
+    };
+    for (let i = 0; i < 6; i++) expect(await opened()).toBe("open");
+    expect(await opened()).toBe(TUNNEL_CLOSE.rateLimited);
+
+    // Linked, the same server counts against the looser limit.
+    await linkTestServer(token, "rate@tunnel.test");
+    expect(await opened()).toBe("open");
+    // Someone else isn't limited.
+    const other = await signIn("tunnel-rate-other@example.com");
+    const theirs = tunnel(other.token, mailTarget);
+    await until(() => theirs.frames.length >= 2, "the greeting");
+    theirs.socket.close();
+  });
+
+  it("says when it couldn't connect", async () => {
+    const { token } = await signIn("tunnel-fail@example.com");
+    const { frames, closed } = tunnel(token, "nowhere.invalid:993");
+    expect((await closed).code).toBe(TUNNEL_CLOSE.connectFailed);
+    expect(frames).toEqual([]);
+  });
+});
+
+describe("Gmail pushes next to IMAP mailboxes", () => {
+  const imap = (username: string) => ({
+    provider: "imap",
+    imap: {
+      username,
+      imap: { host: "imap.gmail.test", port: 993, security: "tls" },
+      smtp: { host: "smtp.gmail.test", port: 465, security: "tls" },
+    },
+  });
+  const put = (token: string, email: string, body: unknown) =>
+    call("PUT", `/v1/accounts/${encodeURIComponent(email)}`, token, body);
+  const mailEvents = (events: (RelayEvent | string)[]) =>
+    events.filter((e) => typeof e !== "string" && e.type === "mail");
+
+  it("reach everyone who linked the address as Gmail, and nobody who linked it over IMAP", async () => {
+    // Two Otter accounts linked the same Gmail account; one has an IMAP mailbox too.
+    const owner = await signIn("push-owner@example.com");
+    const partner = await signIn("push-partner@example.com");
+    const stranger = await signIn("push-stranger@example.com");
+    expect((await link(owner.token, "Shared@Gmail.test")).status).toBe(204);
+    expect((await link(partner.token, "shared@gmail.test")).status).toBe(204);
+    expect((await put(owner.token, "owner@fastmail.test", imap("owner"))).status).toBe(204);
+    // Someone else claims the address over IMAP: it proves nothing, and takes nothing away.
+    expect((await put(stranger.token, "shared@gmail.test", imap("shared"))).status).toBe(204);
+    // Editing the Gmail link's profile (no provider, as every client sends it) keeps it Gmail.
+    expect((await put(owner.token, "shared@gmail.test", { displayName: "Shared" })).status).toBe(
+      204,
+    );
+
+    const devices = await Promise.all(
+      [owner, owner, partner, stranger].map((user) => connect(user.token)),
+    );
+    const [ownerMac, ownerWeb, partnerMac, strangerMac] = devices;
+
+    expect((await push({ emailAddress: "SHARED@gmail.test", historyId: "9001" })).status).toBe(204);
+    const event = { type: "mail", email: "shared@gmail.test", historyId: "9001" };
+    for (const device of [ownerMac, ownerWeb, partnerMac]) {
+      await until(() => mailEvents(device.events).length > 0, "the mail event");
+    }
+
+    // Gmail never publishes for an IMAP mailbox; a notification for one reaches nobody.
+    expect((await push({ emailAddress: "owner@fastmail.test", historyId: "1" })).status).toBe(204);
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    for (const device of [ownerMac, ownerWeb, partnerMac]) {
+      expect(mailEvents(device.events)).toEqual([event]);
+    }
+    expect(mailEvents(strangerMac.events)).toEqual([]);
+
+    expect((await listAccounts(owner.token)).map((a) => [a.email, a.provider])).toEqual([
+      ["shared@gmail.test", "gmail"],
+      ["owner@fastmail.test", "imap"],
+    ]);
+    for (const device of devices) device.socket.close();
+  });
+
+  it("stop with the Gmail link, and don't come back with an IMAP link in its place", async () => {
+    const { token } = await signIn("push-relinker@example.com");
+    const route = `/v1/accounts/${encodeURIComponent("relinked@gmail.test")}`;
+    await link(token, "relinked@gmail.test");
+    const device = await connect(token);
+    expect((await call("DELETE", route, token)).status).toBe(204);
+    expect((await put(token, "relinked@gmail.test", imap("relinked"))).status).toBe(204);
+    await push({ emailAddress: "relinked@gmail.test", historyId: "2" });
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(mailEvents(device.events)).toEqual([]);
+    device.socket.close();
   });
 });

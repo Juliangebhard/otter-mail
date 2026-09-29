@@ -10,6 +10,7 @@ import {
 import { toast } from "./toast";
 import {
   gmailApi,
+  type AddImapAccountParams,
   type ModifyMessageParams,
   type ModifyThreadParams,
   type SendMessageParams,
@@ -753,6 +754,32 @@ export function useAddAccount() {
     mutationFn: (email?: string) => {
       console.log("[hooks:useAddAccount] adding account", { email });
       return gmailApi.addAccount(email);
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.accounts() });
+    },
+  });
+}
+
+export function useAddImapAccount() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (params: AddImapAccountParams) => {
+      console.log("[hooks:useAddImapAccount] adding account", { email: params.email });
+      return gmailApi.addImapAccount(params);
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.accounts() });
+    },
+  });
+}
+
+export function useSignInImap() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (params: { accountId: string; password: string }) => {
+      console.log("[hooks:useSignInImap] signing in", { accountId: params.accountId });
+      return gmailApi.signInImap(params.accountId, params.password);
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: queryKeys.accounts() });

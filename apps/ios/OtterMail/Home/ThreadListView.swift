@@ -186,6 +186,8 @@ struct ThreadActions: View {
                     ))
                 }
             }
+            // A switch (the app's toggle style) can't sit in a menu; checkmarks can.
+            .toggleStyle(.automatic)
         }
         Divider()
         if thread.labels.contains("INBOX") {

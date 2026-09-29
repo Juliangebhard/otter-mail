@@ -47,6 +47,21 @@ export interface GoogleAuth {
   removeTokens(accountId: string): Promise<void>;
 }
 
+/**
+ * A TCP connection to a mail server (IMAP, SMTP), TLS already negotiated when
+ * asked for. The desktop opens real sockets; the web app tunnels through the
+ * relay (a WebSocket to `/v1/tunnel`) and does TLS itself, so the relay only
+ * ever carries ciphertext.
+ */
+export interface ByteStream {
+  /** The next bytes from the server; null once the connection has closed. */
+  read(): Promise<Uint8Array | null>;
+  write(data: Uint8Array): Promise<void>;
+  /** STARTTLS: negotiate TLS over the open connection; everything after it is encrypted. */
+  startTls(): Promise<void>;
+  close(): void;
+}
+
 export type LanguageDetection = { language: string | null; confidence: number };
 
 /**
@@ -109,6 +124,12 @@ export interface Platform {
   };
 
   google: GoogleAuth;
+  /**
+   * Opens a connection to a mail server: TLS from the first byte with
+   * `tls: true`, plain (to be upgraded with `startTls`) otherwise. Certificates
+   * are verified against the system's (or a bundled) root store.
+   */
+  connect(host: string, port: number, opts: { tls: boolean }): Promise<ByteStream>;
   /** The relay (infra/relay): Otter accounts, linked accounts, push. */
   relayUrl: string;
   /**

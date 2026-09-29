@@ -12,7 +12,7 @@ import { broadcast, handle } from "../ipc.js";
 import { logger } from "../logger.js";
 import { platform } from "../platform.js";
 import { listAccounts } from "../services/account-store.js";
-import { renewWatches } from "../services/gmail-watch.js";
+import { findProvider, isSignedIn } from "../providers/index.js";
 import {
   clearLinkedSnapshot,
   linkedAccountIds,
@@ -76,13 +76,13 @@ async function refreshOnce(): Promise<void> {
     const { pushTopic } = await relayRequest<MeResponse>("GET", "/v1/me");
     await reconcileAccounts(removeLocalAccount);
     const linked = linkedAccountIds();
-    const accountIds = (await listAccounts())
-      .filter(
-        (account) =>
-          linked.has(account.email.toLowerCase()) && platform().google.isSignedIn(account.id),
-      )
-      .map((account) => account.id);
-    setPushedAccounts(await renewWatches(accountIds, pushTopic));
+    const pushed: string[] = [];
+    for (const account of await listAccounts()) {
+      const watch = findProvider(account)?.watchViaRelay;
+      if (!watch || !linked.has(account.email.toLowerCase()) || !isSignedIn(account)) continue;
+      if (await watch(account.id, pushTopic)) pushed.push(account.id);
+    }
+    setPushedAccounts(pushed);
   } catch (err) {
     logger.info("otter-account", `Refresh failed: ${String(err)}`);
   }

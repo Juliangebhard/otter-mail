@@ -40,7 +40,6 @@ import {
   useCombinedMessages,
   useCombinedCounts,
   useGmailSearch,
-  useLabels,
   useModifyMessage,
   useModifyThread,
   useTrashMessage,
@@ -57,9 +56,9 @@ import {
 import { LabelChip, InboxChip, ImportantMarker } from "./label-chip";
 import { SignedOutMailbox } from "./signed-out-mailbox";
 import { LabelOverlay, type LabelOverlayMode } from "./label-overlay";
-import { renderLabelMenuNodes } from "./label-picker-menu";
+import { useCapabilities } from "./capabilities";
+import { moveToFolder, renderLabelChoices, useLabelChoices } from "./label-picker-menu";
 import { INBOX_VIEW_ID, STARRED_VIEW_ID, SENT_VIEW_ID, DRAFTS_VIEW_ID } from "./custom-views";
-import { buildLabelTree, isAssignableLabel } from "./label-tree";
 import { isTypingTarget } from "./keyboard";
 import { useCommandHandlers } from "../keybindings/dispatch";
 import { SEARCH_HINT, SearchHeader } from "./search-header";
@@ -279,20 +278,8 @@ function MessageRow({
   const shownLabels = messageLabels.slice(0, MAX_CHIPS);
   const hiddenLabelCount = messageLabels.length - shownLabels.length;
 
-  const ownerLabels = useLabels(ownerAccountId);
-  const labelTree = buildLabelTree((ownerLabels.data ?? []).filter(isAssignableLabel));
-  const appliedLabels = new Set(labelIds);
-
   // Labels apply to the whole conversation, like Gmail's list.
-  const handleLabelToggle = (labelId: string, checked: boolean) => {
-    console.log("[MessageList:labelToggle]", { threadId, labelId, checked });
-    void modifyThread.mutateAsync({
-      accountId: ownerAccountId,
-      threadId,
-      addLabelIds: checked ? [labelId] : undefined,
-      removeLabelIds: checked ? undefined : [labelId],
-    });
-  };
+  const labelChoices = useLabelChoices({ accountId: ownerAccountId, threadId, labelIds });
 
   const handleToggleRead = () => {
     const isUnread = message.threadUnread ?? message.unread;
@@ -556,16 +543,13 @@ function MessageRow({
             Open in assistant chat
           </ContextMenuItem>
           <ContextMenuSeparator />
-          <ContextMenuSub label="Label">
-            {labelTree.length === 0 ? (
-              <ContextMenuItem disabled>No labels</ContextMenuItem>
-            ) : (
-              renderLabelMenuNodes(labelTree, appliedLabels, handleLabelToggle, {
-                CheckboxItem: ContextMenuCheckboxItem,
-                Sub: ContextMenuSub,
-                Separator: ContextMenuSeparator,
-              })
-            )}
+          <ContextMenuSub label={labelChoices.folders ? "Move to folder" : "Label"}>
+            {renderLabelChoices(labelChoices, {
+              Item: ContextMenuItem,
+              CheckboxItem: ContextMenuCheckboxItem,
+              Sub: ContextMenuSub,
+              Separator: ContextMenuSeparator,
+            })}
           </ContextMenuSub>
           <ContextMenuSeparator />
           {trashed || junk ? null : (
@@ -788,6 +772,8 @@ export function MessageList({
 
   const selectedRow = visibleMessages.find((m) => m.id === selectedMessageId) ?? null;
   const selectedOwner = selectedRow ? (selectedRow.accountId ?? accountId) : null;
+  const selectedCapabilities = useCapabilities(selectedOwner);
+  const { multipleLabels } = useCapabilities(accountId);
 
   // Conversations opened up in place (Apple Mail), keyed `${owner}:${threadId}`;
   // cleared with the multi-selection when the view changes.
@@ -1102,6 +1088,18 @@ export function MessageList({
     if (!row || !labelOverlay) return;
     const owner = row.accountId ?? accountId;
     const rowThreadId = row.threadId || row.id;
+    if (labelOverlay === "label" && !selectedCapabilities.multipleLabels) {
+      // One folder per message: "Label as" moves the conversation there.
+      if (wasApplied) return;
+      const labels = allLabels.find((l) => l.accountId === owner)?.labels ?? [];
+      const move = moveToFolder(rowLabels(row), pickedId, labels);
+      console.log("[MessageList:moveToFolder]", { rowThreadId, pickedId });
+      if (moveContextLabelId && move.removeLabelIds.includes(moveContextLabelId)) {
+        advanceFrom(row.id);
+      }
+      void listModifyThread.mutateAsync({ accountId: owner, threadId: rowThreadId, ...move });
+      return;
+    }
     if (labelOverlay === "label") {
       console.log("[MessageList:labelAs]", { rowThreadId, pickedId, wasApplied });
       void listModifyThread.mutateAsync({
@@ -1572,7 +1570,9 @@ export function MessageList({
                 ? "Everything here has been read."
                 : searchQuery
                   ? "No messages match your search."
-                  : "This label is empty."
+                  : multipleLabels
+                    ? "This label is empty."
+                    : "This folder is empty."
             }
           />
         ) : (

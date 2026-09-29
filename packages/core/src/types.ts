@@ -1,12 +1,21 @@
 /**
- * Shared Gmail types — used by backend services/handlers.
+ * Shared mail types — used by backend services/handlers. They are shaped like
+ * Gmail's (labels, threads) for every provider: see contracts' mail.ts.
  * The frontend duplicates these; keep names exact.
  */
+
+import type { ImapSettings, MailCapabilities, MailProviderKind } from "@otter-mail/contracts";
 
 export interface GmailAccount {
   id: string;
   email: string;
   name: string;
+  /** Absent in accounts stored before IMAP: Gmail. */
+  provider?: MailProviderKind;
+  /** Where an IMAP mailbox lives; its password is in the platform's secrets. */
+  imap?: ImapSettings;
+  /** What the mailbox can do; set by gmail:listAccounts, never stored. */
+  capabilities?: MailCapabilities;
   picture?: string;
   /** User-set override for the Google profile name, edited in Settings. */
   displayName?: string;

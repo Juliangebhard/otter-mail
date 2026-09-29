@@ -7,11 +7,11 @@
  *  3. Otherwise only a web page — open it in the browser.
  */
 
-import { toBase64, utf8Encode } from "../bytes.js";
 import { logger } from "../logger.js";
 import { getAccount } from "./account-store.js";
-import { getUnsubscribeHeaders, sendRawMessage } from "./gmail-api.js";
+import { providerFor } from "../providers/index.js";
 import * as store from "./mail-store.js";
+import { buildMime, formatAddress } from "./outgoing.js";
 
 export type UnsubscribeInfo = {
   method: "oneClick" | "mailto" | "web";
@@ -34,7 +34,10 @@ function parse(header: string, oneClick: boolean): Parsed | null {
 async function lookup(accountId: string, messageId: string): Promise<Parsed | null> {
   const key = `${accountId}:${messageId}`;
   if (cache.has(key)) return cache.get(key)!;
-  const { listUnsubscribe, oneClick } = await getUnsubscribeHeaders(accountId, messageId);
+  const { listUnsubscribe, oneClick } = await providerFor(accountId).getUnsubscribeHeaders(
+    accountId,
+    messageId,
+  );
   const parsed = listUnsubscribe ? parse(listUnsubscribe, oneClick) : null;
   cache.set(key, parsed);
   return parsed;
@@ -55,25 +58,32 @@ export async function getUnsubscribe(
   return parsed ? describe(parsed) : null;
 }
 
-/** mailto:list@x?subject=…&body=… → an email to that address. */
-async function sendUnsubscribeEmail(accountId: string, mailto: string): Promise<void> {
+/**
+ * The email a `mailto:list@x?subject=…&body=…` link asks for. The link is
+ * the sender's to write: exactly one plain address, only subject and body
+ * taken from it, and no line breaks anywhere they could add headers.
+ */
+export function unsubscribeEmail(
+  mailto: string,
+  from: string,
+): { to: string; subject: string; body: string; raw: string } {
   const url = new URL(mailto);
-  const to = decodeURIComponent(url.pathname);
+  const to = decodeURIComponent(url.pathname).trim();
   const subject = url.searchParams.get("subject") ?? "unsubscribe";
   const body = url.searchParams.get("body") ?? "unsubscribe";
+  if (!/^[^\s@<>()[\]\\,;:"]+@[^\s@<>()[\]\\,;:"]+\.[^\s@<>()[\]\\,;:"]+$/.test(to)) {
+    throw new Error("This message's unsubscribe address isn't one address.");
+  }
+  if (/[\r\n]/.test(subject)) throw new Error("This message's unsubscribe link is malformed.");
+  const raw = buildMime({ from, to, subject, body });
+  return { to, subject, body, raw };
+}
+
+async function sendUnsubscribeEmail(accountId: string, mailto: string): Promise<void> {
   const account = await getAccount(accountId);
   const me = account?.email ?? accountId;
-  const raw = [
-    `From: ${account?.name ? `"${account.name}" <${me}>` : me}`,
-    `To: ${to}`,
-    `Subject: =?UTF-8?B?${toBase64(utf8Encode(subject))}?=`,
-    "MIME-Version: 1.0",
-    "Content-Type: text/plain; charset=UTF-8",
-    "",
-    body,
-    "",
-  ].join("\r\n");
-  await sendRawMessage(accountId, raw);
+  const { raw } = unsubscribeEmail(mailto, formatAddress(account?.name ?? "", me));
+  await providerFor(accountId).sendRaw(accountId, raw);
 }
 
 /** Returns "done" when handled in place, or the URL the caller should open. */

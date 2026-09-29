@@ -5,6 +5,8 @@
  * (main → renderer pushes, sent with `broadcast`).
  */
 
+export * from "./mail.js";
+
 export type ThemeSource = "system" | "light" | "dark";
 
 export interface NativeThemeInfo {

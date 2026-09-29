@@ -13,6 +13,7 @@
 import { fromBase64, sha256Hex, toBase64 } from "../bytes.js";
 import { logger } from "../logger.js";
 import { platform } from "../platform.js";
+import { findProvider } from "../providers/index.js";
 import { getKv, setKv } from "./mail-store.js";
 
 const HIT_TTL_MS = 30 * 24 * 60 * 60 * 1000; // found photos: refresh monthly
@@ -169,7 +170,8 @@ async function fromDomainLogo(email: string): Promise<string | null> {
 
 async function resolveAvatar(accountId: string, email: string): Promise<string | null> {
   const sources: (() => Promise<string | null>)[] = [
-    () => fromPeopleApi(accountId, email),
+    // Contact photos need a Google sign-in; other mailboxes start at Gravatar.
+    ...(findProvider(accountId)?.kind === "gmail" ? [() => fromPeopleApi(accountId, email)] : []),
     () => fromGravatar(email),
     () => fromDomainLogo(email),
   ];

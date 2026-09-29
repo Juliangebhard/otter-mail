@@ -66,7 +66,13 @@ struct MailboxesSettings: View {
                             }
                         }
                     } label: {
-                        Label(session.busy ?? "Add mailbox", systemImage: "plus")
+                        Label(session.busy ?? "Add Gmail mailbox", systemImage: "plus")
+                    }
+                    .disabled(session.busy != nil)
+                    NavigationLink {
+                        AddImapMailbox()
+                    } label: {
+                        Label("Add IMAP mailbox", systemImage: "envelope.badge")
                     }
                     .disabled(session.busy != nil)
                 }
@@ -85,7 +91,7 @@ struct MailboxesSettings: View {
     }
 }
 
-/** One mailbox: signing in here, its name and color, its signature in Gmail, and removing it. */
+/** One mailbox: signing in here, its name and color, its signature, and removing it. */
 struct MailboxSettings: View {
     @Environment(Session.self) private var session
     @Environment(MailStore.self) private var store
@@ -95,6 +101,7 @@ struct MailboxSettings: View {
     let email: String
     @State private var name = ""
     @State private var confirmRemove = false
+    @State private var password = ""
     @State private var error: String?
 
     var body: some View {
@@ -105,7 +112,23 @@ struct MailboxSettings: View {
 
     private func form(_ mailbox: Mailbox) -> some View {
         SettingsForm {
-            if mailbox.signedOut {
+            if mailbox.signedOut, let imap = mailbox.imap {
+                Section {
+                    SecureField("Password", text: $password)
+                        .textContentType(.password)
+                        .onSubmit(signInImap)
+                    Button(action: signInImap) {
+                        Label(session.busy ?? "Sign in to \(email)", systemImage: "person.crop.circle.badge.checkmark")
+                    }
+                    .disabled(password.isEmpty || session.busy != nil)
+                } header: {
+                    // Whose password, and where it goes: the servers can change on another device.
+                    Text("\(imap.username) on \(imap.imap.host)")
+                        .textCase(nil)
+                } footer: {
+                    Text("This iPhone needs the password: the mailbox is new here, the server refused it, or its servers changed. It stays on this iPhone; your mail goes straight between it and \(imap.imap.host).")
+                }
+            } else if mailbox.signedOut {
                 Section {
                     Button {
                         Task {
@@ -138,13 +161,15 @@ struct MailboxSettings: View {
 
             if !mailbox.signedOut {
                 Section {
-                    SignatureEditor(html: mailbox.signature) { html in
+                    SignatureEditor(html: mailbox.signature, savedIn: mailbox.capabilities.serverSignatures ? "Gmail" : "your Otter account") { html in
                         try await session.setSignature(html, for: email)
                     }
                 } header: {
                     Text("Signature")
                 } footer: {
-                    Text("Added to new messages, replies and forwards from this mailbox. Saved in Gmail, so it's the same there and on every device.")
+                    Text(mailbox.capabilities.serverSignatures
+                        ? "Added to new messages, replies and forwards from this mailbox. Saved in Gmail, so it's the same there and on every device."
+                        : "Added to new messages, replies and forwards from this mailbox. Saved with your Otter account, so it's the same on every device.")
                 }
             }
 
@@ -156,7 +181,7 @@ struct MailboxSettings: View {
                             Task { await session.remove(mailbox) }
                         }
                     } message: {
-                        Text("Removes it from your Otter account on every device and signs this iPhone out of it. Nothing is deleted from Gmail.")
+                        Text("Removes it from your Otter account on every device and signs this iPhone out of it. Nothing is deleted from \(mailbox.imap == nil ? "Gmail" : "the server").")
                     }
             }
         }
@@ -168,6 +193,18 @@ struct MailboxSettings: View {
             Button("OK") { error = nil }
         } message: {
             Text(error ?? "")
+        }
+    }
+
+    private func signInImap() {
+        guard !password.isEmpty else { return }
+        Task {
+            do {
+                try await session.signIn(mailbox: email, password: password)
+                password = ""
+            } catch {
+                self.error = error.localizedDescription
+            }
         }
     }
 

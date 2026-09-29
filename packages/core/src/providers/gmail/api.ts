@@ -1,25 +1,21 @@
 /**
- * gmail-api.ts
- *
  * Gmail REST API client.
  * Base URL: https://gmail.googleapis.com/gmail/v1/users/me
  *
  * gmailFetch: authenticated fetch that spends the account's Gmail quota through
- * gmail-quota.ts (user actions first, sync in the background) and backs off on
+ * quota.ts (user actions first, sync in the background) and backs off on
  * rate limits (429, and 403 per-user quota errors).
  */
 
-import { fromBase64, randomHex, toBase64, toBase64Url, utf8Decode, utf8Encode } from "../bytes.js";
-import { platform } from "../platform.js";
-import { getAccount } from "./account-store.js";
-import { getCachedAttachment, putCachedAttachment } from "./attachment-cache.js";
-import { acquireQuota, isBackgroundWork, quotaCost, reportQuotaExceeded } from "./gmail-quota.js";
-import type {
-  GmailLabel,
-  GmailMessageSummary,
-  GmailMessageDetail,
-  ComposeAttachment,
-} from "../types.js";
+import { fromBase64, toBase64Url, utf8Decode, utf8Encode } from "../../bytes.js";
+import { SIGNED_OUT_MESSAGE } from "../../google.js";
+import { platform } from "../../platform.js";
+import { mapPool } from "../../pool.js";
+import { getAccount } from "../../services/account-store.js";
+import { buildMime, formatAddress } from "../../services/outgoing.js";
+import type { GmailLabel, GmailMessageSummary, GmailMessageDetail } from "../../types.js";
+import type { DraftSave, ErrorKind, OutgoingMail } from "../provider.js";
+import { acquireQuota, isBackgroundWork, quotaCost, reportQuotaExceeded } from "./quota.js";
 
 const BASE_URL = "https://gmail.googleapis.com/gmail/v1/users/me";
 
@@ -94,6 +90,37 @@ export function isNetworkError(err: unknown): boolean {
       `${err.message} ${String((err as { cause?: unknown }).cause ?? "")}`,
     )
   );
+}
+
+export function errorKind(err: unknown): ErrorKind | null {
+  if (isRateLimitError(err)) return "rateLimit";
+  if (isNetworkError(err)) return "network";
+  if (err instanceof GmailApiError && err.status === 404) return "notFound";
+  return null;
+}
+
+/** A short, readable reason for the status line (Gmail errors carry whole JSON bodies). */
+export function describeError(err: unknown): string {
+  if (isRateLimitError(err)) return "Gmail is limiting requests right now — retrying shortly";
+  if (isNetworkError(err)) return "Can't reach Gmail — retrying when the connection is back";
+  const text = String(err);
+  if (text.includes(SIGNED_OUT_MESSAGE) || text.includes("Google sign-in expired")) {
+    return SIGNED_OUT_MESSAGE;
+  }
+  if (err instanceof GmailApiError) {
+    if (err.status === 401) {
+      return "Gmail rejected this account's sign-in — try removing and re-adding it";
+    }
+    if (err.status >= 500) return "Gmail is having trouble right now — retrying shortly";
+    let detail = "";
+    try {
+      detail = (JSON.parse(err.body) as { error?: { message?: string } }).error?.message ?? "";
+    } catch {
+      // not JSON: fall back to the status alone
+    }
+    return `Gmail error ${err.status}${detail ? `: ${detail.slice(0, 160)}` : ""}`;
+  }
+  return text.length > 240 ? `${text.slice(0, 240)}…` : text;
 }
 
 type GmailFetchInit = {
@@ -177,28 +204,6 @@ async function gmailFetch(
   // DELETE endpoints (drafts) return an empty 204 body.
   const text = await response.text();
   return text ? JSON.parse(text) : {};
-}
-
-/**
- * Runs `fn` over `items` with at most `concurrency` calls in flight, keeping
- * every slot busy (a slow request doesn't hold up the rest of its batch).
- * Results keep the order of `items`.
- */
-export async function mapPool<T, R>(
-  items: readonly T[],
-  concurrency: number,
-  fn: (item: T, index: number) => Promise<R>,
-): Promise<R[]> {
-  const results = new Array<R>(items.length);
-  let next = 0;
-  const worker = async () => {
-    while (next < items.length) {
-      const index = next++;
-      results[index] = await fn(items[index], index);
-    }
-  };
-  await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, worker));
-  return results;
 }
 
 // ── listLabels ────────────────────────────────────────────────────────────────
@@ -419,14 +424,14 @@ function mapMessageSummary(msg: RawMessageMetadata): GmailMessageSummary {
 
 /**
  * Fetch metadata-format summaries for a set of message ids, capped at 5
- * concurrent requests. Shared by listMessages (live cold-cache warm-up) and the
- * background sync engine (gmail-quota paces the latter behind user actions).
+ * concurrent requests. Shared by live paging (cold-cache warm-up) and the
+ * background sync engine (quota.ts paces the latter behind user actions).
  */
 export async function fetchMetadataForIds(
   accountId: string,
   ids: string[],
 ): Promise<GmailMessageSummary[]> {
-  // messages.get costs 5 quota units; gmail-quota paces the calls, so the
+  // messages.get costs 5 quota units; quota.ts paces the calls, so the
   // pool only bounds sockets in flight.
   const fetched = await mapPool(ids, 6, async (id) => {
     try {
@@ -446,41 +451,6 @@ export async function fetchMetadataForIds(
   return fetched.filter((m): m is RawMessageMetadata => m !== null).map(mapMessageSummary);
 }
 
-// ── listMessages ──────────────────────────────────────────────────────────────
-
-export async function listMessages(
-  accountId: string,
-  params: {
-    labelIds?: string[];
-    pageToken?: string;
-    maxResults?: number;
-  },
-): Promise<{ messages: GmailMessageSummary[]; nextPageToken?: string }> {
-  const query = new URLSearchParams();
-  if (params.labelIds?.length) {
-    for (const lid of params.labelIds) {
-      query.append("labelIds", lid);
-    }
-  }
-  if (params.pageToken) query.set("pageToken", params.pageToken);
-  query.set("maxResults", String(params.maxResults ?? 25));
-
-  const list = (await gmailFetch(accountId, `/messages?${query.toString()}`)) as {
-    messages?: { id: string; threadId: string }[];
-    nextPageToken?: string;
-  };
-
-  if (!list.messages?.length) {
-    return { messages: [], nextPageToken: list.nextPageToken };
-  }
-
-  const messages = await fetchMetadataForIds(
-    accountId,
-    list.messages.map((m) => m.id),
-  );
-  return { messages, nextPageToken: list.nextPageToken };
-}
-
 // ── Sync primitives ───────────────────────────────────────────────────────────
 
 /** Mailbox profile — used to seed/track the incremental-sync history cursor. */
@@ -497,12 +467,12 @@ export async function getProfile(
 /** A single page of message ids (no metadata) for full-mailbox sync. */
 export async function listMessageIdsPage(
   accountId: string,
-  params: { pageToken?: string; maxResults?: number; labelIds?: string[] },
+  params: { pageToken?: string; maxResults?: number; labelIds?: string[]; spamTrash?: boolean },
 ): Promise<{ ids: string[]; nextPageToken?: string; resultSizeEstimate: number }> {
   const query = new URLSearchParams();
   query.set("maxResults", String(params.maxResults ?? 500));
   // Spam/Trash are synced too — the Junk and Trash views read the local cache.
-  query.set("includeSpamTrash", "true");
+  if (params.spamTrash !== false) query.set("includeSpamTrash", "true");
   for (const lid of params.labelIds ?? []) query.append("labelIds", lid);
   if (params.pageToken) query.set("pageToken", params.pageToken);
 
@@ -810,197 +780,13 @@ export async function fetchReplyHeaders(
 
 // ── sendMessage ───────────────────────────────────────────────────────────────
 
-const CRLF = "\r\n";
-
-function isPrintableAscii(value: string): boolean {
-  return /^[\x20-\x7e]*$/.test(value);
-}
-
-/**
- * RFC 2047 B-encoded word(s), chunked by code point so UTF-8 byte sequences
- * never split across words; continuation words are folded onto new lines.
- */
-function encodeWords(value: string): string {
-  const MAX_BYTES = 45; // "=?UTF-8?B?" + base64(45B → 60ch) + "?=" = 72 chars ≤ 75
-  const chunks: string[] = [];
-  let current = "";
-  for (const ch of value) {
-    if (current && utf8Encode(current + ch).length > MAX_BYTES) {
-      chunks.push(current);
-      current = ch;
-    } else {
-      current += ch;
-    }
-  }
-  if (current) chunks.push(current);
-  return chunks.map((c) => `=?UTF-8?B?${toBase64(utf8Encode(c))}?=`).join(`${CRLF} `);
-}
-
-function encodeHeaderValue(value: string): string {
-  return isPrintableAscii(value) ? value : encodeWords(value);
-}
-
-function formatAddress(name: string, email: string): string {
-  if (!name || name === email) return email;
-  if (!isPrintableAscii(name)) return `${encodeWords(name)} <${email}>`;
-  if (/[^A-Za-z0-9 !#$%&'*+\-/=?^_`{|}~.]/.test(name)) {
-    return `"${name.replace(/(["\\])/g, "\\$1")}" <${email}>`;
-  }
-  return `${name} <${email}>`;
-}
-
-/**
- * Split a user-typed address list on commas outside double quotes. CR/LF are
- * collapsed to spaces — a raw newline in an entry would otherwise terminate
- * the To/Cc/Bcc header line mid-value (header injection).
- */
-function splitAddressList(value: string): string[] {
-  const parts: string[] = [];
-  let current = "";
-  let inQuotes = false;
-  for (const ch of value) {
-    if (ch === '"') inQuotes = !inQuotes;
-    if (ch === "," && !inQuotes) {
-      parts.push(current);
-      current = "";
-    } else {
-      current += ch;
-    }
-  }
-  parts.push(current);
-  return parts.map((p) => p.replace(/[\r\n]+/g, " ").trim()).filter((p) => p.length > 0);
-}
-
-/** Re-emit an address list with display names RFC 2047-encoded when non-ASCII. */
-function encodeAddressList(value: string): string {
-  return splitAddressList(value)
-    .map((entry) => {
-      const match = entry.match(/^(.*?)\s*<([^>]+)>$/);
-      if (!match) return entry;
-      const name = match[1].trim().replace(/^"|"$/g, "").replace(/\\(.)/g, "$1");
-      return formatAddress(name, match[2].trim());
-    })
-    .join(", ");
-}
-
-function wrapBase64(base64: string): string {
-  return base64.match(/.{1,76}/g)?.join(CRLF) ?? "";
-}
-
-function attachmentHeaders(att: { name: string; mimeType: string }): string[] {
-  const mimeType = att.mimeType || "application/octet-stream";
-  if (isPrintableAscii(att.name) && !/["\\]/.test(att.name)) {
-    return [
-      `Content-Type: ${mimeType}; name="${att.name}"`,
-      `Content-Disposition: attachment; filename="${att.name}"`,
-    ];
-  }
-  // RFC 2231 extended parameter + RFC 2047 fallback for legacy clients.
-  const extended = `UTF-8''${encodeURIComponent(att.name).replace(/[!'()*]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`)}`;
-  const fallback = encodeWords(att.name).split(`${CRLF} `).join(" ");
-  return [
-    `Content-Type: ${mimeType}`,
-    `Content-Disposition: attachment; filename="${fallback}"; filename*=${extended}`,
-  ];
-}
-
-interface OutgoingMessage {
-  /** Already formatted, e.g. via formatAddress(). */
-  from: string;
-  to: string;
-  cc?: string;
-  bcc?: string;
-  subject: string;
-  body: string;
-  /** When present, the message is sent as multipart/alternative (text + html). */
-  bodyHtml?: string;
-  inReplyTo?: string;
-  references?: string;
-  attachments?: ComposeAttachment[];
-}
-
-function buildMime(params: OutgoingMessage): string {
-  // Drafts may not have recipients yet.
-  const headers: string[] = [`From: ${params.from}`];
-  if (params.to) headers.push(`To: ${encodeAddressList(params.to)}`);
-  if (params.cc) headers.push(`Cc: ${encodeAddressList(params.cc)}`);
-  if (params.bcc) headers.push(`Bcc: ${encodeAddressList(params.bcc)}`);
-  headers.push(`Subject: ${encodeHeaderValue(params.subject)}`);
-  if (params.inReplyTo) headers.push(`In-Reply-To: ${params.inReplyTo}`);
-  if (params.references) {
-    // One message id per folded line keeps long reply chains within line limits.
-    headers.push(`References: ${params.references.split(/\s+/).filter(Boolean).join(`${CRLF} `)}`);
-  }
-  headers.push("MIME-Version: 1.0");
-
-  const bodyBase64 = wrapBase64(toBase64(utf8Encode(params.body)));
-  const textPart = [
-    "Content-Type: text/plain; charset=UTF-8",
-    "Content-Transfer-Encoding: base64",
-    "",
-    bodyBase64,
-  ];
-
-  // Rich mail: text/plain + text/html under multipart/alternative.
-  let bodyEntity = textPart;
-  if (params.bodyHtml) {
-    const altBoundary = `otter_alt_${randomHex(12)}`;
-    const htmlPart = [
-      "Content-Type: text/html; charset=UTF-8",
-      "Content-Transfer-Encoding: base64",
-      "",
-      wrapBase64(toBase64(utf8Encode(params.bodyHtml))),
-    ];
-    bodyEntity = [
-      `Content-Type: multipart/alternative; boundary="${altBoundary}"`,
-      "",
-      [`--${altBoundary}`, ...textPart].join(CRLF),
-      [`--${altBoundary}`, ...htmlPart].join(CRLF),
-      `--${altBoundary}--`,
-    ];
-  }
-
-  const attachments = params.attachments ?? [];
-  if (attachments.length === 0) {
-    return [...headers, ...bodyEntity].join(CRLF);
-  }
-
-  const boundary = `otter_${randomHex(12)}`;
-  headers.push(`Content-Type: multipart/mixed; boundary="${boundary}"`);
-  const parts: string[] = [[`--${boundary}`, ...bodyEntity].join(CRLF)];
-  for (const att of attachments) {
-    parts.push(
-      [
-        `--${boundary}`,
-        ...attachmentHeaders(att),
-        "Content-Transfer-Encoding: base64",
-        "",
-        // A round trip normalizes url-safe/whitespaced input.
-        wrapBase64(toBase64(fromBase64(att.base64))),
-      ].join(CRLF),
-    );
-  }
-  return [headers.join(CRLF), "", parts.join(CRLF), `--${boundary}--`].join(CRLF);
-}
-
 function encodeBase64url(data: string): string {
   return toBase64Url(utf8Encode(data));
 }
 
 export async function sendMessage(
   accountId: string,
-  params: {
-    to: string;
-    cc?: string;
-    bcc?: string;
-    subject: string;
-    body: string;
-    bodyHtml?: string;
-    threadId?: string;
-    inReplyTo?: string;
-    references?: string;
-    attachments?: ComposeAttachment[];
-  },
+  params: OutgoingMail,
 ): Promise<{ ok: true; messageId?: string }> {
   const account = await getAccount(accountId);
   const fromAddress = account ? formatAddress(account.name, account.email) : accountId;
@@ -1046,17 +832,7 @@ export async function sendRawMessage(
 /** Creates or updates a Gmail draft with the same MIME builder as sends. */
 export async function saveDraft(
   accountId: string,
-  params: {
-    draftId?: string;
-    to: string;
-    cc?: string;
-    bcc?: string;
-    subject: string;
-    body: string;
-    bodyHtml?: string;
-    threadId?: string;
-    attachments?: ComposeAttachment[];
-  },
+  params: DraftSave,
 ): Promise<{ draftId: string; messageId?: string; threadId?: string }> {
   const account = await getAccount(accountId);
   const fromAddress = account ? formatAddress(account.name, account.email) : accountId;
@@ -1163,17 +939,13 @@ export async function deleteDraft(
   return { ok: true, messageId };
 }
 
-// ── getAttachment ─────────────────────────────────────────────────────────────
+// ── Attachments ───────────────────────────────────────────────────────────────
 
-/** Attachment bytes. Local-first: served from the cache when present, write-through otherwise. */
-export async function getAttachmentBytes(
+export async function fetchAttachment(
   accountId: string,
   messageId: string,
   attachmentId: string,
 ): Promise<Uint8Array> {
-  const cached = await getCachedAttachment(accountId, messageId, attachmentId);
-  if (cached) return cached;
-
   const data = (await gmailFetch(
     accountId,
     `/messages/${messageId}/attachments/${attachmentId}`,
@@ -1182,107 +954,5 @@ export async function getAttachmentBytes(
   if (!data.data) {
     throw new Error(`Attachment ${attachmentId} returned no data.`);
   }
-
-  const bytes = fromBase64(data.data);
-  await putCachedAttachment(accountId, messageId, attachmentId, bytes);
-  return bytes;
+  return fromBase64(data.data);
 }
-
-/** Attachment bytes as standard base64 (for forwarding / in-memory use). */
-export async function getAttachmentData(
-  accountId: string,
-  messageId: string,
-  attachmentId: string,
-): Promise<{ base64: string; size: number }> {
-  const bytes = await getAttachmentBytes(accountId, messageId, attachmentId);
-  return { base64: toBase64(bytes), size: bytes.length };
-}
-
-/** Saves an attachment where the user chooses (a save dialog, or a download). */
-export async function getAttachment(
-  accountId: string,
-  messageId: string,
-  attachmentId: string,
-  filename: string,
-): Promise<{ saved: boolean }> {
-  const bytes = await getAttachmentBytes(accountId, messageId, attachmentId);
-  return { saved: await platform().userFiles.save(filename, bytes) };
-}
-
-const MAX_PROXY_IMAGE_BYTES = 10 * 1024 * 1024;
-
-/**
- * Fetch a remote email image in the backend and return it as a data URL. The
- * renderer's iframe can't load some remote images directly — e.g. anything
- * served with `Cross-Origin-Resource-Policy: same-origin` (Anthropic/Cloudflare
- * do this) is blocked by WebKit because the frame's origin isn't the image's.
- * The desktop backend has no such policy, so it can act as the image proxy
- * every mail client uses. (In a browser the fetch is subject to CORS, so this
- * only rescues images whose servers allow it.) Rejects non-image / oversized
- * responses.
- */
-export async function proxyRemoteImage(url: string): Promise<{ dataUrl: string }> {
-  let parsed: URL;
-  try {
-    parsed = new URL(url);
-  } catch {
-    throw new Error("invalid url");
-  }
-  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-    throw new Error(`unsupported protocol: ${parsed.protocol}`);
-  }
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 12000);
-  try {
-    const res = await fetch(url, {
-      signal: controller.signal,
-      redirect: "follow",
-      headers: {
-        // A browser-like UA + Accept so CDNs don't reject a bare fetch.
-        "User-Agent":
-          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15",
-        Accept: "image/avif,image/webp,image/png,image/svg+xml,image/*,*/*;q=0.8",
-      },
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const contentType = res.headers.get("content-type") ?? "";
-    if (!contentType.startsWith("image/"))
-      throw new Error(`not an image: ${contentType || "unknown"}`);
-    const declared = Number(res.headers.get("content-length") ?? "0");
-    if (declared > MAX_PROXY_IMAGE_BYTES) throw new Error("image too large");
-    const bytes = new Uint8Array(await res.arrayBuffer());
-    if (bytes.byteLength > MAX_PROXY_IMAGE_BYTES) throw new Error("image too large");
-    const mime = contentType.split(";")[0].trim() || "image/png";
-    return { dataUrl: `data:${mime};base64,${toBase64(bytes)}` };
-  } finally {
-    clearTimeout(timeout);
-  }
-}
-
-// ── Compose attachments ───────────────────────────────────────────────────────
-
-export const MAX_ATTACHMENT_TOTAL_BYTES = 25 * 1024 * 1024;
-
-/**
- * Lets the user pick files to attach. `existingBytes` is the size already
- * attached, so the 25 MB total cap covers the whole message.
- */
-export async function pickComposeAttachments(
-  existingBytes: number,
-): Promise<{ attachments: ComposeAttachment[]; error?: string }> {
-  const picked = await platform().userFiles.pick();
-  const total = picked.reduce((sum, file) => sum + file.bytes.length, existingBytes);
-  if (total > MAX_ATTACHMENT_TOTAL_BYTES) {
-    return { attachments: [], error: "Attachments can total at most 25 MB." };
-  }
-  return {
-    attachments: picked.map((file) => ({
-      name: file.name,
-      mimeType: file.mimeType,
-      size: file.bytes.length,
-      base64: toBase64(file.bytes),
-    })),
-  };
-}
-
-export type { GmailLabel, GmailMessageSummary, GmailMessageDetail };

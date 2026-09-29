@@ -3,7 +3,7 @@ import type { RelayAccount } from "@otter-mail/contracts/relay";
 
 vi.mock("electron", () => ({ app: {}, safeStorage: {}, shell: {}, BrowserWindow: {} }));
 
-const { planReconcile } = await import("./linked-accounts.ts");
+const { accountFromRelay, linkRequest, planReconcile } = await import("./linked-accounts.ts");
 
 const local = (
   email: string,
@@ -17,6 +17,8 @@ const local = (
 
 const remote = (email: string, extra: Partial<RelayAccount> = {}): RelayAccount => ({
   email,
+  provider: "gmail",
+  imap: null,
   name: null,
   picture: null,
   displayName: null,
@@ -24,7 +26,7 @@ const remote = (email: string, extra: Partial<RelayAccount> = {}): RelayAccount 
   ...extra,
 });
 
-const none = { link: [], unlink: [], add: [], remove: [], update: [] };
+const none = { link: [], unlink: [], add: [], remove: [], update: [], moved: [] };
 
 describe("planReconcile", () => {
   it("does nothing when both sides agree", () => {
@@ -80,5 +82,96 @@ describe("planReconcile", () => {
   it("compares addresses without case", () => {
     const plan = planReconcile([local("Me@X.com")], [remote("me@x.com")], new Set());
     expect(plan).toEqual(none);
+  });
+});
+
+const imapSettings = {
+  username: "me@fastmail.com",
+  imap: { host: "imap.fastmail.com", port: 993, security: "tls" as const },
+  smtp: { host: "smtp.fastmail.com", port: 465, security: "tls" as const },
+};
+
+describe("IMAP mailboxes", () => {
+  it("adds one linked elsewhere, like Gmail", () => {
+    const linked = remote("me@fastmail.com", { provider: "imap", imap: imapSettings });
+    const plan = planReconcile([], [linked], new Set());
+    expect(plan).toEqual({ ...none, add: [linked] });
+  });
+
+  it("arrives with its settings, signed out (no password here)", () => {
+    const linked = remote("me@fastmail.com", {
+      provider: "imap",
+      imap: imapSettings,
+      name: "Me",
+      color: "#0a0",
+    });
+    expect(accountFromRelay(linked)).toEqual({
+      id: "me@fastmail.com",
+      email: "me@fastmail.com",
+      name: "Me",
+      provider: "imap",
+      imap: imapSettings,
+      signature: undefined,
+      picture: undefined,
+      displayName: undefined,
+      color: "#0a0",
+    });
+  });
+
+  it("never adopts other servers for a mailbox signed in here; asks for the password", () => {
+    const here = { ...local("me@fastmail.com"), imap: imapSettings };
+    const elsewhere = (host: string) =>
+      remote("me@fastmail.com", {
+        provider: "imap",
+        imap: { ...imapSettings, imap: { ...imapSettings.imap, host } },
+      });
+    const linked = new Set(["me@fastmail.com"]);
+    expect(planReconcile([here], [elsewhere("IMAP.fastmail.com")], linked)).toEqual(none);
+    expect(planReconcile([here], [elsewhere("imap.evil.example")], linked)).toEqual({
+      ...none,
+      moved: ["me@fastmail.com"],
+    });
+    // Signed out here: nothing to protect (the prompt names the host).
+    const out = { ...here, signedIn: false };
+    expect(planReconcile([out], [elsewhere("imap.evil.example")], linked)).toEqual(none);
+  });
+
+  it("a Gmail account from the relay stays a plain Gmail account", () => {
+    const account = accountFromRelay(remote("a@gmail.com"));
+    expect(account.provider).toBeUndefined();
+    expect(account.imap).toBeUndefined();
+  });
+
+  it("links with its settings and no ID token", async () => {
+    const idToken = vi.fn(async () => "token");
+    const body = await linkRequest(
+      {
+        id: "me@fastmail.com",
+        email: "me@fastmail.com",
+        name: "Me",
+        provider: "imap",
+        imap: imapSettings,
+        color: "#0a0",
+      },
+      idToken,
+    );
+    expect(body).toEqual({
+      provider: "imap",
+      imap: imapSettings,
+      name: "Me",
+      picture: null,
+      displayName: null,
+      color: "#0a0",
+    });
+    expect(idToken).not.toHaveBeenCalled();
+  });
+
+  it("Gmail still links with an ID token", async () => {
+    const body = await linkRequest(
+      { id: "a@gmail.com", email: "a@gmail.com", name: "A" },
+      async (id) => `token-for-${id}`,
+    );
+    expect(body).toMatchObject({ idToken: "token-for-a@gmail.com", name: "A" });
+    expect(body).not.toHaveProperty("provider");
   });
 });

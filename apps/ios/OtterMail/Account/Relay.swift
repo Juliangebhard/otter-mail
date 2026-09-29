@@ -2,9 +2,10 @@ import Foundation
 
 /**
  * The Otter relay (infra/relay; its API is packages/contracts/src/relay.ts):
- * who's signed in, the Gmail accounts linked to them, the preferences that
- * follow them, and a WebSocket that says when mail, accounts or preferences
- * changed. It never sees mail, and this app's Gmail tokens never go there.
+ * who's signed in, the mailboxes linked to them (Gmail, and IMAP with its
+ * server settings), the preferences that follow them, and a WebSocket that
+ * says when mail, accounts or preferences changed. It never sees mail, and
+ * this app's Gmail tokens and IMAP passwords never go there.
  */
 @MainActor
 final class Relay {
@@ -17,6 +18,9 @@ final class Relay {
 
     struct Account: Codable {
         var email: String
+        /** "gmail" or "imap" (absent from older relays: Gmail). */
+        var provider: MailProviderKind?
+        var imap: ImapSettings?
         var name: String?
         var picture: String?
         var displayName: String?
@@ -109,22 +113,30 @@ final class Relay {
 
     func accounts() async throws -> [Account] {
         struct Response: Decodable { var accounts: [Account] }
-        let response: Response = try await get("/v1/accounts")
+        let response: Response = try await get("/v1/accounts?providers=gmail,imap")
         return response.accounts
     }
 
-    /** Links the mailbox (with an ID token proving the sign-in) or updates its profile. */
+    /**
+     * Links the mailbox or updates its profile. A Gmail link needs an ID token
+     * proving the sign-in; an IMAP one, its settings (`profile.imap`).
+     */
     func putAccount(_ email: String, idToken: String? = nil, profile: Account) async throws {
         struct Body: Encodable {
             var idToken: String?
+            var provider: MailProviderKind?
+            var imap: ImapSettings?
             var name, picture, displayName, color: String?
         }
-        let body = Body(idToken: idToken, name: profile.name, picture: profile.picture, displayName: profile.displayName, color: profile.color)
+        let body = Body(
+            idToken: idToken, provider: profile.imap == nil ? nil : .imap, imap: profile.imap,
+            name: profile.name, picture: profile.picture, displayName: profile.displayName, color: profile.color
+        )
         _ = try await send("PUT", "/v1/accounts/\(Self.path(email))", body: body)
     }
 
     func unlink(_ email: String) async throws {
-        _ = try await send("DELETE", "/v1/accounts/\(Self.path(email))")
+        _ = try await send("DELETE", "/v1/accounts/\(Self.path(email))?providers=gmail,imap")
     }
 
     // ── Preferences ──────────────────────────────────────────────────────────

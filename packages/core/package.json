@@ -9,13 +9,15 @@
   },
   "scripts": {
     "test": "vp test run --passWithNoTests",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit && tsc --noEmit -p src/protocols/test && tsc --noEmit -p src/providers/imap/test && tsc --noEmit -p src/services/test"
   },
   "dependencies": {
     "@otter-mail/contracts": "workspace:*",
-    "better-auth": "^1.7.6"
+    "better-auth": "^1.7.6",
+    "postal-mime": "^4.0.0"
   },
   "devDependencies": {
+    "@types/node": "catalog:",
     "typescript": "catalog:",
     "vite-plus": "catalog:"
   }

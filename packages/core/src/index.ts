@@ -7,12 +7,14 @@
 import { registerAssistantHandlers } from "./handlers/assistant.js";
 import { registerCalendarHandlers } from "./handlers/calendar.js";
 import { registerGmailHandlers } from "./handlers/gmail.js";
+import { registerImapAccountHandlers } from "./handlers/imap-accounts.js";
 import { registerOtterAccountHandlers } from "./handlers/otter-account.js";
 import { registerSearchHandlers } from "./handlers/search.js";
 import { registerTranslationHandlers } from "./handlers/translation.js";
 import { broadcast, handle } from "./ipc.js";
 import { setPlatform, type Platform } from "./platform.js";
 import { pruneAttachmentCache } from "./services/attachment-cache.js";
+import { loadImapPasswords } from "./services/imap-passwords.js";
 import { readKeybindings, writeKeybindings } from "./services/keybindings-store.js";
 import {
   configureAutoSync,
@@ -28,9 +30,11 @@ import { refreshSignatures } from "./services/signatures.js";
 export async function startCore(platform: Platform): Promise<void> {
   setPlatform(platform);
   await platform.google.load();
+  await loadImapPasswords();
   await loadOtterAccount();
 
   registerGmailHandlers();
+  registerImapAccountHandlers();
   registerSearchHandlers();
   registerCalendarHandlers();
   registerOtterAccountHandlers();
@@ -71,7 +75,7 @@ export { runAsTask } from "./handlers/ipc-budget.js";
 export { ATTACHMENTS_DIR, dataUrl, readAttachment } from "./services/assistant/attachments.js";
 export { shutdownProviders } from "./services/assistant/service.js";
 export * from "./services/assistant/types.js";
-export { getAttachmentBytes } from "./services/gmail-api.js";
+export { getAttachmentBytes } from "./services/attachment-cache.js";
 export { KEYBINDINGS_FILE } from "./services/keybindings-store.js";
 export { syncAllAccounts } from "./services/mail-sync.js";
 export {

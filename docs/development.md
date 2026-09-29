@@ -16,6 +16,7 @@
 | `pnpm dev:desktop`       | Vite dev server + main-process watcher + Electron, restarting on main changes.     |
 | `pnpm dev:web`           | The web app alone, against `VITE_RELAY_URL`.                                       |
 | `pnpm dev:demo`          | The web app on a made-up mailbox, no accounts (see [Demo mailbox](#demo-mailbox)). |
+| `pnpm dev:mail`          | A local IMAP server with a seeded mailbox (see [IMAP locally](#imap-locally)).     |
 | `pnpm dev:ios`           | Builds the iPhone app and runs it in the simulator (see `apps/ios/README.md`).     |
 | `pnpm ios:resources`     | Re-exports the themes and demo mailbox the iPhone app bundles.                     |
 | `pnpm start`             | Runs the built app unpackaged (`pnpm build` first).                                |
@@ -93,6 +94,26 @@ URIs include `http://localhost:8787/...`, so it works in the main checkout (work
 on another port). The production relay only accepts its own origin, so `pnpm dev:web` alone is
 for pointing `VITE_RELAY_URL` at a relay you run yourself. The browser's data (the mail
 cache and files) lives in the site's OPFS storage: clear site data to start fresh.
+
+## IMAP locally
+
+`pnpm dev:mail` (Docker) runs a mail server on this machine to add as an IMAP mailbox:
+Dovecot, as in core's protocol tests, with special-use folders and a few seeded threads for
+`me@otter.test`, and Mailpit catching what it sends (http://localhost:8025). It prints the
+settings to enter: password `pass`, IMAP on `localhost` port 31993 (TLS), SMTP on 31465 (TLS).
+`pnpm dev:mail down` stops it and drops its mail: the next run starts from the seed again.
+
+Both apps verify certificates, so the server's comes from a dev CA made once per checkout in
+`.otter-mail/dev-mail/` (gitignored). The dev runner trusts it when it exists, and only there:
+
+- `pnpm dev`: the web app's TLS (`apps/web/src/web/tls.ts`) adds it to Mozilla's roots through
+  `VITE_DEV_MAIL_CA`, read in dev builds only. The local relay runs with
+  `TUNNEL_ALLOW_PRIVATE=true`, which lets its tunnel reach `localhost` and any port; the
+  production relay (`wrangler.jsonc`) never sets it and allows only mail ports on public hosts.
+- `pnpm dev:desktop`: `NODE_EXTRA_CA_CERTS`, which Electron's main process honors.
+
+The web app still needs an Otter account to open the tunnel (sign in as usual). Delete
+`.otter-mail/dev-mail/` and rerun `pnpm dev:mail` for a new CA.
 
 ## Demo mailbox
 

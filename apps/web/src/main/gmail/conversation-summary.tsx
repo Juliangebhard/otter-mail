@@ -80,16 +80,19 @@ export function ConversationSummary({
             <div className="text-[13px] text-muted-foreground">{span(first.date, last.date)}</div>
           ) : null}
         </div>
-        <HintTooltip label="Open in Gmail">
-          <button
-            type="button"
-            aria-label="Open in Gmail"
-            onClick={openInGmail}
-            className="-me-1.5 -mt-0.5 flex size-7 cursor-pointer items-center justify-center rounded-lg text-muted-foreground hover:bg-foreground/[0.06] hover:text-foreground"
-          >
-            <ExternalLinkIcon className="size-4" />
-          </button>
-        </HintTooltip>
+        {/* IMAP mail has no web page to open. */}
+        {account?.imap ? null : (
+          <HintTooltip label="Open in Gmail">
+            <button
+              type="button"
+              aria-label="Open in Gmail"
+              onClick={openInGmail}
+              className="-me-1.5 -mt-0.5 flex size-7 cursor-pointer items-center justify-center rounded-lg text-muted-foreground hover:bg-foreground/[0.06] hover:text-foreground"
+            >
+              <ExternalLinkIcon className="size-4" />
+            </button>
+          </HintTooltip>
+        )}
       </div>
 
       {people.length > 0 ? (

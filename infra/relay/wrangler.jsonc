@@ -19,6 +19,18 @@
   ],
   "durable_objects": { "bindings": [{ "name": "USER_HUB", "class_name": "UserHub" }] },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["UserHub"] }],
+  // The web app's tunnel, per user and minute (periods are 10 or 60 seconds):
+  // to the servers of their IMAP mailboxes, and to any other host (checking a
+  // password before linking a mailbox). Counted per Cloudflare location, in
+  // memory, not billed separately (no Durable Object or KV per tunnel).
+  "ratelimits": [
+    { "name": "TUNNEL_LIMIT", "namespace_id": "1001", "simple": { "limit": 30, "period": 60 } },
+    {
+      "name": "TUNNEL_UNLINKED_LIMIT",
+      "namespace_id": "1002",
+      "simple": { "limit": 6, "period": 60 },
+    },
+  ],
   // Secrets (`wrangler secret put`): BETTER_AUTH_SECRET, GOOGLE_WEB_CLIENT_SECRET.
   "vars": {
     "BETTER_AUTH_URL": "https://relay.mail.otterware.dev",

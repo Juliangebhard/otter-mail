@@ -18,6 +18,8 @@ import {
   useUpdateAccount,
 } from "../gmail/hooks";
 import { RichTextArea, type RichTextRef } from "../gmail/rich-text";
+import { AddMailboxMenu, ImapPasswordForm } from "../gmail/add-mailbox";
+import { capabilitiesOf, mailServerName, signsInWithPassword } from "../gmail/capabilities";
 import {
   ACCOUNT_COLOR_PALETTE,
   getAccountColor,
@@ -211,7 +213,10 @@ function AccountAvatar({
   );
 }
 
-/** Sign in again (signed-out account) or add a new one; cancellable while Google is open. */
+/**
+ * Sign in again with Google (signed-out account) or add a mailbox: Gmail, or
+ * other mail over IMAP. Cancellable while Google is open.
+ */
 function SignInButton({ email, label }: { email?: string; label: string }) {
   const signIn = useAddAccount();
   if (signIn.isPending) {
@@ -221,21 +226,26 @@ function SignInButton({ email, label }: { email?: string; label: string }) {
       </Btn>
     );
   }
+  const google = () =>
+    void signIn.mutateAsync(email).catch((err: unknown) => {
+      toast.error(email ? `Couldn't sign in to ${email}` : "Couldn't add the account", {
+        description: err instanceof Error ? err.message : String(err),
+      });
+    });
+  if (email) {
+    return (
+      <Btn size="sm" variant="primary" onClick={google}>
+        {label}
+      </Btn>
+    );
+  }
   return (
-    <Btn
-      size="sm"
-      variant={email ? "primary" : "outline"}
-      onClick={() =>
-        void signIn.mutateAsync(email).catch((err: unknown) => {
-          toast.error(email ? `Couldn't sign in to ${email}` : "Couldn't add the account", {
-            description: err instanceof Error ? err.message : String(err),
-          });
-        })
-      }
-    >
-      {email ? null : <PlusIcon className="size-3.5" />}
-      {label}
-    </Btn>
+    <AddMailboxMenu onGmail={google} align="end">
+      <Btn size="sm" variant="outline">
+        <PlusIcon className="size-3.5" />
+        {label}
+      </Btn>
+    </AddMailboxMenu>
   );
 }
 
@@ -390,6 +400,7 @@ function AccountEditor({ account }: { account: GmailAccount }) {
   const sync = useSyncStatusOnly(account.id);
   const displayName = getAccountDisplayName(account);
   const status = accountStatus(account, sync.data);
+  const capabilities = capabilitiesOf(account);
   const signatureRef = useRef<RichTextRef>(null);
   // Gmail's signature as loaded into the editor. A newer one from Gmail replaces it only while
   // the editor holds no unsaved edits (compared with what the editor showed once loaded).
@@ -424,7 +435,9 @@ function AccountEditor({ account }: { account: GmailAccount }) {
     void updateAccount.mutateAsync({ accountId: account.id, signature: html }).then(
       (saved) => {
         setShown(saved.signature ?? "");
-        toast.success("Signature saved in Gmail");
+        toast.success(
+          capabilities.serverSignatures ? "Signature saved in Gmail" : "Signature saved",
+        );
       },
       (err: unknown) => {
         const message = err instanceof Error ? err.message : String(err);
@@ -454,7 +467,9 @@ function AccountEditor({ account }: { account: GmailAccount }) {
           title="Status"
           description={<StatusText status={status} />}
           control={
-            account.signedOut ? (
+            account.signedOut && signsInWithPassword(account) ? (
+              <ImapPasswordForm account={account} />
+            ) : account.signedOut ? (
               <SignInButton email={account.email} label="Sign in" />
             ) : (
               <Btn size="sm" disabled={syncing || sync.data?.syncing} onClick={syncNow}>
@@ -499,7 +514,11 @@ function AccountEditor({ account }: { account: GmailAccount }) {
 
       <SettingsSection
         title="Signature"
-        description="Added to new messages, replies and forwards from this account. Saved in Gmail, so it's the same there and on every device."
+        description={
+          capabilities.serverSignatures
+            ? "Added to new messages, replies and forwards from this account. Saved in Gmail, so it's the same there and on every device."
+            : "Added to new messages, replies and forwards from this account, on every device with your Otter account."
+        }
         headerAction={
           <Btn size="sm" variant="primary" onClick={saveSignature}>
             Save signature
@@ -519,7 +538,7 @@ function AccountEditor({ account }: { account: GmailAccount }) {
       <SettingsSection title="Remove">
         <SettingsRow
           title="Remove account"
-          description="Stops syncing and deletes the local copy. Nothing is deleted from Gmail."
+          description={`Stops syncing and deletes the local copy. Nothing is deleted from ${mailServerName(account)}.`}
           control={
             <Btn size="sm" variant="destructive" onClick={() => setConfirmRemove(true)}>
               Remove…
@@ -541,7 +560,7 @@ function AccountEditor({ account }: { account: GmailAccount }) {
       >
         <Text variant="small">
           Otter Mail stops syncing {account.email} and deletes its local copy. Nothing is deleted
-          from Gmail — you can add the account again any time.
+          from {mailServerName(account)} — you can add the account again any time.
         </Text>
       </Dialog>
     </>
@@ -632,7 +651,7 @@ export function AccountsPane() {
         <SettingsGroup>
           <SettingsRow
             title={accountsQuery.isLoading ? "Loading mailboxes…" : "No mailboxes yet"}
-            description="Add a Gmail account to start syncing mail. You'll sign in with Google in your browser."
+            description="Add a Gmail account, or any mailbox that works with IMAP, to start syncing mail."
           />
         </SettingsGroup>
       )}

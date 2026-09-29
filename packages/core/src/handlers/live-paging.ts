@@ -1,11 +1,10 @@
 /**
  * Keeps lists usable while an account's mail is still arriving: live paging
- * from Gmail during the first full sync, and pulling in unread mail the cache
- * doesn't have yet.
+ * from the server during the first full sync (providers that list by label),
+ * and pulling in unread mail the cache doesn't have yet.
  */
 
-import { fetchMetadataForIds, listMessages, listMessageIdsPage } from "../services/gmail-api.js";
-import { platform } from "../platform.js";
+import { findProvider, isSignedIn, providerFor } from "../providers/index.js";
 import * as mailStore from "../services/mail-store.js";
 import type { GmailMessageSummary } from "../types.js";
 import { sleep } from "./ipc-budget.js";
@@ -30,7 +29,7 @@ const liveKey = (accountId: string, labelId: string | null) => `${accountId}:${l
 function needsLive(accountId: string, labelId: string | null): boolean {
   if (mailStore.getSyncState(accountId).fullSyncDone) return false;
   // Nothing to page from until the account signs in on this device.
-  if (!platform().google.isSignedIn(accountId)) return false;
+  if (!isSignedIn(accountId) || !findProvider(accountId)?.listIds) return false;
   return !(liveCursors.get(liveKey(accountId, labelId))?.exhausted ?? false);
 }
 
@@ -59,14 +58,15 @@ async function fillOnce(accountId: string, labelId: string | null): Promise<void
   const key = liveKey(accountId, labelId);
   const cursor = liveCursors.get(key) ?? { exhausted: false };
   if (cursor.exhausted) return;
-  const page = await listMessageIdsPage(accountId, {
+  const provider = providerFor(accountId);
+  const page = await provider.listIds!(accountId, {
     labelIds: labelId ? [labelId] : [],
     pageToken: cursor.pageToken,
     maxResults: LIVE_PAGE_SIZE,
   });
   const fresh = mailStore.filterUnknownIds(accountId, page.ids);
   if (fresh.length > 0)
-    mailStore.upsertMessages(accountId, await fetchMetadataForIds(accountId, fresh));
+    mailStore.upsertMessages(accountId, await provider.getSummaries(accountId, fresh));
   liveCursors.set(key, { pageToken: page.nextPageToken, exhausted: !page.nextPageToken });
   console.log("[gmail:livePage]", { labelId, listed: page.ids.length, fetched: fresh.length });
 }
@@ -106,26 +106,30 @@ export async function pageWithLiveFill(
 const RECONCILE_COOLDOWN_MS = 60_000;
 const lastUnreadReconcile = new Map<string, number>();
 
-/** Fetches a label's unread messages live when the cache has fewer than Gmail counts. */
+/** Fetches a label's unread messages live when the cache has fewer than the server counts. */
 export async function reconcileUnread(accountId: string, labelId: string): Promise<void> {
+  const provider = findProvider(accountId);
+  if (!provider?.listIds) return;
   const expected = mailStore.getLabelUnread(accountId, labelId);
   if (expected === 0 || mailStore.countUnreadForLabel(accountId, labelId) >= expected) return;
-  // Mid-triage the cache is ahead of Gmail's counter (mail just read or
+  // Mid-triage the cache is ahead of the server's counter (mail just read or
   // archived here), so the gap is expected, not missing mail.
   if (hasPendingLabelWrites(accountId)) return;
   const key = `${accountId}:${labelId}`;
   if (Date.now() - (lastUnreadReconcile.get(key) ?? 0) < RECONCILE_COOLDOWN_MS) return;
   lastUnreadReconcile.set(key, Date.now());
   try {
-    const live = await listMessages(accountId, {
+    const { ids } = await provider.listIds(accountId, {
       labelIds: [labelId, "UNREAD"],
       maxResults: Math.min(expected, 100),
+      spamTrash: false,
     });
-    mailStore.upsertMessages(accountId, live.messages);
+    const live = ids.length > 0 ? await provider.getSummaries(accountId, ids) : [];
+    mailStore.upsertMessages(accountId, live);
     console.log("[gmail:listMessages] reconciled unread", {
       labelId,
       expected,
-      fetched: live.messages.length,
+      fetched: live.length,
     });
   } catch (err) {
     console.log("[gmail:listMessages] unread reconcile failed", { error: String(err) });

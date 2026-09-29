@@ -17,6 +17,7 @@ import { NewMessageView } from "./gmail/new-message-view";
 import { CommandPalette } from "./gmail/command-palette";
 import { AssistantChatPanel } from "./gmail/assistant-chat";
 import { SEARCH_MAILBOX } from "./gmail/gmail-query";
+import { ImapAccountDialog } from "./gmail/add-mailbox";
 import { searchTabId, searchTitle, type SearchTab } from "./gmail/search-tabs";
 import {
   PanelControl,
@@ -62,7 +63,7 @@ import {
 import { getAccountColor, getAccountContrastColor } from "./gmail/account-style";
 import { gmailApi, type MailtoTarget } from "./gmail/api";
 import type { QuoteContext } from "./gmail/chat-context";
-import type { GmailMessageSummary } from "./gmail/types";
+import type { GmailAccount, GmailMessageSummary } from "./gmail/types";
 import {
   useMailViews,
   resolveRules,
@@ -920,13 +921,16 @@ export function HomeView() {
     setReaderAccountId(null);
   };
 
+  const [imapOpen, setImapOpen] = useState(false);
+  const showAdded = (account: GmailAccount) => {
+    setSelectedAccountId(account.id);
+    setSelectedLabelId("INBOX");
+  };
   const handleAddAccount = async () => {
     console.log("[HomeView:addAccount]");
     try {
       const account = await addAccount.mutateAsync();
-      if (!account) return;
-      setSelectedAccountId(account.id);
-      setSelectedLabelId("INBOX");
+      if (account) showAdded(account);
     } catch (err) {
       toast.error("Couldn't add the account", {
         description: err instanceof Error ? err.message : String(err),
@@ -971,19 +975,25 @@ export function HomeView() {
       <div className="h-full flex items-center justify-center bg-canvas">
         <EmptyState
           title="Add your first mailbox"
-          description="Sign in to a Gmail account to start reading your mail."
+          description="Sign in to Gmail, or any mailbox that works with IMAP, to start reading your mail."
           actions={
             addAccount.isPending ? (
               <Button variant="outline" onClick={() => void gmailApi.cancelAddAccount()}>
                 Cancel sign-in
               </Button>
             ) : (
-              <Button variant="accent" onClick={() => void handleAddAccount()}>
-                Add a Gmail account
-              </Button>
+              <>
+                <Button variant="accent" onClick={() => void handleAddAccount()}>
+                  Add a Gmail account
+                </Button>
+                <Button variant="ghost" onClick={() => setImapOpen(true)}>
+                  Other mail (IMAP)
+                </Button>
+              </>
             )
           }
         >
+          <ImapAccountDialog open={imapOpen} onOpenChange={setImapOpen} onAdded={showAdded} />
           <OtterSignInOnboardingLink />
         </EmptyState>
       </div>

@@ -420,6 +420,57 @@ export function deleteMessage(accountId: string, messageId: string): boolean {
   return true;
 }
 
+/**
+ * Re-keys a cached message, body and all, and sets its labels: an IMAP
+ * message moved to another folder has a new id. When the new id is cached
+ * already (a sync got there first), the old row just goes.
+ */
+export function renameMessage(
+  accountId: string,
+  fromId: string,
+  toId: string,
+  labelIds: string[],
+): void {
+  const d = getDb();
+  const prior = getMessageLabelIds(accountId, fromId);
+  if (!prior) return;
+  if (getMessageLabelIds(accountId, toId)) {
+    deleteMessage(accountId, fromId);
+  } else {
+    d.exec("BEGIN");
+    try {
+      d.prepare("UPDATE messages SET id = ? WHERE accountId = ? AND id = ?").run(
+        toId,
+        accountId,
+        fromId,
+      );
+      d.prepare(
+        "UPDATE message_labels SET messageId = ? WHERE accountId = ? AND messageId = ?",
+      ).run(toId, accountId, fromId);
+      d.exec("COMMIT");
+    } catch (err) {
+      d.exec("ROLLBACK");
+      throw err;
+    }
+  }
+  const current = getMessageLabelIds(accountId, toId) ?? [];
+  applyLabelChange(
+    accountId,
+    toId,
+    labelIds.filter((l) => !current.includes(l)),
+    current.filter((l) => !labelIds.includes(l)),
+  );
+  recomputeLabelCounts(accountId, prior);
+}
+
+/** Ids of cached messages starting with `prefix` (IMAP: a folder's, by UIDVALIDITY). */
+export function getMessageIdsWithPrefix(accountId: string, prefix: string): string[] {
+  const rows = getDb()
+    .prepare("SELECT id FROM messages WHERE accountId = ? AND id >= ? AND id < ?")
+    .all(accountId, prefix, `${prefix}\uffff`) as unknown as { id: string }[];
+  return rows.map((r) => r.id);
+}
+
 /** Apply an optimistic label add/remove to a locally-cached message. */
 /** A cached message's current label ids, or null when it isn't cached. */
 export function getMessageLabelIds(accountId: string, messageId: string): string[] | null {
@@ -1099,7 +1150,11 @@ export function searchMessages(
 ): { messages: GmailMessageSummary[]; hasMore: boolean } {
   const match = toFtsMatch(queryText);
   const hasFilters = Boolean(
-    scope?.starred || scope?.important || scope?.hasAttachments || scope?.withinDays,
+    scope?.labelId ||
+    scope?.starred ||
+    scope?.important ||
+    scope?.hasAttachments ||
+    scope?.withinDays,
   );
   if (!match && !hasFilters) return { messages: [], hasMore: false };
   if (scope?.rules && scope.rules.length === 0) return { messages: [], hasMore: false };
@@ -1445,6 +1500,7 @@ export function removeAccountData(accountId: string): void {
       "fullSyncRefresh",
       "spamTrashBackfilled",
       "gmailWatch",
+      "imapSync",
     ].map((prefix) => `${prefix}:${accountId}`);
     d.prepare(`DELETE FROM kv WHERE key IN (${kvKeys.map(() => "?").join(", ")})`).run(...kvKeys);
     d.exec("COMMIT");

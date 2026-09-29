@@ -8,6 +8,7 @@
  */
 
 import { index, integer, primaryKey, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import type { ImapSettings, MailProviderKind } from "@otter-mail/contracts/mail";
 
 const createdAt = () =>
   integer({ mode: "timestamp_ms" })
@@ -80,7 +81,7 @@ export const verification = sqliteTable("verification", {
   updatedAt: updatedAt(),
 });
 
-/** Gmail accounts linked to an Otter account, with the profile the app shows. */
+/** Mailboxes (Gmail, IMAP) linked to an Otter account, with the profile the app shows. */
 export const linkedAccounts = sqliteTable(
   "linked_accounts",
   {
@@ -89,6 +90,9 @@ export const linkedAccounts = sqliteTable(
       .references(() => user.id, { onDelete: "cascade" }),
     /** Lowercased. */
     email: text().notNull(),
+    provider: text().$type<MailProviderKind>().notNull().default("gmail"),
+    /** JSON, for IMAP mailboxes: where the mailbox lives (never its password). */
+    imap: text({ mode: "json" }).$type<ImapSettings>(),
     name: text(),
     picture: text(),
     displayName: text(),

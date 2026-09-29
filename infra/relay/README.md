@@ -1,11 +1,14 @@
 # Otter Mail relay
 
-https://relay.mail.otterware.dev, a Cloudflare Worker. It gives Otter Mail four things (the
+https://relay.mail.otterware.dev, a Cloudflare Worker. It gives Otter Mail five things (the
 Mac app works without it; the web app needs it):
 
-- **Otter accounts.** Sign in with Google once per Mac, and the Gmail accounts you use come
-  along to every Mac. The relay keeps the list of linked addresses and their display names and
-  colors. Each Mac still signs in to Gmail itself; the relay never holds Gmail tokens.
+- **Otter accounts.** Sign in with Google once per Mac, and the mailboxes you use come along to
+  every Mac. The relay keeps the list of linked addresses (Gmail, or IMAP with its server
+  settings) and their display names and colors. Each Mac still signs in to each mailbox itself;
+  the relay never holds Gmail tokens or IMAP passwords. Linking a Gmail account needs a Google ID
+  token for it; an IMAP link proves nothing, so it never receives Gmail pushes, and a mailbox
+  can't switch between Gmail and IMAP without being unlinked first (409).
 - **Preferences that follow you.** Settings, views, keybindings, the assistant's settings and
   UI choices like the theme, as sections of JSON per Otter account, plus the Hermes API key,
   sealed with a key derived from the auth secret. A change is pushed to the account's other
@@ -19,6 +22,33 @@ Mac app works without it; the web app needs it):
   `gmail-push` Pub/Sub topic. Pub/Sub pushes each notification (`{ emailAddress, historyId }`,
   no content) to the relay, which forwards it over WebSocket to the Macs of whoever linked that
   address. They sync the change from Gmail within a couple of seconds, instead of on the next poll.
+- **A tunnel to mail servers for the web app.** A browser can't open TCP connections, so
+  `/v1/tunnel` pipes a WebSocket to an IMAP or SMTP server (mail ports only, public hosts only).
+  The web app does TLS inside it, so the relay carries ciphertext; it logs host, port, byte
+  counts and duration, once per tunnel. It runs in the plain Worker, not a Durable Object:
+  a Worker bills CPU time, and an IDLE connection is hours of waiting. Tunnels close after 30
+  minutes without a byte. See `src/tunnel.ts`; the protocol is in the contracts.
+
+  So it isn't a free proxy for anyone with an Otter account, and costs nothing per tunnel beyond
+  the request (no Durable Object, no KV):
+  - **Where.** Mail ports only, on DNS names or public IPv4 addresses. A DNS name is checked by
+    its spelling only; that it doesn't resolve somewhere private is Cloudflare's doing:
+    `connect()` refuses "Cloudflare IPs, `localhost`, and private network IPs"
+    ([TCP sockets, Troubleshooting](https://developers.cloudflare.com/workers/runtime-apis/tcp-sockets/)).
+  - **Linked or not.** The servers (host and port) of the user's linked IMAP mailboxes, read from
+    D1 with one query after the session check, get 30 tunnels a minute and 200 MB each way per
+    tunnel. Any other host gets 6 a minute and 1 MB each way: adding a mailbox checks its
+    password before linking it, and a login fits in far less. Linking a host proves nothing (an
+    IMAP link is just settings), but it puts the host on record against the account.
+  - **How often.** Workers' rate limiting bindings (`ratelimits` in `wrangler.jsonc`), keyed by
+    user id: counted in memory per Cloudflare location, loosely, and not billed separately; they
+    work in `wrangler dev` and the tests too. Over the rate, the WebSocket closes at once with
+    `TUNNEL_CLOSE.rateLimited`. Concurrent tunnels aren't counted (that would take a Durable
+    Object); the rate bounds them.
+  - **Memory.** The client's bytes are written to the socket one frame at a time; a client more
+    than 8 MB ahead of the server is cut off. A Worker's WebSocket has no `bufferedAmount`, so
+    the server's bytes are read at most 4 MB a second (after 8 MB): a client that stops reading
+    lets the backlog grow only that fast, until the byte cap closes the tunnel.
 
 ```
 Gmail ──users.watch──▶ Pub/Sub topic gmail-push ──push (OIDC)──▶ /push/gmail
@@ -29,7 +59,10 @@ Mac ◀──── WebSocket /v1/events ◀── UserHub (Durable Object, one 
 ## Code map
 
 - `src/worker.ts`: routes (Hono). `/v1/auth/*` is better-auth; `/v1/me`, `/v1/accounts`,
-  `/v1/preferences` and `/v1/events` need a session; `/push/gmail` takes Pub/Sub pushes.
+  `/v1/preferences`, `/v1/events` and `/v1/tunnel` need a session; `/push/gmail` takes Pub/Sub
+  pushes.
+- `src/tunnel.ts`: the web app's TCP tunnel (`cloudflare:sockets`), and which hosts and ports
+  it may reach.
 - `src/auth.ts`: better-auth: Google sign-in (ID tokens from the Mac app, the redirect flow for
   the web app), sessions (bearer tokens for the Mac app, a cookie shared with mail.otterware.dev
   for the web app; one per device, 90 days, renewed with use), device list, account deletion.
