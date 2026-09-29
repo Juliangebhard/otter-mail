@@ -58,7 +58,7 @@ export class CodexAppServer {
       // Only errors are interesting; Codex logs a lot at info level.
       for (const line of chunk.split("\n")) {
         if (/\bERROR\b/.test(line))
-          logger.info("assistant", "codex stderr", {
+          logger.info("agent", "codex stderr", {
             line: line.slice(0, 300),
           });
       }

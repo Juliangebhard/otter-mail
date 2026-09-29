@@ -1,5 +1,5 @@
 /**
- * Renderer side of the assistant providers: the live provider state, icons,
+ * Renderer side of the agent providers: the live provider state, icons,
  * and the status wording shared by Settings and the chat composer (ported
  * from T3 Code's providerStatus / providerDriverMeta).
  */
@@ -10,21 +10,21 @@ import { gmailApi, type ProviderKind, type ProviderSnapshot, type ProvidersState
 import { cn } from "./ui";
 import hermesIconUrl from "../assets/hermes-agent-icon.png";
 
-const PROVIDERS_KEY = ["assistant-providers"] as const;
+const PROVIDERS_KEY = ["agent-providers"] as const;
 
-/** Provider snapshots + settings, kept live by `assistant:providersChanged`. */
-export function useAssistantProviders() {
+/** Provider snapshots + settings, kept live by `agent:providersChanged`. */
+export function useAgentProviders() {
   const qc = useQueryClient();
   useEffect(
     () =>
-      window.desktopBridge.on("assistant:providersChanged", (state: unknown) =>
+      window.desktopBridge.on("agent:providersChanged", (state: unknown) =>
         qc.setQueryData(PROVIDERS_KEY, state as ProvidersState),
       ),
     [qc],
   );
   return useQuery({
     queryKey: PROVIDERS_KEY,
-    queryFn: () => gmailApi.assistantProviders(),
+    queryFn: () => gmailApi.agentProviders(),
     staleTime: 30_000,
   });
 }

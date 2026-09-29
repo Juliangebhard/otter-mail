@@ -26,7 +26,7 @@ import type {
   ProviderSnapshot,
   RuntimeMode,
 } from "./api";
-import { ProviderIcon, isProviderUsable } from "./assistant-providers";
+import { ProviderIcon, isProviderUsable } from "./agent-providers";
 import { modelKey, toggleFavorite, useModelPrefs } from "./model-prefs";
 import {
   DropdownMenu,

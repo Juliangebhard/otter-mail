@@ -1,6 +1,6 @@
 /**
  * Preferences that follow the Otter account to every device (the relay's
- * `/v1/preferences`): app settings, views, keybindings, the assistant's
+ * `/v1/preferences`): app settings, views, keybindings, the agent's
  * settings and Hermes key, the renderer's UI choices (`ui`, which it
  * mirrors from localStorage), and the signatures of mailboxes whose server
  * keeps none (IMAP; Gmail keeps its own). Each section is replaced whole; the last write
@@ -25,8 +25,8 @@ import {
   applySyncedProviderSettings,
   syncedProviderSettings,
   type SyncedProviderSettings,
-} from "./assistant/service.js";
-import { getHermesKey } from "./assistant/settings.js";
+} from "./agent/service.js";
+import { getHermesKey } from "./agent/settings.js";
 import { readKeybindings, writeKeybindings } from "./keybindings-store.js";
 import { configureAutoSync, followMailboxArrangement } from "./mail-sync.js";
 import { getOtterUser, relayRequest } from "./otter-account.js";
@@ -114,6 +114,7 @@ const SECTIONS = {
       broadcast("keybindings:updated");
     },
   },
+  // The agents' settings, under their old name: other devices sync this key.
   assistant: {
     read: () => syncedProviderSettings(),
     apply: (value) => applySyncedProviderSettings(value as Partial<SyncedProviderSettings>),

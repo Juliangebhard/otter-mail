@@ -61,6 +61,7 @@ function migrateRuntimeMode<T extends { runtimeMode: RuntimeMode }>(settings: T)
     : { ...settings, runtimeMode: "approval-required" };
 }
 
+// Stored under names from when agents were "assistants"; renaming them would lose them.
 const HERMES_KEY_SECRET = "assistant-hermes-key";
 
 let cache: ProviderSettings | null = null;

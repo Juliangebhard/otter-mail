@@ -63,7 +63,7 @@ struct ThreadView: View {
         .contentMargins(.bottom, 24, for: .scrollContent)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button("Ask the assistant", systemImage: "sparkles") { asking = [MailContext(thread)] }
+                Button("Ask the agent", systemImage: "cursorarrow") { asking = [MailContext(thread)] }
             }
             ToolbarSpacer(.fixed, placement: .topBarTrailing)
             ToolbarItem(placement: .topBarTrailing) {
@@ -95,9 +95,9 @@ struct ThreadView: View {
         }
         .sheet(isPresented: Binding(get: { asking != nil }, set: { if !$0 { asking = nil } })) {
             NavigationStack {
-                AssistantView(context: asking ?? [], sheet: true)
+                AgentView(context: asking ?? [], sheet: true)
             }
-            .onAppear { session.assistant.newChat() }
+            .onAppear { session.agent.newChat() }
         }
         .toolbarTitleDisplayMode(.inline)
         .onAppear {

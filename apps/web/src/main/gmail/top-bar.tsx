@@ -56,7 +56,7 @@ export function SidebarControl({
 }
 
 /**
- * The assistant panel toggle, pinned at the window's top-right. The rightmost
+ * The agent panel toggle, pinned at the window's top-right. The rightmost
  * band (list, reader, draft, or the panel's own header) keeps a
  * `PanelControlSlot` where it sits.
  */
@@ -64,12 +64,12 @@ export function PanelControl({ open, onToggle }: { open: boolean; onToggle: () =
   return (
     <div className="pointer-events-none fixed right-(--workspace-controls-right) top-0 z-40 flex h-(--workspace-topbar-height) items-center">
       <HintTooltip
-        label={open ? "Hide assistant panel" : "Show assistant panel"}
-        shortcut="assistant.toggle"
+        label={open ? "Hide agent panel" : "Show agent panel"}
+        shortcut="agent.toggle"
         side="bottom"
       >
         <IconBtn
-          label="Toggle assistant panel"
+          label="Toggle agent panel"
           active={open}
           className="no-drag pointer-events-auto"
           onClick={onToggle}
@@ -306,7 +306,7 @@ export function MailboxSwitcher({
 
 /**
  * Right end of the content column's title band: room for the pinned
- * assistant toggle. Views that own the band (the reader) render it at the end
+ * agent toggle. Views that own the band (the reader) render it at the end
  * of their own header.
  */
 export function TitleTrailing({ showPanelToggle }: { showPanelToggle: boolean }) {

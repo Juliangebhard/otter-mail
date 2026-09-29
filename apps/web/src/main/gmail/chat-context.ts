@@ -1,11 +1,11 @@
 import type { GmailMessageSummary } from "./types";
 
 /**
- * Pointer-sized mail context for the assistant chat. The agent has gog
+ * Pointer-sized mail context for the agent chat. The agent has gog
  * access to the same mailboxes, so ids are enough — no mail content leaves
  * the app.
  */
-export type AssistantContext = {
+export type AgentContext = {
   /** Owning account email per conversation (falls back to account id). */
   conversations: {
     account: string;
@@ -32,7 +32,7 @@ export type QuoteContext = {
 export function contextFromMessages(
   messages: GmailMessageSummary[],
   accountEmailById: (accountId: string | undefined) => string,
-): AssistantContext {
+): AgentContext {
   return {
     conversations: messages.map((m) => ({
       account: accountEmailById(m.accountId),
@@ -45,7 +45,7 @@ export function contextFromMessages(
 }
 
 /** A highlighted excerpt → a single quote context entry. */
-export function contextFromQuote(q: QuoteContext): AssistantContext {
+export function contextFromQuote(q: QuoteContext): AgentContext {
   return {
     conversations: [
       {
@@ -61,7 +61,7 @@ export function contextFromQuote(q: QuoteContext): AssistantContext {
 }
 
 /** Question + pointer block sent with a chat turn. */
-export function buildHandoffText(question: string, context: AssistantContext): string {
+export function buildHandoffText(question: string, context: AgentContext): string {
   const lines: string[] = [question.trim(), "", "— context from Otter Mail —"];
   for (const c of context.conversations) {
     if (c.quote) {

@@ -1,11 +1,11 @@
 import SwiftUI
 
 /**
- * Settings › Assistant, as on the desktop: Hermes' connection and model
+ * Settings › Agents, as on the desktop: Hermes' connection and model
  * (following the Otter account, key included), and the Mac's local agents,
  * listed but off here.
  */
-struct AssistantSettings: View {
+struct AgentSettings: View {
     @Environment(Session.self) private var session
     @Environment(\.palette) private var palette
 
@@ -14,39 +14,39 @@ struct AssistantSettings: View {
     @State private var connecting = false
 
     var body: some View {
-        @Bindable var assistant = session.assistant
+        @Bindable var agent = session.agent
         SettingsForm {
             Section {
                 LabeledContent {
                     Text(statusText).foregroundStyle(statusColor)
                 } label: {
-                    Label("Hermes", systemImage: "sparkles")
+                    Label("Hermes", systemImage: "cursorarrow")
                 }
-                if assistant.hasKey && !assistant.hermes.baseUrl.isEmpty {
+                if agent.hasKey && !agent.hermes.baseUrl.isEmpty {
                     LabeledContent("Server") {
-                        Text(URL(string: assistant.hermes.baseUrl)?.host() ?? assistant.hermes.baseUrl)
+                        Text(URL(string: agent.hermes.baseUrl)?.host() ?? agent.hermes.baseUrl)
                             .foregroundStyle(palette.muted)
                     }
-                    if !assistant.models.isEmpty {
-                        Picker("Model", selection: $assistant.hermes.model) {
+                    if !agent.models.isEmpty {
+                        Picker("Model", selection: $agent.hermes.model) {
                             Text("Hermes' default").tag("")
-                            ForEach(assistant.models.filter { !$0.slug.isEmpty }) { model in
+                            ForEach(agent.models.filter { !$0.slug.isEmpty }) { model in
                                 Text(model.subProvider.map { "\(model.name) · \($0)" } ?? model.name).tag(model.slug)
                             }
                         }
                     }
-                    if let model = assistant.model, model.reasoning {
-                        Picker("Reasoning", selection: $assistant.hermes.reasoningEffort) {
-                            ForEach(AssistantView.efforts(model), id: \.0) { Text($0.1).tag($0.0) }
+                    if let model = agent.model, model.reasoning {
+                        Picker("Reasoning", selection: $agent.hermes.reasoningEffort) {
+                            ForEach(AgentView.efforts(model), id: \.0) { Text($0.1).tag($0.0) }
                         }
                     }
-                    if let model = assistant.model, model.fast {
+                    if let model = agent.model, model.fast {
                         Toggle("Fast", isOn: Binding(
-                            get: { assistant.hermes.serviceTier == "priority" },
-                            set: { assistant.hermes.serviceTier = $0 ? "priority" : "default" }
+                            get: { agent.hermes.serviceTier == "priority" },
+                            set: { agent.hermes.serviceTier = $0 ? "priority" : "default" }
                         ))
                     }
-                    Button("Disconnect", role: .destructive) { assistant.disconnect() }
+                    Button("Disconnect", role: .destructive) { agent.disconnect() }
                 } else {
                     TextField("https://hermes.example:8642", text: $url)
                         .keyboardType(.URL)
@@ -57,7 +57,7 @@ struct AssistantSettings: View {
                     Button(connecting ? "Connecting…" : "Connect") {
                         connecting = true
                         Task {
-                            await assistant.connect(url: url, key: key)
+                            await agent.connect(url: url, key: key)
                             connecting = false
                         }
                     }
@@ -78,10 +78,10 @@ struct AssistantSettings: View {
                 Text("Codex and Claude run on your Mac, where their command-line tools are. Use them in the Mac app.")
             }
         }
-        .navigationTitle("Assistant")
+        .navigationTitle("Agents")
         .toolbarTitleDisplayMode(.inline)
-        .onAppear { url = session.assistant.hermes.baseUrl }
-        .task { await session.assistant.check() }
+        .onAppear { url = session.agent.hermes.baseUrl }
+        .task { await session.agent.check() }
     }
 
     private func macOnly(_ name: String, _ symbol: String) -> some View {
@@ -93,7 +93,7 @@ struct AssistantSettings: View {
     }
 
     private var statusText: String {
-        switch session.assistant.status {
+        switch session.agent.status {
         case .notConfigured: "Not connected"
         case .checking: "Checking…"
         case .ready: "Connected"
@@ -102,7 +102,7 @@ struct AssistantSettings: View {
     }
 
     private var statusColor: Color {
-        switch session.assistant.status {
+        switch session.agent.status {
         case .ready: palette.focus
         case .failed: palette.error
         default: palette.muted

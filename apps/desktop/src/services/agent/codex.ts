@@ -5,7 +5,7 @@
  *  - one app-server per chat session, started with thread/start (or
  *    thread/resume for a saved Codex thread id), then turn/start per message.
  *  - raw notifications map onto the canonical ChatEvent stream.
- * Threads run in the app's assistant workspace, so listing that cwd yields
+ * Threads run in the app's agent workspace, so listing that cwd yields
  * exactly the chats started from Otter Mail.
  */
 
@@ -17,8 +17,8 @@ import {
   type ServerRequest,
 } from "./codex-app-server.js";
 import { dataUrl } from "@otter-mail/core";
-import { assistantWorkspace, withAttachmentPaths } from "./local.js";
-import { ASSISTANT_INSTRUCTIONS } from "./instructions.js";
+import { agentWorkspace, withAttachmentPaths } from "./local.js";
+import { AGENT_INSTRUCTIONS } from "./instructions.js";
 import type {
   ChatProvider,
   ChatSession,
@@ -273,7 +273,7 @@ function handleServerRequest(session: Session, request: ServerRequest): void {
     turn.emit({ requestId: turn.requestId, type: "approval", approval });
     return;
   }
-  logger.info("assistant", "codex server request answered empty", {
+  logger.info("agent", "codex server request answered empty", {
     method: request.method,
   });
   if (approval) session.server.respond(request.id, approvalResponse(request, "deny"));
@@ -390,13 +390,13 @@ async function openSession(
   const existing = sessionId ? sessions.get(sessionId) : undefined;
   if (existing?.server.alive) return existing;
 
-  const cwd = await assistantWorkspace();
+  const cwd = await agentWorkspace();
   const server = await CodexAppServer.start(settings, cwd);
   const params = {
     cwd,
     ...threadConfig(settings),
     ...(settings.model ? { model: settings.model } : {}),
-    developerInstructions: ASSISTANT_INSTRUCTIONS,
+    developerInstructions: AGENT_INSTRUCTIONS,
   };
   let threadId: string;
   try {
@@ -409,7 +409,7 @@ async function openSession(
           )
           .catch((error: unknown) => {
             if (!isMissingThread(error)) throw error;
-            logger.info("assistant", "codex thread gone, starting fresh", {
+            logger.info("agent", "codex thread gone, starting fresh", {
               sessionId,
             });
             return server.request<{ thread: { id: string } }>(
@@ -436,7 +436,7 @@ async function openSession(
     sessions.delete(threadId);
     const turn = session.turn;
     if (turn) {
-      logger.info("assistant", "codex exited mid-turn", { code });
+      logger.info("agent", "codex exited mid-turn", { code });
       turn.emit({
         requestId: turn.requestId,
         type: "error",
@@ -463,7 +463,7 @@ async function withUtility<T>(
   fn: (server: CodexAppServer) => Promise<T>,
 ): Promise<T> {
   if (!utility) {
-    const server = assistantWorkspace().then((cwd) => CodexAppServer.start(settings, cwd));
+    const server = agentWorkspace().then((cwd) => CodexAppServer.start(settings, cwd));
     utility = { server, timer: null };
     server.catch(() => {
       utility = null;
@@ -648,7 +648,7 @@ export const codexProvider: ChatProvider = {
     try {
       return await withTimeout(
         (async () => {
-          server = await CodexAppServer.start(settings.codex, await assistantWorkspace());
+          server = await CodexAppServer.start(settings.codex, await agentWorkspace());
           const account = await server.request<{
             account: {
               type: string;
@@ -719,7 +719,7 @@ export const codexProvider: ChatProvider = {
     try {
       session = await openSession(settings.codex, turn.sessionId);
     } catch (error) {
-      logger.info("assistant", "codex session failed", {
+      logger.info("agent", "codex session failed", {
         error: String(error),
       });
       const message =
@@ -806,7 +806,7 @@ export const codexProvider: ChatProvider = {
       );
       return true;
     } catch (error) {
-      logger.info("assistant", "codex steer failed", { error: String(error) });
+      logger.info("agent", "codex steer failed", { error: String(error) });
       return false;
     }
   },
@@ -828,7 +828,7 @@ export const codexProvider: ChatProvider = {
         REQUEST_TIMEOUT_MS,
       )
       .catch((error: unknown) => {
-        logger.info("assistant", "codex interrupt failed", {
+        logger.info("agent", "codex interrupt failed", {
           error: String(error),
         });
         session.server.kill();
@@ -847,7 +847,7 @@ export const codexProvider: ChatProvider = {
 
   async listSkills(settings): Promise<Skill[]> {
     try {
-      const cwd = await assistantWorkspace();
+      const cwd = await agentWorkspace();
       const response = await withUtility(settings.codex, (server) =>
         server.request<{
           data: {
@@ -872,13 +872,13 @@ export const codexProvider: ChatProvider = {
           path: s.path,
         }));
     } catch (error) {
-      logger.info("assistant", "codex skills failed", { error: String(error) });
+      logger.info("agent", "codex skills failed", { error: String(error) });
       return [];
     }
   },
 
   async listSessions(settings, limit): Promise<ChatSession[]> {
-    const cwd = await assistantWorkspace();
+    const cwd = await agentWorkspace();
     const response = await withUtility(settings.codex, (server) =>
       server.request<{
         data: {

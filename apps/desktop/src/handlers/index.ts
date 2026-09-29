@@ -49,7 +49,7 @@ export function registerHandlers(): void {
       p?.pane === "accounts" ||
       p?.pane === "views" ||
       p?.pane === "keybindings" ||
-      p?.pane === "assistant" ||
+      p?.pane === "agents" ||
       p?.pane === "otter"
         ? p.pane
         : "general";

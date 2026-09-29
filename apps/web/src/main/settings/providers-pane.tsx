@@ -1,5 +1,5 @@
 /**
- * Settings → Assistant, after T3 Code's provider settings: "Checked … ago"
+ * Settings → Agents, after T3 Code's provider settings: "Checked … ago"
  * refresh by the title, the provider list (icon, name, version, status, enable
  * switch), then the selected provider's settings below it.
  */
@@ -10,7 +10,7 @@ import { toast } from "../gmail/toast";
 import { CheckIcon, RotateCwIcon, StarIcon } from "lucide-react";
 import {
   gmailApi,
-  type AssistantSettingsPatch,
+  type AgentSettingsPatch,
   type ProviderKind,
   type ProviderModel,
   type ProviderSnapshot,
@@ -22,9 +22,9 @@ import {
   ProviderIcon,
   providerSummary,
   providerVersionLabel,
-  useAssistantProviders,
+  useAgentProviders,
   useSetProvidersState,
-} from "../gmail/assistant-providers";
+} from "../gmail/agent-providers";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../gmail/select";
 import { Btn, cn } from "../gmail/ui";
 import {
@@ -404,7 +404,7 @@ function HermesEditor({
 }: {
   state: ProvidersState;
   provider: ProviderSnapshot;
-  update: (patch: AssistantSettingsPatch) => void;
+  update: (patch: AgentSettingsPatch) => void;
 }) {
   const setState = useSetProvidersState();
   const [baseUrl, setBaseUrl] = useState("");
@@ -517,7 +517,7 @@ function AgentEditor({
   kind: "codex" | "claude";
   state: ProvidersState;
   provider: ProviderSnapshot;
-  update: (patch: AssistantSettingsPatch) => void;
+  update: (patch: AgentSettingsPatch) => void;
 }) {
   const meta = AGENT_RUNTIME[kind];
   const settings = state.settings[kind];
@@ -598,17 +598,17 @@ function AgentEditor({
 // ---------------------------------------------------------------------------
 
 export function ProvidersPane() {
-  const query = useAssistantProviders();
+  const query = useAgentProviders();
   const setState = useSetProvidersState();
   const state = query.data;
   const [selectedKind, setSelectedKind] = useState<ProviderKind | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const now = useNow(1000);
 
-  const update = (patch: AssistantSettingsPatch) => {
-    console.log("[Settings:updateAssistant]", patch);
+  const update = (patch: AgentSettingsPatch) => {
+    console.log("[Settings:updateAgent]", patch);
     gmailApi
-      .updateAssistantSettings(patch)
+      .updateAgentSettings(patch)
       .then(setState, (error: unknown) =>
         toast.error(`Could not save: ${error instanceof Error ? error.message : String(error)}`),
       );
@@ -617,14 +617,14 @@ export function ProvidersPane() {
   const refresh = () => {
     if (refreshing) return;
     setRefreshing(true);
-    void gmailApi.refreshAssistantProviders().catch(() => {});
+    void gmailApi.refreshAgentProviders().catch(() => {});
     // Results arrive as broadcasts; keep the spinner up while the probes run.
     setTimeout(() => setRefreshing(false), 1500);
   };
 
   if (!state) {
     return (
-      <SettingsPageContainer title="Assistant">
+      <SettingsPageContainer title="Agents">
         <p className="text-sm text-muted-foreground">
           {query.isError ? "Provider settings are unavailable." : "Loading provider settings…"}
         </p>
@@ -639,7 +639,7 @@ export function ProvidersPane() {
 
   return (
     <SettingsPageContainer
-      title="Assistant"
+      title="Agents"
       description="The agents behind chat. Turn them on, pick one for new chats, and set it up."
       action={
         <Btn

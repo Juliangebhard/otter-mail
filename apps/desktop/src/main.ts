@@ -12,7 +12,7 @@ import { broadcast } from "./ipc.js";
 import { logger } from "./logger.js";
 import { configureAppPaths } from "./paths.js";
 import { desktopPlatform } from "./platform.js";
-import { migrateHermesKey } from "./services/assistant/local.js";
+import { migrateHermesKey } from "./services/agent/local.js";
 import { parseMailtoUrl, setPendingMailto } from "./services/mailto-target.js";
 import { createTray, destroyTray } from "./services/tray.js";
 import { initUpdates } from "./updates.js";
@@ -167,7 +167,7 @@ function setupApplicationMenu(): void {
       submenu: [
         // Otter Code's ⌘W: closes the active chat tab first; the window only
         // closes once there's no tab left to close. The main window decides
-        // (window:closeRequest → assistant tab, or window:closeMain).
+        // (window:closeRequest → agent tab, or window:closeMain).
         {
           label: "Close",
           accelerator: "Command+W",

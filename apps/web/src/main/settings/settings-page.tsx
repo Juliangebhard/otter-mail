@@ -328,7 +328,7 @@ export function SettingsPage({
   if (route.pane === "keybindings") return <KeybindingsPane />;
   if (route.pane === "accounts") return <AccountsPane />;
   if (route.pane === "otter") return <OtterAccountPane />;
-  if (route.pane === "assistant") return <ProvidersPane />;
+  if (route.pane === "agents") return <ProvidersPane />;
   if (route.pane === "views") {
     return (
       <ViewsPane

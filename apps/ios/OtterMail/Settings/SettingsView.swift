@@ -3,7 +3,7 @@ import SwiftUI
 /**
  * Settings, ChatGPT's sheet: who's signed in, then grouped rows. Everything
  * here is also in the Mac and web apps' settings, under the same names;
- * what only a computer has (menu bar, launch at login, the assistants,
+ * what only a computer has (menu bar, launch at login, the local agents,
  * keyboard shortcuts) stays there.
  */
 struct SettingsView: View {
@@ -73,14 +73,14 @@ struct SettingsView: View {
                     Text("Mail in other languages is translated on this iPhone, by Apple's Translation.")
                 }
 
-                Section("Assistant") {
+                Section("Agents") {
                     NavigationLink {
-                        AssistantSettings()
+                        AgentSettings()
                     } label: {
                         LabeledContent {
-                            Text(session.assistant.status == .ready ? "Hermes" : "Off")
+                            Text(session.agent.status == .ready ? "Hermes" : "Off")
                         } label: {
-                            Label("Assistant", systemImage: "sparkles")
+                            Label("Agents", systemImage: "cursorarrow")
                         }
                     }
                 }

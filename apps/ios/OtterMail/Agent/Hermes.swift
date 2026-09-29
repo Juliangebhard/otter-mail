@@ -1,7 +1,7 @@
 import Foundation
 
 /**
- * Hermes over its API server, as core's assistant/hermes.ts talks to it:
+ * Hermes over its API server, as core's Hermes client talks to it:
  * chats are server-side sessions (so they're the same on the Mac, the web and
  * here), turns stream as server-sent events, and a running turn can be
  * stopped or asked for approval.

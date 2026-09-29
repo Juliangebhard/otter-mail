@@ -6,7 +6,7 @@
  * `initCore(platform)` once before using anything else.
  */
 
-import type { ChatProvider } from "./services/assistant/types.js";
+import type { ChatProvider } from "./services/agent/types.js";
 import type { GmailAccount } from "./types.js";
 
 export type SqlValue = string | number | bigint | null | Uint8Array;
@@ -158,8 +158,8 @@ export interface Platform {
   offlineDownloads: boolean;
   /** Absent where there's no on-device translator (browsers other than Chrome). */
   translator?: Translator;
-  /** Assistants beyond Hermes that run on this device (Codex and Claude, on the Mac). */
-  assistantProviders?: ChatProvider[];
+  /** Agents beyond Hermes that run on this device (Codex and Claude, on the Mac). */
+  agentProviders?: ChatProvider[];
 }
 
 let current: Platform | null = null;

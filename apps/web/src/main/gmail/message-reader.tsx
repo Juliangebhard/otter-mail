@@ -18,7 +18,7 @@ import {
   ArchiveIcon,
   ArchiveRestoreIcon,
   ArchiveXIcon,
-  BotMessageSquareIcon,
+  MousePointer2Icon,
   ChevronDownIcon,
   DownloadIcon,
   EllipsisIcon,
@@ -135,7 +135,7 @@ type MessageReaderProps = {
   onDeselect?: () => void;
   /** Toolbar archive/trash move on to the next conversation through this. */
   onAdvance?: () => void;
-  /** Opens the in-app assistant chat panel (this conversation becomes its context). */
+  /** Opens the in-app agent chat panel (this conversation becomes its context). */
   onOpenChat?: () => void;
   /** A selected excerpt was sent to the chat panel as a quote. */
   onQuote?: (quote: QuoteContext) => void;
@@ -2621,8 +2621,8 @@ export function MessageReader({
                 </DropdownMenuItem>
               )}
               <DropdownMenuSeparator />
-              <DropdownMenuItem icon={<BotMessageSquareIcon />} onSelect={() => onOpenChat?.()}>
-                Chat about this with the assistant
+              <DropdownMenuItem icon={<MousePointer2Icon />} onSelect={() => onOpenChat?.()}>
+                Chat about this with the agent
               </DropdownMenuItem>
               {isTrashed || isJunk ? (
                 <>

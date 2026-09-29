@@ -203,7 +203,7 @@ async function fetchHermesCatalog(baseUrl: string, key: string): Promise<Provide
     }
     return models;
   } catch (error) {
-    logger.info("assistant", "hermes model options failed", {
+    logger.info("agent", "hermes model options failed", {
       error: String(error),
     });
     return [];
@@ -418,7 +418,7 @@ async function streamSessionTurn(ctx: TurnContext & { sessionId: string }): Prom
   if (response.status === 404)
     return emit({ requestId, type: "error", message: "session_not_found" });
   if (!response.ok || !response.body) {
-    logger.info("assistant", "hermes turn rejected", {
+    logger.info("agent", "hermes turn rejected", {
       requestId,
       status: response.status,
       message: await readError(response),
@@ -783,7 +783,7 @@ export const hermesProvider: ChatProvider = {
           sessionId = await createSession(ready, turn.title);
           emit({ requestId, type: "session", sessionId });
         } catch (error) {
-          logger.info("assistant", "hermes session create failed, chaining", {
+          logger.info("agent", "hermes session create failed, chaining", {
             error: String(error),
           });
         }
@@ -801,7 +801,7 @@ export const hermesProvider: ChatProvider = {
           ? "timeout"
           : "cancelled"
         : "unreachable";
-      logger.info("assistant", "hermes turn failed", {
+      logger.info("agent", "hermes turn failed", {
         requestId,
         message,
         error: String(err),

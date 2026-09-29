@@ -9,8 +9,11 @@ import path from "node:path";
 
 import { ATTACHMENTS_DIR, type ChatAttachment, type Platform } from "@otter-mail/core";
 
-/** Codex threads started from Otter Mail run here (their cwd), so they're listable as ours. */
-export async function assistantWorkspace(): Promise<string> {
+/**
+ * Codex threads started from Otter Mail run here (their cwd), so they're listable as ours.
+ * Named when agents were "assistants": renaming it would orphan those threads.
+ */
+export async function agentWorkspace(): Promise<string> {
   const dir = path.join(app.getPath("userData"), "assistant-workspace");
   await fs.mkdir(dir, { recursive: true });
   return dir;
