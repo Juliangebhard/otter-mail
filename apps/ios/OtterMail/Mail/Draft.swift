@@ -28,7 +28,7 @@ struct Draft: Identifiable, Hashable {
     /** A reply to the thread's latest message (to everyone on it, for reply all). */
     static func reply(to thread: MailThread, in mailbox: Mailbox, all: Bool) -> Draft {
         let last = thread.sent.last ?? thread.latest
-        let mine = last.from.email == mailbox.email
+        let mine = last.from.isAddress(mailbox.email)
         var to = mine ? last.to : [last.from]
         var cc: [Person] = []
         if all {

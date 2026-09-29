@@ -43,3 +43,12 @@ export function formatAddressEntry(name: string, email: string): string {
 export function normalizeAddressList(value: string): string {
   return splitAddressList(value).join(", ");
 }
+
+/**
+ * Who a message is from, for display: the sender's name, or "Me" for the
+ * mailbox's own address when it has none (account ids are addresses).
+ */
+export function senderLabel(fromName: string, fromEmail: string, accountId?: string): string {
+  if (fromName && fromName !== fromEmail) return fromName;
+  return accountId && fromEmail.toLowerCase() === accountId.toLowerCase() ? "Me" : fromEmail;
+}

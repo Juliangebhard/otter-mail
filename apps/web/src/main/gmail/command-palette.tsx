@@ -37,6 +37,7 @@ import {
 } from "lucide-react";
 import { useDebouncedValue, useSearchMessages } from "./hooks";
 import { getAccountColor, getAccountDisplayName } from "./account-style";
+import { senderLabel } from "./address";
 import { cn } from "./ui";
 import { COMBINED_ACCOUNT_ID } from "./custom-views";
 import {
@@ -345,7 +346,7 @@ export function CommandPalette({
             ) : (
               <InboxIcon className={ICON} />
             ),
-            title: message.fromName || message.fromEmail,
+            title: senderLabel(message.fromName, message.fromEmail, message.accountId),
             description: message.subject || "(no subject)",
             trailing: formatResultDate(message.date),
             run: () => onOpenMessage(message),

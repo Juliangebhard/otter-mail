@@ -113,7 +113,7 @@ struct MessageView: View {
             SenderAvatar(person: message.from, size: 38)
             VStack(alignment: .leading, spacing: 2) {
                 HStack(alignment: .firstTextBaseline) {
-                    Text(message.from.email == mailbox.email ? "Me" : message.from.label)
+                    Text(message.from.isAddress(mailbox.email) ? "Me" : message.from.label)
                         .font(.body.weight(.semibold))
                         .foregroundStyle(palette.text)
                         .lineLimit(1)
@@ -136,7 +136,7 @@ struct MessageView: View {
     }
 
     private var recipients: String {
-        let name = { (p: Person) in p.email == mailbox.email ? "me" : p.label }
+        let name = { (p: Person) in p.isAddress(mailbox.email) ? "me" : p.label }
         let to = "to " + message.to.map(name).joined(separator: ", ")
         return message.cc.isEmpty ? to : "\(to), cc \(message.cc.map(name).joined(separator: ", "))"
     }

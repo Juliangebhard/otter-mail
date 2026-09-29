@@ -66,7 +66,7 @@ import { labelSearchToken, viewSearchQuery } from "./gmail-query";
 import { getAccountColor, getAccountDisplayName } from "./account-style";
 import { ALL_MAIL_LABEL_ID, SYSTEM_LABEL_NAMES, labelDisplayName } from "./label-names";
 import { decodeEntities } from "./text";
-import { parseAddressEntry, splitAddressList } from "./address";
+import { parseAddressEntry, senderLabel, splitAddressList } from "./address";
 import type { GmailAccount, GmailLabel, GmailMessageSummary, ViewRule } from "./types";
 import { pickAdvanceTarget } from "./advance-direction";
 import { beginUndoGroup, clearUndo } from "./undo";
@@ -442,7 +442,7 @@ function MessageRow({
                       ? draftTo
                         ? `to ${draftTo}`
                         : ""
-                      : message.fromName || message.fromEmail}
+                      : senderLabel(message.fromName, message.fromEmail, ownerAccountId)}
                   </span>
                 </span>
                 <div className="flex shrink-0 items-center gap-1.5">
@@ -628,7 +628,7 @@ function ThreadMessageRow({
               message.unread ? "font-medium text-foreground" : "text-foreground/85",
             )}
           >
-            {message.fromName || message.fromEmail}
+            {senderLabel(message.fromName, message.fromEmail, message.accountId)}
           </span>
         </span>
         <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
@@ -1452,7 +1452,7 @@ export function MessageList({
       rows.length > 1
         ? { title: `${rows.length} conversations` }
         : {
-            title: message.fromName || message.fromEmail,
+            title: senderLabel(message.fromName, message.fromEmail, message.accountId ?? accountId),
             subtitle: message.subject || "(no subject)",
           },
     );

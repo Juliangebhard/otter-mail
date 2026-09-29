@@ -11,12 +11,19 @@ data-access verification; until then sign-in shows "Google hasn't verified this 
 Google Auth Platform → Data access (https://console.cloud.google.com/auth/scopes?project=otter-mail).
 The form only saves once every field is filled, including the video link.
 
-### Sensitive scopes (calendar.events, contacts.readonly, contacts.other.readonly)
+The app asks for five scopes (`GMAIL_SCOPES` in `packages/contracts/src/index.ts`), plus
+`openid email profile`: `https://mail.google.com/`, `gmail.settings.basic`,
+`calendar.events.owned`, `contacts.readonly`, `contacts.other.readonly`. Each is the narrowest that
+does the job; justifications below.
 
-> Otter Mail is a desktop email client for macOS (https://mail.otterware.dev). calendar.events:
-> when a user receives a calendar invitation by email, Otter Mail shows the event and lets the
-> user Accept, Decline or reply Maybe from the message; the reply is written to that event on the
-> user's primary calendar. Read-only calendar scopes cannot record an RSVP, and we only touch
+### Sensitive scopes (calendar.events.owned, contacts.readonly, contacts.other.readonly)
+
+> Otter Mail is a desktop email client for macOS (https://mail.otterware.dev).
+> calendar.events.owned: when a user receives a calendar invitation by email, Otter Mail shows the
+> event and lets the user Accept, Decline or reply Maybe from the message; the reply is written to
+> that event on the user's own primary calendar (events.list by the invitation's iCalUID, then
+> events.patch of the user's attendee response). Read-only calendar scopes cannot record an RSVP;
+> we ask only for events on calendars the user owns, not all their calendars, and we only touch
 > events the user acts on. contacts.readonly and contacts.other.readonly: Otter Mail shows the
 > names and profile photos of the people the user corresponds with next to their messages, and
 > suggests recipients while the user types an address. Both are read-only; we never modify
@@ -75,9 +82,26 @@ Google reviews the submission (usually a few weeks, by email to chris.kafrouni@g
 the restricted Gmail scope it then requires a CASA security assessment from an authorised lab,
 renewed yearly; follow the instructions in that email.
 
+## Clients
+
+Four OAuth clients in the project (Google Auth Platform → Clients). All ask for `openid email
+profile` as well.
+
+| Client                                | Used by                                                                   | Gmail scopes                                                                                              |
+| ------------------------------------- | ------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| "Otter Mail" (Desktop)                | the Mac app (`OTTER_MAIL_GOOGLE_CLIENT_ID`, `187875144740-aspevse90…`)    | all five (`GMAIL_SCOPES`); Otter sign-in asks for identity only                                           |
+| "Otter Mail - Web" (Web application)  | the relay, for the web app (`GOOGLE_WEB_CLIENT_ID`, `187875144740-drhr…`) | all five (`GMAIL_SCOPES`); Otter sign-in asks for identity only                                           |
+| "Otter Mail - IOS" (iOS)              | iPhone Debug builds, bundle `dev.otterware.mail.dev` (`…-tegr2te…`)       | `https://mail.google.com/`, `gmail.settings.basic` (`GoogleAuth.swift`): no calendar or contacts features |
+| "Otter Mail iPhone (App Store)" (iOS) | iPhone Release builds, bundle `dev.otterware.mail` (`…-vu3ordog…`)        | as Debug                                                                                                  |
+
+Sign-ins from before a scope was added keep working without it: calendar.events (asked for before
+calendar.events.owned) covers the same calls; without calendar, RSVP is emailed; without
+contacts, avatars fall back to Gravatar; without gmail.settings.basic, a signature is kept in
+Otter Mail until the account is signed in again (the iPhone asks to sign in again).
+
 ## The web app
 
-The web app uses a second OAuth client in the same project ("Web application", used by the relay
-for Otter sign-in and Gmail sign-in). Because its Gmail tokens pass through the relay, Google
+The web app uses the "Web application" client (used by the relay for Otter sign-in and Gmail
+sign-in). Because its Gmail tokens pass through the relay, Google
 treats the restricted Gmail scope as accessed through a server: expect the CASA security
 assessment to be required, whatever the Mac app alone would need.

@@ -16,7 +16,16 @@ final class GoogleAuth {
      * secret; the relay lists it too), from Info.plist's GoogleClientID.
      */
     static let clientID = Bundle.main.object(forInfoDictionaryKey: "GoogleClientID") as? String ?? ""
-    static let scopes = ["https://mail.google.com/", "openid", "email", "profile"]
+    /**
+     * Gmail, its settings (saving a signature) and who you are; no calendar or
+     * contacts, which the iPhone app doesn't use. Sign-ins from before the
+     * settings scope can't save signatures until signed in again.
+     */
+    static let scopes = [
+        "https://mail.google.com/",
+        "https://www.googleapis.com/auth/gmail.settings.basic",
+        "openid", "email", "profile",
+    ]
 
     struct Tokens {
         var accessToken: String

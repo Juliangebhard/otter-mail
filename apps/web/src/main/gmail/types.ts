@@ -17,6 +17,8 @@ export type GmailAccount = {
   color?: string;
   /** Rich-text HTML signature appended to new/reply/forward compose bodies. */
   signature?: string;
+  /** False while the signature is kept only here: this sign-in may not save it in Gmail. */
+  signatureInGmail?: boolean;
   /** No usable sign-in (Google, or the IMAP password on this device): sign in again. */
   signedOut?: boolean;
 };
