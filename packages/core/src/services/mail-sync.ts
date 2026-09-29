@@ -480,29 +480,50 @@ async function downloadBodies(accountId: string, provider: MailProvider): Promis
   if (total > 0) {
     let done = 0;
     const attempted = new Set<string>();
+    /** Messages whose thread failed to come whole: each goes on its own. */
+    const singly = new Set<string>();
     update(accountId, { download: { done, total } });
     for (;;) {
       assertActive(accountId);
       if (provider.isCoolingDown?.(accountId)) break;
-      const ids = store
-        .getUndownloadedMessageIds(accountId, DOWNLOAD_CHUNK)
-        .filter((id) => !attempted.has(id));
-      if (ids.length === 0) break;
+      const batch = store
+        .getUndownloadedMessages(accountId, DOWNLOAD_CHUNK)
+        .filter((m) => !attempted.has(m.id));
+      if (batch.length === 0) break;
+      // Two or more messages of a thread come in one request where the
+      // provider can (Gmail's threads.get costs what two messages do).
+      const threads = new Map<string, string[]>();
+      for (const m of batch) {
+        const key = provider.getThread && !singly.has(m.id) ? m.threadId : m.id;
+        threads.set(key, [...(threads.get(key) ?? []), m.id]);
+      }
+      const jobs: { threadId: string | null; ids: string[] }[] = [...threads].map(
+        ([threadId, ids]) => ({ threadId: ids.length > 1 ? threadId : null, ids }),
+      );
       let pushedBack = false;
       // Written together once the chunk is in: one transaction, not sixty.
       const details: GmailMessageDetail[] = [];
-      await mapPool(ids, DOWNLOAD_CONCURRENCY, async (id) => {
+      await mapPool(jobs, DOWNLOAD_CONCURRENCY, async ({ threadId, ids }) => {
         if (pushedBack || removed.has(accountId)) return;
-        attempted.add(id);
+        for (const id of ids) attempted.add(id);
+        const id = ids[0]!;
         try {
-          details.push(await provider.getMessage(accountId, id));
+          if (threadId) details.push(...(await provider.getThread!(accountId, threadId)));
+          else details.push(await provider.getMessage(accountId, id));
         } catch (err) {
           if (err instanceof SyncCancelled) throw err;
           const kind = provider.errorKind(err);
           if (kind === "rateLimit" || kind === "network" || !isSignedIn(accountId)) {
             // Not the message's fault: leave it queued and end this pass.
-            attempted.delete(id);
+            for (const each of ids) attempted.delete(each);
             pushedBack = true;
+          } else if (threadId) {
+            // Next time each message goes on its own, with its own outcome.
+            for (const each of ids) {
+              attempted.delete(each);
+              singly.add(each);
+            }
+            return;
           } else if (kind === "notFound") {
             // Deleted on the server since it was listed (sync may have dropped it already).
             if (store.deleteMessage(accountId, id)) bumpRevision(accountId);
@@ -514,7 +535,7 @@ async function downloadBodies(accountId: string, provider: MailProvider): Promis
             store.markBodyFetchFailed(accountId, id);
           }
         }
-        done += 1;
+        done += ids.length;
         update(accountId, { download: { done: Math.min(done, total), total } });
       });
       assertActive(accountId);

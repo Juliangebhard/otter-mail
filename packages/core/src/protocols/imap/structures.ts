@@ -71,6 +71,11 @@ export interface FetchedMessage {
   source?: Uint8Array;
   /** The start of the body (BODY[TEXT]<0.N>). */
   textStart?: Uint8Array;
+  /** Gmail's X-GM-MSGID and X-GM-THRID: its API's message and thread ids, in decimal. */
+  gmailId?: bigint;
+  gmailThreadId?: bigint;
+  /** Gmail's X-GM-LABELS, as sent (modified UTF-7; system labels as \Inbox, \Sent, …). */
+  gmailLabels?: string[];
 }
 
 export function parseFetch(response: ImapResponse): FetchedMessage {
@@ -94,6 +99,10 @@ export function parseFetch(response: ImapResponse): FetchedMessage {
       message.source = tokenBytes(value) ?? new Uint8Array();
     } else if (key.startsWith("BODY[TEXT]")) {
       message.textStart = tokenBytes(value) ?? new Uint8Array();
+    } else if (key === "X-GM-MSGID") message.gmailId = toBigInt(value);
+    else if (key === "X-GM-THRID") message.gmailThreadId = toBigInt(value);
+    else if (key === "X-GM-LABELS") {
+      message.gmailLabels = tokenList(value).map((label) => tokenText(label) ?? "");
     }
   }
   return message;

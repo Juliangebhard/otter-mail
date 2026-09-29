@@ -13,8 +13,11 @@
  * that seed: what changed meanwhile lands on top of the older copies it
  * wrote (the feed's changes can be applied twice).
  *
- * Where bodies are kept for offline reading (the Mac), messages are fetched
- * whole: one request gives the list row and the body, instead of one each.
+ * On the Mac the first sync goes over IMAP (imap-fill.ts): every list row in
+ * seconds, off the API's quota. Elsewhere, or when IMAP isn't to be had, it
+ * lists the mailbox through the API, the inbox first; where bodies are kept
+ * for offline reading, messages are fetched whole there: one request gives
+ * the list row and the body, instead of one each.
  */
 
 import { logger } from "../../logger.js";
@@ -34,6 +37,7 @@ import {
   listLabels,
   listMessageIdsPage,
 } from "./api.js";
+import { fillOverImap } from "./imap-fill.js";
 
 // Kept in kv, so a backfill survives quitting and picks up where it stopped.
 /** The history id a backfill began at: the feed replays from it once it's done. */
@@ -188,12 +192,30 @@ async function refreshLabels(
 const META_CHUNK = 100;
 
 /**
- * The first sync of a mailbox: lists it newest first and caches what isn't
- * cached yet, 100 messages at a time so lists fill in steadily. Resumable:
- * the page cursor is kept after every page, so a failure (rate limits, sleep,
- * quit) continues where it stopped instead of starting over.
+ * The first sync of a mailbox. On the Mac, over IMAP (every row in seconds),
+ * then the category labels IMAP doesn't carry.
+ *
+ * Otherwise through the API: the newest page of the inbox, then the whole
+ * mailbox newest first (Spam and Trash after it: backfillSpamTrash), caching
+ * what isn't cached yet, 100 messages at a time so lists fill in steadily.
+ * Resumable: the page cursor is kept after every page, so a failure (rate
+ * limits, sleep, quit) continues where it stopped instead of starting over.
  */
 async function fillMailbox(accountId: string, ctx: SyncContext): Promise<void> {
+  if (platform().kind === "desktop") {
+    try {
+      await fillOverImap(accountId, ctx);
+      await fillCategories(accountId, ctx);
+      ctx.assertActive();
+      finishBackfill(accountId);
+      store.setKv(spamTrashKey(accountId), "1");
+      return;
+    } catch (err) {
+      if (err instanceof SyncCancelled) throw err;
+      logger.info("mail-sync", `filling ${accountId} through the API: ${describeError(err)}`);
+    }
+  }
+
   let total: number | null = null;
   try {
     total = (await getProfile(accountId)).messagesTotal || null;
@@ -206,10 +228,24 @@ async function fillMailbox(accountId: string, ctx: SyncContext): Promise<void> {
   ctx.update({ phase: "full", synced, total });
   if (pageToken) logger.info("mail-sync", `full sync resuming for ${accountId} at ${synced}`);
 
+  // What the user looks at first: the newest page of the inbox.
+  const inbox = await listMessageIdsPage(accountId, {
+    labelIds: ["INBOX"],
+    maxResults: 500,
+    spamTrash: false,
+  });
+  const inboxFresh = store.filterUnknownIds(accountId, inbox.ids);
+  for (let i = 0; i < inboxFresh.length; i += META_CHUNK) {
+    synced += (await fetchAndStore(accountId, inboxFresh.slice(i, i + META_CHUNK), ctx, true))
+      .length;
+    ctx.update({ synced });
+    ctx.bumpRevision();
+  }
+
   for (;;) {
     let page: Awaited<ReturnType<typeof listMessageIdsPage>>;
     try {
-      page = await listMessageIdsPage(accountId, { pageToken, maxResults: 500 });
+      page = await listMessageIdsPage(accountId, { pageToken, maxResults: 500, spamTrash: false });
     } catch (err) {
       // A stale saved cursor: start the listing over (cached ids are skipped).
       if (pageToken && err instanceof Error && err.message.includes("Gmail API error: 400")) {
@@ -236,7 +272,20 @@ async function fillMailbox(accountId: string, ctx: SyncContext): Promise<void> {
 
   ctx.assertActive();
   finishBackfill(accountId);
-  store.setKv(spamTrashKey(accountId), "1");
+}
+
+/** The category labels (Promotions, Social, …) IMAP doesn't carry, from API listings. */
+async function fillCategories(accountId: string, ctx: SyncContext): Promise<void> {
+  for (const label of store.getLabels(accountId)) {
+    if (!label.id.startsWith("CATEGORY_")) continue;
+    const ids = await listAllIds(accountId, label.id);
+    ctx.assertActive();
+    store.applyHistoryChanges(
+      accountId,
+      ids.map((id) => ({ kind: "labelsAdded", id, labelIds: [label.id] })),
+    );
+  }
+  ctx.bumpRevision();
 }
 
 /**

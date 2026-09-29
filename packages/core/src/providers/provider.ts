@@ -123,6 +123,8 @@ export interface MailProvider {
   getSummaries(accountId: string, messageIds: string[]): Promise<GmailMessageSummary[]>;
   /** The whole message: bodies and the attachment list. */
   getMessage(accountId: string, messageId: string): Promise<GmailMessageDetail>;
+  /** Every message of a thread, whole, where one request is cheaper than one per message. */
+  getThread?(accountId: string, threadId: string): Promise<GmailMessageDetail[]>;
   fetchAttachment(accountId: string, messageId: string, attachmentId: string): Promise<Uint8Array>;
   /** Message-ID and References, for replying to a message cached without them. */
   getReplyHeaders(

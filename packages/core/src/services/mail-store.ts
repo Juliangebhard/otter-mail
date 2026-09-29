@@ -732,17 +732,23 @@ export function setReplyHeaders(
     .run(messageIdHeader, referencesHeader, accountId, messageId);
 }
 
-/** Ids of messages whose full body hasn't been downloaded yet (newest first),
-    skipping ones waiting out a retry backoff. */
-export function getUndownloadedMessageIds(accountId: string, limit: number): string[] {
-  const rows = getDb()
+/** Messages whose full body hasn't been downloaded yet, the inbox's first and
+    then newest first, skipping ones waiting out a retry backoff. */
+export function getUndownloadedMessages(
+  accountId: string,
+  limit: number,
+): { id: string; threadId: string }[] {
+  return getDb()
     .prepare(
-      `SELECT id FROM messages
-        WHERE accountId = ? AND detailFetched = 0 AND bodyRetryAt <= ?
-        ORDER BY date DESC LIMIT ?`,
+      `SELECT m.id, m.threadId FROM messages m
+        WHERE m.accountId = ? AND m.detailFetched = 0 AND m.bodyRetryAt <= ?
+        ORDER BY EXISTS (
+          SELECT 1 FROM message_labels ml
+           WHERE ml.accountId = m.accountId AND ml.messageId = m.id AND ml.labelId = 'INBOX'
+        ) DESC, m.date DESC
+        LIMIT ?`,
     )
-    .all(accountId, Date.now(), limit) as unknown as { id: string }[];
-  return rows.map((r) => r.id);
+    .all(accountId, Date.now(), limit) as unknown as { id: string; threadId: string }[];
 }
 
 /** Messages still missing a body that are due for download. */

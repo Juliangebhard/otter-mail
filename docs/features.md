@@ -109,11 +109,13 @@ Swift code (`apps/ios`). Gmail and IMAP are noted where they differ.
 
 ## Offline & sync
 
-| Feature                               | Mac                   | Web                 | iPhone                               |
-| ------------------------------------- | --------------------- | ------------------- | ------------------------------------ |
-| Local cache                           | SQLite, whole mailbox | SQLite WASM on OPFS | JSON, newest 400 threads per mailbox |
-| Bodies downloaded for offline         | ✓                     | — (fetched on open) | —                                    |
-| Changes applied at once, synced after | ✓                     | ✓                   | ✓ (no outbox)                        |
+| Feature                               | Mac                                | Web                    | iPhone                               |
+| ------------------------------------- | ---------------------------------- | ---------------------- | ------------------------------------ |
+| Local cache                           | SQLite, whole mailbox              | SQLite WASM on OPFS    | JSON, newest 400 threads per mailbox |
+| Gmail: first sync                     | every row over IMAP, in seconds    | Gmail API, inbox first | newest threads                       |
+| Bodies downloaded for offline         | ✓ (inbox first, then newest first) | — (fetched on open)    | —                                    |
+| New mail during a long sync           | ✓                                  | ✓                      | —                                    |
+| Changes applied at once, synced after | ✓                                  | ✓                      | ✓ (no outbox)                        |
 
 ## Settings & customization
 

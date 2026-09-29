@@ -39,6 +39,7 @@ export const gmailProvider: MailProvider = {
   listLabels: api.listLabels,
   getSummaries: api.fetchMetadataForIds,
   getMessage: api.getMessage,
+  getThread: api.getThread,
   fetchAttachment: api.fetchAttachment,
   getReplyHeaders: api.fetchReplyHeaders,
   getUnsubscribeHeaders: api.getUnsubscribeHeaders,

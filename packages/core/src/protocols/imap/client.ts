@@ -130,6 +130,8 @@ export interface FetchQuery {
   source?: boolean;
   /** The first n bytes of the body (BODY.PEEK[TEXT]<0.n>). */
   textStart?: number;
+  /** Gmail's own ids and labels (X-GM-MSGID, X-GM-THRID, X-GM-LABELS). */
+  gmail?: boolean;
 }
 
 export interface SearchCriteria {
@@ -474,6 +476,7 @@ export class ImapClient {
     }
     if (query.source) items.push("BODY.PEEK[]");
     if (query.textStart) items.push(`BODY.PEEK[TEXT]<0.${query.textStart}>`);
+    if (query.gmail) items.push("X-GM-MSGID", "X-GM-THRID", "X-GM-LABELS");
     const modifiers: string[] = [];
     if (changedSince !== undefined) {
       const vanished = this.enabled.has("QRESYNC") ? " VANISHED" : "";

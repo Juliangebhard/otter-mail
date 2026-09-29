@@ -4,8 +4,10 @@
  * history feed. What it locks in: new mail keeps coming while the first sync
  * fills a mailbox (the fill runs as a backfill beside the sync lane), each
  * message is fetched once (whole), a finished fill is corrected by replaying
- * the feed from where it began, and an expired feed is caught up from Gmail's
- * listings instead of re-reading every message.
+ * the feed from where it began, an expired feed is caught up from Gmail's
+ * listings instead of re-reading every message, and on the Mac a new
+ * mailbox's rows come over IMAP (a pretend Gmail IMAP server) while bodies
+ * follow through the API, the inbox first and whole threads at once.
  */
 
 import { DatabaseSync } from "node:sqlite";
@@ -13,6 +15,7 @@ import { DatabaseSync } from "node:sqlite";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
 import type { Platform, SqlDatabase } from "../../platform.ts";
+import { FakeStream, tagOf } from "../../protocols/test/fake-stream.ts";
 import type { GmailAccount } from "../../types.ts";
 
 const GMAIL = "gmail.googleapis.com";
@@ -30,8 +33,9 @@ type HistoryEntry = {
   labelsRemoved?: (Ref & { labelIds: string[] })[];
 };
 
-const LABELS = ["INBOX", "UNREAD", "STARRED", "SENT", "SPAM", "TRASH", "DRAFT"];
+const SYSTEM_LABELS = ["INBOX", "UNREAD", "STARRED", "SENT", "SPAM", "TRASH", "DRAFT"];
 
+let labels: { id: string; name: string; type: "system" | "user" }[];
 let mail: Map<string, Mail>;
 let historyId: number;
 let history: HistoryEntry[];
@@ -39,6 +43,8 @@ let history: HistoryEntry[];
 let historyFloor: number;
 /** Message fetches, by id and format. */
 let fetches: { id: string; format: string }[];
+/** Thread fetches, by id. */
+let threadFetches: string[];
 /** Listings of the whole mailbox (no label), by the page asked for. */
 let listings: (string | null)[];
 /** Gmail answers pages of at most this many ids. */
@@ -53,8 +59,8 @@ const ref = (m: Mail): Ref => ({
   message: { id: m.id, threadId: m.threadId, labelIds: [...m.labelIds] },
 });
 
-function deliver(id: string, labelIds: string[], date = Date.now()): Mail {
-  const m: Mail = { id, threadId: id, labelIds, date, subject: `Subject ${id}` };
+function deliver(id: string, labelIds: string[], date = Date.now(), threadId = id): Mail {
+  const m: Mail = { id, threadId, labelIds, date, subject: `Subject ${id}` };
   mail.set(id, m);
   history.push({ id: String(++historyId), messagesAdded: [ref(m)] });
   return m;
@@ -80,6 +86,25 @@ const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 
 const base64url = (text: string) => Buffer.from(text).toString("base64url");
+
+/** A message as messages.get (and threads.get) answers it. */
+function resource(m: Mail, format: string) {
+  const headers = [
+    { name: "From", value: "Sender <sender@example.test>" },
+    { name: "Subject", value: m.subject },
+  ];
+  return {
+    id: m.id,
+    threadId: m.threadId,
+    labelIds: [...m.labelIds],
+    internalDate: String(m.date),
+    snippet: m.subject,
+    payload:
+      format === "full"
+        ? { mimeType: "text/plain", headers, body: { data: base64url(`Body of ${m.id}`) } }
+        : { headers },
+  };
+}
 
 async function fakeFetch(input: string | URL | Request): Promise<Response> {
   const url = new URL(typeof input === "string" ? input : input instanceof URL ? input : input.url);
@@ -122,35 +147,120 @@ async function fakeFetch(input: string | URL | Request): Promise<Response> {
     const m = mail.get(id);
     if (!m) return json({ error: { message: "Not Found" } }, 404);
     // Answered as the message is now, delivered later.
-    const headers = [
-      { name: "From", value: "Sender <sender@example.test>" },
-      { name: "Subject", value: m.subject },
-    ];
-    const body = {
-      id: m.id,
-      threadId: m.threadId,
-      labelIds: [...m.labelIds],
-      internalDate: String(m.date),
-      snippet: m.subject,
-      payload:
-        format === "full"
-          ? { mimeType: "text/plain", headers, body: { data: base64url(`Body of ${m.id}`) } }
-          : { headers },
-    };
+    const body = resource(m, format);
     if (hold?.ids.includes(id) && !held.has(id)) {
       held.add(id);
       await hold.until;
     }
     return json(body);
   }
-  if (path === "/labels") {
-    return json({ labels: LABELS.map((id) => ({ id, name: id, type: "system" })) });
+  const thread = path.match(/^\/threads\/([^/]+)$/);
+  if (thread) {
+    threadFetches.push(thread[1]!);
+    const messages = [...mail.values()].filter((m) => m.threadId === thread[1]);
+    const format = url.searchParams.get("format") ?? "full";
+    return json({ id: thread[1], messages: messages.map((m) => resource(m, format)) });
   }
+  if (path === "/labels") return json({ labels });
   const label = path.match(/^\/labels\/([^/]+)$/);
   if (label) return json({ id: label[1], messagesTotal: 0, messagesUnread: 0 });
   if (path === "/drafts") return json({ drafts: [] });
   if (path === "/settings/sendAs") return json({ sendAs: [] });
   return json({ error: { message: "not in this test" } }, 404);
+}
+
+// ── Gmail's IMAP ────────────────────────────────────────────────────────────
+// The same mailbox over IMAP, as Gmail serves it: All Mail (everything but
+// Spam and Trash) and those two folders, X-GM-MSGID/X-GM-THRID in decimal,
+// labels in X-GM-LABELS (no categories), unread as a missing \Seen.
+
+/** Whether Gmail lets this account in over IMAP (a Workspace admin can turn it off). */
+let imapOpen: boolean;
+let imapLogins: number;
+
+const IMAP_NAMES: Record<string, string> = {
+  INBOX: "\\\\Inbox",
+  SENT: "\\\\Sent",
+  STARRED: "\\\\Starred",
+  DRAFT: "\\\\Draft",
+};
+
+function imapFolder(name: string): Mail[] {
+  const inFolder =
+    name === "[Gmail]/Spam"
+      ? (m: Mail) => m.labelIds.includes("SPAM")
+      : name === "[Gmail]/Trash"
+        ? (m: Mail) => m.labelIds.includes("TRASH")
+        : (m: Mail) => !m.labelIds.includes("SPAM") && !m.labelIds.includes("TRASH");
+  // UIDs in arrival order.
+  return [...mail.values()].filter(inFolder).sort((a, b) => a.date - b.date);
+}
+
+/** IMAP's date-time: "29-Sep-2026 12:00:00 +0000". */
+function internalDate(ms: number): string {
+  const d = new Date(ms);
+  const month = d.toLocaleString("en", { month: "short", timeZone: "UTC" });
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(d.getUTCDate())}-${month}-${d.getUTCFullYear()} ${d.toISOString().slice(11, 19)} +0000`;
+}
+
+function gmailImap(): FakeStream {
+  let selected: Mail[] = [];
+  return new FakeStream(
+    "* OK [CAPABILITY IMAP4rev1 SASL-IR AUTH=XOAUTH2 X-GM-EXT-1] Gimap\r\n",
+    (line) => {
+      const tag = tagOf(line);
+      const command = line.slice(tag.length + 1).trim();
+      if (command.startsWith("AUTHENTICATE")) {
+        if (!imapOpen) return `${tag} NO [AUTHENTICATIONFAILED] IMAP access is disabled\r\n`;
+        imapLogins++;
+        return `${tag} OK [CAPABILITY IMAP4rev1 X-GM-EXT-1] Success\r\n`;
+      }
+      if (command.startsWith("LIST")) {
+        return (
+          '* LIST (\\HasNoChildren) "/" "INBOX"\r\n' +
+          '* LIST (\\All \\HasNoChildren) "/" "[Gmail]/All Mail"\r\n' +
+          '* LIST (\\HasNoChildren \\Junk) "/" "[Gmail]/Spam"\r\n' +
+          '* LIST (\\HasNoChildren \\Trash) "/" "[Gmail]/Trash"\r\n' +
+          `${tag} OK\r\n`
+        );
+      }
+      if (command.startsWith("EXAMINE")) {
+        selected = imapFolder(command.match(/"(.*)"/)![1]!);
+        return `* ${selected.length} EXISTS\r\n* OK [UIDVALIDITY 1] UIDs\r\n${tag} OK [READ-ONLY]\r\n`;
+      }
+      if (command.startsWith("UID SEARCH")) {
+        return `* SEARCH ${selected.map((_, i) => i + 1).join(" ")}\r\n${tag} OK\r\n`;
+      }
+      if (command.startsWith("UID FETCH")) {
+        const uids = command
+          .split(" ")[2]!
+          .split(",")
+          .flatMap((part) => {
+            const [from, to = from] = part.split(":").map(Number);
+            return Array.from({ length: to! - from! + 1 }, (_, i) => from! + i);
+          });
+        const lines = uids.map((uid) => {
+          const m = selected[uid - 1]!;
+          const header = `From: Sender <sender@example.test>\r\nSubject: ${m.subject}\r\n\r\n`;
+          const names = m.labelIds
+            .map((l) => IMAP_NAMES[l] ?? labels.find((x) => x.id === l && x.type === "user")?.name)
+            .filter(Boolean)
+            .map((name) => `"${name}"`);
+          const flags = m.labelIds.includes("UNREAD") ? "()" : "(\\Seen)";
+          return (
+            `* ${uid} FETCH (UID ${uid} FLAGS ${flags} INTERNALDATE "${internalDate(m.date)}" ` +
+            `X-GM-MSGID ${BigInt(`0x${m.id}`)} X-GM-THRID ${BigInt(`0x${m.threadId}`)} ` +
+            `X-GM-LABELS (${names.join(" ")}) ` +
+            `BODY[HEADER.FIELDS (FROM TO CC SUBJECT DATE MESSAGE-ID REFERENCES)] {${header.length}}\r\n${header})\r\n`
+          );
+        });
+        return `${lines.join("")}${tag} OK\r\n`;
+      }
+      if (command.startsWith("LOGOUT")) return `* BYE\r\n${tag} OK\r\n`;
+      return `${tag} OK\r\n`;
+    },
+  );
 }
 
 // ── Core on Node ────────────────────────────────────────────────────────────
@@ -169,7 +279,10 @@ async function until(check: () => boolean, what: string): Promise<void> {
  * Starts core fresh, signed in to the Gmail account, with `seed` run on the
  * cache first (what an earlier run left there).
  */
-async function boot(seed?: (store: typeof import("../mail-store.ts")) => void) {
+async function boot(
+  seed?: (store: typeof import("../mail-store.ts")) => void,
+  opts: { imap?: boolean } = {},
+) {
   vi.resetModules();
   const { setPlatform } = await import("../../platform.ts");
   const { startCore } = await import("../../index.ts");
@@ -209,7 +322,7 @@ async function boot(seed?: (store: typeof import("../mail-store.ts")) => void) {
       getIdToken: unused,
       removeTokens: async () => {},
     },
-    connect: unused,
+    connect: opts.imap ? async () => gmailImap() : unused,
     relayUrl: "http://relay.test",
     relaySession: "bearer",
     broadcast: () => {},
@@ -249,6 +362,10 @@ beforeEach(() => {
   history = [];
   historyFloor = 0;
   fetches = [];
+  threadFetches = [];
+  labels = SYSTEM_LABELS.map((id) => ({ id, name: id, type: "system" }));
+  imapOpen = true;
+  imapLogins = 0;
   listings = [];
   pageSize = 500;
   refuse = new Set();
@@ -401,5 +518,54 @@ describe("Gmail sync", () => {
     expect(fetches.map((f) => f.id)).toEqual(["fresh"]);
     // The feed runs from now on.
     expect(mailStore.getSyncState(account.id).historyId).toBe(String(historyId));
+  });
+
+  it("fills a new mailbox over IMAP at once, then brings bodies inbox first, whole threads together", async () => {
+    labels.push(
+      { id: "Label_1", name: "Projects/Otter", type: "user" },
+      { id: "CATEGORY_UPDATES", name: "CATEGORY_UPDATES", type: "system" },
+      { id: "CATEGORY_PROMOTIONS", name: "CATEGORY_PROMOTIONS", type: "system" },
+    );
+    const hour = 3_600_000;
+    // A thread with a reply, archived mail with a label, promotions, spam, trash.
+    deliver("a1", ["INBOX", "UNREAD"], Date.now() - 5 * hour, "a1");
+    deliver("a2", ["SENT"], Date.now() - 4 * hour, "a1");
+    deliver("b0", ["Label_1", "CATEGORY_UPDATES", "STARRED"], Date.now() - 3 * hour);
+    deliver("c0", ["INBOX", "CATEGORY_PROMOTIONS"], Date.now() - 6 * hour);
+    deliver("d0", ["SPAM", "UNREAD"], Date.now() - 2 * hour);
+    deliver("e0", ["TRASH"], Date.now() - hour);
+
+    const { mailStore, status, labelsOf } = await boot(undefined, { imap: true });
+    await until(() => status().fullSyncDone, "the fill");
+    expect(imapLogins).toBe(1);
+    expect(mailStore.countAllMessages(account.id)).toBe(6);
+    expect(labelsOf("a1")?.sort()).toEqual(["INBOX", "UNREAD"]);
+    expect(labelsOf("a2")).toEqual(["SENT"]);
+    expect(labelsOf("b0")?.sort()).toEqual(["CATEGORY_UPDATES", "Label_1", "STARRED"]);
+    expect(labelsOf("c0")?.sort()).toEqual(["CATEGORY_PROMOTIONS", "INBOX"]);
+    expect(labelsOf("d0")?.sort()).toEqual(["SPAM", "UNREAD"]);
+    expect(labelsOf("e0")).toEqual(["TRASH"]);
+
+    // Bodies (and Gmail's snippets) follow through the API: the inbox first,
+    // the thread in one request.
+    await until(() => status().download === null && threadFetches.length > 0, "the downloads");
+    await until(() => mailStore.countUndownloaded(account.id) === 0, "every body");
+    // Each message came through the API once, whole: the rows cost nothing.
+    expect(threadFetches).toEqual(["a1"]);
+    expect(fetches.map((f) => f.id).sort()).toEqual(["b0", "c0", "d0", "e0"]);
+    expect(fetches.every((f) => f.format === "full")).toBe(true);
+    expect(fetches[0]?.id).toBe("c0");
+    expect(mailStore.getMessageDetail(account.id, "b0")?.snippet).toBe("Subject b0");
+  });
+
+  it("fills through the API when Gmail won't let the account in over IMAP", async () => {
+    imapOpen = false;
+    deliver("f1", ["INBOX"], Date.now() - 60_000);
+    deliver("f2", ["INBOX", "UNREAD"], Date.now() - 120_000);
+    const { mailStore, status } = await boot(undefined, { imap: true });
+    await until(() => status().fullSyncDone && !status().syncing, "the fill");
+    expect(imapLogins).toBe(0);
+    expect(mailStore.countAllMessages(account.id)).toBe(2);
+    expect(status().error).toBeNull();
   });
 });

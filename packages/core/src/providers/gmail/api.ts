@@ -9,13 +9,21 @@
 
 import { fromBase64, toBase64Url, utf8Decode, utf8Encode } from "../../bytes.js";
 import { SIGNED_OUT_MESSAGE } from "../../google.js";
+import { logger } from "../../logger.js";
 import { platform } from "../../platform.js";
 import { mapPool } from "../../pool.js";
 import { getAccount } from "../../services/account-store.js";
 import { buildMime, formatAddress } from "../../services/outgoing.js";
 import type { GmailLabel, GmailMessageSummary, GmailMessageDetail } from "../../types.js";
 import type { DraftSave, ErrorKind, OutgoingMail } from "../provider.js";
-import { acquireQuota, isBackgroundWork, quotaCost, reportQuotaExceeded } from "./quota.js";
+import {
+  acquireQuota,
+  budgetOf,
+  isBackgroundWork,
+  quotaCost,
+  reportQuotaExceeded,
+  spentLastMinute,
+} from "./quota.js";
 
 const BASE_URL = "https://gmail.googleapis.com/gmail/v1/users/me";
 
@@ -175,7 +183,13 @@ async function gmailFetch(
     }
     if (isRateLimited(response.status, body)) {
       const retryAfter = parseInt(response.headers.get("Retry-After") ?? "", 10) * 1000;
-      reportQuotaExceeded(accountId, retryAfter > 0 ? retryAfter : 0);
+      const spent = spentLastMinute(accountId);
+      if (reportQuotaExceeded(accountId, retryAfter > 0 ? retryAfter : 0)) {
+        logger.info("gmail", `rate limited (${response.status}): ${gmailErrorMessage(body)}`, {
+          spentLastMinute: spent,
+          budgetNow: budgetOf(accountId),
+        });
+      }
       const waitMs = background
         ? retryAfter > 0
           ? retryAfter
@@ -384,7 +398,7 @@ export async function getUnsubscribeHeaders(
 
 // ── mapMessageSummary ─────────────────────────────────────────────────────────
 
-interface RawMessageMetadata {
+export interface RawMessageMetadata {
   id: string;
   threadId: string;
   labelIds?: string[];
@@ -396,7 +410,7 @@ interface RawMessageMetadata {
   };
 }
 
-function mapMessageSummary(msg: RawMessageMetadata): GmailMessageSummary {
+export function mapMessageSummary(msg: RawMessageMetadata): GmailMessageSummary {
   const headers = msg.payload?.headers ?? [];
   const from = getHeaderValue(headers, "From");
   const { fromName, fromEmail } = parseFrom(from);
@@ -652,8 +666,26 @@ export async function getMessage(
   accountId: string,
   messageId: string,
 ): Promise<GmailMessageDetail> {
-  const msg = (await gmailFetch(accountId, `/messages/${messageId}?format=full`)) as RawMessageFull;
+  return detailOf(
+    (await gmailFetch(accountId, `/messages/${messageId}?format=full`)) as RawMessageFull,
+  );
+}
 
+/**
+ * Every message of a thread, whole: one threads.get (40 units) where each
+ * message on its own costs 20, so it's cheaper from two messages up.
+ */
+export async function getThread(
+  accountId: string,
+  threadId: string,
+): Promise<GmailMessageDetail[]> {
+  const thread = (await gmailFetch(accountId, `/threads/${threadId}?format=full`)) as {
+    messages?: RawMessageFull[];
+  };
+  return (thread.messages ?? []).map(detailOf);
+}
+
+function detailOf(msg: RawMessageFull): GmailMessageDetail {
   const summary = mapMessageSummary(msg);
   const headers = msg.payload?.headers ?? [];
 
