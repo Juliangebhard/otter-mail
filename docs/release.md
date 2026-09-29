@@ -1,5 +1,7 @@
 # Releases
 
+The short version, for every part including the web app and relay: `docs/runbook.md`.
+
 Releases are GitHub Releases of this repository, built by `.github/workflows/release.yml`.
 There is one channel, stable, like T3 Code's stable train (no nightlies). Installed apps check for
 a new release at launch and every few hours, download it in the background, and show a card at

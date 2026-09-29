@@ -1,0 +1,75 @@
+# Runbook
+
+How each part of Otter Mail gets from `main` to people, what to check, and what to do when it
+breaks. The details behind each step are in `docs/release.md`, `infra/relay/README.md` and
+`apps/ios/README.md`.
+
+| Part           | Ships                | You do                                          |
+| -------------- | -------------------- | ----------------------------------------------- |
+| Web app, relay | on merge to `main`   | nothing                                         |
+| Mac app        | when you run Release | one click                                       |
+| iPhone app     | after a Mac release  | `pnpm release:ios`, then TestFlight / App Store |
+
+## Web app and relay
+
+Cloudflare Workers Builds deploys `site/` (https://mail.otterware.dev) and `infra/relay`
+(https://relay.mail.otterware.dev) on every push to `main` that touches them. The relay's D1
+migrations run first.
+
+- **Check:** the commit's checks on GitHub ("Workers Builds: …"), or Cloudflare → Workers →
+  the worker → Deployments. The relay smoke test (Actions → Relay smoke test) runs every 6 hours;
+  run it by hand after a risky relay change.
+- **Roll back:** Cloudflare → the worker → Deployments → pick the last good one → Rollback. Then
+  revert on `main` so the next deploy doesn't bring it back. Migrations don't roll back: fix
+  forward.
+
+## Mac app
+
+1. Actions → **Release** → Run workflow → `patch`, `minor` or `major` (or
+   `gh workflow run release.yml -f bump=minor`).
+2. It builds arm64 and x64, signs with the Developer ID, notarizes, publishes a GitHub Release
+   and bumps the version on `main`.
+3. Installed apps update themselves ("Restart to update" in the sidebar).
+
+- **Check:** the run is green and its log says "macOS signing and notarization enabled." (not
+  "Building UNSIGNED").
+- **Bad release:** release a fixed `patch`. To stop it spreading first, edit the GitHub Release
+  and untick "Set as the latest release" (apps update from the latest one).
+- **Signing fails:** the secrets are `CSC_LINK`, `CSC_KEY_PASSWORD`, `APPLE_API_KEY`,
+  `APPLE_API_KEY_ID`, `APPLE_API_ISSUER` (see `docs/release.md`). The Developer ID certificate
+  runs until 2031.
+
+## iPhone app
+
+Needs this Mac: Xcode 27 and `~/.otter-mail/signing` (the Apple Distribution certificate, the
+"Otter Mail App Store" profile and the App Store Connect API key).
+
+1. After the Mac release: `git pull`, then `pnpm release:ios`. It builds `main` at the Mac app's
+   version and uploads it (about 5 min).
+2. Apple processes it (10–30 min). The internal group **Otter team** gets it automatically.
+3. External testers: App Store Connect → Otter Mail: Calm Email → TestFlight → **Testers** →
+   Builds → + → pick the build. The first build of a new version goes through Beta App Review
+   (about a day); later builds of that version don't. Public link:
+   https://testflight.apple.com/join/KPpsSdgX
+4. App Store (when a build is good): Distribution → the version → pick the build → **Submit for
+   Review** (about a day), then release it.
+
+- **Check:** App Store Connect → TestFlight shows the build as "Ready to Test" (or "Ready to
+  Submit" for external groups).
+- **Bad build:** TestFlight → the build → Expire Build. On the App Store there's no rollback: submit
+  a fixed build (you can ask for an expedited review).
+- **Upload refused:** the error names the problem (icon, version already used, signing). The
+  Apple Distribution certificate expires 2027-09-29: make a new one in the developer portal,
+  regenerate the "Otter Mail App Store" profile with it, and install both.
+- TestFlight builds expire after 90 days.
+
+## Accounts and access
+
+- **Apple:** team 838JVGY7W4 (chris.kafrouni@gmail.com, Account Holder). App Store Connect app 6817249947. The API key in `~/.otter-mail/signing` has the Developer role: it uploads builds but
+  can't create App IDs, profiles or review submissions (do those in the browser).
+- **Google Cloud:** project `otter-mail`. Until Gmail access is verified, only accounts listed as
+  test users (Google Auth Platform → Audience, 100 max) can sign in. See
+  `docs/google-verification.md`.
+- **Cloudflare:** the `otter-mail-relay` and site workers.
+- **Back up `~/.otter-mail/signing`** (a password manager works). Losing it means new
+  certificates and keys from Apple's portals.
