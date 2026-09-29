@@ -1,0 +1,10 @@
+{
+  // The provider's tests run core on a Node platform (node:sqlite, sockets):
+  // Node's types, which the rest of core must not see.
+  "extends": "../../../../tsconfig.json",
+  "compilerOptions": {
+    "types": ["node"]
+  },
+  "include": ["."],
+  "exclude": []
+}

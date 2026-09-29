@@ -8,11 +8,12 @@ import type { MailProviderKind } from "@otter-mail/contracts";
 import { providerKindOf } from "../services/account-store.js";
 import type { GmailAccount } from "../types.js";
 import { gmailProvider } from "./gmail/index.js";
+import { imapProvider } from "./imap/index.js";
 import type { MailProvider } from "./provider.js";
 
 const providers: Record<MailProviderKind, MailProvider | null> = {
   gmail: gmailProvider,
-  imap: null,
+  imap: imapProvider,
 };
 
 /** What an account whose provider isn't here yet shows. */

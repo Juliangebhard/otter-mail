@@ -8,5 +8,5 @@
   },
   "include": ["src"],
   // Node-only test helpers; checked by their own tsconfig.
-  "exclude": ["src/protocols/test"]
+  "exclude": ["src/protocols/test", "src/providers/imap/test"]
 }
