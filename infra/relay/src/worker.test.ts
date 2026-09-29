@@ -666,7 +666,8 @@ describe("web app", () => {
   /** The popup's HTML posts `{ type, result | error }` to the app: pull it out. */
   async function popupMessage(response: Response) {
     const html = await response.text();
-    const json = /postMessage\((\{.*?\}), "http:\/\/app\.test"\)/s.exec(html)?.[1];
+    const json = /const message = (\{.*?\});\n/s.exec(html)?.[1];
+    expect(html).toContain('postMessage(message, "http://app.test")');
     expect(json).toBeTruthy();
     return JSON.parse(json!) as {
       type: string;
