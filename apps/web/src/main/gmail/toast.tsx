@@ -302,6 +302,8 @@ export type ToastOptions = {
   action?: { label: ReactNode; onClick: () => void };
   /** Runs when the toast is dismissed with its × button. */
   onClose?: () => void;
+  /** Runs once the toast is gone, however it closed. */
+  onRemove?: () => void;
 };
 
 /** The toast's button: closes the toast, then runs the action. Updates skip
@@ -324,6 +326,7 @@ function show(type: ToastType | undefined, title: ReactNode, options: ToastOptio
     description: options.description,
     timeout: options.timeout,
     data: { onClose: options.onClose },
+    onRemove: options.onRemove,
     actionProps: actionPropsFor(() => id, options.action),
   });
   return id;

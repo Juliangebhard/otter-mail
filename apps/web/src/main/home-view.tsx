@@ -52,14 +52,7 @@ import {
   useUntrashThread,
   useUntrashMessage,
 } from "./gmail/hooks";
-import {
-  beginUndoGroup,
-  onUndoableAction,
-  peekUndo,
-  quietParams,
-  takeUndo,
-  type UndoAction,
-} from "./gmail/undo";
+import { onUndoableAction, quietParams, takeUndo, type UndoAction } from "./gmail/undo";
 import { getAccountColor, getAccountContrastColor } from "./gmail/account-style";
 import { gmailApi, type MailtoTarget } from "./gmail/api";
 import type { QuoteContext } from "./gmail/chat-context";
@@ -361,7 +354,7 @@ export function HomeView() {
   const undoUntrashMessage = useUntrashMessage();
   const undoRunner = useRef<(action: UndoAction) => void>(() => {});
   const runUndo = (action: UndoAction): Promise<unknown> => {
-    // quietParams: the inverse re-registers (so z redoes) without its own toast.
+    // quietParams: the inverse doesn't register an undo or a toast of its own.
     switch (action.kind) {
       case "modifyMessage":
         return undoModifyMessage.mutateAsync(quietParams(action.params));
@@ -375,8 +368,6 @@ export function HomeView() {
         action.run();
         return Promise.resolve();
       case "batch":
-        // Their redo registrations regroup, so z again redoes the whole batch.
-        beginUndoGroup(action.actions.length);
         return Promise.all(action.actions.map(runUndo));
     }
   };
@@ -396,19 +387,16 @@ export function HomeView() {
       }),
     [],
   );
-  // The latest action's toast (its Undo is what z would undo); a newer action
-  // or an undo replaces it.
-  const actionToastRef = useRef<ToastId | null>(null);
-  const closeActionToast = () => {
-    if (actionToastRef.current) toast.close(actionToastRef.current);
-    actionToastRef.current = null;
-  };
+  // Each action's toast, stacked; undoing an action (z or its Undo) closes it.
+  const actionToasts = useRef(new Map<UndoAction, ToastId>());
   undoRunner.current = (action) => {
     console.log("[HomeView:undo]", {
       kind: action.kind,
       count: action.kind === "batch" ? action.actions.length : 1,
     });
-    closeActionToast();
+    const toastId = actionToasts.current.get(action);
+    if (toastId) toast.close(toastId);
+    actionToasts.current.delete(action);
     runUndo(action).then(
       // Callbacks (e.g. holding back a send) say what happened themselves.
       () => (action.kind === "callback" ? undefined : toast.success("Undone")),
@@ -417,25 +405,23 @@ export function HomeView() {
   };
   useEffect(
     () =>
-      onUndoableAction((title) => {
-        closeActionToast();
-        // This toast undoes this action only — not whatever came after it
-        // (e.g. a message sent since, which has its own Undo).
-        const action = peekUndo();
-        actionToastRef.current = toast.success(title, {
+      onUndoableAction((title, action) => {
+        // This toast undoes this action only, whatever came after it.
+        const toastId = toast.success(title, {
           action: {
             label: "Undo",
             onClick: () => {
-              actionToastRef.current = null;
-              if (!action || peekUndo() !== action) {
+              if (!takeUndo(action)) {
+                actionToasts.current.delete(action);
                 toast.info("That can no longer be undone");
                 return;
               }
-              takeUndo();
               undoRunner.current(action);
             },
           },
+          onRemove: () => actionToasts.current.delete(action),
         });
+        actionToasts.current.set(action, toastId);
       }),
     [],
   );

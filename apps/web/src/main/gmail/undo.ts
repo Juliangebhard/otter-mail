@@ -1,9 +1,13 @@
 import type { ModifyMessageParams, ModifyThreadParams } from "./api";
 
 /**
- * Single-level undo (Gmail's z): mutation hooks register the INVERSE of each
- * user-initiated triage action; the z shortcut takes and runs it. Running the
- * inverse goes through the same hooks, which re-register — so z toggles.
+ * Undo history: mutation hooks register the INVERSE of each user-initiated
+ * triage action. z undoes the newest, then the one before; each action's toast
+ * undoes its own, in any order. Running an inverse doesn't register again.
+ *
+ * Actions on different conversations undo independently. A newer action on the
+ * same conversation or message retires the older one's undo, which would
+ * otherwise act on a state that's gone (e.g. un-archive something since trashed).
  *
  * Each registration also says what the action did ("Archived", "Moved to
  * “X”"); listeners (the action toast) hear about it once it's committed, so a
@@ -27,9 +31,11 @@ export type ActionSummary = {
   noun: "conversation" | "message";
 };
 
-let last: UndoAction | null = null;
+/** Oldest first; z takes from the end. */
+const history: UndoAction[] = [];
+const HISTORY_LIMIT = 20;
 
-type ActionListener = (title: string) => void;
+type ActionListener = (title: string, action: UndoAction) => void;
 const listeners = new Set<ActionListener>();
 
 /** Hears every committed undoable action, with a title describing it. */
@@ -62,10 +68,45 @@ let group: {
   timer: ReturnType<typeof setTimeout>;
 } | null = null;
 
-function announce(summaries: ActionSummary[]): void {
+function announce(action: UndoAction, summaries: ActionSummary[]): void {
   if (summaries.length === 0) return;
   const title = titleFor(summaries);
-  for (const listener of listeners) listener(title);
+  for (const listener of listeners) listener(title, action);
+}
+
+/** The conversations and messages an action touches. */
+function targets(action: UndoAction): string[] {
+  switch (action.kind) {
+    case "modifyThread":
+    case "untrashThread":
+      return [`${action.params.accountId}/thread/${action.params.threadId}`];
+    case "modifyMessage":
+    case "untrashMessage":
+      return [`${action.params.accountId}/message/${action.params.messageId}`];
+    case "callback":
+      return [];
+    case "batch":
+      return action.actions.flatMap(targets);
+  }
+}
+
+/** Retires older undos of anything `action` touches: whole actions, or a
+    batch's rows (so a bulk undo still restores the rest). */
+function retire(action: UndoAction): void {
+  const touched = new Set(targets(action));
+  if (touched.size === 0) return;
+  const stale = (a: UndoAction) => targets(a).some((t) => touched.has(t));
+  for (let i = history.length - 1; i >= 0; i--) {
+    const entry = history[i];
+    if (entry.kind === "batch") entry.actions = entry.actions.filter((a) => !stale(a));
+    if (entry.kind === "batch" ? entry.actions.length === 0 : stale(entry)) history.splice(i, 1);
+  }
+}
+
+function push(action: UndoAction): void {
+  retire(action);
+  history.push(action);
+  if (history.length > HISTORY_LIMIT) history.shift();
 }
 
 function commitGroup(): void {
@@ -73,8 +114,10 @@ function commitGroup(): void {
   clearTimeout(group.timer);
   const { actions, summaries } = group;
   group = null;
-  if (actions.length > 0) last = actions.length === 1 ? actions[0] : { kind: "batch", actions };
-  announce(summaries);
+  if (actions.length === 0) return;
+  const action: UndoAction = actions.length === 1 ? actions[0] : { kind: "batch", actions };
+  push(action);
+  announce(action, summaries);
 }
 
 export function beginUndoGroup(size: number): void {
@@ -98,30 +141,27 @@ export function registerUndo(action: UndoAction, summary?: ActionSummary): void 
     if (--group.remaining <= 0) commitGroup();
     return;
   }
-  last = action;
-  if (summary) announce([summary]);
+  push(action);
+  if (summary) announce(action, [summary]);
 }
 
-/** Forgets the pending undo (after an irreversible action like Delete forever). */
+/** Forgets every undo (after an irreversible action like Delete forever). */
 export function clearUndo(): void {
   commitGroup();
-  last = null;
+  history.length = 0;
 }
 
-/** Drops `action` if it's still the one z would undo (it was undone another way). */
+/** Drops `action` from the history (it was undone another way, or can't be anymore). */
 export function forgetUndo(action: UndoAction): void {
-  if (last === action) last = null;
+  const i = history.indexOf(action);
+  if (i !== -1) history.splice(i, 1);
 }
 
-/** What z would undo, without taking it. */
-export function peekUndo(): UndoAction | null {
-  return last;
-}
-
-export function takeUndo(): UndoAction | null {
-  const action = last;
-  last = null;
-  return action;
+/** Takes `action` out of the history to run it, or the newest (z) when omitted.
+    Null when there's nothing to undo, or `action` was retired. */
+export function takeUndo(action?: UndoAction): UndoAction | null {
+  const i = action ? history.indexOf(action) : history.length - 1;
+  return i === -1 ? null : history.splice(i, 1)[0];
 }
 
 /** Auto-mark-read (and ⇧I) shouldn't clobber the undo slot. */
