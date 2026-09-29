@@ -3,7 +3,7 @@
  * (schema.ts). Users and sessions belong to better-auth (auth.ts).
  */
 
-import { and, asc, eq, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { drizzle, type DrizzleD1Database } from "drizzle-orm/d1";
 import type { MailProviderKind } from "@otter-mail/contracts/mail";
 import type { Preferences, RelayAccount } from "@otter-mail/contracts/relay";
@@ -26,12 +26,30 @@ const accountFields = {
   color: linkedAccounts.color,
 };
 
-export function listAccounts(db: Db, userId: string): Promise<RelayAccount[]> {
+/** The accounts linked with one of `providers`. */
+export function listAccounts(
+  db: Db,
+  userId: string,
+  providers: MailProviderKind[],
+): Promise<RelayAccount[]> {
   return db
     .select(accountFields)
     .from(linkedAccounts)
-    .where(eq(linkedAccounts.userId, userId))
+    .where(and(eq(linkedAccounts.userId, userId), inArray(linkedAccounts.provider, providers)))
     .orderBy(asc(linkedAccounts.linkedAt), asc(linkedAccounts.email));
+}
+
+/** The servers ("host:port", host lowercased) of the user's IMAP mailboxes, IMAP and SMTP. */
+export async function imapServers(db: Db, userId: string): Promise<Set<string>> {
+  const rows = await db
+    .select({ imap: linkedAccounts.imap })
+    .from(linkedAccounts)
+    .where(and(eq(linkedAccounts.userId, userId), eq(linkedAccounts.provider, "imap")));
+  return new Set(
+    rows.flatMap(({ imap }) =>
+      imap ? [imap.imap, imap.smtp].map((s) => `${s.host.toLowerCase()}:${s.port}`) : [],
+    ),
+  );
 }
 
 /** The provider the account is linked with, or null when it isn't linked. */
@@ -68,11 +86,22 @@ export async function putAccount(
     : insert.onConflictDoNothing());
 }
 
-/** Unlinks the account; false when it wasn't linked. */
-export async function deleteAccount(db: Db, userId: string, email: string): Promise<boolean> {
+/** Unlinks the account if it's linked with one of `providers`; false when it wasn't. */
+export async function deleteAccount(
+  db: Db,
+  userId: string,
+  email: string,
+  providers: MailProviderKind[],
+): Promise<boolean> {
   const removed = await db
     .delete(linkedAccounts)
-    .where(and(eq(linkedAccounts.userId, userId), eq(linkedAccounts.email, email)))
+    .where(
+      and(
+        eq(linkedAccounts.userId, userId),
+        eq(linkedAccounts.email, email),
+        inArray(linkedAccounts.provider, providers),
+      ),
+    )
     .returning({ email: linkedAccounts.email });
   return removed.length > 0;
 }

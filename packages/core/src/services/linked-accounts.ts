@@ -108,7 +108,10 @@ export function linkedAccountIds(): Set<string> {
 
 // ── Relay calls ─────────────────────────────────────────────────────────────
 
-const accountRoute = (email: string) => `/v1/accounts/${encodeURIComponent(key(email))}`;
+/** `providers`: this build knows IMAP mailboxes (contracts' ListAccountsResponse). */
+const PROVIDERS = "?providers=gmail,imap";
+const accountRoute = (email: string) =>
+  `/v1/accounts/${encodeURIComponent(key(email))}${PROVIDERS}`;
 
 const profile = (account: GmailAccount) => ({
   name: account.name,
@@ -195,7 +198,10 @@ export async function reconcileAccounts(
   removeLocal: (accountId: string) => Promise<void>,
 ): Promise<void> {
   if (!getOtterUser()) return;
-  const { accounts: remote } = await relayRequest<ListAccountsResponse>("GET", "/v1/accounts");
+  const { accounts: remote } = await relayRequest<ListAccountsResponse>(
+    "GET",
+    `/v1/accounts${PROVIDERS}`,
+  );
   const localAccounts = await accountStore.listAccounts();
   const byKey = new Map(localAccounts.map((account) => [key(account.email), account]));
   const plan = planReconcile(

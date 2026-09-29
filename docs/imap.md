@@ -75,7 +75,10 @@ upgrades to a WebSocket (Otter session required), the relay opens the TCP connec
 `cloudflare:sockets` (TLS off) and pipes binary frames both ways; either side closing closes
 both. The worker negotiates TLS inside the tunnel itself, so the relay carries only ciphertext
 (for STARTTLS, just the plaintext greeting before the upgrade). Only mail ports (143, 993,
-465, 587) are allowed. Nothing is logged but host, port and byte counts.
+465, 587) are allowed. Nothing is logged but host, port and byte counts. The servers of the
+account's linked IMAP mailboxes get full tunnels; any other host (checking a password before
+the mailbox is linked) gets 6 a minute of 1 MB each, so a mailbox must be linked before it
+syncs. The limits are in infra/relay/README.md.
 
 ## The iPhone app
 
