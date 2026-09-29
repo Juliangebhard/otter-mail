@@ -85,8 +85,8 @@ const READ_TRIGGER_COOLDOWN_MS = 20_000;
 const BACKOFF_BASE_MS = 30_000;
 const BACKOFF_MAX_MS = 10 * 60_000;
 const failures = new Map<string, { count: number; retryAt: number }>();
-/** A sync was requested while one ran: run once more when it ends. */
-const rerun = new Set<string>();
+/** A sync was requested while one ran: run once more when it ends (explicitly, or as a push, which respects backoff). */
+const rerun = new Map<string, "explicit" | "push">();
 
 function recordFailure(accountId: string): void {
   const count = (failures.get(accountId)?.count ?? 0) + 1;
@@ -177,7 +177,8 @@ export function syncAccount(
 ): void {
   const explicit = opts?.force === true && opts.trigger === undefined;
   if (running.has(accountId)) {
-    if (explicit || opts?.trigger === "push") rerun.add(accountId);
+    if (explicit) rerun.set(accountId, "explicit");
+    else if (opts?.trigger === "push" && !rerun.has(accountId)) rerun.set(accountId, "push");
     return;
   }
   // Re-added after removal: the old run has ended (not running), start fresh.
@@ -210,8 +211,10 @@ export function syncAccount(
   void runSync(accountId).finally(() => {
     running.delete(accountId);
     lastFinishedAt.set(accountId, Date.now());
-    if (rerun.delete(accountId) && !removed.has(accountId)) {
-      syncAccount(accountId, { force: true });
+    const again = rerun.get(accountId);
+    rerun.delete(accountId);
+    if (again && !removed.has(accountId)) {
+      syncAccount(accountId, again === "push" ? { force: true, trigger: "push" } : { force: true });
     }
   });
 }
@@ -316,11 +319,14 @@ async function runSyncNow(accountId: string, provider: MailProvider): Promise<vo
     recordFailure(accountId);
     logger.error("mail-sync", `sync failed for ${accountId}: ${describeSyncError(accountId, err)}`);
     update(accountId, { syncing: false, phase: "idle", error: describeSyncError(accountId, err) });
+    // The server refused the sign-in (the provider set it aside): nothing more
+    // to try, IDLE included, until the user signs in again.
+    if (!isSignedIn(accountId)) stopWatch(accountId);
   }
 
   updateDockBadge();
   // Offline bodies download in their own lane, after the mailbox is current.
-  startDownloads(accountId, provider);
+  if (isSignedIn(accountId)) startDownloads(accountId, provider);
 }
 
 const PREFETCH_MAX_FILE_BYTES = 15 * 1024 * 1024;
@@ -410,7 +416,7 @@ async function downloadBodies(accountId: string, provider: MailProvider): Promis
         } catch (err) {
           if (err instanceof SyncCancelled) throw err;
           const kind = provider.errorKind(err);
-          if (kind === "rateLimit" || kind === "network") {
+          if (kind === "rateLimit" || kind === "network" || !isSignedIn(accountId)) {
             // Not the message's fault: leave it queued and end this pass.
             attempted.delete(id);
             pushedBack = true;

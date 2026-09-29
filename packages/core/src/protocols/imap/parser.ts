@@ -53,6 +53,11 @@ const RBRACE = 125;
 const TILDE = 126;
 const PLUS = 43;
 
+/** The longest line (outside literals) a server may send: a protocol error beyond. */
+export const MAX_LINE = 1024 * 1024;
+/** The largest literal: bigger than any message a mail server would take. */
+export const MAX_LITERAL = 100 * 1024 * 1024;
+
 /** Collects chunks and hands out whole responses. */
 export class ResponseReader {
   private buf = new Uint8Array(16 * 1024);
@@ -91,11 +96,20 @@ export class ResponseReader {
   next(): ImapResponse | null {
     for (;;) {
       const lf = this.buf.subarray(0, this.end).indexOf(LF, this.scan);
+      if ((lf < 0 ? this.end : lf) - this.line > MAX_LINE) {
+        throw new ImapParseError("Response line too long", this.buf.subarray(this.line, this.end));
+      }
       if (lf < 0) {
         this.scan = this.end;
         return null;
       }
       const literal = literalSize(this.buf, this.line, lf);
+      if (literal !== null && literal > MAX_LITERAL) {
+        throw new ImapParseError(
+          `Literal too large (${literal} bytes)`,
+          this.buf.subarray(this.line, lf),
+        );
+      }
       if (literal === null) {
         const frame = this.buf.slice(this.start, lf + 1);
         this.start = this.line = this.scan = lf + 1;

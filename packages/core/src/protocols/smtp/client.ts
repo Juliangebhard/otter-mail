@@ -97,6 +97,10 @@ export async function sendMail(
   }
 }
 
+/** Replies are short (RFC 5321 allows 512 bytes a line): anything far beyond is a broken server. */
+const MAX_LINE = 64 * 1024;
+const MAX_REPLY_LINES = 1000;
+
 export class SmtpClient {
   /** EHLO's extensions, upper-cased names: "SIZE" → "35882577", "AUTH" → "PLAIN LOGIN". */
   readonly extensions = new Map<string, string>();
@@ -281,6 +285,10 @@ export class SmtpClient {
     const lines: string[] = [];
     for (;;) {
       const line = await this.readLine();
+      if (lines.length >= MAX_REPLY_LINES) {
+        this.close();
+        throw new SmtpError(`${this.options.host} sent a reply that never ends.`, "protocol");
+      }
       const match = /^(\d{3})([ -]?)(.*)$/.exec(line);
       if (!match) {
         this.close();
@@ -298,6 +306,10 @@ export class SmtpClient {
         const line = utf8Decode(this.buffer.subarray(0, lf)).replace(/\r$/, "");
         this.buffer = this.buffer.slice(lf + 1);
         return line;
+      }
+      if (this.buffer.length > MAX_LINE) {
+        this.close();
+        throw new SmtpError(`${this.options.host} sent a line that never ends.`, "protocol");
       }
       let chunk: Uint8Array | null;
       try {

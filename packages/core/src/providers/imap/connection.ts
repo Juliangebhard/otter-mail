@@ -20,7 +20,7 @@ import {
   type SmtpOptions,
 } from "../../protocols/index.js";
 import { getAccount } from "../../services/account-store.js";
-import { getImapPassword } from "../../services/imap-passwords.js";
+import { getImapPassword, setAsideImapPassword } from "../../services/imap-passwords.js";
 
 const IDLE_CLOSE_MS = 2 * 60_000;
 
@@ -45,11 +45,29 @@ const connections = new Map<string, Connection>();
 /** Where a failure happened, for describeError's text. */
 export const failedServer = new WeakMap<object, { host: string; user: string }>();
 
+/** No password on this device (or the server refused it): nothing to try until the user enters one. */
+export class NeedsPassword extends Error {
+  constructor(email: string) {
+    super(`Enter the password for ${email} to sync it.`);
+  }
+}
+
+/** A failure that retrying can't fix: the password is missing or wrong. */
+export const isSignInFailure = (err: unknown): boolean =>
+  err instanceof NeedsPassword || (err instanceof MailProtocolError && err.kind === "auth");
+
+/** Sets the password aside when the server refused it (see setAsideImapPassword). */
+export function noteSignInFailure(accountId: string, access: ImapAccess, err: unknown): void {
+  if (err instanceof MailProtocolError && err.kind === "auth") {
+    setAsideImapPassword(accountId, access.password, err.message);
+  }
+}
+
 export async function accessFor(accountId: string): Promise<ImapAccess> {
   const account = await getAccount(accountId);
   if (!account?.imap) throw new Error(`${accountId} isn't an IMAP mailbox.`);
   const password = getImapPassword(accountId);
-  if (!password) throw new Error(`Enter the password for ${account.email} to sync it.`);
+  if (!password) throw new NeedsPassword(account.email);
   return { settings: account.imap, password };
 }
 
@@ -81,6 +99,7 @@ export async function openImap(accountId: string): Promise<ImapClient> {
     await client.enable(["CONDSTORE", "QRESYNC"]);
     return client;
   } catch (err) {
+    noteSignInFailure(accountId, access, err);
     throw tagFailure(err, access.settings.imap.host, access.settings.username);
   }
 }
@@ -191,6 +210,25 @@ export async function selectFolder(
     throw new FolderChanged(path);
   }
   return mailbox;
+}
+
+/** A whole `<id>` Message-ID: nothing SEARCH could match inside other ids, nothing to break a header. */
+export const isMessageIdHeader = (value: string | null | undefined): value is string =>
+  !!value && /^<[^<>\s]+>$/.test(value);
+
+/**
+ * The selected folder's messages whose Message-ID is exactly `header`, UIDs
+ * ascending. SEARCH HEADER matches substrings, so its answers are checked.
+ */
+export async function findByMessageId(client: ImapClient, header: string): Promise<number[]> {
+  if (!isMessageIdHeader(header)) return [];
+  const found = await client.search({ messageId: header, deleted: false });
+  if (found.length === 0) return [];
+  const fetched = await client.fetch(found, { envelope: true });
+  return fetched
+    .filter((m) => m.envelope?.messageId?.trim() === header)
+    .map((m) => m.uid)
+    .sort((a, b) => a - b);
 }
 
 /** `withImap` with `path` selected (and still at `uidValidity`, when given). */

@@ -21,6 +21,7 @@ beforeAll(async () => {
   relay.on("connection", (ws, req) => {
     const query = new URL(req.url!, "http://relay").searchParams;
     const host = query.get("host")!;
+    if (host === "busy.example") return ws.close(TUNNEL_CLOSE.rateLimited, "");
     const target = route.get(host) ?? { host, port: Number(query.get("port")) };
     const socket = net.connect(target);
     socket.on("connect", () => ws.send("open"));
@@ -86,6 +87,29 @@ it("refuses a relay that answers with its own certificate", async () => {
     );
   } finally {
     route.delete("imap.gmail.com");
+    server.close();
+  }
+});
+
+it("says when the relay turns a connection away", async () => {
+  await expect(connectMailSocket(relayUrl, "busy.example", 993, { tls: false })).rejects.toThrow(
+    "Too many connections",
+  );
+});
+
+it("drops a connection whose server sends far more than is read", async () => {
+  const server = net.createServer((socket) => socket.end(Buffer.alloc(70 * 1024 * 1024)));
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  route.set("flood.example", {
+    host: "127.0.0.1",
+    port: (server.address() as net.AddressInfo).port,
+  });
+  try {
+    const stream = await connectMailSocket(relayUrl, "flood.example", 993, { tls: false });
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    await expect(stream.read()).rejects.toThrow("more than we could keep up with");
+  } finally {
+    route.delete("flood.example");
     server.close();
   }
 });

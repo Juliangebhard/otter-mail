@@ -43,22 +43,46 @@ export function formatAddresses(addresses: ImapAddress[]): string {
 const firstId = (value: string | null | undefined): string | null =>
   value?.match(/<[^<>\s]+>/)?.[0] ?? null;
 
+/** A subject without its Re:/Fwd: prefixes (in a few languages), for threading. */
+export function baseSubject(subject: string): string {
+  let text = subject.replace(/\s+/g, " ").trim().toLowerCase();
+  for (;;) {
+    const next = text.replace(/^(re|fwd?|aw|wg|sv|vs|antw|tr|rif|odp)(\[\d+\])?\s*:\s*/, "");
+    if (next === text) return text;
+    text = next;
+  }
+}
+
+/** FNV-1a, as 8 hex digits: a short, stable tag for a subject. */
+function hash(text: string): string {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 0x01000193);
+  return (h >>> 0).toString(16).padStart(8, "0");
+}
+
 /**
- * A conversation is its root message: the first of References, else
- * In-Reply-To, else the message itself. Ids are kept without brackets.
+ * A conversation is its root message (the first of References, else
+ * In-Reply-To, else the message itself) and its subject, Re: and all
+ * stripped: `<subject hash>.<root id without brackets>`. The subject is part
+ * of it because References is the sender's to write: naming someone else's
+ * Message-ID alone mustn't pull a message into their conversation (and have
+ * it reported as junk along with it).
  */
 export function threadIdOf(
   references: string | undefined,
   inReplyTo: string | null | undefined,
   ownId: string | null | undefined,
+  subject: string,
 ): string | null {
   const root = firstId(references) ?? firstId(inReplyTo) ?? firstId(ownId);
-  return root ? root.slice(1, -1) : null;
+  return root ? `${hash(baseSubject(subject))}.${root.slice(1, -1)}` : null;
 }
 
-/** The References header a draft carries to stay in its conversation (a root id). */
-export const referencesFor = (threadId: string | undefined): string | undefined =>
-  threadId?.includes("@") ? `<${threadId}>` : undefined;
+/** The References header a draft carries to stay in its conversation (its root id). */
+export const referencesFor = (threadId: string | undefined): string | undefined => {
+  const root = /^[\da-f]{8}\.(.+@.+)$/.exec(threadId ?? "")?.[1];
+  return root ? `<${root}>` : undefined;
+};
 
 function hasAttachments(node: BodyStructure | undefined): boolean {
   if (!node) return false;
@@ -120,7 +144,9 @@ export async function toSummary(
   const references = message.headers?.references;
   return {
     id,
-    threadId: threadIdOf(references, envelope?.inReplyTo, envelope?.messageId) ?? id,
+    threadId:
+      threadIdOf(references, envelope?.inReplyTo, envelope?.messageId, envelope?.subject ?? "") ??
+      id,
     fromName: from?.name ?? "",
     fromEmail: from?.address ?? "",
     to: formatAddresses(envelope?.to ?? []),

@@ -29,6 +29,8 @@ MailProvider                packages/core/src/providers/provider.ts
 - The IMAP password lives in `platform.secrets` under `imap-password:<accountId>`
   (`services/imap-passwords.ts`); it is never synced. A mailbox linked on another device arrives
   with its settings and shows as signed out until the password is entered (`gmail:signInImap`).
+  A password the server refuses is set aside (signed out, no retries) until it's entered again;
+  so is one whose mailbox the relay lists with other hosts (the device keeps its own settings).
 - Adding one (`handlers/imap-accounts.ts`): `gmail:discoverImap` finds the servers (known
   providers, Mozilla's ISPDB, the domain's autoconfig file on the Mac only, as its host rarely
   allows CORS, then the MX records over DNS-over-HTTPS); `gmail:addImapAccount` logs in to both
@@ -57,7 +59,9 @@ MailProvider                packages/core/src/providers/provider.ts
 - Message ids: `<uidvalidity>:<uid>:<folder path>`, re-keyed in the cache when the message
   moves (COPYUID tells the new uid, else the next sync finds it by Message-ID).
 - Threads: the root Message-ID of `References` (else `In-Reply-To`, else its own Message-ID),
-  so a reply in Sent and its original in INBOX share a thread.
+  and the subject without Re:/Fwd: (References is the sender's to write), so a reply in Sent
+  and its original in INBOX share a thread. Junk / Not junk on a thread moves only what's in
+  the folder it was reported from.
 - Sync, per folder: `UIDVALIDITY` change → refetch the folder; otherwise new UIDs since the
   stored `UIDNEXT`, and flag changes since the stored `HIGHESTMODSEQ` (CONDSTORE/QRESYNC),
   or a full UID + FLAGS listing on servers without it (which also finds expunged mail).
