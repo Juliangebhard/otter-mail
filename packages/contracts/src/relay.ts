@@ -1,8 +1,8 @@
 /**
  * The Otter Mail relay's HTTP API (infra/relay), shared by the Worker and the
- * apps. The relay knows who an Otter account is, which Gmail addresses it has
- * linked, the account's preferences, and when Gmail says one of them changed.
- * It never sees mail or keeps Gmail tokens.
+ * apps. The relay knows who an Otter account is, which mailboxes it has
+ * linked (Gmail, IMAP), the account's preferences, and when Gmail says one of
+ * them changed. It never sees mail or keeps Gmail tokens or IMAP passwords.
  *
  * Otter accounts are better-auth's, under `/v1/auth` (the app uses
  * better-auth's client): `sign-in/social` with `{ provider: "google",
@@ -22,9 +22,14 @@ export interface RelayUser {
   picture: string | null;
 }
 
-/** A Gmail account linked to an Otter account, with the profile shown in the app. */
+import type { ImapSettings, MailProviderKind } from "./mail.js";
+
+/** A mailbox linked to an Otter account, with the profile shown in the app. */
 export interface RelayAccount {
   email: string;
+  provider: MailProviderKind;
+  /** Where an IMAP mailbox lives (null for Gmail). Its password stays on each device. */
+  imap: ImapSettings | null;
   name: string | null;
   picture: string | null;
   /** User-set overrides, as edited in Settings › Accounts. */
@@ -52,12 +57,18 @@ export interface ListAccountsResponse {
 }
 
 /**
- * `PUT /v1/accounts/:email`: link a Gmail account or update its profile.
- * Linking needs `idToken`, a Google ID token for that address proving the
- * caller signed in to it; updating an already linked account doesn't.
+ * `PUT /v1/accounts/:email`: link a mailbox or update its profile.
+ * Linking a Gmail account needs `idToken`, a Google ID token for that address
+ * proving the caller signed in to it; updating an already linked account
+ * doesn't. Linking an IMAP mailbox needs `provider: "imap"` and `imap`; the
+ * relay can't check the sign-in, which is fine: it sends nothing for IMAP
+ * mailboxes but their settings back to the same Otter account.
  */
 export interface PutAccountRequest {
   idToken?: string;
+  /** Absent means Gmail. */
+  provider?: MailProviderKind;
+  imap?: ImapSettings;
   name?: string | null;
   picture?: string | null;
   displayName?: string | null;

@@ -17,6 +17,8 @@ const local = (
 
 const remote = (email: string, extra: Partial<RelayAccount> = {}): RelayAccount => ({
   email,
+  provider: "gmail",
+  imap: null,
   name: null,
   picture: null,
   displayName: null,

@@ -24,11 +24,13 @@ const accountFields = {
 };
 
 export async function listAccounts(db: Db, userId: string): Promise<RelayAccount[]> {
-  return db
+  const rows = await db
     .select(accountFields)
     .from(linkedAccounts)
     .where(eq(linkedAccounts.userId, userId))
     .orderBy(asc(linkedAccounts.linkedAt), asc(linkedAccounts.email));
+  // TODO(imap): stored per mailbox.
+  return rows.map((row) => ({ ...row, provider: "gmail", imap: null }));
 }
 
 export async function isLinked(db: Db, userId: string, email: string): Promise<boolean> {

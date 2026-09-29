@@ -132,6 +132,7 @@ export async function webPlatform(page: Page): Promise<Platform> {
       console[level === "debug" ? "log" : level](`[${scope}] ${message}`, data ?? ""),
 
     database: () => database,
+    connect: () => Promise.reject(new Error("IMAP connections aren't wired up yet.")),
     files,
     secrets: {
       get: async (name) => (await readSecrets())[name] ?? null,

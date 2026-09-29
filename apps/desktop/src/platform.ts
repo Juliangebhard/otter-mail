@@ -118,6 +118,7 @@ export function desktopPlatform(): Platform {
     log: (level, scope, message, data) => logger[level](scope, message, data),
 
     database: () => (database ??= openDatabase()),
+    connect: () => Promise.reject(new Error("IMAP connections aren't wired up yet.")),
     files: {
       async read(file) {
         try {
