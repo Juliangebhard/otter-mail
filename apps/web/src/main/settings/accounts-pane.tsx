@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import { GMAIL_SETTINGS_PERMISSION } from "@otter-mail/contracts";
 import { Popover } from "radix-ui";
 import { useQuery } from "@tanstack/react-query";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
@@ -435,23 +434,24 @@ function AccountEditor({ account }: { account: GmailAccount }) {
     void updateAccount.mutateAsync({ accountId: account.id, signature: html }).then(
       (saved) => {
         setShown(saved.signature ?? "");
+        if (saved.signatureInGmail === false) {
+          // An older sign-in may not change Gmail's settings: core kept it here.
+          toast.info("Signature saved in Otter Mail, not in Gmail", {
+            description: `Sign in to ${account.email} again to let Otter Mail save it in Gmail too.`,
+            action: {
+              label: "Sign in",
+              onClick: () => void signIn.mutateAsync(account.email).catch(() => {}),
+            },
+          });
+          return;
+        }
         toast.success(
           capabilities.serverSignatures ? "Signature saved in Gmail" : "Signature saved",
         );
       },
       (err: unknown) => {
         const message = err instanceof Error ? err.message : String(err);
-        if (message.includes(GMAIL_SETTINGS_PERMISSION)) {
-          toast.error("Gmail needs your permission first", {
-            description: `Sign in to ${account.email} again to let Otter Mail save its signature in Gmail, then save it again. Your edits stay here.`,
-            action: {
-              label: "Sign in",
-              onClick: () => void signIn.mutateAsync(account.email).catch(() => {}),
-            },
-          });
-        } else {
-          toast.error("Couldn't save the signature", { description: message });
-        }
+        toast.error("Couldn't save the signature", { description: message });
       },
     );
   };
