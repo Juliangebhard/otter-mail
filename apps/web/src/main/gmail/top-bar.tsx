@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
 import { DropdownMenu as RadixMenu } from "radix-ui";
 import {
-  CheckIcon,
   ChevronDownIcon,
   LayersIcon,
   PanelLeftCloseIcon,
@@ -281,9 +280,6 @@ export function MailboxSwitcher({
                 </span>
                 <span className="min-w-0 flex-1 truncate">{option.name}</span>
                 <UnreadPill count={unread[option.id] ?? 0} />
-                {selected ? (
-                  <CheckIcon className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
-                ) : null}
                 <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
                   {option.shortcut}
                 </span>
