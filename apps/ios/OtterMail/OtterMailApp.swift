@@ -54,7 +54,14 @@ struct OtterMailApp: App {
     private static func scheduleRefresh() async {
         let request = BGAppRefreshTaskRequest(identifier: refreshTask)
         request.earliestBeginDate = .now.addingTimeInterval(15 * 60)
-        try? await BGTaskScheduler.shared.submitTaskRequest(request)
+        // Xcode 27 (Swift 6.4) has the async form; CI's Xcode 26 doesn't yet.
+        #if compiler(>=6.4)
+        if #available(iOS 27, *) {
+            try? await BGTaskScheduler.shared.submitTaskRequest(request)
+            return
+        }
+        #endif
+        try? BGTaskScheduler.shared.submit(request)
     }
 }
 

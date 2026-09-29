@@ -1,3 +1,4 @@
+import StoreKit
 import SwiftUI
 
 /** First launch, or signed out: sign in with Google, or look around the demo mailbox. */
@@ -5,6 +6,8 @@ struct WelcomeView: View {
     @Environment(Session.self) private var session
     @Environment(\.palette) private var palette
     @State private var error: String?
+    /** The demo is for development and testers (TestFlight, App Review), not App Store customers. */
+    @State private var offersDemo = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -44,15 +47,17 @@ struct WelcomeView: View {
                 .buttonStyle(.glassProminent)
                 .disabled(session.busy != nil)
 
-                Button {
-                    session.tryDemo()
-                } label: {
-                    Text("Try the demo mailbox")
-                        .font(.headline)
-                        .frame(maxWidth: .infinity, minHeight: 34)
+                if offersDemo {
+                    Button {
+                        session.tryDemo()
+                    } label: {
+                        Text("Try the demo mailbox")
+                            .font(.headline)
+                            .frame(maxWidth: .infinity, minHeight: 34)
+                    }
+                    .buttonStyle(.glass)
+                    .disabled(session.busy != nil)
                 }
-                .buttonStyle(.glass)
-                .disabled(session.busy != nil)
 
                 Text("Your mail goes straight between this iPhone and Gmail. Your mailboxes, themes and settings follow your Otter account to the Mac and the web.")
                     .font(.footnote)
@@ -65,6 +70,14 @@ struct WelcomeView: View {
         }
         .frame(maxWidth: .infinity)
         .background(palette.canvas)
+        .task {
+            // Xcode and TestFlight builds run in the sandbox; the App Store's in production.
+            guard let result = try? await AppTransaction.shared else { return offersDemo = true }
+            let environment = switch result {
+            case .verified(let transaction), .unverified(let transaction, _): transaction.environment
+            }
+            offersDemo = environment != .production
+        }
         .alert("Couldn't sign in", isPresented: .constant(error != nil)) {
             Button("OK") { error = nil }
         } message: {
@@ -72,3 +85,4 @@ struct WelcomeView: View {
         }
     }
 }
+

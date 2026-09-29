@@ -24,6 +24,7 @@ import type {
 const CLIENT_ID = "test-client.apps.googleusercontent.com";
 const WEB_CLIENT_ID = "test-web-client.apps.googleusercontent.com";
 const IOS_CLIENT_ID = "test-ios-client.apps.googleusercontent.com";
+const IOS_STORE_CLIENT_ID = "test-ios-store-client.apps.googleusercontent.com";
 const APP_ORIGIN = "http://app.test";
 const PUSH_AUDIENCE = "https://relay.test/push/gmail";
 const PUSH_SERVICE_ACCOUNT = "push@test.iam.gserviceaccount.com";
@@ -81,7 +82,10 @@ beforeAll(async () => {
     config: path.join(root, "wrangler.jsonc"),
     bindings: {
       GOOGLE_CLIENT_ID: { type: "plain_text", value: CLIENT_ID },
-      GOOGLE_IOS_CLIENT_ID: { type: "plain_text", value: IOS_CLIENT_ID },
+      GOOGLE_IOS_CLIENT_ID: {
+        type: "plain_text",
+        value: `${IOS_CLIENT_ID},${IOS_STORE_CLIENT_ID}`,
+      },
       GOOGLE_JWKS_URL: { type: "plain_text", value: `http://127.0.0.1:${port}/certs` },
       GOOGLE_TOKEN_URL: { type: "plain_text", value: `http://127.0.0.1:${port}/token` },
       GOOGLE_WEB_CLIENT_ID: { type: "plain_text", value: WEB_CLIENT_ID },
@@ -275,6 +279,11 @@ describe("sign-in", () => {
       idToken: await idToken("iphone@example.com", { aud: IOS_CLIENT_ID }),
     });
     expect(linked.status).toBe(204);
+    // The App Store build's client too.
+    const store = await signInRequest(
+      await idToken("iphone@example.com", { aud: IOS_STORE_CLIENT_ID }),
+    );
+    expect(store.status).toBe(200);
   });
 
   it("rejects ID tokens for another OAuth client, and garbage", async () => {

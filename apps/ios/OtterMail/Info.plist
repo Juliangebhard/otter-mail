@@ -6,6 +6,10 @@
 	<array>
 		<string>dev.otterware.mail.refresh</string>
 	</array>
+	<key>GoogleClientID</key>
+	<string>$(GOOGLE_IOS_CLIENT_ID)</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsLocalNetworking</key>

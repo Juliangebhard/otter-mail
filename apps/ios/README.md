@@ -70,5 +70,7 @@ xcrun devicectl device install app --device <udid> "apps/ios/.build/Build/Produc
 `-authenticationKeyPath/-authenticationKeyID/-authenticationKeyIssuerID` with an App Store Connect
 API key.)
 
+Shipping: `pnpm release:ios` uploads a build to TestFlight; see `docs/release.md`.
+
 `Resources/Themes.json` and `Resources/DemoMailboxes.json` are exported from `apps/web` by
 `pnpm ios:resources` (`dev:ios` runs it); rerun it after changing the palettes or the demo seed.

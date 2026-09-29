@@ -14,6 +14,7 @@
     "icons:export": "node scripts/export-brand-icons.ts",
     "dev:ios": "node scripts/dev-ios.ts",
     "ios:resources": "node scripts/export-ios-resources.ts",
+    "release:ios": "node scripts/release-ios.ts",
     "typecheck": "vp run -r typecheck",
     "lint": "vp lint --report-unused-disable-directives",
     "test": "vp run -r test",

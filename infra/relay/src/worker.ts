@@ -36,7 +36,7 @@ export interface Env {
   USER_HUB: DurableObjectNamespace<UserHub>;
   /** The desktop app's Google OAuth client ("Desktop app" type). */
   GOOGLE_CLIENT_ID: string;
-  /** The iPhone app's Google OAuth client ("iOS", no secret). */
+  /** The iPhone app's Google OAuth clients ("iOS", no secret), comma-separated: one per bundle ID. */
   GOOGLE_IOS_CLIENT_ID?: string;
   /** The web app's Google OAuth client ("Web application"): Otter and Gmail sign-in. */
   GOOGLE_WEB_CLIENT_ID: string;
