@@ -5,6 +5,7 @@
 
 import { and, asc, eq, sql } from "drizzle-orm";
 import { drizzle, type DrizzleD1Database } from "drizzle-orm/d1";
+import type { MailProviderKind } from "@otter-mail/contracts/mail";
 import type { Preferences, RelayAccount } from "@otter-mail/contracts/relay";
 
 import * as schema from "./schema.ts";
@@ -17,31 +18,36 @@ export const openDb = (d1: D1Database): Db => drizzle(d1, { schema, casing: "sna
 
 const accountFields = {
   email: linkedAccounts.email,
+  provider: linkedAccounts.provider,
+  imap: linkedAccounts.imap,
   name: linkedAccounts.name,
   picture: linkedAccounts.picture,
   displayName: linkedAccounts.displayName,
   color: linkedAccounts.color,
 };
 
-export async function listAccounts(db: Db, userId: string): Promise<RelayAccount[]> {
-  const rows = await db
+export function listAccounts(db: Db, userId: string): Promise<RelayAccount[]> {
+  return db
     .select(accountFields)
     .from(linkedAccounts)
     .where(eq(linkedAccounts.userId, userId))
     .orderBy(asc(linkedAccounts.linkedAt), asc(linkedAccounts.email));
-  // TODO(imap): stored per mailbox.
-  return rows.map((row) => ({ ...row, provider: "gmail", imap: null }));
 }
 
-export async function isLinked(db: Db, userId: string, email: string): Promise<boolean> {
+/** The provider the account is linked with, or null when it isn't linked. */
+export async function linkedProvider(
+  db: Db,
+  userId: string,
+  email: string,
+): Promise<MailProviderKind | null> {
   const [row] = await db
-    .select({ email: linkedAccounts.email })
+    .select({ provider: linkedAccounts.provider })
     .from(linkedAccounts)
     .where(and(eq(linkedAccounts.userId, userId), eq(linkedAccounts.email, email)));
-  return row !== undefined;
+  return row?.provider ?? null;
 }
 
-/** Profile fields to write: a field left out keeps its value, `null` clears it. */
+/** Fields to write (profile, provider, IMAP settings): a field left out keeps its value, `null` clears it. */
 export type AccountPatch = Partial<Omit<RelayAccount, "email">>;
 
 /** Links the account, or updates the fields present in `patch` if it's linked already. */
@@ -71,12 +77,16 @@ export async function deleteAccount(db: Db, userId: string, email: string): Prom
   return removed.length > 0;
 }
 
-/** Everyone who linked this Gmail address (normally one Otter account). */
-export async function usersWithMailbox(db: Db, email: string): Promise<string[]> {
+/**
+ * Everyone who linked this address as a Gmail account (normally one Otter
+ * account). An IMAP mailbox at a Gmail address doesn't count: linking it
+ * proved nothing.
+ */
+export async function usersWithGmail(db: Db, email: string): Promise<string[]> {
   const rows = await db
     .select({ userId: linkedAccounts.userId })
     .from(linkedAccounts)
-    .where(eq(linkedAccounts.email, email));
+    .where(and(eq(linkedAccounts.email, email), eq(linkedAccounts.provider, "gmail")));
   return rows.map((row) => row.userId);
 }
 

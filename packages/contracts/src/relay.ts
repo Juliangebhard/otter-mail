@@ -62,7 +62,13 @@ export interface ListAccountsResponse {
  * proving the caller signed in to it; updating an already linked account
  * doesn't. Linking an IMAP mailbox needs `provider: "imap"` and `imap`; the
  * relay can't check the sign-in, which is fine: it sends nothing for IMAP
- * mailboxes but their settings back to the same Otter account.
+ * mailboxes but their settings back to the same Otter account (Gmail pushes
+ * only go to Gmail links).
+ *
+ * Updates may leave `provider` out; given, it must be the link's (409
+ * otherwise: switching a mailbox between Gmail and IMAP means unlinking it
+ * first). An IMAP link's update may replace `imap`; `imap` on a Gmail
+ * account is a 400.
  */
 export interface PutAccountRequest {
   idToken?: string;
@@ -96,6 +102,39 @@ export interface PutPreferencesRequest {
   preferences?: Preferences;
   hermesKey?: string | null;
 }
+
+/**
+ * `GET /v1/tunnel?host=…&port=…`: a TCP connection for the web app, which
+ * can't open one itself (the Mac and iPhone apps connect directly). A
+ * WebSocket upgrade, with the session like `/v1/events` (the cookie, or the
+ * bearer token); from a browser, only the web app's origin may open it.
+ *
+ * - `port` is 143, 993, 465 or 587; `host` a DNS name or a public IPv4
+ *   address (no IPv6 literals, private ranges or localhost). Otherwise 400,
+ *   before the upgrade (401 without a session).
+ * - The relay accepts the WebSocket at once, then connects. When the TCP
+ *   connection is up it sends one text frame, `open`; nothing comes before it.
+ *   If it can't connect, it closes with `TUNNEL_CLOSE.connectFailed` instead
+ *   (the reason says why, e.g. a DNS failure or a refused connection).
+ * - After `open`: binary frames only, both ways, each carrying raw bytes of
+ *   the TCP stream (no header, no framing; frame boundaries mean nothing).
+ *   Send after `open`. A text frame from the client closes the tunnel (1003).
+ * - The relay opens the socket without TLS: the client does TLS itself inside
+ *   the tunnel (from the first byte on 993/465, after STARTTLS on 143/587), so
+ *   the relay carries ciphertext.
+ * - Either side closing closes both: the server closing its end is a 1000
+ *   close; the client closing the WebSocket closes the TCP connection. A
+ *   connection that fails midway closes with `TUNNEL_CLOSE.lost`, one with no
+ *   bytes either way for 30 minutes with `TUNNEL_CLOSE.idle` (re-IDLE sooner).
+ */
+export const TUNNEL_CLOSE = {
+  /** Couldn't open the TCP connection. */
+  connectFailed: 4502,
+  /** The TCP connection failed after opening. */
+  lost: 4500,
+  /** 30 minutes without a byte either way. */
+  idle: 4408,
+} as const;
 
 /**
  * Messages on the `GET /v1/events` WebSocket. Clients may send the text
