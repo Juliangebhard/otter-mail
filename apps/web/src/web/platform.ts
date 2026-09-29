@@ -9,6 +9,7 @@ import sqlite3InitModule from "@sqlite.org/sqlite-wasm";
 import type { AsyncContext, FileInfo, Platform, SqlDatabase, SqlValue } from "@otter-mail/core";
 
 import { webGoogleAuth } from "./google";
+import { connectMailSocket } from "./mail-socket";
 import type { PageEffect, PageRequests } from "./protocol";
 
 export type Page = {
@@ -132,7 +133,10 @@ export async function webPlatform(page: Page): Promise<Platform> {
       console[level === "debug" ? "log" : level](`[${scope}] ${message}`, data ?? ""),
 
     database: () => database,
-    connect: () => Promise.reject(new Error("IMAP connections aren't wired up yet.")),
+    // The relay's tunnel (mail-socket.ts); the demo has no relay.
+    connect: demo
+      ? () => Promise.reject(new Error("The demo can't connect to mail servers."))
+      : (host, port, opts) => connectMailSocket(relayUrl, host, port, opts),
     files,
     secrets: {
       get: async (name) => (await readSecrets())[name] ?? null,
