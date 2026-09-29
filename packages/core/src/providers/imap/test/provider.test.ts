@@ -8,6 +8,7 @@
 import type { ImapSettings } from "@otter-mail/contracts";
 import { afterAll, beforeAll, describe, expect, it } from "vite-plus/test";
 
+import { searchGmail } from "../../../handlers/search.ts";
 import { connectImap, type ImapClient } from "../../../protocols/index.ts";
 import { nodeConnect } from "../../../protocols/test/node-stream.ts";
 import {
@@ -206,6 +207,18 @@ function providerScenario(
     expect((await provider.getSummaries(accountId, [id]))[0]!.unread).toBe(true);
   });
 
+  it("searches the local index with Gmail's operators", async () => {
+    const subjects = async (q: string) =>
+      (await searchGmail(q, [accountId])).messages.map((m) => m.subject).sort();
+    expect(await subjects("report")).toEqual(["Old report", "Report"]);
+    expect(await subjects("in:inbox report")).toEqual([]);
+    expect(await subjects("label:work old")).toEqual(["Old report"]);
+    expect(await subjects("in:inbox")).toEqual(["Lunch?"]);
+    expect(await subjects("is:unread has:attachment")).toEqual(["Lunch?"]);
+    expect(await subjects("from:bob -in:inbox")).toEqual(["Old report", "Report"]);
+    expect(await subjects("in:sent lunch")).toEqual(["Re: Lunch?"]);
+  });
+
   it("catches up with another device: flags, new mail, expunged mail", async () => {
     await seed.select("INBOX");
     const [uid] = await seed.search({ messageId: a.id });
@@ -335,8 +348,14 @@ function providerScenario(
       subject: "Draft",
       body: "Two",
       draftId: first.draftId,
+      threadId: first.threadId,
     });
     expect(second.draftId).toBe(first.draftId);
+    // A new message's draft doesn't reference itself.
+    expect(await provider.getReplyHeaders(accountId, second.messageId!)).toEqual({
+      messageIdHeader: first.draftId,
+      referencesHeader: null,
+    });
     expect(second.messageId).not.toBe(first.messageId);
     expect(await provider.getDraftVersion(accountId, first.draftId)).toBe(second.messageId);
     expect((await provider.getMessage(accountId, second.messageId!)).bodyText).toContain("Two");

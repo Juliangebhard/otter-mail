@@ -113,7 +113,7 @@ final class Relay {
 
     func accounts() async throws -> [Account] {
         struct Response: Decodable { var accounts: [Account] }
-        let response: Response = try await get("/v1/accounts")
+        let response: Response = try await get("/v1/accounts?providers=gmail,imap")
         return response.accounts
     }
 
@@ -136,7 +136,7 @@ final class Relay {
     }
 
     func unlink(_ email: String) async throws {
-        _ = try await send("DELETE", "/v1/accounts/\(Self.path(email))")
+        _ = try await send("DELETE", "/v1/accounts/\(Self.path(email))?providers=gmail,imap")
     }
 
     // ── Preferences ──────────────────────────────────────────────────────────

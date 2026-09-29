@@ -87,17 +87,21 @@ function message(opts: {
   subject: string;
   body: string;
   hoursAgo: number;
-  replyTo?: string;
+  /** The conversation so far, oldest first: the last is the one replied to. */
+  replyTo?: string[];
   attachment?: { name: string; text: string };
-}): { id: string; raw: string } {
+}): { id: string; raw: string; date: Date } {
   const id = `<seed-${++sequence}@otter.test>`;
+  const date = new Date(Date.now() - opts.hoursAgo * 3_600_000);
   const headers = [
     `From: ${opts.from}`,
     `To: ${opts.to ?? `Me <${USER}>`}`,
     `Subject: ${opts.subject}`,
-    `Date: ${new Date(Date.now() - opts.hoursAgo * 3_600_000).toUTCString()}`,
+    `Date: ${date.toUTCString()}`,
     `Message-ID: ${id}`,
-    ...(opts.replyTo ? [`In-Reply-To: ${opts.replyTo}`, `References: ${opts.replyTo}`] : []),
+    ...(opts.replyTo
+      ? [`In-Reply-To: ${opts.replyTo.at(-1)}`, `References: ${opts.replyTo.join(" ")}`]
+      : []),
     "MIME-Version: 1.0",
   ];
   const text = ["Content-Type: text/plain; charset=utf-8", "", opts.body];
@@ -116,7 +120,7 @@ function message(opts: {
         "--part--",
       ]
     : text;
-  return { id, raw: [...headers, ...body, ""].join("\r\n") };
+  return { id, raw: [...headers, ...body, ""].join("\r\n"), date };
 }
 
 function seed(): void {
@@ -136,8 +140,16 @@ function seed(): void {
     "INBOX",
   ]);
   if (!/messages=0\b/.test(count)) return;
-  const save = (folder: string, raw: string) =>
-    docker([...compose, "exec", "-T", "dovecot", "doveadm", "save", "-u", USER, "-m", folder], raw);
+  // Received when it was sent (-r), as the list shows the arrival date.
+  const save = (folder: string, { raw, date }: { raw: string; date: Date }) =>
+    docker(
+      [
+        ...compose,
+        ...["exec", "-T", "dovecot", "doveadm", "save", "-u", USER, "-m", folder],
+        ...["-r", String(Math.floor(date.getTime() / 1000))],
+      ],
+      raw,
+    );
 
   const question = message({
     from: "Ada Lovelace <ada@example.com>",
@@ -145,16 +157,16 @@ function seed(): void {
     body: "Are you free for lunch on Thursday? The usual place, around noon.",
     hoursAgo: 30,
   });
-  save("INBOX", question.raw);
+  save("INBOX", question);
   const answer = message({
     from: `Me <${USER}>`,
     to: "Ada Lovelace <ada@example.com>",
     subject: "Re: Lunch on Thursday?",
     body: "Thursday works. See you there!",
     hoursAgo: 29,
-    replyTo: question.id,
+    replyTo: [question.id],
   });
-  save("Sent", answer.raw);
+  save("Sent", answer);
   save(
     "INBOX",
     message({
@@ -162,8 +174,8 @@ function seed(): void {
       subject: "Re: Lunch on Thursday?",
       body: "Great, I booked a table.",
       hoursAgo: 28,
-      replyTo: answer.id,
-    }).raw,
+      replyTo: [question.id, answer.id],
+    }),
   );
   save(
     "INBOX",
@@ -173,7 +185,7 @@ function seed(): void {
       body: "Here are the dates we talked about.",
       hoursAgo: 5,
       attachment: { name: "dates.txt", text: "Reykjavík: 12 Oct\nParis: 19 Oct\n" },
-    }).raw,
+    }),
   );
   save(
     "INBOX",
@@ -182,7 +194,7 @@ function seed(): void {
       subject: "This week in otters",
       body: "Otters hold hands while they sleep so they don't drift apart.",
       hoursAgo: 1,
-    }).raw,
+    }),
   );
   save(
     "Archive",
@@ -191,7 +203,7 @@ function seed(): void {
       subject: "Old notes",
       body: "Filed away for later.",
       hoursAgo: 24 * 14,
-    }).raw,
+    }),
   );
 }
 

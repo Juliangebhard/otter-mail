@@ -37,7 +37,7 @@ let jwks: http.Server;
 let worker: Awaited<ReturnType<typeof unstable_startWorker>>;
 let base: string;
 let persistDir: string;
-/** A mail server for the tunnel: greets, then echoes; `bye` makes it hang up. */
+/** A mail server for the tunnel: greets, then echoes; `bye` makes it hang up, `stall` stop reading. */
 let mailServer: net.Server;
 let mailTarget: string;
 
@@ -68,7 +68,12 @@ beforeAll(async () => {
 
   mailServer = net.createServer((socket) => {
     socket.write("* OK hello\r\n");
-    socket.on("data", (data) => (String(data) === "bye\r\n" ? socket.end() : socket.write(data)));
+    socket.on("error", () => {}); // The relay resets connections it cuts off.
+    socket.on("data", (data) => {
+      if (String(data) === "bye\r\n") socket.end();
+      else if (String(data) === "stall\r\n") socket.pause();
+      else socket.write(data);
+    });
   });
   await new Promise<void>((resolve) => mailServer.listen(0, "127.0.0.1", resolve));
   mailTarget = `127.0.0.1:${(mailServer.address() as net.AddressInfo).port}`;
@@ -208,8 +213,9 @@ async function link(token: string, email: string, profile: Record<string, unknow
   });
 }
 
-async function listAccounts(token: string) {
-  const response = await call("GET", "/v1/accounts", token);
+/** The linked mailboxes, as a build that knows IMAP asks for them (`query` "" for older ones). */
+async function listAccounts(token: string, query = "?providers=gmail,imap") {
+  const response = await call("GET", `/v1/accounts${query}`, token);
   expect(response.status).toBe(200);
   return ((await response.json()) as ListAccountsResponse).accounts;
 }
@@ -521,6 +527,24 @@ describe("IMAP mailboxes", () => {
     await until(() => device.events.length > 0, "the accounts event");
     expect(device.events).toEqual([{ type: "accounts" }]);
     device.socket.close();
+  });
+
+  it("shows IMAP mailboxes only to builds that ask, and only they unlink them", async () => {
+    const { token } = await signIn("imap-old-build@example.com");
+    await link(token, "old@gmail.test");
+    await put(token, "new@fastmail.test", { provider: "imap", imap: settings });
+    expect((await listAccounts(token, "")).map((a) => a.email)).toEqual(["old@gmail.test"]);
+    expect((await listAccounts(token, "?providers=gmail")).length).toBe(1);
+    expect((await listAccounts(token, "?providers=imap,outlook")).map((a) => a.email)).toEqual([
+      "new@fastmail.test",
+    ]);
+
+    // An old build's unlink leaves the IMAP mailbox alone.
+    expect((await call("DELETE", "/v1/accounts/new%40fastmail.test", token)).status).toBe(204);
+    expect((await listAccounts(token)).length).toBe(2);
+    const route = "/v1/accounts/new%40fastmail.test?providers=gmail,imap";
+    expect((await call("DELETE", route, token)).status).toBe(204);
+    expect((await listAccounts(token)).map((a) => a.email)).toEqual(["old@gmail.test"]);
   });
 
   it("gets no Gmail pushes for an address linked over IMAP", async () => {
@@ -878,6 +902,85 @@ describe("tunnel", () => {
     await until(() => frames.length >= 2, "the greeting");
     socket.close();
     await until(() => ended === 1, "the server's connection to close");
+  });
+
+  /** Links an IMAP mailbox on the test server, making its tunnels the linked kind. */
+  async function linkTestServer(token: string, email: string) {
+    const [host, port] = mailTarget.split(":");
+    const server = { host: host!, port: Number(port), security: "tls" };
+    const response = await call("PUT", `/v1/accounts/${encodeURIComponent(email)}`, token, {
+      provider: "imap",
+      imap: { username: email, imap: server, smtp: { ...server, host: "smtp.example.com" } },
+    });
+    expect(response.status).toBe(204);
+  }
+
+  /** Sends `total` bytes in 256 KB frames, once the tunnel is open. */
+  async function flood(open: ReturnType<typeof tunnel>, total: number) {
+    await until(() => open.frames.length >= 2, "the greeting");
+    const frame = new Uint8Array(256 * 1024).fill(120);
+    for (let sent = 0; sent < total && open.socket.readyState === WebSocket.OPEN;) {
+      open.socket.send(frame);
+      sent += frame.byteLength;
+    }
+  }
+
+  /** Rate limits count per wall-clock minute (locally): start away from its end. */
+  async function startOfMinute() {
+    const into = Date.now() % 60_000;
+    if (into > 40_000) await new Promise((resolve) => setTimeout(resolve, 60_000 - into));
+  }
+
+  it("carries 1 MB each way to a host that isn't the user's mailbox's", async () => {
+    const { token } = await signIn("tunnel-unlinked@example.com");
+    const open = tunnel(token, mailTarget);
+    await flood(open, 1.25 * 2 ** 20);
+    expect((await open.closed).code).toBe(TUNNEL_CLOSE.limit);
+  });
+
+  it("carries more to the servers of the user's IMAP mailboxes", async () => {
+    const { token } = await signIn("tunnel-linked@example.com");
+    await linkTestServer(token, "linked@tunnel.test");
+    const open = tunnel(token, mailTarget);
+    await flood(open, 1.25 * 2 ** 20);
+    await until(() => open.frames.join("").length > 1.25 * 2 ** 20, "the echo");
+    expect(open.socket.readyState).toBe(WebSocket.OPEN);
+    open.socket.close();
+  });
+
+  it("cuts off a client far ahead of the server", { timeout: 20_000 }, async () => {
+    const { token } = await signIn("tunnel-backlog@example.com");
+    await linkTestServer(token, "backlog@tunnel.test");
+    const open = tunnel(token, mailTarget);
+    await until(() => open.frames.length >= 2, "the greeting");
+    open.socket.send(new TextEncoder().encode("stall\r\n"));
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    await flood(open, 64 * 2 ** 20);
+    expect((await open.closed).code).toBe(TUNNEL_CLOSE.backlog);
+  });
+
+  it("limits tunnels a minute per user, fewer to other hosts", { timeout: 90_000 }, async () => {
+    await startOfMinute();
+    const { token } = await signIn("tunnel-rate@example.com");
+    const opened = async () => {
+      const open = tunnel(token, mailTarget);
+      let code: number | undefined;
+      void open.closed.then((closed) => (code = closed.code));
+      await until(() => open.frames.length >= 2 || code !== undefined, "the greeting or a close");
+      open.socket.close();
+      return open.frames[0] === "text:open" ? "open" : code;
+    };
+    for (let i = 0; i < 6; i++) expect(await opened()).toBe("open");
+    expect(await opened()).toBe(TUNNEL_CLOSE.rateLimited);
+
+    // Linked, the same server counts against the looser limit.
+    await linkTestServer(token, "rate@tunnel.test");
+    expect(await opened()).toBe("open");
+    // Someone else isn't limited.
+    const other = await signIn("tunnel-rate-other@example.com");
+    const theirs = tunnel(other.token, mailTarget);
+    await until(() => theirs.frames.length >= 2, "the greeting");
+    theirs.socket.close();
   });
 
   it("says when it couldn't connect", async () => {

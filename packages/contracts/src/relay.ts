@@ -51,7 +51,14 @@ export interface MeResponse {
   pushTopic: string;
 }
 
-/** `GET /v1/accounts` */
+/**
+ * `GET /v1/accounts?providers=gmail,imap`: the linked mailboxes of the
+ * providers named. Without `providers` it lists Gmail accounts only: builds
+ * from before IMAP take every row for a Gmail account. Unknown names are
+ * ignored. `DELETE /v1/accounts/:email` takes the same parameter, and without
+ * it unlinks only a Gmail account (an old build can't unlink an IMAP mailbox
+ * it was never shown).
+ */
 export interface ListAccountsResponse {
   accounts: RelayAccount[];
 }
@@ -111,7 +118,19 @@ export interface PutPreferencesRequest {
  *
  * - `port` is 143, 993, 465 or 587; `host` a DNS name or a public IPv4
  *   address (no IPv6 literals, private ranges or localhost). Otherwise 400,
- *   before the upgrade (401 without a session).
+ *   before the upgrade (401 without a session). A DNS name is only checked
+ *   by its spelling: that it doesn't resolve to a private address is up to
+ *   Cloudflare, whose `connect()` refuses "Cloudflare IPs, `localhost`, and
+ *   private network IPs" (Troubleshooting, in
+ *   https://developers.cloudflare.com/workers/runtime-apis/tcp-sockets/).
+ * - Limits, so the tunnel isn't a free proxy. A host and port in one of the
+ *   Otter account's IMAP mailboxes (its `imap` or `smtp` server) is linked:
+ *   up to 30 tunnels a minute per account, 200 MB each way per tunnel. Any
+ *   other allowed host (adding a mailbox checks its password before linking
+ *   it) gets 6 tunnels a minute, 1 MB each way: enough to log in, not to sync.
+ *   Over the rate, the relay accepts the WebSocket and closes it with
+ *   `TUNNEL_CLOSE.rateLimited`; past the bytes, with `TUNNEL_CLOSE.limit`
+ *   (open another). Rates are counted per Cloudflare location, loosely.
  * - The relay accepts the WebSocket at once, then connects. When the TCP
  *   connection is up it sends one text frame, `open`; nothing comes before it.
  *   If it can't connect, it closes with `TUNNEL_CLOSE.connectFailed` instead
@@ -126,6 +145,9 @@ export interface PutPreferencesRequest {
  *   close; the client closing the WebSocket closes the TCP connection. A
  *   connection that fails midway closes with `TUNNEL_CLOSE.lost`, one with no
  *   bytes either way for 30 minutes with `TUNNEL_CLOSE.idle` (re-IDLE sooner).
+ * - The client may be at most 8 MB ahead of the server (sent, not yet taken
+ *   by the TCP connection), else `TUNNEL_CLOSE.backlog`. The server's bytes
+ *   come at most 4 MB a second, after a first 8 MB.
  */
 export const TUNNEL_CLOSE = {
   /** Couldn't open the TCP connection. */
@@ -134,6 +156,12 @@ export const TUNNEL_CLOSE = {
   lost: 4500,
   /** 30 minutes without a byte either way. */
   idle: 4408,
+  /** Too many tunnels this minute: nothing was connected. */
+  rateLimited: 4429,
+  /** The tunnel carried all the bytes it may, one way or the other. */
+  limit: 4413,
+  /** The client sent more than 8 MB ahead of the server. */
+  backlog: 4507,
 } as const;
 
 /**
