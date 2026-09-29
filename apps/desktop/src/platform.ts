@@ -18,6 +18,7 @@ import type { AsyncContext, Platform, SqlDatabase } from "@otter-mail/core";
 import { broadcast } from "./ipc.js";
 import { logger } from "./logger.js";
 import { googleAuth } from "./services/gmail-oauth.js";
+import { connectMailSocket } from "./services/mail-socket.js";
 import { claudeProvider } from "./services/assistant/claude.js";
 import { codexProvider } from "./services/assistant/codex.js";
 import { appleTranslator } from "./services/translator.js";
@@ -118,7 +119,7 @@ export function desktopPlatform(): Platform {
     log: (level, scope, message, data) => logger[level](scope, message, data),
 
     database: () => (database ??= openDatabase()),
-    connect: () => Promise.reject(new Error("IMAP connections aren't wired up yet.")),
+    connect: connectMailSocket,
     files: {
       async read(file) {
         try {
