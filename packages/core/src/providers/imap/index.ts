@@ -16,9 +16,14 @@ import { readLabels, syncImap } from "./sync.js";
 import { watchInbox } from "./watch.js";
 import * as writes from "./writes.js";
 
+/** The web app's tunnel turned a connection away (mail-socket.ts): wait, like a rate limit. */
+const tooManyConnections = (err: MailProtocolError) =>
+  err.kind === "network" && /Too many connections/i.test(err.message);
+
 function errorKind(err: unknown): ErrorKind | null {
   if (err instanceof reads.MessageGone) return "notFound";
   if (!(err instanceof MailProtocolError)) return null;
+  if (tooManyConnections(err)) return "rateLimit";
   if (err.kind === "network" || err.kind === "timeout") return "network";
   // Too many connections, or the server is unwell: back off like a rate limit.
   const code = (err as { code?: string }).code;
@@ -35,6 +40,7 @@ function describeError(err: unknown): string {
     if (/certificate|self[- ]signed|CERT_|unable to verify/i.test(err.message)) {
       return `${host}'s certificate isn't trusted — check the server name`;
     }
+    if (tooManyConnections(err)) return "Too many connections, retrying shortly";
     if (err.kind === "network") return `Can't reach ${host} — retrying`;
     if (err.kind === "timeout") return `${host} isn't answering — retrying`;
     const text = (err as { serverText?: string }).serverText || err.message;

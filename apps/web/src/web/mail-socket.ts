@@ -10,6 +10,8 @@ import type { ByteStream } from "@otter-mail/core";
 import { TUNNEL_CLOSE } from "@otter-mail/contracts/relay";
 
 const CONNECT_TIMEOUT_MS = 20_000;
+/** Bytes from the server not yet read: past this the connection goes (a WebSocket can't be paused). */
+const MAX_UNREAD = 64 * 1024 * 1024;
 
 export async function connectMailSocket(
   relayUrl: string,
@@ -24,6 +26,7 @@ export async function connectMailSocket(
 
   // The server's bytes, as they arrive (a WebSocket can't be paused).
   const chunks: Uint8Array[] = [];
+  let unread = 0;
   let opened = false;
   let closed = false;
   let failure: Error | null = null;
@@ -33,7 +36,17 @@ export async function connectMailSocket(
     if (code === TUNNEL_CLOSE.connectFailed) {
       return new Error(`Couldn't connect to ${host} on port ${port}. ${reason}`);
     }
-    if (code === TUNNEL_CLOSE.lost) return new Error(`Lost the connection to ${host}.`);
+    if (code === TUNNEL_CLOSE.rateLimited) {
+      return new Error("Too many connections through Otter's relay, retrying shortly.");
+    }
+    // The relay's limits for one tunnel: like a dropped connection, the next one goes on.
+    if (
+      code === TUNNEL_CLOSE.lost ||
+      code === TUNNEL_CLOSE.limit ||
+      code === TUNNEL_CLOSE.backlog
+    ) {
+      return new Error(`Lost the connection to ${host}.`);
+    }
     if (code === TUNNEL_CLOSE.idle) return new Error(`The connection to ${host} idled out.`);
     return opened ? null : new Error(`Couldn't reach ${host} through Otter's relay.`);
   };
@@ -46,7 +59,15 @@ export async function connectMailSocket(
     }, CONNECT_TIMEOUT_MS);
     ws.addEventListener("message", ({ data }) => {
       if (data instanceof ArrayBuffer) {
-        chunks.push(new Uint8Array(data));
+        if (failure) return;
+        unread += data.byteLength;
+        if (unread > MAX_UNREAD) {
+          failure = new Error(`${host} sent more than we could keep up with.`);
+          chunks.length = 0;
+          ws.close();
+        } else {
+          chunks.push(new Uint8Array(data));
+        }
         wake?.();
       } else if (data === "open") {
         opened = true;
@@ -57,7 +78,7 @@ export async function connectMailSocket(
     ws.addEventListener("close", ({ code, reason }) => {
       clearTimeout(timer);
       closed = true;
-      failure = closeError(code, reason);
+      failure ??= closeError(code, reason);
       if (failure) reject(failure);
       wake?.();
     });
@@ -70,7 +91,9 @@ export async function connectMailSocket(
       await new Promise<void>((resolve) => (wake = resolve));
       wake = null;
     }
-    return chunks.shift()!;
+    const chunk = chunks.shift()!;
+    unread -= chunk.length;
+    return chunk;
   };
   const writePlain = (data: Uint8Array) => {
     if (ws.readyState !== WebSocket.OPEN) {
