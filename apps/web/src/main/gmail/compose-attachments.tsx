@@ -4,7 +4,7 @@ import { PaperclipIcon, XIcon } from "lucide-react";
 import { gmailApi } from "./api";
 import type { ComposeAttachment } from "./types";
 
-/** Mirror of the backend cap (gmail-api.ts) so renderer-side drops fail early. */
+/** Mirror of the backend cap (core services/outgoing.ts) so renderer-side drops fail early. */
 const MAX_ATTACHMENT_TOTAL_BYTES = 25 * 1024 * 1024;
 
 function formatBytes(bytes: number): string {

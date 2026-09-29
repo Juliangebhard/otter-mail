@@ -1,7 +1,7 @@
 /**
  * attachment-cache.ts
  *
- * Local-first byte cache for Gmail attachments (the app's attachment-cache/
+ * Local-first byte cache for mail attachments (the app's attachment-cache/
  * folder). File names hash accountId:messageId:attachmentId — Gmail
  * attachment ids run far past filesystem name limits. getAttachmentBytes
  * writes through it, and mail-sync prefetches draft attachments so resuming a
@@ -9,8 +9,9 @@
  * the mail flow.
  */
 
-import { sha256Hex } from "../bytes.js";
+import { sha256Hex, toBase64 } from "../bytes.js";
 import { platform } from "../platform.js";
+import { providerFor } from "../providers/index.js";
 
 const DIR = "attachment-cache";
 const MAX_CACHE_BYTES = 512 * 1024 * 1024;
@@ -51,6 +52,40 @@ export async function putCachedAttachment(
   } catch {
     // best-effort
   }
+}
+
+/** Attachment bytes. Local-first: served from the cache when present, write-through otherwise. */
+export async function getAttachmentBytes(
+  accountId: string,
+  messageId: string,
+  attachmentId: string,
+): Promise<Uint8Array> {
+  const cached = await getCachedAttachment(accountId, messageId, attachmentId);
+  if (cached) return cached;
+  const bytes = await providerFor(accountId).fetchAttachment(accountId, messageId, attachmentId);
+  await putCachedAttachment(accountId, messageId, attachmentId, bytes);
+  return bytes;
+}
+
+/** Attachment bytes as standard base64 (for forwarding / in-memory use). */
+export async function getAttachmentData(
+  accountId: string,
+  messageId: string,
+  attachmentId: string,
+): Promise<{ base64: string; size: number }> {
+  const bytes = await getAttachmentBytes(accountId, messageId, attachmentId);
+  return { base64: toBase64(bytes), size: bytes.length };
+}
+
+/** Saves an attachment where the user chooses (a save dialog, or a download). */
+export async function saveAttachment(
+  accountId: string,
+  messageId: string,
+  attachmentId: string,
+  filename: string,
+): Promise<{ saved: boolean }> {
+  const bytes = await getAttachmentBytes(accountId, messageId, attachmentId);
+  return { saved: await platform().userFiles.save(filename, bytes) };
 }
 
 /** Drop oldest files once the cache passes the size cap (run at startup). */

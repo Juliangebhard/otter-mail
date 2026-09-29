@@ -22,7 +22,7 @@
  * `asPrefetchWork`; anything else counts as foreground.
  */
 
-import { platform, type AsyncContext } from "../platform.js";
+import { platform, type AsyncContext } from "../../platform.js";
 
 /** Gmail's per-minute limit for this project, per user. */
 const UNITS_PER_MINUTE_LIMIT = 6_000;

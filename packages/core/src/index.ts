@@ -71,7 +71,7 @@ export { runAsTask } from "./handlers/ipc-budget.js";
 export { ATTACHMENTS_DIR, dataUrl, readAttachment } from "./services/assistant/attachments.js";
 export { shutdownProviders } from "./services/assistant/service.js";
 export * from "./services/assistant/types.js";
-export { getAttachmentBytes } from "./services/gmail-api.js";
+export { getAttachmentBytes } from "./services/attachment-cache.js";
 export { KEYBINDINGS_FILE } from "./services/keybindings-store.js";
 export { syncAllAccounts } from "./services/mail-sync.js";
 export {

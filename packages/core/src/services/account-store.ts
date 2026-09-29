@@ -5,15 +5,30 @@
  * never stored here; the platform's Google sign-in keeps them.
  */
 
+import type { MailProviderKind } from "@otter-mail/contracts";
+
 import { readJson, writeJson } from "../json-file.js";
 import type { GmailAccount } from "../types.js";
 
+/** Each account's provider as last read or written, for lookups by id that can't wait. */
+const providerKinds = new Map<string, MailProviderKind>();
+
+function rememberProviders(accounts: GmailAccount[]): GmailAccount[] {
+  for (const account of accounts) providerKinds.set(account.id, account.provider ?? "gmail");
+  return accounts;
+}
+
+/** An account's provider by id (Gmail until accounts.json was read). */
+export function providerKindOf(accountId: string): MailProviderKind {
+  return providerKinds.get(accountId) ?? "gmail";
+}
+
 async function readAccounts(): Promise<GmailAccount[]> {
-  return (await readJson<GmailAccount[]>("accounts.json")) ?? [];
+  return rememberProviders((await readJson<GmailAccount[]>("accounts.json")) ?? []);
 }
 
 async function writeAccounts(accounts: GmailAccount[]): Promise<void> {
-  await writeJson("accounts.json", accounts);
+  await writeJson("accounts.json", rememberProviders(accounts));
 }
 
 export async function listAccounts(): Promise<GmailAccount[]> {
