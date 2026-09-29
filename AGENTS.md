@@ -5,6 +5,9 @@ browser at https://mail.otterware.dev. It is laid out like Otter Code (our fork 
 pnpm monorepo built with Vite+ (`vp`); the Mac app ships through GitHub Releases with
 auto-update.
 
+What each app supports (Mac, web, iPhone; Gmail vs IMAP): `docs/features.md`. Keep it current
+when a feature lands or goes.
+
 ## Where code lives
 
 - `packages/core`: the mail backend, shared by both apps: Gmail API client, quota, the SQLite
