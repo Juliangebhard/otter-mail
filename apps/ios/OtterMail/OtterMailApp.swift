@@ -67,20 +67,27 @@ struct OtterMailApp: App {
 
 /** Opens the thread a notification is about. */
 final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
-    var session: Session?
+    var session: Session? {
+        didSet { if let tapped { session?.opening = tapped; self.tapped = nil } }
+    }
+    /** A tap that launched the app, held until the window hands over the session. */
+    private var tapped: String?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
         UNUserNotificationCenter.current().delegate = self
         return true
     }
 
-    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
+    // The completion-handler forms, called on the main thread: the async forms' thunks
+    // call UIKit's completion handler from a background thread, which crashes on a tap.
+    func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse, withCompletionHandler completionHandler: @escaping () -> Void) {
         let thread = response.notification.request.content.userInfo["thread"] as? String
-        await MainActor.run { session?.opening = thread }
+        if let session { session.opening = thread } else { tapped = thread }
+        completionHandler()
     }
 
-    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification) async -> UNNotificationPresentationOptions {
-        [.banner, .sound]
+    func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification, withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
+        completionHandler([.banner, .sound])
     }
 }
 

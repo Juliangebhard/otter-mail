@@ -154,7 +154,7 @@ struct SidebarView: View {
 
     private func row(_ folder: Folder, scope: String?, color: String? = nil, indent: Int = 0) -> some View {
         let selected = place.scope == scope && place.folder == folder
-        let unread = folder == .inbox || folder.isLabel ? store.unreadCount(in: folder, scope: scope) : 0
+        let count = store.badge(in: folder, scope: scope)
         return Button {
             onSelect(Place(scope: scope, folder: folder))
         } label: {
@@ -168,8 +168,8 @@ struct SidebarView: View {
                     .foregroundStyle(palette.sidebarText)
                     .lineLimit(1)
                 Spacer()
-                if unread > 0 {
-                    Text("\(unread)")
+                if count > 0 {
+                    Text("\(count)")
                         .font(.subheadline)
                         .foregroundStyle(palette.sidebarMuted)
                         .monospacedDigit()
