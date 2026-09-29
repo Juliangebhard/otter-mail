@@ -1,10 +1,8 @@
 /**
- * The demo's mailboxes (see gmail.ts): two accounts with a few weeks of
+ * The demo's mailboxes: two accounts with a few weeks of
  * made-up mail. Everything here is fixed; only the dates are relative, to
  * when the demo was first opened, so the mail always looks recent.
  */
-
-import { toBase64 } from "@otter-mail/core";
 
 type Person = { name: string; email: string };
 
@@ -1088,9 +1086,3 @@ const work: SeedAccount = {
 };
 
 export const DEMO_ACCOUNTS: SeedAccount[] = [personal, work];
-
-export const attachmentData = (content: string) =>
-  toBase64(new TextEncoder().encode(content))
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/, "");

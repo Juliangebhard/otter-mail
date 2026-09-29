@@ -27,7 +27,7 @@ Two mailboxes under "All mailboxes": Personal (`demo@otter.example`) and Work
 (`sam@acme.example`). A few weeks of mail: multi-message threads, newsletters
 with unsubscribe, PDF/SVG/CSV attachments, calendar invitations (RSVP),
 drafts, spam, trash, nested labels (`Projects/Otter`), non-ASCII names.
-The seed is `apps/web/src/web/demo/seed.ts`; add to it when a flow needs
+The seed is `packages/shared/src/demo-mailboxes.ts`; add to it when a flow needs
 mail it doesn't have.
 
 A pretend Gmail (`apps/web/src/web/demo/gmail.ts`) answers the backend: archive,

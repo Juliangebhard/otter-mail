@@ -14,6 +14,7 @@
     "@base-ui/react": "^1.8.0",
     "@otter-mail/contracts": "workspace:*",
     "@otter-mail/core": "workspace:*",
+    "@otter-mail/shared": "workspace:*",
     "@radix-ui/colors": "^3.0.0",
     "@shadcn/react": "^0.2.0",
     "@sqlite.org/sqlite-wasm": "3.53.4-build1",

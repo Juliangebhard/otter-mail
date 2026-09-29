@@ -3,7 +3,7 @@
  * backend's Worker, so the web app runs with no Google or Otter account.
  *
  * `installFakeGmail` wraps the Worker's fetch: calls to the Gmail REST API are
- * answered from the seeded mailboxes (seed.ts), which live in the demo's own
+ * answered from the seeded mailboxes (@otter-mail/shared/demo-mailboxes), which live in the demo's own
  * files and change as the app archives, labels, sends and drafts. Each change
  * goes into a history feed like Gmail's, so incremental sync sees it. Other
  * Google APIs answer empty, the relay "signed out", and everything else goes
@@ -13,12 +13,20 @@
 import {
   accountStore,
   fromBase64,
+  toBase64,
   type GmailAccount,
   type GoogleAuth,
   type Platform,
 } from "@otter-mail/core";
 
-import { attachmentData, DEMO_ACCOUNTS, type SeedAccount } from "./seed";
+import { DEMO_ACCOUNTS, type SeedAccount } from "@otter-mail/shared/demo-mailboxes";
+
+/** A seeded file's text as Gmail sends attachment data: base64url. */
+const attachmentData = (content: string) =>
+  toBase64(new TextEncoder().encode(content))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
 
 export const DEMO_RELAY_URL = "https://relay.demo.invalid";
 
