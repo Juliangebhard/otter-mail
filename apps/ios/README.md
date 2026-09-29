@@ -19,8 +19,8 @@ their code.
 
 ## How it works
 
-Like the Mac app, the phone signs in to Google itself and talks to Gmail directly; the relay
-never sees its mail or tokens.
+Like the Mac app, the phone signs in to Google itself and talks to Gmail directly, and to IMAP and
+SMTP servers directly too (`docs/imap.md`); the relay never sees its mail, tokens or passwords.
 
 - `Account/GoogleAuth.swift`: Google sign-in per mailbox with the otter-mail project's "iOS" OAuth
   client (no secret; PKCE; Google returns to the client ID's reversed form). Refresh tokens stay in
@@ -31,9 +31,17 @@ never sees its mail or tokens.
 - `Account/Session.swift`: the demo or the signed-in account, and keeping it in step: mailboxes
   linked on any device show here (signed out until this phone signs in to them), preferences sync
   both ways under the other apps' keys (`ui` and `settings` sections), relay events trigger syncs.
-- `Gmail/`: the Gmail API (`GmailAPI.swift`), messages out (`MIME.swift`), and sync
-  (`MailSync.swift`): history-based, local-first, cached on disk, changes shown at once then
-  written to Gmail. `users.watch` is renewed daily so pushes reach the relay.
+- `Mail/MailSync.swift`: sync, local-first: cached on disk, changes shown at once then written
+  through the mailbox's `MailProvider` (`Mail/MailProvider.swift`, core's provider seam).
+- `Gmail/`: the Gmail provider: the Gmail API (`GmailAPI.swift`), messages out (`MIME.swift`),
+  history-based sync; `users.watch` is renewed daily so pushes reach the relay.
+- `Imap/`: the IMAP provider (`ImapProvider.swift`): folders as labels, flags, UID/CONDSTORE sync,
+  IDLE on the inbox while the app is open. Its IMAP and SMTP clients run over Network.framework
+  with the system's TLS (`MailSocket.swift`; STARTTLS goes through `URLSessionStreamTask`, which
+  can start TLS mid-connection). `MailDiscovery.swift` finds the servers for an address (known
+  providers, then Thunderbird's autoconfig). The password stays in the Keychain; the settings
+  follow the Otter account. Debug builds trust any certificate from localhost, to test against
+  GreenMail or Dovecot in Docker.
 - `Assistant/`: the assistant, as on the desktop. Hermes (`Hermes.swift`) runs anywhere, so it
   runs here: the same server-side chats, model and key (the `assistant` preferences section and
   the sealed `hermesKey` follow the Otter account). Conversations go to it as pointers, the
