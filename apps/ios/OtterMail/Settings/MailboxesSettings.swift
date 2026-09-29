@@ -112,7 +112,7 @@ struct MailboxSettings: View {
 
     private func form(_ mailbox: Mailbox) -> some View {
         SettingsForm {
-            if mailbox.signedOut, mailbox.imap != nil {
+            if mailbox.signedOut, let imap = mailbox.imap {
                 Section {
                     SecureField("Password", text: $password)
                         .textContentType(.password)
@@ -121,8 +121,12 @@ struct MailboxSettings: View {
                         Label(session.busy ?? "Sign in to \(email)", systemImage: "person.crop.circle.badge.checkmark")
                     }
                     .disabled(password.isEmpty || session.busy != nil)
+                } header: {
+                    // Whose password, and where it goes: the servers can change on another device.
+                    Text("\(imap.username) on \(imap.imap.host)")
+                        .textCase(nil)
                 } footer: {
-                    Text("Linked to your Otter account, but this iPhone doesn't have its password yet. It stays on this iPhone; your mail goes straight between it and \(mailbox.imap?.imap.host ?? "the server").")
+                    Text("This iPhone needs the password: the mailbox is new here, the server refused it, or its servers changed. It stays on this iPhone; your mail goes straight between it and \(imap.imap.host).")
                 }
             } else if mailbox.signedOut {
                 Section {

@@ -32,20 +32,27 @@ nonisolated final class MailSocket {
         return MailSocket(transport)
     }
 
+    /** The longest line read (literals aside), and the most an IMAP response's literals may carry. */
+    static let maxLine = 1 << 20
+    static let maxLiteral = 100 << 20
+
     /** A line, without its CRLF. */
     func readLine() async throws -> Data {
         while true {
             if let end = buffer.firstRange(of: Data("\r\n".utf8)) {
                 let line = buffer[buffer.startIndex..<end.lowerBound]
+                guard line.count <= Self.maxLine else { throw ImapError.protocolError("The mail server sent a line too long to read.") }
                 buffer = Data(buffer[end.upperBound...])
                 return Data(line)
             }
+            guard buffer.count <= Self.maxLine else { throw ImapError.protocolError("The mail server sent a line too long to read.") }
             buffer.append(try await transport.receive())
         }
     }
 
     /** Exactly `count` bytes (an IMAP literal). */
     func read(_ count: Int) async throws -> Data {
+        guard count <= Self.maxLiteral else { throw ImapError.protocolError("The mail server sent too much at once.") }
         while buffer.count < count { buffer.append(try await transport.receive()) }
         let bytes = buffer.prefix(count)
         buffer = Data(buffer.dropFirst(count))
