@@ -58,8 +58,19 @@ const demo = DEMO_ACCOUNTS.map(({ threads, ...account }) => ({
   ...account,
   threads: threads(seededAt).map((thread) => ({
     ...thread,
-    messages: thread.messages.map(({ attachments, ...message }) => ({
+    messages: thread.messages.map(({ attachments, html, ...message }) => ({
       ...message,
+      // Inline images (`cid:`) go into the HTML itself; the app has no Gmail to fetch them from.
+      html: (attachments ?? []).reduce(
+        (body, a) =>
+          a.contentId && body
+            ? body.replaceAll(
+                `cid:${a.contentId}`,
+                `data:${a.mimeType};base64,${Buffer.from(a.content).toString("base64")}`,
+              )
+            : body,
+        html,
+      ),
       attachments: (attachments ?? [])
         .filter((a) => !a.contentId)
         .map((a) => ({ filename: a.filename, mimeType: a.mimeType, size: a.content.length })),

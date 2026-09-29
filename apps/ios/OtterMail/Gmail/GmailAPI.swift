@@ -316,12 +316,20 @@ nonisolated private struct GmailMessage: Decodable {
         let text = leaves.first { $0.mimeType == "text/plain" && !isFile($0) }?.text
             ?? html.map(HTMLText.plain) ?? ""
         // Inline images (a Content-ID, not marked as an attachment) are part of the body.
-        let attachments = leaves.filter { part in
-            guard isFile(part), part.body?.attachmentId != nil else { return false }
-            let attached = part.header("Content-Disposition")?.lowercased().hasPrefix("attachment") == true
-            return part.header("Content-ID") == nil || attached
+        let isInline = { (part: Part) in
+            part.header("Content-ID") != nil
+                && part.header("Content-Disposition")?.lowercased().hasPrefix("attachment") != true
         }
-        .map { Attachment(id: $0.body?.attachmentId, filename: $0.filename ?? "", mimeType: $0.mimeType ?? "", size: $0.body?.size ?? 0) }
+        let attachments = leaves.filter { isFile($0) && $0.body?.attachmentId != nil && !isInline($0) }
+            .map { Attachment(id: $0.body?.attachmentId, filename: $0.filename ?? "", mimeType: $0.mimeType ?? "", size: $0.body?.size ?? 0) }
+        let inline = leaves.filter { $0.body?.attachmentId != nil && isInline($0) }
+            .map { part in
+                Attachment(
+                    id: part.body?.attachmentId, filename: part.filename ?? "", mimeType: part.mimeType ?? "",
+                    size: part.body?.size ?? 0,
+                    contentID: part.header("Content-ID")?.trimmingCharacters(in: CharacterSet(charactersIn: "<> "))
+                )
+            }
         let labels = Set(labelIds ?? [])
         var headers: [String: String] = [:]
         for name in ["Message-ID", "References", "List-Unsubscribe", "List-Unsubscribe-Post"] {
@@ -336,6 +344,7 @@ nonisolated private struct GmailMessage: Decodable {
             text: text,
             html: html,
             attachments: attachments,
+            inline: inline.isEmpty ? nil : inline,
             unread: labels.contains("UNREAD"),
             starred: labels.contains("STARRED"),
             draft: labels.contains("DRAFT"),

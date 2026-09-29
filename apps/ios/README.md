@@ -57,8 +57,18 @@ Or open `OtterMail.xcodeproj` in Xcode (27 or later). The welcome screen offers 
 the same pretend mail as `pnpm dev:demo`; build and test against it rather than real accounts.
 
 Debug builds are `dev.otterware.mail.dev`, release builds `dev.otterware.mail`. The Google "iOS"
-client is registered for the former. Running on a device needs an Apple Developer team (set
-`DEVELOPMENT_TEAM`).
+client is registered for the former. The project signs with team 838JVGY7W4; to run on your
+iPhone, pick it in Xcode, or from the command line:
+
+```sh
+xcodebuild -project apps/ios/OtterMail.xcodeproj -scheme OtterMail -destination 'platform=iOS,id=<udid>' \
+  -derivedDataPath apps/ios/.build -allowProvisioningUpdates -allowProvisioningDeviceRegistration build
+xcrun devicectl device install app --device <udid> "apps/ios/.build/Build/Products/Debug-iphoneos/Otter Mail.app"
+```
+
+(`xcrun devicectl list devices` gives the UDID. Without an Apple account signed in to Xcode, add
+`-authenticationKeyPath/-authenticationKeyID/-authenticationKeyIssuerID` with an App Store Connect
+API key.)
 
 `Resources/Themes.json` and `Resources/DemoMailboxes.json` are exported from `apps/web` by
 `pnpm ios:resources` (`dev:ios` runs it); rerun it after changing the palettes or the demo seed.

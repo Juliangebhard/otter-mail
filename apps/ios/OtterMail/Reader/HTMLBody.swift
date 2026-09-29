@@ -8,6 +8,9 @@ import WebKit
  */
 struct HTMLBody: View {
     let html: String
+    /** Images it shows inline (`cid:` references), and how to get their bytes. */
+    var inline: [Attachment] = []
+    var load: (Attachment) async -> Data? = { _ in nil }
 
     @State private var page = WebPage(navigationDecider: OpenLinksOutside())
     @State private var height: CGFloat = 200
@@ -19,7 +22,7 @@ struct HTMLBody: View {
             .clipShape(.rect(cornerRadius: 14))
             .task(id: html) {
                 do {
-                    for try await event in page.load(html: Self.fitted(html), baseURL: URL(string: "about:blank")!) {
+                    for try await event in page.load(html: Self.fitted(await withImages()), baseURL: URL(string: "about:blank")!) {
                         guard event == .finished else { continue }
                         if let measured = try await page.callJavaScript("return document.documentElement.scrollHeight") as? Double {
                             height = measured
@@ -27,6 +30,16 @@ struct HTMLBody: View {
                     }
                 } catch {}
             }
+    }
+
+    /** The HTML with each `cid:` image it references swapped for the image itself. */
+    private func withImages() async -> String {
+        var html = html
+        for image in inline {
+            guard let cid = image.contentID, html.contains("cid:\(cid)"), let data = await load(image) else { continue }
+            html = html.replacingOccurrences(of: "cid:\(cid)", with: "data:\(image.mimeType);base64,\(data.base64EncodedString())")
+        }
+        return html
     }
 
     /** Fits fixed-width mail (600px tables) to the phone. */

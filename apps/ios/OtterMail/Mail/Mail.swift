@@ -49,6 +49,8 @@ nonisolated struct Attachment: Hashable, Codable {
     var filename: String
     var mimeType: String
     var size: Int
+    /** Set on an image the HTML shows inline (`cid:` + this), rather than a file. */
+    var contentID: String? = nil
 }
 
 nonisolated struct Message: Identifiable, Hashable, Codable {
@@ -60,15 +62,17 @@ nonisolated struct Message: Identifiable, Hashable, Codable {
     var text: String
     var html: String?
     var attachments: [Attachment]
+    /** Images the HTML shows inline (by `contentID`). */
+    var inline: [Attachment]? = nil
     var unread: Bool
     var starred: Bool
     var draft: Bool
     /** The ones replies and unsubscribing need: Message-ID, References, List-Unsubscribe. */
     var headers: [String: String]
 
-    /** The first line of the text with its whitespace collapsed, as Gmail's snippet. */
+    /** The message's own words (not the history it quotes), whitespace collapsed, as Gmail's snippet. */
     var snippet: String {
-        text.split(whereSeparator: \.isNewline)
+        Quote.split(text).body.split(whereSeparator: \.isNewline)
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty && !$0.hasPrefix(">") }
             .joined(separator: " ")
@@ -125,3 +129,16 @@ nonisolated enum Folder: Hashable {
         }
     }
 }
+
+/** A reply's own words, and the history it quotes ("On … wrote:" and the ">" lines after). */
+nonisolated enum Quote {
+    static func split(_ text: String) -> (body: String, quote: String?) {
+        let pattern = /\n+(On .{4,200}wrote:\s*\n|>)/
+        guard let match = text.firstMatch(of: pattern), text[match.range.upperBound...].contains(">") || match.output.1 == ">" else {
+            return (text, nil)
+        }
+        let body = String(text[..<match.range.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
+        return body.isEmpty ? (text, nil) : (body, String(text[match.range.lowerBound...]))
+    }
+}
+

@@ -301,6 +301,12 @@ final class MailSync {
         scheduleSave()
     }
 
+    /** An inline image's bytes, for the HTML that shows it. */
+    func inlineImage(_ attachment: Attachment, of message: Message, in email: String) async -> Data? {
+        guard let id = attachment.id else { return nil }
+        return try? await api(email).attachment(message: message.id, id: id)
+    }
+
     func attachment(_ attachment: Attachment, of message: Message, in email: String) async throws -> URL {
         guard let id = attachment.id else { throw GmailAPI.Failure(status: 0, message: "No file to open.") }
         let data = try await api(email).attachment(message: message.id, id: id)

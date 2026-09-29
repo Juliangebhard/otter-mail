@@ -37,7 +37,9 @@ struct MessageView: View {
                 if let translated, !showOriginal {
                     Text(translated).bodyText(palette)
                 } else if let html = message.html {
-                    HTMLBody(html: html)
+                    HTMLBody(html: html, inline: message.inline ?? []) { image in
+                        await store.sync?.inlineImage(image, of: message, in: mailbox.email)
+                    }
                 } else {
                     let (body, quote) = Quote.split(message.text)
                     Text(showQuote ? message.text : body).bodyText(palette)
@@ -137,18 +139,6 @@ struct MessageView: View {
         let name = { (p: Person) in p.email == mailbox.email ? "me" : p.label }
         let to = "to " + message.to.map(name).joined(separator: ", ")
         return message.cc.isEmpty ? to : "\(to), cc \(message.cc.map(name).joined(separator: ", "))"
-    }
-}
-
-/** A reply's own words, and the history it quotes ("On … wrote:" and the ">" lines after). */
-enum Quote {
-    static func split(_ text: String) -> (body: String, quote: String?) {
-        let pattern = /\n+(On .{4,200}wrote:\s*\n|>)/
-        guard let match = text.firstMatch(of: pattern), text[match.range.upperBound...].contains(">") || match.output.1 == ">" else {
-            return (text, nil)
-        }
-        let body = String(text[..<match.range.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
-        return body.isEmpty ? (text, nil) : (body, String(text[match.range.lowerBound...]))
     }
 }
 
