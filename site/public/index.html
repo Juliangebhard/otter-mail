@@ -3,20 +3,25 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Otter Mail · Gmail, calm and fast</title>
+    <title>Otter Mail · Email, calm and fast</title>
     <meta
       name="description"
-      content="Otter Mail is a calm, fast Gmail client for macOS. Your mail stays on your Mac."
+      content="Otter Mail is a calm, fast mail client for Gmail and IMAP. On your Mac, in your browser and on iOS. Your mail stays on your device."
     />
+    <meta property="og:title" content="Otter Mail" />
+    <meta property="og:description" content="Email, calm and fast." />
+    <meta property="og:image" content="https://mail.otterware.dev/screenshot.png" />
     <link rel="icon" href="/favicon.png" />
     <link rel="stylesheet" href="/style.css" />
   </head>
-  <body>
+  <body class="landing">
     <main>
       <header class="hero">
-        <img src="/icon.png" alt="Otter Mail icon" />
-        <h1>Otter Mail</h1>
-        <p class="tagline">Gmail, calm and fast. On your Mac, or in your browser.</p>
+        <img class="icon" src="/icon.png" width="88" height="88" alt="Otter Mail" />
+        <h1>Email, calm and&nbsp;fast.</h1>
+        <p class="tagline">
+          A quiet mail client for Gmail and IMAP. On your Mac, in your browser, on iOS.
+        </p>
         <p class="actions">
           <a class="button" href="https://github.com/ckafrouni/otter-mail/releases/latest"
             >Download for macOS</a
@@ -24,32 +29,95 @@
           <a class="button secondary" href="/app">Open in your browser</a>
         </p>
         <p class="note">
-          Free · <a href="https://github.com/ckafrouni/otter-mail">Source on GitHub</a>
+          <a
+            href="mailto:chris.kafrouni@gmail.com?subject=Otter%20Mail%20for%20iOS%20(TestFlight)&body=Hi%2C%20please%20add%20me%20to%20the%20Otter%20Mail%20iOS%20TestFlight.%0A%0AThe%20email%20of%20my%20Apple%20ID%3A%20"
+            >iOS on TestFlight</a
+          >
+          · Free ·
+          <a href="https://github.com/ckafrouni/otter-mail">Open source</a>
         </p>
       </header>
 
-      <h2>What it does</h2>
-      <ul>
-        <li>Several Gmail accounts side by side, or combined into one inbox.</li>
-        <li>Gmail labels, plus saved views that filter across accounts.</li>
-        <li>A local cache with full-text search, so mail opens instantly and works offline.</li>
-        <li>A menu-bar mini inbox, new-mail notifications and a Dock unread badge.</li>
-        <li>On-device translation of mail in other languages, using Apple's translator.</li>
-        <li>Calendar invitations you can answer in place, and one-click unsubscribe.</li>
-        <li>
-          An optional agent that works on your mail through your own Claude Code, Codex or Hermes.
-        </li>
-      </ul>
+      <figure class="shot">
+        <img
+          src="/screenshot.png"
+          width="1280"
+          height="800"
+          alt="Otter Mail: a mailbox with its labels on the left, the inbox in the middle and a conversation open on the right."
+        />
+      </figure>
 
-      <h2>Your mail stays on your Mac</h2>
-      <p>
-        Otter Mail talks to Google directly from your computer. There is no Otter Mail server: your
-        messages, contacts and sign-in are never sent to us. Details are in the
-        <a href="/privacy/">privacy policy</a>.
-      </p>
+      <section class="features">
+        <div>
+          <h2>Every mailbox, one place</h2>
+          <p>
+            Gmail and IMAP, side by side or combined into one inbox. Rename, color and reorder them;
+            they follow you to every device.
+          </p>
+        </div>
+        <div>
+          <h2>Instant, and offline</h2>
+          <p>
+            Mail opens from a local cache with full-text search, so it is fast and keeps working
+            without a connection.
+          </p>
+        </div>
+        <div>
+          <h2>Made for the keyboard</h2>
+          <p>
+            Rebindable shortcuts, a command palette, and undo for what you do, sending included.
+          </p>
+        </div>
+        <div>
+          <h2>Labels and views</h2>
+          <p>
+            Gmail labels, nested as you made them, plus saved views that filter across every
+            account.
+          </p>
+        </div>
+        <div>
+          <h2>Live on every device</h2>
+          <p>
+            New mail arrives the moment it lands, with notifications, and on the Mac a menu-bar mini
+            inbox and a Dock badge.
+          </p>
+        </div>
+        <div>
+          <h2>The small things</h2>
+          <p>
+            On-device translation, calendar invitations you answer in place, one-click unsubscribe,
+            seven themes.
+          </p>
+        </div>
+        <div>
+          <h2>An agent, if you want one</h2>
+          <p>
+            Ask Claude Code, Codex or Hermes about a conversation, through your own account. Off
+            until you set it up.
+          </p>
+        </div>
+        <div>
+          <h2>Wherever you are</h2>
+          <p>
+            A Mac app that updates itself, the same app in any current browser, and a native iOS
+            app. Sign in once and your mailboxes and settings are there.
+          </p>
+        </div>
+      </section>
+
+      <section class="privacy">
+        <h2>Your mail stays yours</h2>
+        <p>
+          Otter Mail reads your mail from Gmail or your IMAP server directly on your device and
+          keeps its cache there, never on our server. An Otter account, optional on the Mac, only
+          syncs your mailboxes and preferences and wakes your devices when mail arrives. No
+          analytics, no tracking. Details are in the <a href="/privacy/">privacy policy</a>.
+        </p>
+      </section>
 
       <footer>
         <a href="/privacy/">Privacy</a><a href="/terms/">Terms</a
+        ><a href="https://github.com/ckafrouni/otter-mail">GitHub</a
         ><a href="https://otterware.dev">Otterware</a>
       </footer>
     </main>
