@@ -9,6 +9,7 @@ import {
   Trash2Icon,
 } from "lucide-react";
 import { getAccountColor, getAccountDisplayName } from "../main/gmail/account-style";
+import { senderLabel } from "../main/gmail/address";
 import { decodeEntities } from "../main/gmail/text";
 import { HintTooltip, IconBtn, buttonClass, cn } from "../main/gmail/ui";
 import { MailboxSwitcher } from "../main/gmail/top-bar";
@@ -74,7 +75,7 @@ function InboxRow({
               unread ? "font-medium text-foreground" : "font-normal text-foreground",
             )}
           >
-            {message.fromName || message.fromEmail}
+            {senderLabel(message.fromName, message.fromEmail, message.accountId)}
           </span>
           {/* Meta at rest; row actions take its place on hover. */}
           <span className="relative flex h-5 shrink-0 items-center">

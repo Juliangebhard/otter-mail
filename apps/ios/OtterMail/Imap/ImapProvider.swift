@@ -532,12 +532,35 @@ final class ImapProvider: MailProvider {
                 if let id = ImapID(message) { try await flag([id], #"+FLAGS.SILENT (\Flagged)"#, client) }
             case .trash:
                 let trash = try await path(.trash, client)
-                moved = try await move(ids.filter { $0.path != trash }, to: trash, &state, client)
+                let trashing = ids.filter { $0.path != trash }
+                moved = try await move(trashing, to: trash, &state, client)
+                // Where each came from, for Restore; kept with the mailbox's state, so it outlives a relaunch.
+                var origins = state.trashedFrom ?? [:]
+                for id in trashing {
+                    if let new = moved[id.id] ?? nil { origins[new] = id.path }
+                }
+                state.trashedFrom = origins
             case .untrash:
-                moved = try await move(ids.filter { role($0.path) == .trash }, to: roles[.inbox] ?? "INBOX", &state, client)
+                var origins = state.trashedFrom ?? [:]
+                let trashed = ids.filter { role($0.path) == .trash }
+                // Back where it came from while that folder's still there, else to the inbox.
+                let inbox = roles[.inbox] ?? "INBOX"
+                let destination = { (id: ImapID) -> String in
+                    guard let origin = origins[id.id], self.folders.contains(where: { $0.path == origin }) else { return inbox }
+                    return origin
+                }
+                for (path, group) in Dictionary(grouping: trashed, by: destination) {
+                    moved.merge(try await move(group, to: path, &state, client)) { $1 }
+                }
+                for id in trashed { origins[id.id] = nil }
+                state.trashedFrom = origins
             case .delete:
                 // Only what's in Trash or Junk (where it's offered): the rest of the thread stays.
                 let doomed = ids.filter { [.trash, .junk].contains(role($0.path)) }
+                if var origins = state.trashedFrom {
+                    for id in doomed { origins[id.id] = nil }
+                    state.trashedFrom = origins
+                }
                 for (path, group) in Dictionary(grouping: doomed, by: \.path) {
                     try await client.open(path)
                     try await client.delete(group.map(\.uid))

@@ -1501,6 +1501,7 @@ export function removeAccountData(accountId: string): void {
       "spamTrashBackfilled",
       "gmailWatch",
       "imapSync",
+      "imapTrashedFrom",
     ].map((prefix) => `${prefix}:${accountId}`);
     d.prepare(`DELETE FROM kv WHERE key IN (${kvKeys.map(() => "?").join(", ")})`).run(...kvKeys);
     d.exec("COMMIT");

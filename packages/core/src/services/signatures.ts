@@ -7,9 +7,12 @@
  * follows the Otter account as a preference (preferences.ts).
  *
  * Reading needs only the Gmail scope; saving needs gmail.settings.basic,
- * which sign-ins from before it was added lack: saving then asks to sign in
- * again (GMAIL_SETTINGS_PERMISSION).
+ * which sign-ins from before it was added lack (GMAIL_SETTINGS_PERMISSION):
+ * the signature is then kept here (signatureInGmail false) and moved to Gmail
+ * once the account is signed in again.
  */
+
+import { GMAIL_SETTINGS_PERMISSION } from "@otter-mail/contracts";
 
 import { broadcast } from "../ipc.js";
 import { logger } from "../logger.js";
@@ -27,13 +30,23 @@ export async function saveSignature(account: GmailAccount, html: string): Promis
     preferenceChanged("signatures");
     return updated;
   }
-  const saved = await signatures.set(account.id, account.email, html);
-  return updateAccount(account.id, { signature: saved, signatureInGmail: true });
+  try {
+    const saved = await signatures.set(account.id, account.email, html);
+    return updateAccount(account.id, { signature: saved, signatureInGmail: true });
+  } catch (err) {
+    if (!(err instanceof Error && err.message === GMAIL_SETTINGS_PERMISSION)) throw err;
+    // This sign-in may not change Gmail's settings: keep it here until one may.
+    return updateAccount(account.id, { signature: html, signatureInGmail: false });
+  }
 }
 
 async function refreshSignature(account: GmailAccount): Promise<boolean> {
   const signatures = findProvider(account)?.signatures;
   if (!signatures) return false;
+  if (account.signatureInGmail === false) {
+    // Saved here while the sign-in couldn't save it in Gmail: try again.
+    return (await saveSignature(account, account.signature ?? "")).signatureInGmail === true;
+  }
   const inGmail = await signatures.get(account.id, account.email);
   if (!account.signatureInGmail && !inGmail && account.signature) {
     // Kept only here until now: move it to Gmail (if this sign-in may).

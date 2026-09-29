@@ -83,6 +83,7 @@ import {
   formatAddressEntry,
   normalizeAddressList,
   parseAddressEntry,
+  senderLabel,
   splitAddressList,
 } from "./address";
 import { useCommandHandlers } from "../keybindings/dispatch";
@@ -1225,7 +1226,7 @@ export function CollapsedRow({
                 summary.unread ? "font-medium text-foreground" : "text-foreground",
               )}
             >
-              {summary.fromName || summary.fromEmail}
+              {senderLabel(summary.fromName, summary.fromEmail, accountId)}
             </span>
             <span
               className="shrink-0 text-xs tabular-nums text-muted-foreground"
@@ -1357,7 +1358,7 @@ export function ExpandedRow({
                 onSearch={onSearchSender}
               >
                 <span className="truncate text-sm font-medium leading-snug text-foreground">
-                  {summary.fromName || summary.fromEmail}
+                  {senderLabel(summary.fromName, summary.fromEmail, accountId)}
                 </span>
               </SenderHoverCard>
               <span

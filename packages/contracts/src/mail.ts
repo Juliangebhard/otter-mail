@@ -35,7 +35,7 @@ export interface ImapSettings {
  * hides what a mailbox's provider can't do (never checks the provider itself).
  */
 export interface MailCapabilities {
-  /** Gmail's inbox categories (Promotions, Social, …). */
+  /** Gmail's sorting of the inbox: categories (Promotions, Social, …) and Important. */
   categories: boolean;
   /** A message can carry several labels at once (Gmail); IMAP mail sits in one folder. */
   multipleLabels: boolean;

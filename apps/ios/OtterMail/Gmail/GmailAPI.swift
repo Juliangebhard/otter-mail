@@ -14,6 +14,8 @@ nonisolated struct GmailAPI {
         var status: Int
         var message: String
         var errorDescription: String? { message }
+        /** The sign-in wasn't granted what the call needs (Gmail settings, for sign-ins from before it was asked for). */
+        var insufficientScope: Bool { status == 403 && message.localizedCaseInsensitiveContains("insufficient") }
     }
 
     /** The history cursor is too old (Gmail keeps about a week): sync from scratch. */

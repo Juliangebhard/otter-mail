@@ -70,7 +70,7 @@ struct ThreadRow: View {
     private var senders: String {
         var names: [String] = []
         for message in thread.messages where !message.draft {
-            let name = message.from.email == thread.mailbox
+            let name = message.from.isAddress(thread.mailbox)
                 ? "me"
                 : message.from.label.split(separator: " ").first.map(String.init) ?? message.from.label
             if !names.contains(name) { names.append(name) }
