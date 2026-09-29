@@ -616,7 +616,8 @@ export function HomeView() {
     return unsub;
   }, []);
 
-  // A conversation clicked in the menu-bar popover opens here, in the reader.
+  // A conversation clicked in the menu-bar popover, or a new-mail
+  // notification, opens here, in the reader.
   const openFromTrayRef = useRef<(accountId: string, messageId: string) => void>(() => {});
   useEffect(() => {
     const pull = async () => {
