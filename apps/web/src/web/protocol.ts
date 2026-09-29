@@ -33,7 +33,13 @@ export type PageRequests = {
 };
 
 export type PageEffect =
-  | { kind: "notify"; title: string; subtitle?: string; body?: string }
+  | {
+      kind: "notify";
+      title: string;
+      subtitle?: string;
+      body?: string;
+      open?: { accountId: string; messageId: string };
+    }
   | { kind: "badge"; count: number }
   | { kind: "download"; name: string; bytes: Uint8Array }
   | { kind: "open"; name: string; bytes: Uint8Array };

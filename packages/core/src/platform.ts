@@ -142,7 +142,13 @@ export interface Platform {
 
   /** Push to every window (renderer: `desktopBridge.on`). */
   broadcast(channel: string, params?: unknown): void;
-  notify(notification: { title: string; subtitle?: string; body?: string }): void;
+  /** A new-mail notification; clicking it opens `open` in the main window. */
+  notify(notification: {
+    title: string;
+    subtitle?: string;
+    body?: string;
+    open?: { accountId: string; messageId: string };
+  }): void;
   /** Total unread in the inbox, for the Dock or tab badge. */
   setUnreadCount(count: number): void;
   /** Runs `listener` after the machine wakes or the network comes back. */

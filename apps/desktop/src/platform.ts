@@ -21,11 +21,14 @@ import { googleAuth } from "./services/gmail-oauth.js";
 import { connectMailSocket } from "./services/mail-socket.js";
 import { claudeProvider } from "./services/assistant/claude.js";
 import { codexProvider } from "./services/assistant/codex.js";
+import { setPendingOpenMessage } from "./services/open-message-target.js";
 import { appleTranslator } from "./services/translator.js";
 import { refreshTray } from "./services/tray.js";
 import { focusMainWindow } from "./windows/main-window.js";
 
 const home = () => app.getPath("userData");
+
+const shownNotifications = new Set<Notification>();
 
 /** Writes through a temp file, so a crash never leaves half a file. */
 async function writeFileAtomic(file: string, data: Uint8Array | string): Promise<void> {
@@ -192,10 +195,18 @@ export function desktopPlatform(): Platform {
     deviceName: computerName(),
 
     broadcast,
-    notify(options) {
+    notify({ open, ...options }) {
       if (!Notification.isSupported()) return;
       const notification = new Notification(options);
-      notification.on("click", () => void focusMainWindow());
+      // Held until it's done with: a collected notification's click never fires.
+      shownNotifications.add(notification);
+      notification.on("close", () => shownNotifications.delete(notification));
+      notification.on("click", () => {
+        shownNotifications.delete(notification);
+        // The same handoff as a click in the menu-bar popover.
+        if (open) setPendingOpenMessage(open);
+        void focusMainWindow().then(() => open && broadcast("mail:open"));
+      });
       notification.show();
     },
     setUnreadCount(count) {

@@ -57,10 +57,17 @@ export async function notifyNewMail(
           title: m.fromName || m.fromEmail,
           subtitle,
           body: m.subject || m.snippet,
+          open: { accountId, messageId: m.id },
         });
       }
     } else {
-      platform().notify({ title: `${fresh.length} new messages`, subtitle });
+      // A click opens the newest of them.
+      const newest = fresh.reduce((a, b) => (b.date > a.date ? b : a));
+      platform().notify({
+        title: `${fresh.length} new messages`,
+        subtitle,
+        open: { accountId, messageId: newest.id },
+      });
     }
   } catch (err) {
     logger.info("notifier", `notifyNewMail failed: ${String(err)}`);

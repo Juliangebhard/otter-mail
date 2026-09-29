@@ -81,7 +81,8 @@ it; the web app needs it (the relay keeps its Gmail sign-ins alive).
 
 Stable only (no nightlies): run the Release workflow from `main` with a patch/minor/major bump, or
 push a `vX.Y.Z` tag. Installed apps download updates on their own and offer "Restart to update" in
-the sidebar. Details in `docs/release.md`.
+the sidebar. The iPhone app follows with `pnpm release:ios` (TestFlight). `docs/runbook.md` is the
+short version of shipping each part; details in `docs/release.md`.
 
 ## Verifying
 
