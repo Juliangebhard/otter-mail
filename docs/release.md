@@ -2,7 +2,9 @@
 
 The short version, for every part including the web app and relay: `docs/runbook.md`.
 
-Releases are GitHub Releases of this repository, built by `.github/workflows/release.yml`.
+Mac releases are GitHub Releases of this repository, built by `.github/workflows/release.yml`.
+The iPhone app ships separately, with its own version, through `.github/workflows/release-ios.yml`
+([The iPhone app](#the-iphone-app)).
 There is one channel, stable, like T3 Code's stable train (no nightlies). Installed apps check for
 a new release at launch and every few hours, download it in the background, and show a card at
 the bottom of the sidebar: "Restart to update". It also installs the next time the app quits (⌘Q,
@@ -22,13 +24,6 @@ Dock → Quit, logging out).
    `latest-mac.yml` and blockmaps for the updater), publishes the GitHub Release as the latest
    with notes generated since the previous release, and commits the new version to
    `apps/*/package.json` on `main`.
-
-4. Ship the iPhone app from a Mac with Xcode 27: `pnpm release:ios` builds `main` at the same
-   version and uploads it to App Store Connect. About half an hour later it's in TestFlight for
-   internal testers (everyone on the App Store Connect team). To put it in the App Store, pick the
-   build in App Store Connect (Otter Mail: Calm Email → App Store) and submit it for review. It
-   runs from a laptop because GitHub's Mac runners don't have Xcode 27 yet; see
-   [The iPhone app](#the-iphone-app).
 
 To release a specific commit instead (say, a fix on a release branch), push a tag:
 `git tag v1.2.4 <commit> && git push origin v1.2.4`. A version with a suffix (`1.3.0-rc.1`) is
@@ -86,14 +81,37 @@ Optional repository variable: `XCODE_APP`, the Xcode to build with on the runner
 
 ## The iPhone app
 
-`scripts/release-ios.ts` (`pnpm release:ios [--version x.y.z]`) archives `apps/ios` in Release,
-signs it for the App Store and uploads it. The version defaults to the Mac app's; the build number
-is the time (YYYYMMDDhhmm). What it needs on the Mac:
+The iPhone app has its own version (`MARKETING_VERSION` in `apps/ios/OtterMail.xcodeproj`) and
+its own tags (`ios-vX.Y.Z`), apart from the Mac app's: release it when it has changed, not with
+every Mac release. It started from the Mac app's 0.5.6, the last shared version.
 
-- The "Apple Distribution: Christophe Nicolas Kafrouni (838JVGY7W4)" identity in the keychain.
-- The "Otter Mail App Store" provisioning profile (Xcode › Settings › Accounts, or downloaded from
-  the developer portal) for `dev.otterware.mail`.
-- An App Store Connect API key, from `~/.otter-mail/signing/AuthKey_<id>.p8` or
+1. Actions → Release iPhone → Run workflow, choose `patch`, `minor` or `major`; or
+   `gh workflow run release-ios.yml -f bump=patch` (or `-f version=1.0.0`). The version is the
+   latest `ios-vX.Y.Z` tag with that bump (the first release ships the project's version).
+2. The workflow builds `main`'s HEAD on GitHub's `xcode-27` runner with its default (release)
+   Xcode, signs it for the App Store and uploads it to App Store Connect. The build number is the
+   time (YYYYMMDDhhmm).
+3. Only once the upload succeeded does it tag the commit `ios-vX.Y.Z` and commit the version to
+   the Xcode project on `main`, so a failed run leaves nothing behind. It makes no GitHub Release:
+   the Mac app updates from the latest one.
+4. About half an hour later the build is in TestFlight for internal testers (everyone on the App
+   Store Connect team). To put it in the App Store, pick the build in App Store Connect (Otter
+   Mail: Calm Email → App Store) and submit it for review.
+
+Both workflows push a version bump to `main`; each rebases before pushing, so they can run at the
+same time.
+
+The workflow and `scripts/release-ios.ts` (`pnpm release:ios [--version x.y.z]`, the same build
+from a Mac with Xcode 27, if GitHub can't) sign with:
+
+- The "Apple Distribution: Christophe Nicolas Kafrouni (838JVGY7W4)" identity: the
+  `IOS_DISTRIBUTION_P12` secret (base64 of `~/.otter-mail/signing/apple-distribution.p12`) and
+  `IOS_DISTRIBUTION_P12_PASSWORD`; on the Mac, the keychain.
+- The "Otter Mail App Store" provisioning profile for `dev.otterware.mail`: the
+  `IOS_PROVISIONING_PROFILE` secret (base64 of the `.mobileprovision`); on the Mac, Xcode ›
+  Settings › Accounts, or downloaded from the developer portal.
+- An App Store Connect API key: the `APPLE_API_KEY`, `APPLE_API_KEY_ID` and `APPLE_API_ISSUER`
+  secrets the Mac release notarizes with; on the Mac, `~/.otter-mail/signing/AuthKey_<id>.p8` or
   `OTTER_MAIL_ASC_KEY`, `OTTER_MAIL_ASC_KEY_ID` and `OTTER_MAIL_ASC_ISSUER`.
 
 The App Store app is "Otter Mail: Calm Email" (ID 6817249947); on the phone it's "Otter Mail".

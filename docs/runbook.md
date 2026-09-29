@@ -4,11 +4,11 @@ How each part of Otter Mail gets from `main` to people, what to check, and what 
 breaks. The details behind each step are in `docs/release.md`, `infra/relay/README.md` and
 `apps/ios/README.md`.
 
-| Part           | Ships                | You do                                          |
-| -------------- | -------------------- | ----------------------------------------------- |
-| Web app, relay | on merge to `main`   | nothing                                         |
-| Mac app        | when you run Release | one click                                       |
-| iPhone app     | after a Mac release  | `pnpm release:ios`, then TestFlight / App Store |
+| Part           | Ships                       | You do                                 |
+| -------------- | --------------------------- | -------------------------------------- |
+| Web app, relay | on merge to `main`          | nothing                                |
+| Mac app        | when you run Release        | one click                              |
+| iPhone app     | when you run Release iPhone | one click, then TestFlight / App Store |
 
 ## Web app and relay
 
@@ -41,11 +41,14 @@ migrations run first.
 
 ## iPhone app
 
-Needs this Mac: Xcode 27 and `~/.otter-mail/signing` (the Apple Distribution certificate, the
-"Otter Mail App Store" profile and the App Store Connect API key).
+Released on its own, with its own version (`ios-vX.Y.Z` tags), only when `apps/ios` or what it
+bundles from `packages/shared` has changed. A Mac release doesn't need one.
 
-1. After the Mac release: `git pull`, then `pnpm release:ios`. It builds `main` at the Mac app's
-   version and uploads it (about 5 min).
+1. Actions → **Release iPhone** → Run workflow → `patch`, `minor` or `major` (or
+   `gh workflow run release-ios.yml -f bump=patch`). It builds `main` on GitHub's `xcode-27`
+   runner and uploads it (about 10 min), then tags the commit and bumps the version on `main`.
+   The same from this Mac, if GitHub is down: `pnpm release:ios` (needs Xcode 27 and
+   `~/.otter-mail/signing`).
 2. Apple processes it (10–30 min). The internal group **Otter team** gets it automatically.
 3. External testers: App Store Connect → Otter Mail: Calm Email → TestFlight → **Testers** →
    Builds → + → pick the build. The first build of a new version goes through Beta App Review
@@ -58,9 +61,13 @@ Needs this Mac: Xcode 27 and `~/.otter-mail/signing` (the Apple Distribution cer
   Submit" for external groups).
 - **Bad build:** TestFlight → the build → Expire Build. On the App Store there's no rollback: submit
   a fixed build (you can ask for an expedited review).
+- **Check the run:** green, and nothing is tagged or bumped unless the upload succeeded, so a
+  failed run can simply be run again.
 - **Upload refused:** the error names the problem (icon, version already used, signing). The
-  Apple Distribution certificate expires 2027-09-29: make a new one in the developer portal,
-  regenerate the "Otter Mail App Store" profile with it, and install both.
+  Apple Distribution certificate and the "Otter Mail App Store" profile expire 2027-09-29: make a
+  new certificate in the developer portal, regenerate the profile with it, and update the
+  `IOS_DISTRIBUTION_P12`, `IOS_DISTRIBUTION_P12_PASSWORD` and `IOS_PROVISIONING_PROFILE` secrets
+  (and this Mac's keychain, for `pnpm release:ios`).
 - TestFlight builds expire after 90 days.
 
 ## Accounts and access
