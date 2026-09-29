@@ -2,36 +2,73 @@ import Foundation
 import UserNotifications
 
 /**
- * Keeps signed-in mailboxes in step with Gmail, local-first like core's
- * mail-sync.ts: the store renders from its copy (cached on disk, so launch
- * is instant), changes are made there first and then written to Gmail, and
- * Gmail's history catches the copy up when the relay says a mailbox changed,
- * on launch and when the app comes back.
+ * Keeps signed-in mailboxes in step with their servers, local-first like
+ * core's mail-sync.ts: the store renders from its copy (cached on disk, so
+ * launch is instant), changes are made there first and then written through
+ * the mailbox's provider (Gmail or IMAP), and the provider catches the copy
+ * up when a mailbox changed (a relay event, IDLE), on launch and when the
+ * app comes back.
  */
 @MainActor
 final class MailSync {
     private let store: MailStore
     private let google: GoogleAuth
+    private var providers: [String: any MailProvider] = [:]
     private var states: [String: MailboxState] = [:]
     private var running: [String: Task<Void, Never>] = [:]
+    private var watching: [String: Task<Void, Never>] = [:]
     private var saving: Task<Void, Never>?
-
-    /** What's kept per mailbox besides its threads: Gmail's cursor and where each folder's list got to. */
-    struct MailboxState: Codable {
-        var historyID: String?
-        var draftIDs: [String: String] = [:]
-        /** Folder key → the next page's token; "" once the folder has no more. */
-        var pages: [String: String] = [:]
-        var watchedAt: Date?
-    }
+    /** Mailboxes with a provider call under way, and the calls waiting their turn. */
+    private var busy: Set<String> = []
+    private var waiting: [String: [CheckedContinuation<Void, Never>]] = [:]
 
     init(store: MailStore, google: GoogleAuth) {
         self.store = store
         self.google = google
     }
 
-    private func api(_ email: String) -> GmailAPI {
-        GmailAPI(email: email) { [google] force in try await google.accessToken(email, force: force) }
+    /** The mailbox's provider: IMAP when it has IMAP settings, else Gmail. */
+    private func provider(_ email: String) -> any MailProvider {
+        if let provider = providers[email] { return provider }
+        let provider: any MailProvider = if let settings = store.mailbox(email)?.imap {
+            ImapProvider(email: email, settings: settings)
+        } else {
+            GmailProvider(api: GmailAPI(email: email) { [google] force in try await google.accessToken(email, force: force) })
+        }
+        providers[email] = provider
+        return provider
+    }
+
+    /**
+     * Runs `body` with the mailbox's provider and state, then shows what it
+     * answers. One at a time per mailbox, so each starts from what the last
+     * left (a sync that IDLE starts while a move is under way would otherwise
+     * bring the thread back as it was).
+     */
+    @discardableResult
+    private func run(
+        _ email: String, _ body: (any MailProvider, inout MailboxState, [MailThread]) async throws -> MailDelta
+    ) async throws -> MailDelta {
+        if busy.contains(email) {
+            await withCheckedContinuation { waiting[email, default: []].append($0) }
+        } else {
+            busy.insert(email)
+        }
+        defer {
+            if let next = waiting[email]?.first {
+                waiting[email]?.removeFirst()
+                next.resume()
+            } else {
+                busy.remove(email)
+            }
+        }
+        var state = states[email] ?? MailboxState()
+        let delta = try await body(provider(email), &state, store.allThreads(of: email))
+        states[email] = state
+        store.remove(threadIDs: delta.removed.subtracting(delta.threads.map(\.id)))
+        store.upsert(threads: delta.threads)
+        scheduleSave()
+        return delta
     }
 
     // ── The cache ────────────────────────────────────────────────────────────
@@ -80,19 +117,21 @@ final class MailSync {
 
     func forget(_ email: String) {
         states[email] = nil
+        providers[email] = nil
         running[email]?.cancel()
         running[email] = nil
+        watching.removeValue(forKey: email)?.cancel()
         try? FileManager.default.removeItem(at: Self.file(email))
     }
 
     func forgetAll() {
-        for email in Array(states.keys) { forget(email) }
+        for email in Set(states.keys).union(providers.keys) { forget(email) }
         try? FileManager.default.removeItem(at: Self.folder)
     }
 
     // ── Syncing ──────────────────────────────────────────────────────────────
 
-    /** Catches every signed-in, turned-on mailbox up with Gmail. */
+    /** Catches every signed-in, turned-on mailbox up. */
     func syncAll(notify: Bool = false) async {
         await withTaskGroup(of: Void.self) { group in
             for mailbox in store.shownMailboxes where !mailbox.signedOut {
@@ -104,89 +143,73 @@ final class MailSync {
     /** Catches one mailbox up (one sync at a time per mailbox). */
     func sync(_ email: String, notify: Bool = false) async {
         if let running = running[email] { return await running.value }
-        let task = Task { await run(email, notify: notify) }
+        let task = Task { await catchUp(email, notify: notify) }
         running[email] = task
         await task.value
         running[email] = nil
     }
 
-    private func run(_ email: String, notify: Bool) async {
-        let api = api(email)
-        var state = states[email] ?? MailboxState()
+    private func catchUp(_ email: String, notify: Bool) async {
         do {
-            if let historyID = state.historyID {
-                do {
-                    let (changed, cursor) = try await api.history(since: historyID)
-                    let before = Dictionary(uniqueKeysWithValues: changed.compactMap { id in store.thread(id).map { (id, $0) } })
-                    let fresh = try await api.threads(Array(changed))
-                    store.upsert(threads: fresh)
-                    store.remove(threadIDs: changed.subtracting(fresh.map(\.id)))
-                    if !changed.isEmpty { state.draftIDs = try await api.draftIDs() }
-                    state.historyID = cursor
-                    if notify { await announce(fresh, before: before) }
-                } catch is GmailAPI.HistoryExpired {
-                    state = MailboxState(watchedAt: state.watchedAt)
-                    store.remove(threadIDs: Set(store.allThreads(of: email).map(\.id)))
-                }
-            }
-            if state.historyID == nil {
-                // First sync: where Gmail is now, then the inbox's first page.
-                state.historyID = try await api.historyID()
-                let (ids, next) = try await api.threadIDs(label: "INBOX")
-                store.upsert(threads: try await api.threads(ids))
-                state.pages[Self.key(.inbox)] = next ?? ""
-                state.draftIDs = try await api.draftIDs()
-            }
+            let before = Dictionary(store.allThreads(of: email).map { ($0.id, $0) }) { a, _ in a }
+            let delta = try await run(email) { provider, state, known in try await provider.sync(&state, known: known) }
+            if notify { await announce(delta.threads, before: before) }
             if var mailbox = store.mailbox(email) {
-                mailbox.labels = try await api.labels()
-                mailbox.signature = try await api.signature()
+                let provider = provider(email)
+                mailbox.labels = try await provider.labels()
+                if let signature = try await provider.signature() { mailbox.signature = signature }
                 store.upsert(mailbox: mailbox)
             }
-            states[email] = state
             scheduleSave()
-        } catch GoogleAuth.Failure.signedOut {
+        } catch where Self.signedOut(error) {
+            // A password the server refuses is no use kept (as GoogleAuth drops a revoked sign-in).
+            if store.mailbox(email)?.imap != nil { ImapProvider.setPassword(nil, for: email) }
             store.setSignedOut(true, email)
+            providers[email] = nil
         } catch {
-            // Offline or Gmail refused: the copy stands, and the next sync tries again.
+            // Offline or the server refused: the copy stands, and the next sync tries again.
         }
     }
 
-    /** Asks Gmail to push this mailbox's changes to the relay, once a day. */
-    func watch(topic: String) async {
-        for mailbox in store.shownMailboxes where !mailbox.signedOut {
-            var state = states[mailbox.email] ?? MailboxState()
-            guard (state.watchedAt ?? .distantPast) < .now.addingTimeInterval(-86_400) else { continue }
-            guard (try? await api(mailbox.email).watch(topic: topic)) != nil else { continue }
-            state.watchedAt = .now
-            states[mailbox.email] = state
+    /** The sign-in is gone (Google's, or the IMAP password): only signing in again helps. */
+    private static func signedOut(_ error: Error) -> Bool {
+        if case GoogleAuth.Failure.signedOut = error { return true }
+        return (error as? ImapError)?.isSignedOut == true
+    }
+
+    // ── Live ─────────────────────────────────────────────────────────────────
+
+    /** Keeps new mail coming while the app is open (Gmail's pushes through the relay, IMAP's IDLE). */
+    func watch(pushTopic: String?) async {
+        for mailbox in store.shownMailboxes where !mailbox.signedOut && watching[mailbox.email] == nil {
+            let email = mailbox.email
+            var task: Task<Void, Never>?
+            _ = try? await run(email) { provider, state, _ in
+                task = await provider.watch(pushTopic: pushTopic, &state) { [weak self] in
+                    Task { await self?.sync(email, notify: true) }
+                }
+                return MailDelta()
+            }
+            if let task { watching[email] = task }
         }
-        scheduleSave()
+    }
+
+    /** The app went to the background: IDLE stops (Gmail's pushes carry on through the relay). */
+    func stopWatching() {
+        for task in watching.values { task.cancel() }
+        watching = [:]
     }
 
     // ── Folders and search ───────────────────────────────────────────────────
 
-    private static func key(_ folder: Folder) -> String {
+    static func key(_ folder: Folder) -> String {
         switch folder {
         case .label(let id, _): "label:\(id)"
         default: folder.title
         }
     }
 
-    private static func gmailLabel(_ folder: Folder) -> String? {
-        switch folder {
-        case .inbox: "INBOX"
-        case .starred: "STARRED"
-        case .sent: "SENT"
-        case .drafts: "DRAFT"
-        case .important: "IMPORTANT"
-        case .allMail: nil
-        case .junk: "SPAM"
-        case .trash: "TRASH"
-        case .label(let id, _): id
-        }
-    }
-
-    /** Whether a folder has more in Gmail than has been loaded. */
+    /** Whether a folder has more on the server than has been loaded. */
     func hasMore(_ folder: Folder, scope: String?) -> Bool {
         mailboxes(scope).contains { states[$0]?.pages[Self.key(folder)] != "" }
     }
@@ -195,22 +218,16 @@ final class MailSync {
     func loadMore(_ folder: Folder, scope: String?) async {
         let key = Self.key(folder)
         for email in mailboxes(scope) where states[email]?.pages[key] != "" {
-            let api = api(email)
-            guard let (ids, next) = try? await api.threadIDs(label: Self.gmailLabel(folder), pageToken: states[email]?.pages[key]) else { continue }
-            let missing = ids.filter { store.thread($0) == nil }
-            if let threads = try? await api.threads(missing) { store.upsert(threads: threads) }
-            states[email, default: MailboxState()].pages[key] = next ?? ""
+            _ = try? await run(email) { provider, state, known in try await provider.loadMore(folder, &state, known: known) }
         }
-        scheduleSave()
     }
 
-    /** Gmail's search, in each mailbox of `scope`; answers the matching thread ids. */
+    /** The servers' search, in each mailbox of `scope`; answers the matching thread ids. */
     func search(_ query: String, scope: String?) async -> [String] {
         var found: [String] = []
         for email in mailboxes(scope) {
-            guard let (ids, _) = try? await api(email).threadIDs(label: nil, query: query, max: 25) else { continue }
-            let missing = ids.filter { store.thread($0) == nil }
-            if let threads = try? await api(email).threads(missing) { store.upsert(threads: threads) }
+            guard let (ids, threads) = try? await provider(email).search(query, known: store.allThreads(of: email)) else { continue }
+            store.upsert(threads: threads)
             found += ids
         }
         return found
@@ -220,80 +237,58 @@ final class MailSync {
         store.shownMailboxes.filter { !$0.signedOut && (scope == nil || $0.email == scope) }.map(\.email)
     }
 
-    // ── Writing changes to Gmail ─────────────────────────────────────────────
+    // ── Writing changes ──────────────────────────────────────────────────────
 
-    /** Writes a change the store already shows; if Gmail refuses, the thread is reloaded as Gmail has it. */
+    /** Writes a change the store already shows; if the server refuses, the thread is reloaded as it has it. */
     func apply(_ change: MailStore.Change, to thread: MailThread) {
         guard store.mailbox(thread.mailbox)?.signedOut == false else { return }
-        let api = api(thread.mailbox)
+        let email = thread.mailbox
         Task {
             do {
-                switch change {
-                case .modify(let add, let remove): try await api.modify(thread: thread.id, add: add, remove: remove)
-                case .star(let message): try await api.modify(message: message, add: ["STARRED"])
-                case .trash: try await api.trash(thread: thread.id)
-                case .untrash: try await api.untrash(thread: thread.id)
-                case .delete: try await api.delete(thread: thread.id)
-                }
+                try await run(email) { provider, state, _ in try await provider.apply(change, to: thread, &state) }
             } catch {
-                await reload(thread.id, in: thread.mailbox)
+                _ = try? await run(email) { provider, state, known in try await provider.refresh(thread, &state, known: known) }
             }
-            scheduleSave()
         }
     }
 
-    private func reload(_ id: String, in email: String) async {
-        if let thread = try? await api(email).thread(id) {
-            store.upsert(threads: [thread])
-        } else {
-            store.remove(threadIDs: [id])
-        }
-    }
-
-    /** Sends (or keeps in Drafts) a message the store already shows, then loads Gmail's copy of its thread. */
+    /** Sends (or keeps in Drafts) a message the store already shows, then shows the server's copy of its thread. */
     func write(_ draft: Draft, asDraft: Bool) async throws {
         guard let mailbox = store.mailbox(draft.from) else { return }
-        let api = api(mailbox.email)
         let replyTo = draft.threadID.flatMap(store.thread)
-        let quoted = replyTo.map { $0.sent.last ?? $0.latest }
+        // The message replied to (not the copy the store shows of this one, which has no Message-ID yet).
+        let quoted = replyTo?.sent.last { $0.headers["Message-ID"] != nil }
+        let to = Draft.people(draft.to), cc = Draft.people(draft.cc)
         let raw = MIME.message(
             from: mailbox.me,
-            to: Draft.people(draft.to),
-            cc: Draft.people(draft.cc),
+            to: to,
+            cc: cc,
             subject: draft.subject,
             text: draft.body,
             html: Compose.html(draft.body, signature: mailbox.signature),
             inReplyTo: quoted?.headers["Message-ID"],
-            references: quoted?.headers["References"]
+            references: quoted?.headers["References"],
+            // Gmail stamps its own; an IMAP server keeps the message as written.
+            stamped: mailbox.imap != nil
         )
-        let draftID = draft.messageID.flatMap { states[mailbox.email]?.draftIDs[$0] }
-        let sent: GmailAPI.Sent
-        if asDraft {
-            let saved = try await api.saveDraft(id: draftID, raw: raw, thread: draft.threadID)
-            states[mailbox.email, default: MailboxState()].draftIDs[saved.message.id] = saved.draft
-            sent = saved.message
-        } else if let draftID {
-            _ = try await api.saveDraft(id: draftID, raw: raw, thread: draft.threadID)
-            sent = try await api.sendDraft(id: draftID)
-        } else {
-            sent = try await api.send(raw: raw, thread: draft.threadID)
+        let message = Outgoing(raw: raw, from: mailbox.email, recipients: (to + cc).map(\.email), threadID: draft.threadID, draft: draft.messageID)
+        try await run(mailbox.email) { provider, state, known in
+            asDraft
+                ? try await provider.saveDraft(message, &state, known: known)
+                : try await provider.send(message, &state, known: known)
         }
-        await reload(sent.threadId, in: mailbox.email)
-        scheduleSave()
     }
 
     func discard(_ draft: Draft) async {
-        guard
-            let messageID = draft.messageID,
-            let draftID = states[draft.from]?.draftIDs[messageID]
-        else { return }
-        try? await api(draft.from).deleteDraft(id: draftID)
-        states[draft.from]?.draftIDs[messageID] = nil
-        scheduleSave()
+        guard let messageID = draft.messageID else { return }
+        _ = try? await run(draft.from) { provider, state, _ in
+            try await provider.deleteDraft(messageID, &state)
+            return MailDelta()
+        }
     }
 
     func setSignature(_ html: String, for email: String) async throws {
-        let saved = try await api(email).setSignature(html)
+        let saved = try await provider(email).setSignature(html)
         if var mailbox = store.mailbox(email) {
             mailbox.signature = saved
             store.upsert(mailbox: mailbox)
@@ -303,14 +298,12 @@ final class MailSync {
 
     /** An inline image's bytes, for the HTML that shows it. */
     func inlineImage(_ attachment: Attachment, of message: Message, in email: String) async -> Data? {
-        guard let id = attachment.id else { return nil }
-        return try? await api(email).attachment(message: message.id, id: id)
+        try? await provider(email).attachment(attachment, of: message)
     }
 
     func attachment(_ attachment: Attachment, of message: Message, in email: String) async throws -> URL {
-        guard let id = attachment.id else { throw GmailAPI.Failure(status: 0, message: "No file to open.") }
-        let data = try await api(email).attachment(message: message.id, id: id)
-        let folder = URL.temporaryDirectory.appending(path: message.id, directoryHint: .isDirectory)
+        let data = try await provider(email).attachment(attachment, of: message)
+        let folder = URL.temporaryDirectory.appending(path: message.id.replacingOccurrences(of: "/", with: "_"), directoryHint: .isDirectory)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         let url = folder.appending(path: attachment.filename.isEmpty ? "attachment" : attachment.filename)
         try data.write(to: url)

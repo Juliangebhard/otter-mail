@@ -116,7 +116,9 @@ struct SidebarView: View {
                         .foregroundStyle(palette.warning)
                         .padding(12)
                 }
-                ForEach(Folder.system, id: \.self) { folder in
+                // Important is Gmail's sorting; a mailbox without it (IMAP) doesn't show it.
+                let sorts = scope.flatMap(store.mailbox)?.capabilities.categories ?? true
+                ForEach(Folder.system.filter { sorts || $0 != .important }, id: \.self) { folder in
                     row(folder, scope: scope)
                 }
                 let labels = scope.flatMap(store.mailbox)?.labels ?? []

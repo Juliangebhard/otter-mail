@@ -1,9 +1,10 @@
 import Foundation
 
 /**
- * The mail the app shows, shaped like Gmail's: mailboxes (the Gmail accounts
- * on the Otter account), their labels, and threads of messages. Label ids
- * are Gmail's (`INBOX`, `STARRED`, …) or a user label's name.
+ * The mail the app shows, shaped like Gmail's: mailboxes (the Gmail and IMAP
+ * accounts on the Otter account), their labels, and threads of messages.
+ * Label ids are Gmail's (`INBOX`, `STARRED`, …) or a user label's name; an
+ * IMAP folder is a label (docs/imap.md).
  */
 
 nonisolated struct Person: Hashable, Codable {
@@ -15,21 +16,64 @@ nonisolated struct Person: Hashable, Codable {
 }
 
 nonisolated struct Mailbox: Identifiable, Hashable, Codable {
-    /** The Gmail address: the one thing every device agrees on. */
+    /** The address: the one thing every device agrees on. */
     var email: String
     var name: String
     /** Set in Settings › Mailboxes; shown in the sidebar and on rows. */
     var displayName: String
     var color: String
-    /** Gmail's signature for the address, as HTML. */
+    /** The address's signature, as HTML: Gmail's, or kept on this iPhone for IMAP. */
     var signature: String
     var labels: [MailLabel]
     var picture: String? = nil
-    /** Linked to the Otter account on another device, but not signed in to Google on this one. */
+    /** Linked to the Otter account on another device, but not signed in on this one (Google, or the IMAP password). */
     var signedOut = false
+    /** Where an IMAP mailbox lives; nil for Gmail. */
+    var imap: ImapSettings? = nil
 
     var id: String { email }
     var me: Person { Person(name: name, email: email) }
+    var provider: MailProviderKind { imap == nil ? .gmail : .imap }
+    var capabilities: MailCapabilities { imap == nil ? .gmail : .imap }
+}
+
+// ── Providers (packages/contracts/src/mail.ts) ────────────────────────────
+
+nonisolated enum MailProviderKind: String, Codable {
+    case gmail, imap
+}
+
+/** A mail server: TLS from the start ("tls", ports 993/465), or upgraded with STARTTLS (143/587). */
+nonisolated struct MailServer: Hashable, Codable {
+    enum Security: String, Codable, CaseIterable { case tls, starttls }
+    var host: String
+    var port: Int
+    var security: Security
+}
+
+/** Where an IMAP mailbox lives. It follows the Otter account; the password stays on each device. */
+nonisolated struct ImapSettings: Hashable, Codable {
+    /** The login, usually the address itself. */
+    var username: String
+    var imap: MailServer
+    var smtp: MailServer
+}
+
+/** What a mailbox can do beyond reading, organizing and sending; the UI hides the rest. */
+nonisolated struct MailCapabilities: Hashable {
+    /** Gmail's sorting of the inbox (categories, Important). */
+    var categories: Bool
+    /** A message can carry several labels at once (Gmail); IMAP mail sits in one folder. */
+    var multipleLabels: Bool
+    var labelColors: Bool
+    /** Signatures kept by the server (Gmail's settings) rather than on this iPhone. */
+    var serverSignatures: Bool
+    var calendar: Bool
+    /** New mail arrives by push through the relay (Gmail); otherwise the iPhone watches itself. */
+    var relayPush: Bool
+
+    static let gmail = MailCapabilities(categories: true, multipleLabels: true, labelColors: true, serverSignatures: true, calendar: true, relayPush: true)
+    static let imap = MailCapabilities(categories: false, multipleLabels: false, labelColors: false, serverSignatures: false, calendar: false, relayPush: false)
 }
 
 nonisolated struct MailLabel: Identifiable, Hashable, Codable {
