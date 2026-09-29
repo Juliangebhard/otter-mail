@@ -16,9 +16,10 @@ import {
   type Notification,
   type ServerRequest,
 } from "./codex-app-server.js";
-import { dataUrl } from "@otter-mail/core";
+import { TOOL_OUTPUT_CHARS, codexStep, dataUrl } from "@otter-mail/core";
 import { agentWorkspace, withAttachmentPaths } from "./local.js";
 import { AGENT_INSTRUCTIONS } from "./instructions.js";
+import { MCP_SERVER_NAME, toolAccess, type ToolAccess } from "./mcp-server.js";
 import type {
   ChatProvider,
   ChatSession,
@@ -30,6 +31,7 @@ import type {
   ProviderModel,
   ProviderModelOption,
   ProviderSettings,
+  RuntimeMode,
   SendTurnInput,
   Skill,
 } from "@otter-mail/core";
@@ -40,7 +42,6 @@ const REQUEST_TIMEOUT_MS = 30_000;
 const SESSION_IDLE_MS = 15 * 60_000;
 /** The utility server (history, skills) goes away sooner. */
 const UTILITY_IDLE_MS = 60_000;
-const TOOL_OUTPUT_PREVIEW_CHARS = 400;
 
 /** T3's runtime modes → Codex thread config. */
 function threadConfig(settings: CodexSettings) {
@@ -83,33 +84,6 @@ function planLabel(plan: string | null | undefined): string {
 
 type Item = { type?: string; id?: string } & Record<string, unknown>;
 
-/** The shell wrapper Codex reports (`/bin/zsh -lc 'echo hi'`) → `echo hi`. */
-function commandLabel(item: Item): string {
-  const actions = item.commandActions as { command?: string }[] | undefined;
-  const command = actions?.[0]?.command ?? String(item.command ?? "command");
-  return command.replace(/^\/bin\/\w+ -l?c '(.*)'$/s, "$1");
-}
-
-/** Tool-like items (not user/agent text or reasoning) → the row label, else null. */
-function toolName(item: Item): string | null {
-  switch (item.type) {
-    case "commandExecution":
-      return commandLabel(item);
-    case "mcpToolCall":
-      return `${String(item.server)}: ${String(item.tool)}`;
-    case "dynamicToolCall":
-      return String(item.tool ?? "tool");
-    case "webSearch":
-      return item.query ? `Web search: ${String(item.query)}` : "Web search";
-    case "fileChange":
-      return "Edit files";
-    case "imageView":
-      return "View image";
-    default:
-      return null;
-  }
-}
-
 function toolOutput(item: Item): string {
   let text = "";
   if (item.type === "commandExecution") text = String(item.aggregatedOutput ?? "");
@@ -124,7 +98,7 @@ function toolOutput(item: Item): string {
     const changes = item.changes as { path?: string }[] | undefined;
     text = (changes ?? []).map((c) => c.path).join("\n");
   }
-  return text.slice(0, TOOL_OUTPUT_PREVIEW_CHARS) || "(done)";
+  return text.slice(0, TOOL_OUTPUT_CHARS) || "(done)";
 }
 
 function userText(item: Item): string {
@@ -157,6 +131,10 @@ type Session = {
   threadId: string;
   turn: ActiveTurn | null;
   idleTimer: ReturnType<typeof setTimeout> | null;
+  /** The chat's runtime mode, as of its last turn. */
+  mode: RuntimeMode;
+  /** Otter Mail's tools, on this chat's token. */
+  tools: ToolAccess;
 };
 
 const sessions = new Map<string, Session>();
@@ -323,13 +301,14 @@ function handleNotification(session: Session, { method, params }: Notification):
       // A new message after tool calls: keep paragraphs apart.
       if (item.type === "agentMessage" && turn.streamedText)
         emit({ requestId, type: "delta", text: "\n\n" });
-      const name = toolName(item);
-      if (name) emit({ requestId, type: "tool", name });
+      const step = codexStep(item);
+      if (step) emit({ requestId, type: "tool", id: item.id, step });
       break;
     }
     case "item/completed": {
       const item = params.item as Item;
-      if (toolName(item)) emit({ requestId, type: "toolResult", output: toolOutput(item) });
+      if (codexStep(item))
+        emit({ requestId, type: "toolResult", id: item.id, output: toolOutput(item) });
       else if (item.type === "agentMessage" && !turn.streamedText && item.text) {
         turn.streamedText = true;
         emit({ requestId, type: "delta", text: String(item.text) });
@@ -391,12 +370,32 @@ async function openSession(
   if (existing?.server.alive) return existing;
 
   const cwd = await agentWorkspace();
-  const server = await CodexAppServer.start(settings, cwd);
+  // The tools' caller is this session, once it exists.
+  const current: { session?: Session } = {};
+  const tools = await toolAccess({
+    mode: () => current.session?.mode ?? settings.runtimeMode,
+    turn: () => current.session?.turn ?? null,
+  });
+  const server = await CodexAppServer.start(settings, cwd).catch((error: unknown) => {
+    tools.revoke();
+    throw error;
+  });
   const params = {
     cwd,
     ...threadConfig(settings),
     ...(settings.model ? { model: settings.model } : {}),
     developerInstructions: AGENT_INSTRUCTIONS,
+    config: {
+      mcp_servers: {
+        [MCP_SERVER_NAME]: {
+          url: tools.url,
+          http_headers: tools.headers,
+          // The tools ask the user themselves (and may wait on them).
+          default_tools_approval_mode: "approve",
+          tool_timeout_sec: 3600,
+        },
+      },
+    },
   };
   let threadId: string;
   try {
@@ -426,14 +425,24 @@ async function openSession(
     threadId = opened.thread.id;
   } catch (error) {
     server.kill();
+    tools.revoke();
     throw error;
   }
 
-  const session: Session = { server, threadId, turn: null, idleTimer: null };
+  const session: Session = {
+    server,
+    threadId,
+    turn: null,
+    idleTimer: null,
+    mode: settings.runtimeMode,
+    tools,
+  };
+  current.session = session;
   server.onNotification = (message) => handleNotification(session, message);
   server.onServerRequest = (request) => handleServerRequest(session, request);
   server.onExit = (code) => {
     sessions.delete(threadId);
+    tools.revoke();
     const turn = session.turn;
     if (turn) {
       logger.info("agent", "codex exited mid-turn", { code });
@@ -731,6 +740,7 @@ export const codexProvider: ChatProvider = {
     if (session.threadId !== turn.sessionId)
       emit({ requestId, type: "session", sessionId: session.threadId });
     if (session.idleTimer) clearTimeout(session.idleTimer);
+    session.mode = settings.codex.runtimeMode;
 
     const finished = new Promise<void>((resolve) => {
       session.turn = {
@@ -821,6 +831,7 @@ export const codexProvider: ChatProvider = {
     }
     // An open approval blocks Codex's loop: settle it before interrupting.
     settleApprovals(session, turn, "cancel");
+    session.tools.cancelApprovals();
     void session.server
       .request(
         "turn/interrupt",
@@ -920,12 +931,12 @@ export const codexProvider: ChatProvider = {
     const messages: ChatSessionMessage[] = [];
     for (const turn of response.data) {
       for (const item of turn.items) {
-        const name = toolName(item);
+        const step = codexStep(item);
         if (item.type === "userMessage") messages.push({ role: "user", text: userText(item) });
         else if (item.type === "agentMessage")
           messages.push({ role: "assistant", text: String(item.text ?? "") });
-        else if (name) {
-          messages.push({ role: "assistant", text: "", toolCalls: [name] });
+        else if (step) {
+          messages.push({ role: "assistant", text: "", toolCalls: [step] });
           messages.push({ role: "tool", text: toolOutput(item) });
         }
       }

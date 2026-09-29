@@ -11,10 +11,8 @@ import {
   LayersIcon,
   MailIcon,
   SendIcon,
-  TerminalIcon,
   TextQuoteIcon,
   Trash2Icon,
-  WrenchIcon,
   XIcon,
   MousePointer2Icon,
   PlusIcon,
@@ -25,6 +23,7 @@ import {
 } from "lucide-react";
 import { IconBtn, HintTooltip, buttonClass, cn } from "./ui";
 import { COMPOSER_SURFACE } from "./composer-kit";
+import { WorkLog, type TurnItem } from "./work-log";
 import { PanelControlSlot } from "./top-bar";
 import {
   gmailApi,
@@ -36,6 +35,7 @@ import {
   type ApprovalRequest,
   type AgentSettingsPatch,
   type ProviderKind,
+  type ToolStep,
   type Skill,
 } from "./api";
 import { ProviderModelPicker, RuntimeModePicker, TraitsPicker } from "./model-picker";
@@ -103,12 +103,16 @@ function ContextKindIcon({ kind, className }: { kind: ContextKind; className?: s
   return <Icon className={className} />;
 }
 
-/** One transcript entry. Tool steps interleave into the agent turn. */
+/** One transcript entry. */
 type ChatTurn = {
   id: string;
   role: "user" | "assistant";
+  /** The user's message (agent turns stored before `items`: their reply). */
   text: string;
-  tools: { name: string; output?: string }[];
+  /** Agent turns: what the agent said and the steps it took, in order. */
+  items?: TurnItem[];
+  /** Agent turns stored before `items`: their tool rows. */
+  tools?: { name: string; output?: string }[];
   /** Attached mail context, shown as a chip above the user's message. */
   context?: ContextMeta;
   /** Invoked skill, rendered as a badge on the user's message. */
@@ -122,6 +126,42 @@ type ChatTurn = {
   startedAt?: number;
   finishedAt?: number;
 };
+
+/**
+ * A tool row as turns stored before steps labelled it (Claude `search_mail: {…}`,
+ * Codex `otter-mail: search_mail` or the command, Hermes the tool's name), as a
+ * step; null for Claude's own ToolSearch.
+ */
+function legacyStep(label: string): ToolStep | null {
+  const words = (name: string) => {
+    const text = name.replace(/[_-]+/g, " ").trim();
+    return text.charAt(0).toUpperCase() + text.slice(1);
+  };
+  const [, head, rest] = label.match(/^([\w.-]+): ([\s\S]*)$/) ?? [];
+  if (head === "ToolSearch") return null;
+  if (head && /^otter[-_]mail$/.test(head))
+    return { kind: "tool", title: words(rest), source: "Otter Mail" };
+  if (head === "Bash")
+    return { kind: "command", title: `Ran ${rest.split("\n")[0]}`, detail: rest };
+  if (head === "Read")
+    return { kind: "read", title: `Read ${rest.split("/").pop()}`, detail: rest };
+  // Claude's rows for Otter Mail's tools went without their prefix: `search_mail: {…}`.
+  if (head && /^[a-z]+(_[a-z]+)+$/.test(head))
+    return { kind: "tool", title: words(head), source: "Otter Mail", detail: rest };
+  if (head) return { kind: "tool", title: words(head), detail: rest };
+  if (/\s/.test(label)) return { kind: "command", title: `Ran ${label}`, detail: label };
+  return { kind: "tool", title: words(label) };
+}
+
+/** An agent turn's items; turns stored before `items` had tool rows, then the reply. */
+function itemsOf(turn: ChatTurn): TurnItem[] {
+  if (turn.items) return turn.items;
+  const steps = (turn.tools ?? []).flatMap((t): TurnItem[] => {
+    const step = legacyStep(t.name);
+    return step ? [{ kind: "step", step, output: t.output }] : [];
+  });
+  return [...steps, ...(turn.text ? [{ kind: "text" as const, text: turn.text }] : [])];
+}
 
 /** Command-style badge for an invoked skill (composer + user message). */
 function SkillBadge({
@@ -261,9 +301,9 @@ function sourceLabel(source: string): string {
 }
 
 /**
- * Rebuilds transcript turns from a session's stored messages: tool-call
- * agent rows + tool rows fold into one agent turn, closed by the final
- * answer, mirroring how a live stream renders.
+ * Rebuilds transcript turns from a session's stored messages: what the agent
+ * said and did between two user messages is one agent turn, in order, as a
+ * live stream renders it.
  */
 function turnsFromMessages(messages: ChatSessionMessage[]): ChatTurn[] {
   const turns: ChatTurn[] = [];
@@ -272,26 +312,21 @@ function turnsFromMessages(messages: ChatSessionMessage[]): ChatTurn[] {
     const m = messages[i];
     if (m.role === "user") {
       open = null;
-      turns.push({
-        id: `h-${i}`,
-        role: "user",
-        text: stripHandoff(m.text),
-        tools: [],
-      });
+      turns.push({ id: `h-${i}`, role: "user", text: stripHandoff(m.text) });
     } else if (m.role === "assistant") {
       if (!open) {
-        open = { id: `h-${i}`, role: "assistant", text: "", tools: [] };
+        open = { id: `h-${i}`, role: "assistant", text: "", items: [] };
         turns.push(open);
       }
-      for (const name of m.toolCalls ?? []) open.tools.push({ name });
-      if (m.text) open.text = open.text ? `${open.text}\n\n${m.text}` : m.text;
-      if (!m.toolCalls?.length) open = null;
+      // Everything the agent says and does until the user's next message is one turn.
+      if (m.text) open.items!.push({ kind: "text", text: m.text });
+      for (const step of m.toolCalls ?? []) open.items!.push({ kind: "step", step });
     } else if (m.role === "tool" && open) {
-      const pending = open.tools.find((t) => t.output === undefined);
-      if (pending) pending.output = m.text.slice(0, 400) || "(done)";
+      const pending = open.items!.find((t) => t.kind === "step" && t.output === undefined);
+      if (pending?.kind === "step") pending.output = m.text || "(done)";
     }
   }
-  return turns.filter((t) => t.role === "user" || t.text || t.tools.length > 0);
+  return turns.filter((t) => t.role === "user" || itemsOf(t).length > 0);
 }
 
 function loadStore(): Store {
@@ -463,75 +498,6 @@ function WorkFoldRow({
         <span>{label}</span>
         <Icon className="size-3.5 opacity-70" />
       </button>
-    </div>
-  );
-}
-
-/** One tool call: icon, name, chevron; expands to the captured output. */
-function ToolRow({ name, output }: { name: string; output?: string }) {
-  const [open, setOpen] = useState(false);
-  const canExpand = Boolean(output);
-  const pending = output === undefined;
-  const Icon = /term|shell|bash|command|exec/i.test(name) ? TerminalIcon : WrenchIcon;
-  const toggle = () => setOpen((o) => !o);
-  return (
-    <div
-      role={canExpand ? "button" : undefined}
-      tabIndex={canExpand ? 0 : undefined}
-      aria-expanded={canExpand ? open : undefined}
-      onClick={canExpand ? toggle : undefined}
-      onKeyDown={
-        canExpand
-          ? (e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                toggle();
-              }
-            }
-          : undefined
-      }
-      className={cn(
-        "group/timeline-row relative flex flex-col rounded-md px-0.5 py-0.5 transition-colors",
-        open && "mb-1",
-        canExpand &&
-          "cursor-pointer hover:bg-accent-surface/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus-ring/70",
-      )}
-    >
-      <div className="flex select-none items-center gap-1.5">
-        <span className="flex size-6 shrink-0 items-center justify-center text-icon-muted">
-          <Icon className="block size-4 shrink-0 stroke-2" aria-hidden />
-        </span>
-        <p
-          className={cn(
-            "min-w-0 flex-1 truncate text-sm leading-relaxed text-secondary-label",
-            pending && "animate-status-pulse",
-          )}
-        >
-          {name}
-        </p>
-        <span
-          className={cn(
-            "flex size-4 shrink-0 items-center justify-center",
-            !canExpand && "invisible",
-          )}
-          aria-hidden
-        >
-          <ChevronRightIcon
-            className={cn(
-              "size-3 shrink-0 text-icon-muted opacity-70 transition-transform duration-200",
-              open && "rotate-90",
-            )}
-          />
-        </span>
-      </div>
-      {open && output ? (
-        <pre
-          onClick={(e) => e.stopPropagation()}
-          className="ms-7 mt-1 max-h-64 select-text overflow-auto rounded-xl bg-code px-3.5 py-2.5 font-mono text-xs leading-relaxed text-muted-foreground"
-        >
-          {output}
-        </pre>
-      ) : null}
     </div>
   );
 }
@@ -964,8 +930,8 @@ export function AgentChatPanel({
   };
 
   // Attach context: the multi-selection wins; otherwise the open conversation
-  // (cache hit — the reader fetched it). Both are pointer-only; Hermes gogs
-  // the bodies.
+  // (cache hit — the reader fetched it). Both are pointer-only; the agent
+  // reads the bodies itself.
   const accountsQuery = useAccounts();
   const accountEmailById = (id: string | undefined) =>
     accountsQuery.data?.find((a) => a.id === id)?.email ?? id ?? "";
@@ -1046,12 +1012,26 @@ export function AgentChatPanel({
           const nextTurns = [...c.turns];
           const turn = nextTurns[nextTurns.length - 1];
           if (!turn || turn.role !== "assistant") return c;
-          const updated = { ...turn, tools: [...turn.tools] };
-          if (event.type === "delta") updated.text += event.text;
-          else if (event.type === "tool") updated.tools.push({ name: event.name });
-          else if (event.type === "toolResult") {
-            const open = [...updated.tools].reverse().find((t) => t.output === undefined);
-            if (open) open.output = event.output;
+          const items = [...itemsOf(turn)];
+          const updated: ChatTurn = { ...turn, items };
+          const last = items[items.length - 1];
+          if (event.type === "delta") {
+            // Text continues the text before it; after a step it starts anew.
+            if (last?.kind === "text")
+              items[items.length - 1] = { ...last, text: last.text + event.text };
+            else items.push({ kind: "text", text: event.text });
+          } else if (event.type === "tool") {
+            items.push({ kind: "step", id: event.id, step: event.step });
+          } else if (event.type === "toolResult") {
+            // Its step by id; else the latest one still running.
+            const index = items.findLastIndex(
+              (t) =>
+                t.kind === "step" &&
+                t.output === undefined &&
+                (event.id === undefined || t.id === undefined || t.id === event.id),
+            );
+            const step = items[index];
+            if (step?.kind === "step") items[index] = { ...step, output: event.output };
           } else if (event.type === "error") {
             updated.error = friendlyError(event.message, s.provider);
           }
@@ -1098,6 +1078,36 @@ export function AgentChatPanel({
     }));
   };
 
+  // Chats saved before turns kept their steps in order: the first time one
+  // opens, its agent turns are read back from the agent's own session.
+  const upgraded = useRef(new Set<string>());
+  useEffect(() => {
+    const c = active;
+    if (!c?.sessionId || runs[c.id] || upgraded.current.has(c.id)) return;
+    if (!c.turns.some((t) => t.role === "assistant" && !t.items)) return;
+    const host = providersState?.providers.find((p) => p.kind === c.provider);
+    if (!host?.sessions || !isProviderUsable(host)) return;
+    upgraded.current.add(c.id);
+    gmailApi.agentSessionMessages(c.provider, c.sessionId).then(
+      (messages) => {
+        const fresh = turnsFromMessages(messages).filter((t) => t.role === "assistant");
+        patchConversation(c.id, (current) => {
+          // Only when the session lines up with the chat, turn for turn.
+          if (fresh.length !== current.turns.filter((t) => t.role === "assistant").length)
+            return current;
+          let i = 0;
+          const turns = current.turns.map((t) => {
+            if (t.role !== "assistant") return t;
+            const items = fresh[i++].items;
+            return t.items ? t : { ...t, items };
+          });
+          return { ...current, turns };
+        });
+      },
+      (error) => console.log("[AgentChat:upgrade] failed", { error: String(error) }),
+    );
+  }, [active, runs, providersState]);
+
   /** Consumes the composer (text, skill, attached context) into a message. */
   const compose = (): Outgoing | null => {
     const question = draft.trim();
@@ -1117,7 +1127,7 @@ export function AgentChatPanel({
       id: crypto.randomUUID(),
       convoId: active.id,
       question,
-      input: attached ? buildHandoffText(question, attached) : question,
+      input: attached ? buildHandoffText(question, attached, providerKind) : question,
       skill,
       title: clampTitle(
         skill ? `/${skill.name} ${question}` : question || sent[0]?.name || "Attachment",
@@ -1155,7 +1165,6 @@ export function AgentChatPanel({
           id: `u-${requestKey}`,
           role: "user",
           text: msg.question,
-          tools: [],
           skill: msg.skill?.name,
           context: msg.context,
           attachments: msg.sent,
@@ -1165,7 +1174,7 @@ export function AgentChatPanel({
           id: `a-${requestKey}`,
           role: "assistant",
           text: "",
-          tools: [],
+          items: [],
           startedAt: Date.now(),
         },
       ],
@@ -1794,13 +1803,24 @@ export function AgentChatPanel({
                   }
                   const isLast = turn.id === turns[turns.length - 1]?.id;
                   const live = streamingActive && isLast && !turn.finishedAt && !turn.error;
-                  const hasTools = turn.tools.length > 0;
-                  const folded = hasTools && !live;
-                  const showTools = hasTools && (live || expandedFolds.has(turn.id));
+                  // ChatGPT's fold: the commentary and steps up to the last step
+                  // fold away once the turn is done; the answer after them stays.
+                  const items = itemsOf(turn).filter(
+                    (item) => item.kind === "step" || item.text.trim(),
+                  );
+                  const lastStep = items.findLastIndex((item) => item.kind === "step");
+                  const work = items.slice(0, lastStep + 1);
+                  const answer = items
+                    .slice(lastStep + 1)
+                    .map((item) => (item.kind === "text" ? item.text.trim() : ""))
+                    .join("\n\n");
+                  const steps = work.filter((item) => item.kind === "step").length;
+                  const folded = steps > 0 && !live;
+                  const showWork = steps > 0 && (live || expandedFolds.has(turn.id));
                   const foldLabel =
                     turn.startedAt && turn.finishedAt
                       ? `Worked for ${formatDuration(turn.finishedAt - turn.startedAt)}`
-                      : `Ran ${turn.tools.length} tool${turn.tools.length === 1 ? "" : "s"}`;
+                      : `Took ${steps} step${steps === 1 ? "" : "s"}`;
                   return (
                     <MessageScroller.Item key={turn.id} messageId={turn.id} scrollAnchor>
                       <div className="flex flex-col">
@@ -1811,16 +1831,10 @@ export function AgentChatPanel({
                             onToggle={() => toggleFold(turn.id)}
                           />
                         ) : null}
-                        {showTools ? (
-                          <div className="flex flex-col py-1">
-                            {turn.tools.map((t, i) => (
-                              <ToolRow key={i} name={t.name} output={t.output} />
-                            ))}
-                          </div>
-                        ) : null}
-                        {turn.text ? (
+                        {showWork ? <WorkLog items={work} /> : null}
+                        {answer ? (
                           <div className="min-w-0 px-1 py-2">
-                            <ChatMarkdown text={turn.text} />
+                            <ChatMarkdown text={answer} />
                           </div>
                         ) : null}
                         {live ? <WorkingRow startedAt={turn.startedAt} /> : null}
