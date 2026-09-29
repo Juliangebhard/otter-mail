@@ -1150,7 +1150,11 @@ export function searchMessages(
 ): { messages: GmailMessageSummary[]; hasMore: boolean } {
   const match = toFtsMatch(queryText);
   const hasFilters = Boolean(
-    scope?.starred || scope?.important || scope?.hasAttachments || scope?.withinDays,
+    scope?.labelId ||
+    scope?.starred ||
+    scope?.important ||
+    scope?.hasAttachments ||
+    scope?.withinDays,
   );
   if (!match && !hasFilters) return { messages: [], hasMore: false };
   if (scope?.rules && scope.rules.length === 0) return { messages: [], hasMore: false };
