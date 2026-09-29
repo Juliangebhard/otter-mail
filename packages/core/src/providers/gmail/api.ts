@@ -467,8 +467,9 @@ export async function fetchMetadataForIds(
 
 /**
  * Whole messages (the summary, bodies and attachment list) for a set of ids.
- * Costs what metadata does (messages.get is 5 units in any format), so sync
- * uses it where bodies are kept for offline reading.
+ * A full fetch costs about 2.5 metadata fetches (quota.ts), less than a
+ * metadata fetch now and a full one later: sync uses it where bodies are
+ * kept for offline reading.
  */
 export async function fetchMessagesForIds(
   accountId: string,

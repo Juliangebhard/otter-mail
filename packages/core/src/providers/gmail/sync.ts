@@ -112,7 +112,8 @@ function finishBackfill(accountId: string): void {
 
 /**
  * Fetches messages and caches them: whole where bodies are kept for offline
- * reading (messages.get costs the same in any format), else the summary.
+ * reading (one full fetch costs less than a summary now and a body later),
+ * else the summary.
  * With `skipCached`, rows cached meanwhile are left alone: a backfill's copy
  * is older than the feed's. Returns what was fetched.
  */
