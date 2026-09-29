@@ -98,7 +98,11 @@ it("says when the relay turns a connection away", async () => {
 });
 
 it("drops a connection whose server sends far more than is read", async () => {
-  const server = net.createServer((socket) => socket.end(Buffer.alloc(70 * 1024 * 1024)));
+  const server = net.createServer((socket) => {
+    // The client hangs up mid-flood, which is the point: the reset is expected.
+    socket.on("error", () => {});
+    socket.end(Buffer.alloc(70 * 1024 * 1024));
+  });
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   route.set("flood.example", {
     host: "127.0.0.1",
