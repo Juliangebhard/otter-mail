@@ -6,13 +6,15 @@
  * (providers/: Gmail's full sync and history deltas); this engine decides
  * when runs happen and keeps their status.
  *
- * Two independent lanes per account:
- *  - sync: the provider's run (Gmail: history delta or full sync, labels,
- *    draft ids). Short once the mailbox is synced, so new mail shows up every
- *    tick and the account reads as synced as soon as it finishes.
- *  - downloads: full bodies for offline reading, newest first, at the lowest
- *    priority. It can take a long time on a big mailbox and never holds up
- *    the sync lane or the "Syncing…" status.
+ * Three independent lanes per account, most urgent first:
+ *  - sync: the provider's run (Gmail: the history delta, labels, draft ids).
+ *    Always short, so new mail shows up on every push and tick.
+ *  - backfill: long work on the whole mailbox (Gmail: the first sync, the
+ *    refresh after its history feed expired), beside the sync lane so it
+ *    never holds up new mail. The account reads as syncing while it runs.
+ *  - downloads: full bodies for offline reading, newest first, once there's
+ *    no backfill left. It can take a long time on a big mailbox and never
+ *    holds up the others or the "Syncing…" status.
  *
  * Syncs run when the mailbox reports a change (Gmail pushes through the
  * relay, realtime.ts), on a timer, and when the user asks. The timer is only
@@ -31,10 +33,11 @@ import { listAccounts } from "./account-store.js";
 import { platform } from "../platform.js";
 import * as store from "./mail-store.js";
 import { notifyNewMail, updateDockBadge } from "./notifier.js";
-import type { SyncStatus } from "../types.js";
+import type { GmailMessageDetail, SyncStatus } from "../types.js";
 
 const statuses = new Map<string, SyncStatus>();
 const running = new Set<string>();
+const backfilling = new Set<string>();
 
 function ensureStatus(accountId: string): SyncStatus {
   const existing = statuses.get(accountId);
@@ -84,14 +87,17 @@ const READ_TRIGGER_COOLDOWN_MS = 20_000;
 
 const BACKOFF_BASE_MS = 30_000;
 const BACKOFF_MAX_MS = 10 * 60_000;
-const failures = new Map<string, { count: number; retryAt: number }>();
+type Failures = Map<string, { count: number; retryAt: number }>;
+const failures: Failures = new Map();
+/** Backfills that failed: retried after a sync on the same growing delay. */
+const backfillFailures: Failures = new Map();
 /** A sync was requested while one ran: run once more when it ends (explicitly, or as a push, which respects backoff). */
 const rerun = new Map<string, "explicit" | "push">();
 
-function recordFailure(accountId: string): void {
-  const count = (failures.get(accountId)?.count ?? 0) + 1;
+function recordFailure(accountId: string, map = failures): void {
+  const count = (map.get(accountId)?.count ?? 0) + 1;
   const delay = Math.min(BACKOFF_BASE_MS * 2 ** (count - 1), BACKOFF_MAX_MS);
-  failures.set(accountId, { count, retryAt: Date.now() + delay });
+  map.set(accountId, { count, retryAt: Date.now() + delay });
 }
 
 // ── Push ─────────────────────────────────────────────────────────────────
@@ -266,6 +272,7 @@ export function forgetAccount(accountId: string): void {
   statuses.delete(accountId);
   lastFinishedAt.delete(accountId);
   failures.delete(accountId);
+  backfillFailures.delete(accountId);
   rerun.delete(accountId);
 }
 
@@ -283,16 +290,37 @@ function runSync(accountId: string): Promise<void> {
   return provider.background("sync", () => runSyncNow(accountId, provider));
 }
 
+/**
+ * Syncing while the sync or the backfill lane runs, showing the backfill's
+ * progress over the sync's (its runs are brief next to it).
+ */
+function laneStatus(
+  accountId: string,
+  syncRunning = running.has(accountId),
+): Pick<SyncStatus, "syncing" | "phase"> {
+  if (backfilling.has(accountId)) return { syncing: true, phase: "full" };
+  return syncRunning
+    ? { syncing: true, phase: ensureStatus(accountId).phase }
+    : { syncing: false, phase: "idle" };
+}
+
 async function runSyncNow(accountId: string, provider: MailProvider): Promise<void> {
   const { lastSyncAt } = store.getSyncState(accountId);
   // Stamped as the run's START: mail arriving while the run is busy is newer
   // than this and still gets notified next time.
   const startedAt = Date.now();
-  update(accountId, { syncing: true, error: null, synced: 0, total: null });
+  // A backfill's progress stays on show while the sync lane runs beside it.
+  const shown = (patch: Partial<SyncStatus>) => {
+    if (!backfilling.has(accountId)) return patch;
+    const { phase: _phase, synced: _synced, total: _total, ...rest } = patch;
+    return rest;
+  };
+  update(accountId, shown({ syncing: true, error: null, synced: 0, total: null }));
 
+  let synced = false;
   try {
     await provider.sync(accountId, {
-      update: (patch) => update(accountId, patch),
+      update: (patch) => update(accountId, shown(patch)),
       bumpRevision: () => bumpRevision(accountId),
       assertActive: () => assertActive(accountId),
       newMail: (messages) => notifyNewMail(accountId, messages, lastSyncAt),
@@ -301,9 +329,9 @@ async function runSyncNow(accountId: string, provider: MailProvider): Promise<vo
     assertActive(accountId);
     store.setSyncState(accountId, { lastSyncAt: startedAt });
     failures.delete(accountId);
+    synced = true;
     update(accountId, {
-      syncing: false,
-      phase: "idle",
+      ...laneStatus(accountId, false),
       lastSyncAt: startedAt,
       fullSyncDone: store.getSyncState(accountId).fullSyncDone,
     });
@@ -314,15 +342,71 @@ async function runSyncNow(accountId: string, provider: MailProvider): Promise<vo
     }
     recordFailure(accountId);
     logger.error("mail-sync", `sync failed for ${accountId}: ${describeSyncError(accountId, err)}`);
-    update(accountId, { syncing: false, phase: "idle", error: describeSyncError(accountId, err) });
+    update(accountId, { ...laneStatus(accountId, false), error: describeSyncError(accountId, err) });
     // The server refused the sign-in (the provider set it aside): nothing more
     // to try, IDLE included, until the user signs in again.
     if (!isSignedIn(accountId)) stopWatch(accountId);
   }
 
   updateDockBadge();
-  // Offline bodies download in their own lane, after the mailbox is current.
-  if (isSignedIn(accountId)) startDownloads(accountId, provider);
+  if (!isSignedIn(accountId)) return;
+  // Long work on the whole mailbox runs beside the sync lane once the feed is
+  // current; offline bodies download after it, in their own lane.
+  if (provider.needsBackfill?.(accountId)) {
+    if (synced) startBackfill(accountId, provider);
+  } else {
+    startDownloads(accountId, provider);
+  }
+}
+
+// ── Backfill ─────────────────────────────────────────────────────────────
+// The provider's long work (Gmail: the first sync of the whole mailbox, the
+// refresh after its history feed expired), in its own lane and quota tier:
+// the sync lane keeps running beside it, so new mail still comes in. Stopped
+// work (quit, rate limits, sleep) picks up where it was after the next sync.
+
+function startBackfill(accountId: string, provider: MailProvider): void {
+  if (backfilling.has(accountId) || removed.has(accountId) || !provider.backfill) return;
+  if (Date.now() < (backfillFailures.get(accountId)?.retryAt ?? 0)) return;
+  backfilling.add(accountId);
+  update(accountId, { ...laneStatus(accountId), synced: 0, total: null });
+  broadcast("gmail:sync-started");
+  const backfill = provider.backfill.bind(provider);
+  void provider
+    .background("backfill", () =>
+      backfill(accountId, {
+        update: (patch) => update(accountId, patch),
+        bumpRevision: () => bumpRevision(accountId),
+        assertActive: () => assertActive(accountId),
+        // Nothing a backfill finds is new mail.
+        newMail: async () => {},
+      }),
+    )
+    .then(
+      () => {
+        backfillFailures.delete(accountId);
+        backfilling.delete(accountId);
+        update(accountId, {
+          ...laneStatus(accountId),
+          error: null,
+          fullSyncDone: store.getSyncState(accountId).fullSyncDone,
+        });
+        bumpRevision(accountId);
+        // Catch up on what changed meanwhile; that run starts the downloads.
+        syncAccount(accountId, { force: true });
+      },
+      (err: unknown) => {
+        backfilling.delete(accountId);
+        if (err instanceof SyncCancelled) {
+          logger.info("mail-sync", err.message);
+          return;
+        }
+        recordFailure(accountId, backfillFailures);
+        const reason = describeSyncError(accountId, err);
+        logger.error("mail-sync", `backfill failed for ${accountId}: ${reason}`);
+        update(accountId, { ...laneStatus(accountId), error: reason });
+      },
+    );
 }
 
 const PREFETCH_MAX_FILE_BYTES = 15 * 1024 * 1024;
@@ -402,13 +486,13 @@ async function downloadBodies(accountId: string, provider: MailProvider): Promis
         .filter((id) => !attempted.has(id));
       if (ids.length === 0) break;
       let pushedBack = false;
+      // Written together once the chunk is in: one transaction, not sixty.
+      const details: GmailMessageDetail[] = [];
       await mapPool(ids, DOWNLOAD_CONCURRENCY, async (id) => {
         if (pushedBack || removed.has(accountId)) return;
         attempted.add(id);
         try {
-          const detail = await provider.getMessage(accountId, id);
-          assertActive(accountId);
-          store.upsertMessageDetail(accountId, detail);
+          details.push(await provider.getMessage(accountId, id));
         } catch (err) {
           if (err instanceof SyncCancelled) throw err;
           const kind = provider.errorKind(err);
@@ -430,6 +514,13 @@ async function downloadBodies(accountId: string, provider: MailProvider): Promis
         done += 1;
         update(accountId, { download: { done: Math.min(done, total), total } });
       });
+      assertActive(accountId);
+      // Not mail the feed deleted meanwhile.
+      const gone = new Set(store.filterUnknownIds(accountId, details.map((m) => m.id)));
+      store.upsertMessageDetails(
+        accountId,
+        details.filter((m) => !gone.has(m.id)),
+      );
       if (pushedBack) break;
     }
   }

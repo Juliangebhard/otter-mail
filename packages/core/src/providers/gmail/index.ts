@@ -11,8 +11,8 @@ import { platform } from "../../platform.js";
 import type { MailProvider } from "../provider.js";
 import * as api from "./api.js";
 import * as calendar from "./calendar.js";
-import { asBackgroundWork, asPrefetchWork, isCoolingDown } from "./quota.js";
-import { forgetGmailSync, syncGmail } from "./sync.js";
+import { inTier, isCoolingDown } from "./quota.js";
+import { backfillGmail, forgetGmailSync, needsBackfill, syncGmail } from "./sync.js";
 import { renewWatch } from "./watch.js";
 
 export const gmailProvider: MailProvider = {
@@ -27,7 +27,9 @@ export const gmailProvider: MailProvider = {
   },
 
   sync: syncGmail,
-  background: (lane, fn) => (lane === "sync" ? asBackgroundWork(fn) : asPrefetchWork(fn)),
+  needsBackfill,
+  backfill: backfillGmail,
+  background: inTier,
   isCoolingDown,
   errorKind: api.errorKind,
   describeError: api.describeError,

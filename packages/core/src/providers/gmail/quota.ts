@@ -8,21 +8,24 @@
  * documents as its default — budgeting for the latter made big syncs trip the
  * limit over and over, failing whole sync runs and the user's own actions.
  *
- * Every request draws from one token bucket per account, in three tiers:
+ * Every request draws from one token bucket per account, in four tiers:
  *
  *  - foreground work (what the user just did) takes units as soon as they're
  *    there and goes ahead of anything waiting;
- *  - sync work (keeping the mailbox current) only spends above a reserve kept
+ *  - sync work (new mail: the history feed) only spends above a reserve kept
  *    for the user;
- *  - prefetch work (downloading bodies for offline reading) only spends above
- *    a larger reserve, and never while sync work is waiting.
+ *  - backfill work (filling or re-reading the whole mailbox) only spends
+ *    above a larger reserve, and never while sync work is waiting;
+ *  - prefetch work (downloading bodies for offline reading) keeps the largest
+ *    reserve and waits for both.
  *
  * Background tiers pause entirely for a while after Gmail reports the quota
- * exhausted. Work is tagged by running it inside `asBackgroundWork` (sync) or
- * `asPrefetchWork`; anything else counts as foreground.
+ * exhausted. Work is tagged by running it inside `inTier`; anything else
+ * counts as foreground.
  */
 
 import { platform, type AsyncContext } from "../../platform.js";
+import type { Lane } from "../provider.js";
 
 /** Gmail's per-minute limit for this project, per user. */
 const UNITS_PER_MINUTE_LIMIT = 6_000;
@@ -30,14 +33,12 @@ const UNITS_PER_MINUTE_LIMIT = 6_000;
 const CAPACITY = 250;
 /** Sustained budget: a full minute of refill plus one full burst stays under the limit. */
 const UNITS_PER_SEC = Math.floor((UNITS_PER_MINUTE_LIMIT * 0.92 - CAPACITY) / 60);
-/** Units sync work leaves in the bucket for the user's next action. */
-const SYNC_RESERVE = 100;
-/** Units prefetch work leaves in the bucket (for the user and for sync). */
-const PREFETCH_RESERVE = 175;
+/** Units each tier leaves in the bucket for the ones ahead of it (the user's next action first). */
+const RESERVE: Record<Lane, number> = { sync: 100, backfill: 140, prefetch: 175 };
+/** Background tiers, most urgent first: each yields to those before it. */
+const TIERS: Lane[] = ["sync", "backfill", "prefetch"];
 /** How long background work stands down after a quota error (Gmail's window is a minute). */
 const COOLDOWN_MS = 30_000;
-
-type Tier = "sync" | "prefetch";
 
 type Bucket = {
   tokens: number;
@@ -46,14 +47,14 @@ type Bucket = {
   cooldownUntil: number;
   /** Foreground requests waiting for units; background yields to them. */
   foregroundWaiting: number;
-  /** Sync requests waiting for units; prefetch yields to them. */
-  syncWaiting: number;
+  /** Background requests waiting for units, per tier; later tiers yield to them. */
+  waiting: Record<Lane, number>;
 };
 
 const buckets = new Map<string, Bucket>();
-let tierContext: AsyncContext<Tier> | null = null;
+let tierContext: AsyncContext<Lane> | null = null;
 /** Which tier the running work belongs to (AsyncLocalStorage on the desktop). */
-const tier = (): AsyncContext<Tier> => (tierContext ??= platform().asyncContext<Tier>());
+const tier = (): AsyncContext<Lane> => (tierContext ??= platform().asyncContext<Lane>());
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -65,7 +66,7 @@ function bucketFor(accountId: string): Bucket {
       updatedAt: Date.now(),
       cooldownUntil: 0,
       foregroundWaiting: 0,
-      syncWaiting: 0,
+      waiting: { sync: 0, backfill: 0, prefetch: 0 },
     };
     buckets.set(accountId, bucket);
   }
@@ -78,17 +79,12 @@ function bucketFor(accountId: string): Bucket {
   return bucket;
 }
 
-/** Runs `fn` as sync work: it yields quota to the user's own actions. */
-export function asBackgroundWork<T>(fn: () => Promise<T>): Promise<T> {
-  return tier().run("sync", fn);
+/** Runs `fn` as background work of `lane`: it yields quota to the user and to more urgent lanes. */
+export function inTier<T>(lane: Lane, fn: () => Promise<T>): Promise<T> {
+  return tier().run(lane, fn);
 }
 
-/** Runs `fn` as prefetch work: it yields quota to the user and to sync. */
-export function asPrefetchWork<T>(fn: () => Promise<T>): Promise<T> {
-  return tier().run("prefetch", fn);
-}
-
-/** True for sync and prefetch work (anything the user isn't waiting on). */
+/** True for background work (anything the user isn't waiting on). */
 export function isBackgroundWork(): boolean {
   return tier().get() !== undefined;
 }
@@ -120,10 +116,9 @@ export async function acquireQuota(accountId: string, units: number): Promise<vo
     return;
   }
 
-  const isSync = current === "sync";
-  const reserve = isSync ? SYNC_RESERVE : PREFETCH_RESERVE;
+  const ahead = TIERS.slice(0, TIERS.indexOf(current));
   const counted = bucketFor(accountId);
-  if (isSync) counted.syncWaiting += 1;
+  counted.waiting[current] += 1;
   try {
     for (;;) {
       const bucket = bucketFor(accountId);
@@ -132,9 +127,9 @@ export async function acquireQuota(accountId: string, units: number): Promise<vo
         await sleep(bucket.cooldownUntil - now);
         continue;
       }
-      const needed = units + reserve;
-      // Sync counts itself in syncWaiting, so prefetch alone checks it.
-      const yielding = bucket.foregroundWaiting > 0 || (!isSync && bucket.syncWaiting > 0);
+      const needed = units + RESERVE[current];
+      const yielding =
+        bucket.foregroundWaiting > 0 || ahead.some((lane) => bucket.waiting[lane] > 0);
       if (!yielding && bucket.tokens >= needed) {
         bucket.tokens -= units;
         return;
@@ -142,7 +137,7 @@ export async function acquireQuota(accountId: string, units: number): Promise<vo
       await sleep(Math.max(50, ((needed - bucket.tokens) / UNITS_PER_SEC) * 1000));
     }
   } finally {
-    if (isSync) counted.syncWaiting -= 1;
+    counted.waiting[current] -= 1;
   }
 }
 

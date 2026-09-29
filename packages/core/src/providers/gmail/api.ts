@@ -451,6 +451,27 @@ export async function fetchMetadataForIds(
   return fetched.filter((m): m is RawMessageMetadata => m !== null).map(mapMessageSummary);
 }
 
+/**
+ * Whole messages (the summary, bodies and attachment list) for a set of ids.
+ * Costs what metadata does (messages.get is 5 units in any format), so sync
+ * uses it where bodies are kept for offline reading.
+ */
+export async function fetchMessagesForIds(
+  accountId: string,
+  ids: string[],
+): Promise<GmailMessageDetail[]> {
+  const fetched = await mapPool(ids, 6, async (id) => {
+    try {
+      return await getMessage(accountId, id);
+    } catch (err) {
+      // Purged since it was listed: skip it, as fetchMetadataForIds does.
+      if (err instanceof GmailApiError && err.status === 404) return null;
+      throw err;
+    }
+  });
+  return fetched.filter((m): m is GmailMessageDetail => m !== null);
+}
+
 // ── Sync primitives ───────────────────────────────────────────────────────────
 
 /** Mailbox profile — used to seed/track the incremental-sync history cursor. */
