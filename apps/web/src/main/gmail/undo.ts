@@ -3,7 +3,8 @@ import type { ModifyMessageParams, ModifyThreadParams } from "./api";
 /**
  * Undo history: mutation hooks register the INVERSE of each user-initiated
  * triage action. z undoes the newest, then the one before; each action's toast
- * undoes its own, in any order. Running an inverse doesn't register again.
+ * undoes its own, in any order. Running an inverse doesn't register again; it
+ * goes on the redo list instead (⇧Z), and redoing an action registers it anew.
  *
  * Actions on different conversations undo independently. A newer action on the
  * same conversation or message retires the older one's undo, which would
@@ -18,6 +19,9 @@ export type UndoAction =
   | { kind: "modifyThread"; params: ModifyThreadParams }
   | { kind: "untrashThread"; params: { accountId: string; threadId: string } }
   | { kind: "untrashMessage"; params: { accountId: string; messageId: string } }
+  /** Only as redos: trashing again what an undo brought back. */
+  | { kind: "trashThread"; params: { accountId: string; threadId: string } }
+  | { kind: "trashMessage"; params: { accountId: string; messageId: string } }
   /** Something that isn't a mail change, e.g. holding back a message being sent. */
   | { kind: "callback"; run: () => void }
   /** A bulk action: every row's inverse, undone together. */
@@ -33,6 +37,8 @@ export type ActionSummary = {
 
 /** Oldest first; z takes from the end. */
 const history: UndoAction[] = [];
+/** What undos took back, oldest first; ⇧Z takes from the end. */
+const redos: UndoAction[] = [];
 const HISTORY_LIMIT = 20;
 
 type ActionListener = (title: string, action: UndoAction) => void;
@@ -79,9 +85,11 @@ function targets(action: UndoAction): string[] {
   switch (action.kind) {
     case "modifyThread":
     case "untrashThread":
+    case "trashThread":
       return [`${action.params.accountId}/thread/${action.params.threadId}`];
     case "modifyMessage":
     case "untrashMessage":
+    case "trashMessage":
       return [`${action.params.accountId}/message/${action.params.messageId}`];
     case "callback":
       return [];
@@ -90,16 +98,18 @@ function targets(action: UndoAction): string[] {
   }
 }
 
-/** Retires older undos of anything `action` touches: whole actions, or a
-    batch's rows (so a bulk undo still restores the rest). */
+/** Retires older undos and redos of anything `action` touches: whole actions,
+    or a batch's rows (so a bulk undo still restores the rest). */
 function retire(action: UndoAction): void {
   const touched = new Set(targets(action));
   if (touched.size === 0) return;
   const stale = (a: UndoAction) => targets(a).some((t) => touched.has(t));
-  for (let i = history.length - 1; i >= 0; i--) {
-    const entry = history[i];
-    if (entry.kind === "batch") entry.actions = entry.actions.filter((a) => !stale(a));
-    if (entry.kind === "batch" ? entry.actions.length === 0 : stale(entry)) history.splice(i, 1);
+  for (const list of [history, redos]) {
+    for (let i = list.length - 1; i >= 0; i--) {
+      const entry = list[i];
+      if (entry.kind === "batch") entry.actions = entry.actions.filter((a) => !stale(a));
+      if (entry.kind === "batch" ? entry.actions.length === 0 : stale(entry)) list.splice(i, 1);
+    }
   }
 }
 
@@ -107,6 +117,35 @@ function push(action: UndoAction): void {
   retire(action);
   history.push(action);
   if (history.length > HISTORY_LIMIT) history.shift();
+}
+
+/** The action an undo took back, to run again; null for what can't be redone
+    (a send held back reopened its draft). */
+function inverse(action: UndoAction): UndoAction | null {
+  switch (action.kind) {
+    case "modifyThread":
+    case "modifyMessage": {
+      const { addLabelIds, removeLabelIds, ...rest } = action.params;
+      return {
+        ...action,
+        params: { ...rest, addLabelIds: removeLabelIds, removeLabelIds: addLabelIds },
+      } as UndoAction;
+    }
+    case "untrashThread":
+      return { kind: "trashThread", params: action.params };
+    case "untrashMessage":
+      return { kind: "trashMessage", params: action.params };
+    case "trashThread":
+      return { kind: "untrashThread", params: action.params };
+    case "trashMessage":
+      return { kind: "untrashMessage", params: action.params };
+    case "callback":
+      return null;
+    case "batch": {
+      const actions = action.actions.map(inverse).filter((a) => a !== null);
+      return actions.length > 0 ? { kind: "batch", actions } : null;
+    }
+  }
 }
 
 function commitGroup(): void {
@@ -145,10 +184,11 @@ export function registerUndo(action: UndoAction, summary?: ActionSummary): void 
   if (summary) announce(action, [summary]);
 }
 
-/** Forgets every undo (after an irreversible action like Delete forever). */
+/** Forgets every undo and redo (after an irreversible action like Delete forever). */
 export function clearUndo(): void {
   commitGroup();
   history.length = 0;
+  redos.length = 0;
 }
 
 /** Drops `action` from the history (it was undone another way, or can't be anymore). */
@@ -162,6 +202,19 @@ export function forgetUndo(action: UndoAction): void {
 export function takeUndo(action?: UndoAction): UndoAction | null {
   const i = action ? history.indexOf(action) : history.length - 1;
   return i === -1 ? null : history.splice(i, 1)[0];
+}
+
+/** After `undone` ran: puts what it took back on the redo list. */
+export function registerRedo(undone: UndoAction): void {
+  const action = inverse(undone);
+  if (!action) return;
+  redos.push(action);
+  if (redos.length > HISTORY_LIMIT) redos.shift();
+}
+
+/** The newest undone action, to run again (⇧Z). */
+export function takeRedo(): UndoAction | null {
+  return redos.pop() ?? null;
 }
 
 /** Auto-mark-read (and ⇧I) shouldn't clobber the undo slot. */

@@ -115,9 +115,12 @@ ipcMain.handle("shell:openExternal", async (_event, url: unknown) => {
   }
 });
 
-// ⌘Z landed in a text field: give it the regular text undo.
+// ⌘Z / ⇧⌘Z landed in a text field: give it the regular text undo and redo.
 ipcMain.handle("edit:nativeUndo", (event) => {
   event.sender.undo();
+});
+ipcMain.handle("edit:nativeRedo", (event) => {
+  event.sender.redo();
 });
 
 ipcMain.handle("window:closeMain", () => {
@@ -184,9 +187,9 @@ function setupApplicationMenu(): void {
     {
       label: "Edit",
       submenu: [
-        // ⌘Z undoes the last mail action (archive, move, send…) — but text
-        // fields keep their own undo: the main window decides (edit:undo →
-        // mail undo, or edit:nativeUndo back to the page).
+        // ⌘Z undoes the last mail action (archive, move, send…), ⇧⌘Z redoes
+        // it — but text fields keep their own undo: the main window decides
+        // (edit:undo → mail undo, or edit:nativeUndo back to the page).
         {
           label: "Undo",
           accelerator: "CommandOrControl+Z",
@@ -198,7 +201,17 @@ function setupApplicationMenu(): void {
             BrowserWindow.getFocusedWindow()?.webContents.undo();
           },
         },
-        { role: "redo" },
+        {
+          label: "Redo",
+          accelerator: "Shift+CommandOrControl+Z",
+          click: () => {
+            if (isMainFocused()) {
+              broadcast("edit:redo");
+              return;
+            }
+            BrowserWindow.getFocusedWindow()?.webContents.redo();
+          },
+        },
         { type: "separator" },
         { role: "cut" },
         { role: "copy" },
