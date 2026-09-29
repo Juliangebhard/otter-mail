@@ -16,6 +16,7 @@ import {
   XIcon,
 } from "lucide-react";
 import type { GmailAccount, GmailMessageSummary } from "./types";
+import { capabilitiesOf } from "./capabilities";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -672,6 +673,8 @@ export function SearchHeader({
 
   const suggestions = useSuggestions(draft, scope, suggesting);
   useEffect(() => setHighlight(0), [draft]);
+  // Important is Gmail's sorting: offered while a mailbox searched has it.
+  const sortsImportant = accounts.some((a) => scope.includes(a.id) && capabilitiesOf(a).categories);
 
   const run = (q: string) => {
     const text = q.trim();
@@ -834,13 +837,15 @@ export function SearchHeader({
         >
           Is starred
         </button>
-        <button
-          type="button"
-          className={chipClass(hasToken(query, "is:important"))}
-          onClick={() => run(toggleToken(query, "is:important"))}
-        >
-          Is important
-        </button>
+        {sortsImportant ? (
+          <button
+            type="button"
+            className={chipClass(hasToken(query, "is:important"))}
+            onClick={() => run(toggleToken(query, "is:important"))}
+          >
+            Is important
+          </button>
+        ) : null}
         <button type="button" className={chipClass(false)} onClick={() => setAdvancedOpen(true)}>
           Advanced search
         </button>
