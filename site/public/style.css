@@ -105,9 +105,46 @@ footer a:hover {
 }
 
 /* The landing page */
+.landing {
+  background: var(--bg);
+  overflow-x: clip;
+}
 .landing main {
   max-width: 66rem;
+  padding-top: 0;
+}
+/* Still water under the hero: a calm glow and faint ripples that fade out before the features. */
+.stage {
+  position: relative;
+  isolation: isolate;
   padding-top: 6rem;
+}
+.stage::before,
+.stage::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  top: 0;
+  left: 50%;
+  width: 100vw;
+  height: 64rem;
+  margin-left: -50vw;
+  pointer-events: none;
+}
+.stage::before {
+  background:
+    radial-gradient(ellipse 50% 40% at 50% 0, rgba(150, 175, 195, 0.3), transparent 72%),
+    radial-gradient(ellipse 38% 34% at 12% 24%, rgba(110, 135, 170, 0.22), transparent 72%),
+    radial-gradient(ellipse 38% 34% at 90% 30%, rgba(115, 155, 150, 0.17), transparent 72%);
+  mask-image: linear-gradient(to bottom, #000 0%, #000 45%, transparent 100%);
+}
+.stage::after {
+  background: repeating-radial-gradient(
+    circle at 50% 9rem,
+    transparent 0 5.5rem,
+    rgba(255, 255, 255, 0.055) 5.5rem calc(5.5rem + 1px)
+  );
+  mask-image: radial-gradient(ellipse 50% 55% at 50% 0, #000 0%, transparent 100%);
 }
 .hero {
   text-align: center;
@@ -202,7 +239,7 @@ footer a:hover {
   }
 }
 @media (max-width: 34rem) {
-  .landing main {
+  .stage {
     padding-top: 4rem;
   }
   .features {
@@ -218,6 +255,13 @@ footer a:hover {
   }
 }
 @media (prefers-reduced-motion: no-preference) {
+  .stage::before {
+    animation: drift 48s ease-in-out infinite alternate;
+  }
+  .stage::after {
+    animation: breathe 36s ease-in-out infinite alternate;
+    transform-origin: 50% 9rem;
+  }
   .hero > *,
   .shot {
     animation: rise 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
@@ -242,5 +286,15 @@ footer a:hover {
   from {
     opacity: 0;
     transform: translateY(0.75rem);
+  }
+}
+@keyframes drift {
+  to {
+    transform: translate3d(3%, 1.5rem, 0) scale(1.05);
+  }
+}
+@keyframes breathe {
+  to {
+    transform: scale(1.08);
   }
 }
