@@ -10,7 +10,7 @@
 import { toBase64, utf8Encode } from "../bytes.js";
 import { logger } from "../logger.js";
 import { getAccount } from "./account-store.js";
-import { getUnsubscribeHeaders, sendRawMessage } from "./gmail-api.js";
+import { providerFor } from "../providers/index.js";
 import * as store from "./mail-store.js";
 
 export type UnsubscribeInfo = {
@@ -34,7 +34,10 @@ function parse(header: string, oneClick: boolean): Parsed | null {
 async function lookup(accountId: string, messageId: string): Promise<Parsed | null> {
   const key = `${accountId}:${messageId}`;
   if (cache.has(key)) return cache.get(key)!;
-  const { listUnsubscribe, oneClick } = await getUnsubscribeHeaders(accountId, messageId);
+  const { listUnsubscribe, oneClick } = await providerFor(accountId).getUnsubscribeHeaders(
+    accountId,
+    messageId,
+  );
   const parsed = listUnsubscribe ? parse(listUnsubscribe, oneClick) : null;
   cache.set(key, parsed);
   return parsed;
@@ -73,7 +76,7 @@ async function sendUnsubscribeEmail(accountId: string, mailto: string): Promise<
     body,
     "",
   ].join("\r\n");
-  await sendRawMessage(accountId, raw);
+  await providerFor(accountId).sendRaw(accountId, raw);
 }
 
 /** Returns "done" when handled in place, or the URL the caller should open. */

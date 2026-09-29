@@ -2,22 +2,22 @@
  * Calendar invitations in the reader: read the invite's .ics, show your
  * current answer, and RSVP in place — the way Gmail's Yes / No / Maybe do.
  *
- * RSVP goes through the Google Calendar API (your calendar updates and the
- * organizer is notified, sendUpdates=all). Accounts connected before the app
- * asked for calendar access fall back to a standard iMIP REPLY email to the
- * organizer (what Apple Mail / Outlook send), which Google Calendar applies.
+ * RSVP goes through the account's calendar when its provider has one
+ * (Google Calendar: your calendar updates and the organizer is notified).
+ * Otherwise, and for Gmail accounts connected before the app asked for
+ * calendar access, it's a standard iMIP REPLY email to the organizer (what
+ * Apple Mail / Outlook send), which the organizer's calendar applies.
  */
 
 import { logger } from "../logger.js";
 import { fromBase64, toBase64, utf8Decode, utf8Encode } from "../bytes.js";
-import { platform } from "../platform.js";
+import { providerFor } from "../providers/index.js";
+import { NoCalendarAccess, type RsvpResponse } from "../providers/provider.js";
 import { getAccount } from "./account-store.js";
-import { getAttachmentData, getMessage, sendRawMessage } from "./gmail-api.js";
+import { getAttachmentData } from "./attachment-cache.js";
 import * as store from "./mail-store.js";
 
-const CALENDAR = "https://www.googleapis.com/calendar/v3/calendars/primary";
-
-export type RsvpResponse = "accepted" | "declined" | "tentative";
+export type { RsvpResponse };
 
 export type CalendarInvite = {
   uid: string;
@@ -30,11 +30,11 @@ export type CalendarInvite = {
   location: string | null;
   organizer: { name: string; email: string } | null;
   sequence: number;
-  /** Your answer: from Google Calendar when readable, else the last one sent from here. */
+  /** Your answer: from the calendar when readable, else the last one sent from here. */
   response: RsvpResponse | "needsAction";
-  /** Calendar API not authorized for this account (email replies are used). */
+  /** No calendar to answer in for this account (email replies are used). */
   calendarAccess: boolean;
-  /** Link to the event in Google Calendar. */
+  /** Link to the event in the calendar. */
   htmlLink: string | null;
   /** The invite was cancelled (METHOD:CANCEL). */
   cancelled: boolean;
@@ -115,62 +115,6 @@ const mailto = (value: string) =>
     .toLowerCase();
 
 // ---------------------------------------------------------------------------
-// Calendar API
-// ---------------------------------------------------------------------------
-
-class NoCalendarAccess extends Error {}
-
-async function calendarFetch(
-  accountId: string,
-  path: string,
-  init: { method?: string; body?: string; headers?: Record<string, string> } = {},
-): Promise<unknown> {
-  const token = await platform().google.getAccessToken(accountId);
-  const response = await fetch(`${CALENDAR}${path}`, {
-    ...init,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-      ...init.headers,
-    },
-  });
-  if (response.status === 403 || response.status === 401) {
-    const body = await response.text().catch(() => "");
-    if (/insufficient|scope|PERMISSION_DENIED|accessNotConfigured|has not been used/i.test(body))
-      throw new NoCalendarAccess(body.slice(0, 200));
-    throw new Error(`Calendar API error: ${response.status} ${body.slice(0, 200)}`);
-  }
-  if (!response.ok)
-    throw new Error(
-      `Calendar API error: ${response.status} ${(await response.text()).slice(0, 200)}`,
-    );
-  const text = await response.text();
-  return text ? JSON.parse(text) : {};
-}
-
-type ApiEvent = {
-  id: string;
-  htmlLink?: string;
-  attendees?: { email: string; self?: boolean; responseStatus?: string }[];
-};
-
-async function findEvent(accountId: string, uid: string): Promise<ApiEvent | null> {
-  const data = (await calendarFetch(
-    accountId,
-    `/events?iCalUID=${encodeURIComponent(uid)}&showDeleted=false&maxResults=1`,
-  )) as { items?: ApiEvent[] };
-  return data.items?.[0] ?? null;
-}
-
-function selfStatus(event: ApiEvent, email: string): RsvpResponse | "needsAction" {
-  const me = event.attendees?.find((a) => a.self || a.email.toLowerCase() === email);
-  const status = me?.responseStatus;
-  return status === "accepted" || status === "declined" || status === "tentative"
-    ? status
-    : "needsAction";
-}
-
-// ---------------------------------------------------------------------------
 // Invite lookup
 // ---------------------------------------------------------------------------
 
@@ -180,7 +124,8 @@ async function inviteIcs(accountId: string, messageId: string): Promise<ParsedIc
   const key = `${accountId}:${messageId}`;
   if (icsCache.has(key)) return icsCache.get(key)!;
   const detail =
-    store.getMessageDetail(accountId, messageId) ?? (await getMessage(accountId, messageId));
+    store.getMessageDetail(accountId, messageId) ??
+    (await providerFor(accountId).getMessage(accountId, messageId));
   const part = detail.attachments.find(
     (a) => /text\/calendar|application\/ics/i.test(a.mimeType) || /\.ics$/i.test(a.filename),
   );
@@ -217,13 +162,14 @@ export async function getInvite(
     (icsStatus === "accepted" || icsStatus === "declined" || icsStatus === "tentative"
       ? icsStatus
       : "needsAction");
-  let calendarAccess = true;
+  const calendar = providerFor(accountId).calendar;
+  let calendarAccess = Boolean(calendar);
   let htmlLink: string | null = null;
   try {
-    const found = await findEvent(accountId, uid);
+    const found = await calendar?.findEvent(accountId, uid);
     if (found) {
-      response = selfStatus(found, email);
-      htmlLink = found.htmlLink ?? null;
+      response = found.response;
+      htmlLink = found.htmlLink;
     }
   } catch (error) {
     if (error instanceof NoCalendarAccess) calendarAccess = false;
@@ -332,7 +278,7 @@ async function sendImipReply(
     "",
   ].join("\r\n");
   const detail = store.getMessageDetail(accountId, messageId);
-  await sendRawMessage(accountId, raw, detail?.threadId);
+  await providerFor(accountId).sendRaw(accountId, raw, detail?.threadId);
 }
 
 export async function respondToInvite(
@@ -343,24 +289,11 @@ export async function respondToInvite(
   const ics = await inviteIcs(accountId, messageId);
   const uid = ics && get(ics.event, "UID")?.value;
   if (!ics || !uid) throw new Error("This message has no calendar invitation.");
-  const email = accountId.toLowerCase();
 
   let viaCalendar = false;
   try {
-    const found = await findEvent(accountId, uid);
-    if (found) {
-      const attendees = (found.attendees ?? []).map((a) =>
-        a.self || a.email.toLowerCase() === email ? { ...a, responseStatus: response } : a,
-      );
-      if (!attendees.some((a) => a.self || a.email.toLowerCase() === email)) {
-        attendees.push({ email, self: true, responseStatus: response });
-      }
-      await calendarFetch(accountId, `/events/${encodeURIComponent(found.id)}?sendUpdates=all`, {
-        method: "PATCH",
-        body: JSON.stringify({ attendees }),
-      });
-      viaCalendar = true;
-    }
+    viaCalendar =
+      (await providerFor(accountId).calendar?.respond(accountId, uid, response)) ?? false;
   } catch (error) {
     if (!(error instanceof NoCalendarAccess)) throw error;
   }

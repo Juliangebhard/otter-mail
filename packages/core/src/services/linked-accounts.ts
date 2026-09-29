@@ -18,6 +18,7 @@ import { logger } from "../logger.js";
 import { broadcast } from "../ipc.js";
 import * as accountStore from "./account-store.js";
 import { platform } from "../platform.js";
+import { isSignedIn } from "../providers/index.js";
 import * as mailStore from "./mail-store.js";
 import { getOtterUser, relayRequest, RelayError } from "./otter-account.js";
 import type { GmailAccount } from "../types.js";
@@ -166,7 +167,7 @@ export async function reconcileAccounts(
   const plan = planReconcile(
     localAccounts.map((account) => ({
       ...account,
-      signedIn: platform().google.isSignedIn(account.id),
+      signedIn: isSignedIn(account),
     })),
     remote,
     readSnapshot(),

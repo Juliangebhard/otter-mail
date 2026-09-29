@@ -1,15 +1,16 @@
 /**
- * Search, Gmail's way: every query runs through Gmail's own search engine
- * (all operators, all mail, attachments and recipients included), so results
- * are the truth rather than whatever this device happens to have cached. Results
- * are conversations, newest first, merged across the accounts in scope; only
- * matches missing from the cache are fetched. Offline, it falls back to the
- * local index and says so.
+ * Search, Gmail's way: every query runs through the server's own search
+ * (Gmail's engine: all operators, all mail, attachments and recipients
+ * included), so results are the truth rather than whatever this device
+ * happens to have cached. Results are conversations, newest first, merged
+ * across the accounts in scope; only matches missing from the cache are
+ * fetched. Offline, it falls back to the local index and says so, as do
+ * providers without server search.
  */
 
 import { handle } from "../ipc.js";
 import { logger } from "../logger.js";
-import { fetchMetadataForIds, searchGmailPage } from "../services/gmail-api.js";
+import { providerFor } from "../providers/index.js";
 import * as mailStore from "../services/mail-store.js";
 import { runAsTask } from "./ipc-budget.js";
 import type { GmailMessageSummary } from "../types.js";
@@ -29,19 +30,25 @@ type SearchResult = {
   offline?: boolean;
 };
 
-/** One account's page: Gmail's matches, cached first, as conversation rows. */
+/** One account's page: the server's matches, cached first, as conversation rows. */
 async function searchAccount(
   accountId: string,
   q: string,
   cursor: string | undefined,
 ): Promise<{ rows: GmailMessageSummary[]; next: string | null; estimate: number }> {
-  const page = await searchGmailPage(accountId, q, cursor, PAGE_SIZE);
+  const provider = providerFor(accountId);
+  if (!provider.search) {
+    const text = freeText(q);
+    const local = text ? mailStore.searchMessages(text, accountId, 0, PAGE_SIZE).messages : [];
+    return { rows: local, next: null, estimate: local.length };
+  }
+  const page = await provider.search(accountId, q, cursor, PAGE_SIZE);
   const unknown = mailStore.filterUnknownIds(
     accountId,
     page.refs.map((r) => r.id),
   );
   if (unknown.length > 0) {
-    mailStore.upsertMessages(accountId, await fetchMetadataForIds(accountId, unknown));
+    mailStore.upsertMessages(accountId, await provider.getSummaries(accountId, unknown));
   }
   const threadIds = [...new Set(page.refs.map((r) => r.threadId))];
   const rows = mailStore.getThreadSummaries(accountId, threadIds).map((m) => ({ ...m, accountId }));

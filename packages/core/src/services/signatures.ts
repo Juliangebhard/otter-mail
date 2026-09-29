@@ -2,44 +2,32 @@
  * Signatures live in Gmail (one per send-as address), so they're the same in
  * Gmail on the web and on every device. The account keeps a copy for the
  * composer, refreshed from Gmail. A signature from before, kept only in Otter
- * Mail, moves to Gmail once.
+ * Mail, moves to Gmail once. Mailboxes whose server keeps no signatures
+ * (capabilities.serverSignatures) keep just the account's copy.
  *
  * Reading needs only the Gmail scope; saving needs gmail.settings.basic,
  * which sign-ins from before it was added lack: saving then asks to sign in
  * again (GMAIL_SETTINGS_PERMISSION).
  */
 
-import { GMAIL_SETTINGS_PERMISSION } from "@otter-mail/contracts";
-
 import { broadcast } from "../ipc.js";
 import { logger } from "../logger.js";
-import { platform } from "../platform.js";
+import { findProvider, isSignedIn } from "../providers/index.js";
 import { listAccounts, updateAccount } from "./account-store.js";
-import { GmailApiError, getSignature, setSignature } from "./gmail-api.js";
 import type { GmailAccount } from "../types.js";
 
-/** Saves the signature in Gmail, then keeps its copy. */
+/** Saves the signature on the server when it keeps them, then keeps its copy. */
 export async function saveSignature(account: GmailAccount, html: string): Promise<GmailAccount> {
-  let saved: string;
-  try {
-    saved = await setSignature(account.id, account.email, html);
-  } catch (err) {
-    // Only a sign-in without the settings scope; not rate limits or other refusals.
-    if (
-      err instanceof GmailApiError &&
-      err.status === 403 &&
-      !err.rateLimited &&
-      /insufficient|ACCESS_TOKEN_SCOPE_INSUFFICIENT/i.test(err.body)
-    ) {
-      throw new Error(GMAIL_SETTINGS_PERMISSION, { cause: err });
-    }
-    throw err;
-  }
+  const signatures = findProvider(account)?.signatures;
+  if (!signatures) return updateAccount(account.id, { signature: html });
+  const saved = await signatures.set(account.id, account.email, html);
   return updateAccount(account.id, { signature: saved, signatureInGmail: true });
 }
 
 async function refreshSignature(account: GmailAccount): Promise<boolean> {
-  const inGmail = await getSignature(account.id, account.email);
+  const signatures = findProvider(account)?.signatures;
+  if (!signatures) return false;
+  const inGmail = await signatures.get(account.id, account.email);
   if (!account.signatureInGmail && !inGmail && account.signature) {
     // Kept only here until now: move it to Gmail (if this sign-in may).
     await saveSignature(account, account.signature).catch((err: unknown) =>
@@ -55,11 +43,11 @@ async function refreshSignature(account: GmailAccount): Promise<boolean> {
   return true;
 }
 
-/** Brings every signed-in account's signature up to date with Gmail. */
+/** Brings every signed-in account's signature up to date with the server. */
 export async function refreshSignatures(): Promise<void> {
   let changed = false;
   for (const account of await listAccounts()) {
-    if (!platform().google.isSignedIn(account.id)) continue;
+    if (!isSignedIn(account)) continue;
     try {
       changed = (await refreshSignature(account)) || changed;
     } catch (err) {

@@ -1,14 +1,19 @@
 /**
- * gmail.ts — IPC handler registration for the Gmail client.
+ * gmail.ts — IPC handler registration for the mail client (`gmail:*`
+ * channels, whichever provider an account uses).
  *
- * All channels proxy to services (credentials-store, account-store,
- * gmail-oauth, gmail-api). Handlers are thin; business logic lives in services.
+ * All channels proxy to services (account-store, mail-store, mail-sync) and
+ * the account's provider (providers/). Handlers are thin; business logic
+ * lives in services.
  */
+
+import { GMAIL_CAPABILITIES, IMAP_CAPABILITIES } from "@otter-mail/contracts";
 
 import { fromBase64 } from "../bytes.js";
 import { SignInCancelledError } from "../google.js";
 import { broadcast, handle } from "../ipc.js";
 import { platform } from "../platform.js";
+import { findProvider, isSignedIn, providerFor } from "../providers/index.js";
 import {
   getAccount,
   listAccounts,
@@ -16,33 +21,12 @@ import {
   updateAccount as storeUpdateAccount,
 } from "../services/account-store.js";
 import {
-  listLabels,
-  createLabel,
-  getMessage,
-  modifyMessage,
-  trashMessage,
-  modifyThread,
-  trashThread,
-  untrashThread,
-  untrashMessage,
-  batchDeleteMessages,
-  listMessageIdsPage,
-  saveDraft,
-  deleteDraft,
-  sendMessage,
-  getAttachment,
-  getAttachmentData,
   getAttachmentBytes,
-  pickComposeAttachments,
-  fetchReplyHeaders,
-  fetchMetadataForIds,
-  MAX_ATTACHMENT_TOTAL_BYTES,
-  findDraftIdByMessageId,
-  updateLabel,
-  deleteLabel,
-  proxyRemoteImage,
-  getDraftVersion,
-} from "../services/gmail-api.js";
+  getAttachmentData,
+  saveAttachment,
+} from "../services/attachment-cache.js";
+import { proxyRemoteImage } from "../services/image-proxy.js";
+import { MAX_ATTACHMENT_TOTAL_BYTES, pickComposeAttachments } from "../services/outgoing.js";
 import * as mailStore from "../services/mail-store.js";
 import { IPC_WRITE_BUDGET_MS, atMost, runAsTask, settleGmailWrite, sleep } from "./ipc-budget.js";
 import { forgetLiveCursors, pageWithLiveFill, reconcileUnread } from "./live-paging.js";
@@ -72,15 +56,15 @@ const LOCAL_PAGE_SIZE = 50;
 export async function removeLocalAccount(accountId: string): Promise<void> {
   mailSync.forgetAccount(accountId);
   forgetLiveCursors(accountId);
-  await platform().google.removeTokens(accountId);
+  await findProvider(accountId)?.removeAccount(accountId);
   await storeRemoveAccount(accountId);
   mailStore.removeAccountData(accountId);
   updateDockBadge();
 }
 
-/** Re-reads every label from Gmail (names, colors, counts) into the cache. */
+/** Re-reads every label from the server (names, colors, counts) into the cache. */
 async function refreshLabels(accountId: string): Promise<void> {
-  mailStore.upsertLabels(accountId, await listLabels(accountId));
+  mailStore.upsertLabels(accountId, await providerFor(accountId).listLabels(accountId));
 }
 
 /** Re-reads Gmail's labels for messages after a trash/untrash (Gmail may
@@ -88,7 +72,7 @@ async function refreshLabels(accountId: string): Promise<void> {
 async function refreshMetadata(accountId: string, ids: string[]): Promise<void> {
   if (ids.length === 0) return;
   const before = new Set(ids.flatMap((id) => mailStore.getMessageLabelIds(accountId, id) ?? []));
-  const fresh = await fetchMetadataForIds(accountId, ids);
+  const fresh = await providerFor(accountId).getSummaries(accountId, ids);
   mailStore.upsertMessages(accountId, fresh);
   for (const m of fresh) for (const l of m.labelIds) before.add(l);
   mailStore.recountLabels(accountId, [...before]);
@@ -231,9 +215,11 @@ export function registerGmailHandlers(): void {
     console.log("[gmail:listAccounts]", {});
     try {
       const accounts = await listAccounts();
-      return accounts.map((account) =>
-        platform().google.isSignedIn(account.id) ? account : { ...account, signedOut: true },
-      );
+      return accounts.map((account) => ({
+        ...account,
+        capabilities: account.provider === "imap" ? IMAP_CAPABILITIES : GMAIL_CAPABILITIES,
+        ...(isSignedIn(account) ? {} : { signedOut: true }),
+      }));
     } catch (err) {
       console.log("[gmail:listAccounts] error", { error: String(err) });
       throw err;
@@ -317,7 +303,7 @@ export function registerGmailHandlers(): void {
       const local = mailStore.getLabels(accountId);
       if (local.length > 0) return local;
       // Cold cache: fetch once live so the sidebar isn't empty on first launch.
-      const labels = await listLabels(accountId);
+      const labels = await providerFor(accountId).listLabels(accountId);
       mailStore.upsertLabels(accountId, labels);
       return labels;
     } catch (err) {
@@ -335,7 +321,7 @@ export function registerGmailHandlers(): void {
       const name = assertString(p?.name, "name");
       // Gmail assigns the id, so this one waits; mirror it so the renderer's
       // refetch (served from the cache) keeps showing the new label.
-      const label = await createLabel(accountId, name);
+      const label = await providerFor(accountId).createLabel(accountId, name);
       mailStore.putLabel(accountId, label);
       return label;
     } catch (err) {
@@ -368,7 +354,9 @@ export function registerGmailHandlers(): void {
       const revert = mailStore.editLabelLocally(accountId, labelId, { name, color });
       return await settleGmailWrite(
         "gmail:updateLabel",
-        updateLabel(accountId, { labelId, name, color }).then(() => refreshLabels(accountId)),
+        providerFor(accountId)
+          .updateLabel(accountId, { labelId, name, color })
+          .then(() => refreshLabels(accountId)),
         revert,
       );
     } catch (err) {
@@ -387,7 +375,9 @@ export function registerGmailHandlers(): void {
       const revert = mailStore.removeLabelLocally(accountId, labelId);
       return await settleGmailWrite(
         "gmail:deleteLabel",
-        deleteLabel(accountId, labelId).then(() => refreshLabels(accountId)),
+        providerFor(accountId)
+          .deleteLabel(accountId, labelId)
+          .then(() => refreshLabels(accountId)),
         revert,
       );
     } catch (err) {
@@ -634,7 +624,7 @@ export function registerGmailHandlers(): void {
       // once and persist so re-opens are instant and work offline.
       const cached = mailStore.getMessageDetail(accountId, messageId);
       if (cached) return cached;
-      const detail = await getMessage(accountId, messageId);
+      const detail = await providerFor(accountId).getMessage(accountId, messageId);
       mailStore.upsertMessageDetail(accountId, detail);
       return detail;
     } catch (err) {
@@ -661,7 +651,11 @@ export function registerGmailHandlers(): void {
         [messageId],
         addLabelIds ?? [],
         removeLabelIds ?? [],
-        () => modifyMessage(accountId, messageId, { addLabelIds, removeLabelIds }),
+        () =>
+          providerFor(accountId).modifyMessage(accountId, messageId, {
+            addLabelIds,
+            removeLabelIds,
+          }),
       );
     } catch (err) {
       console.log("[gmail:modifyMessage] error", { error: String(err) });
@@ -685,7 +679,9 @@ export function registerGmailHandlers(): void {
         ["TRASH"],
         [],
         () =>
-          trashMessage(accountId, messageId).then(() => refreshMetadata(accountId, [messageId])),
+          providerFor(accountId)
+            .trashMessage(accountId, messageId)
+            .then(() => refreshMetadata(accountId, [messageId])),
       );
     } catch (err) {
       console.log("[gmail:trashMessage] error", { error: String(err) });
@@ -722,7 +718,11 @@ export function registerGmailHandlers(): void {
         mailStore.getThreadMessages(accountId, threadId).map((m) => m.id),
         addLabelIds ?? [],
         removeLabelIds ?? [],
-        () => modifyThread(accountId, threadId, { addLabelIds, removeLabelIds }),
+        () =>
+          providerFor(accountId).modifyThread(accountId, threadId, {
+            addLabelIds,
+            removeLabelIds,
+          }),
       );
     } catch (err) {
       console.log("[gmail:modifyThread] error", { error: String(err) });
@@ -741,7 +741,9 @@ export function registerGmailHandlers(): void {
       // trashed right away; Gmail + the metadata refresh finish after.
       const ids = mailStore.getThreadMessages(accountId, threadId).map((m) => m.id);
       return await settleLabelWrite("gmail:trashThread", accountId, ids, ["TRASH"], [], () =>
-        trashThread(accountId, threadId).then(() => refreshMetadata(accountId, ids)),
+        providerFor(accountId)
+          .trashThread(accountId, threadId)
+          .then(() => refreshMetadata(accountId, ids)),
       );
     } catch (err) {
       console.log("[gmail:trashThread] error", { error: String(err) });
@@ -759,14 +761,16 @@ export function registerGmailHandlers(): void {
       const threadId = assertString(p?.threadId, "threadId");
       const ids = mailStore.getThreadMessages(accountId, threadId).map((m) => m.id);
       return await settleLabelWrite("gmail:untrashThread", accountId, ids, [], ["TRASH"], () =>
-        untrashThread(accountId, threadId).then((fresh) => {
-          mailStore.upsertMessages(accountId, fresh);
-          mailStore.recountLabels(accountId, [
-            ...new Set(fresh.flatMap((m) => m.labelIds)),
-            "TRASH",
-          ]);
-          updateDockBadge();
-        }),
+        providerFor(accountId)
+          .untrashThread(accountId, threadId)
+          .then((fresh) => {
+            mailStore.upsertMessages(accountId, fresh);
+            mailStore.recountLabels(accountId, [
+              ...new Set(fresh.flatMap((m) => m.labelIds)),
+              "TRASH",
+            ]);
+            updateDockBadge();
+          }),
       );
     } catch (err) {
       console.log("[gmail:untrashThread] error", { error: String(err) });
@@ -787,14 +791,16 @@ export function registerGmailHandlers(): void {
         [],
         ["TRASH"],
         () =>
-          untrashMessage(accountId, messageId).then((fresh) => {
-            mailStore.upsertMessages(accountId, fresh);
-            mailStore.recountLabels(accountId, [
-              ...new Set(fresh.flatMap((m) => m.labelIds)),
-              "TRASH",
-            ]);
-            updateDockBadge();
-          }),
+          providerFor(accountId)
+            .untrashMessage(accountId, messageId)
+            .then((fresh) => {
+              mailStore.upsertMessages(accountId, fresh);
+              mailStore.recountLabels(accountId, [
+                ...new Set(fresh.flatMap((m) => m.labelIds)),
+                "TRASH",
+              ]);
+              updateDockBadge();
+            }),
       );
     } catch (err) {
       console.log("[gmail:untrashMessage] error", { error: String(err) });
@@ -823,7 +829,7 @@ export function registerGmailHandlers(): void {
           if (m.labelIds.includes("TRASH") || m.labelIds.includes("SPAM")) messageIds.push(m.id);
         }
       }
-      if (messageIds.length > 0) await batchDeleteMessages(accountId, messageIds);
+      if (messageIds.length > 0) await providerFor(accountId).deleteForever(accountId, messageIds);
       for (const id of messageIds) mailStore.deleteMessage(accountId, id);
       updateDockBadge();
       return { ok: true as const };
@@ -834,8 +840,8 @@ export function registerGmailHandlers(): void {
   });
 
   // gmail:emptyFolder — Empty Junk / Empty Trash: permanently deletes every
-  // message in SPAM or TRASH, from Gmail's own listing (the cache may not have
-  // them all) plus anything only cached. Big folders outlast the IPC timeout,
+  // message in SPAM or TRASH, on the server (the cache may not have them all)
+  // and anything only cached. Big folders outlast the IPC timeout,
   // so it reports back as a task.
   handle("gmail:emptyFolder", async (params: unknown) => {
     const p = params as Record<string, unknown>;
@@ -847,15 +853,11 @@ export function registerGmailHandlers(): void {
         throw new Error("Only Junk and Trash can be emptied.");
       }
       return await runAsTask(asString(p?.taskId), async () => {
-        const ids = new Set(mailStore.getMessageIdsForLabel(accountId, labelId));
-        let pageToken: string | undefined;
-        do {
-          const page = await listMessageIdsPage(accountId, { labelIds: [labelId], pageToken });
-          for (const id of page.ids) ids.add(id);
-          pageToken = page.nextPageToken;
-        } while (pageToken);
-        const messageIds = [...ids];
-        if (messageIds.length > 0) await batchDeleteMessages(accountId, messageIds);
+        const messageIds = await providerFor(accountId).emptyFolder(
+          accountId,
+          labelId,
+          mailStore.getMessageIdsForLabel(accountId, labelId),
+        );
         for (const id of messageIds) mailStore.deleteMessage(accountId, id);
         mailStore.recountLabels(accountId, [labelId]);
         updateDockBadge();
@@ -899,13 +901,13 @@ export function registerGmailHandlers(): void {
         // Someone else (Hermes, Gmail web, a phone) may have edited this draft
         // since the composer last saw it: never overwrite that silently.
         if (draftId && expectMessageId) {
-          const current = await getDraftVersion(accountId, draftId);
+          const current = await providerFor(accountId).getDraftVersion(accountId, draftId);
           if (current === null) return { gone: true as const, draftId };
           if (current !== expectMessageId) {
             return { conflict: true as const, draftId, messageId: current };
           }
         }
-        const res = await saveDraft(accountId, {
+        const res = await providerFor(accountId).saveDraft(accountId, {
           ...content,
           draftId,
           threadId: asString(p?.threadId),
@@ -928,7 +930,7 @@ export function registerGmailHandlers(): void {
     try {
       const accountId = assertString(p?.accountId, "accountId");
       const draftId = assertString(p?.draftId, "draftId");
-      return { messageId: await getDraftVersion(accountId, draftId) };
+      return { messageId: await providerFor(accountId).getDraftVersion(accountId, draftId) };
     } catch (err) {
       console.log("[gmail:getDraftVersion] error", { error: String(err) });
       throw err;
@@ -944,7 +946,7 @@ export function registerGmailHandlers(): void {
       const accountId = assertString(p?.accountId, "accountId");
       const draftId = assertString(p?.draftId, "draftId");
       const messageId = assertString(p?.messageId, "messageId");
-      const detail = await getMessage(accountId, messageId);
+      const detail = await providerFor(accountId).getMessage(accountId, messageId);
       mailStore.upsertMessageDetail(accountId, detail);
       mailStore.setDraftId(accountId, messageId, draftId);
       if (detail.threadId)
@@ -963,10 +965,10 @@ export function registerGmailHandlers(): void {
       const accountId = assertString(p?.accountId, "accountId");
       const messageId = assertString(p?.messageId, "messageId");
       const threadId = asString(p?.threadId);
-      // Local first (recorded on save and by sync); Gmail lookup as fallback.
+      // Local first (recorded on save and by sync); a server lookup as fallback.
       const known = mailStore.getDraftId(accountId, messageId, threadId);
       if (known) return { draftId: known };
-      const draftId = await findDraftIdByMessageId(accountId, messageId, threadId);
+      const draftId = await providerFor(accountId).findDraftId(accountId, messageId, threadId);
       if (draftId) mailStore.setDraftId(accountId, messageId, draftId);
       console.log("[gmail:getDraftForMessage]", { accountId, messageId, found: draftId != null });
       return { draftId };
@@ -987,7 +989,7 @@ export function registerGmailHandlers(): void {
       const sessionDraft = await takeSessionDraft(draftSessionId(accountId, sessionKey));
       const draftId = asString(p?.draftId) ?? sessionDraft;
       if (!draftId) return { ok: true as const };
-      const res = await deleteDraft(accountId, draftId);
+      const res = await providerFor(accountId).deleteDraft(accountId, draftId);
       if (res.messageId) mailStore.deleteMessage(accountId, res.messageId);
       return { ok: true as const };
     } catch (err) {
@@ -1031,7 +1033,7 @@ export function registerGmailHandlers(): void {
         let headers = mailStore.getStoredReplyHeaders(accountId, replyToMessageId);
         if (!headers.messageIdHeader) {
           try {
-            headers = await fetchReplyHeaders(accountId, replyToMessageId);
+            headers = await providerFor(accountId).getReplyHeaders(accountId, replyToMessageId);
             mailStore.setReplyHeaders(
               accountId,
               replyToMessageId,
@@ -1039,7 +1041,7 @@ export function registerGmailHandlers(): void {
               headers.referencesHeader,
             );
           } catch (headerErr) {
-            // Still threads via threadId; Gmail just loses the References chain.
+            // Still threads via threadId; the reply just loses the References chain.
             console.log("[gmail:sendMessage] reply-header fetch failed", {
               error: String(headerErr),
             });
@@ -1063,23 +1065,24 @@ export function registerGmailHandlers(): void {
         threadId,
         attachments,
       };
-      const send = sendMessage(accountId, { ...message, inReplyTo, references }).then(
-        async (result) => {
+      const provider = providerFor(accountId);
+      const send = provider
+        .send(accountId, { ...message, inReplyTo, references })
+        .then(async (result) => {
           // Mirror the sent message so it shows in Sent and its conversation
           // before the next sync. Best effort: the mail has already gone out.
           if (!result.messageId) return;
           try {
             mailStore.upsertMessages(
               accountId,
-              await fetchMetadataForIds(accountId, [result.messageId]),
+              await provider.getSummaries(accountId, [result.messageId]),
             );
           } catch (mirrorErr) {
             console.log("[gmail:sendMessage] sent; local mirror failed", {
               error: String(mirrorErr),
             });
           }
-        },
-      );
+        });
       // Uploads (attachments, rate limits) can outlast the renderer's 5s IPC
       // timeout, which used to report a false failure and invite a duplicate
       // send. Past the budget the composer closes as sent; if the send then
@@ -1098,7 +1101,7 @@ export function registerGmailHandlers(): void {
           console.log("[gmail:sendMessage] background send failed", { error: String(error) });
           let savedToDrafts = false;
           try {
-            await saveDraft(accountId, message);
+            await provider.saveDraft(accountId, message);
             savedToDrafts = true;
           } catch (draftErr) {
             console.log("[gmail:sendMessage] could not save a draft copy", {
@@ -1229,7 +1232,7 @@ export function registerGmailHandlers(): void {
       const attachmentId = assertString(p?.attachmentId, "attachmentId");
       const filename = assertString(p?.filename, "filename");
       return await runAsTask(asString(p?.taskId), () =>
-        getAttachment(accountId, messageId, attachmentId, filename),
+        saveAttachment(accountId, messageId, attachmentId, filename),
       );
     } catch (err) {
       console.log("[gmail:getAttachment] error", { error: String(err) });
