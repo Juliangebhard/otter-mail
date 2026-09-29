@@ -310,6 +310,17 @@ document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") backend.resume();
 });
 
+// ⌘Z: the Mac app's Edit › Undo sends edit:undo (the last mail action). Text
+// fields keep the browser's own undo.
+window.addEventListener("keydown", (event) => {
+  if (event.key.toLowerCase() !== "z" || !(event.metaKey || event.ctrlKey)) return;
+  if (event.shiftKey || event.altKey || event.defaultPrevented) return;
+  const target = event.target;
+  if (target instanceof HTMLElement && target.closest("input, textarea, [contenteditable]")) return;
+  event.preventDefault();
+  emit("edit:undo");
+});
+
 // Notifications need permission, which browsers only ask for after a click.
 if ("Notification" in window && Notification.permission === "default") {
   window.addEventListener("pointerdown", () => void Notification.requestPermission(), {
