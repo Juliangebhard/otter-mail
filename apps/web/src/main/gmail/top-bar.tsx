@@ -294,7 +294,7 @@ export function MailboxSwitcher({
           })}
           {children ? (
             <>
-              <DropdownMenuSeparator />
+              <DropdownMenuSeparator className="bg-foreground/15" />
               {children}
             </>
           ) : null}
