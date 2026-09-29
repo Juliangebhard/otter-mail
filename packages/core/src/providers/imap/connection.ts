@@ -21,6 +21,7 @@ import {
 } from "../../protocols/index.js";
 import { getAccount } from "../../services/account-store.js";
 import { getImapPassword, setAsideImapPassword } from "../../services/imap-passwords.js";
+import type { Lane } from "../provider.js";
 
 const IDLE_CLOSE_MS = 2 * 60_000;
 
@@ -28,10 +29,9 @@ const IDLE_CLOSE_MS = 2 * 60_000;
 export type ImapAccess = { settings: ImapSettings; password: string };
 
 /** Who's asking: background work waits behind the user (quota.ts's tiers, for IMAP). */
-export type Tier = "sync" | "prefetch";
-let tierContext: AsyncContext<Tier> | null = null;
-export const tier = (): AsyncContext<Tier> => (tierContext ??= platform().asyncContext<Tier>());
-const RANK = { user: 0, sync: 1, prefetch: 2 } as const;
+let tierContext: AsyncContext<Lane> | null = null;
+export const tier = (): AsyncContext<Lane> => (tierContext ??= platform().asyncContext<Lane>());
+const RANK = { user: 0, sync: 1, backfill: 2, prefetch: 3 } as const;
 
 type Connection = {
   client: ImapClient | null;

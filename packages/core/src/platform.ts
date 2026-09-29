@@ -1,6 +1,6 @@
 /**
  * The seam between the mail backend (this package) and the shell running it:
- * Electron's main process on the desktop (apps/desktop/src/platform.ts), a
+ * an Electron utility process on the desktop (apps/desktop/src/platform.ts), a
  * Web Worker in the browser (apps/web/src/web/platform.ts). Everything in
  * core that isn't plain TypeScript goes through here; a shell calls
  * `initCore(platform)` once before using anything else.

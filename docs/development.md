@@ -110,7 +110,7 @@ Both apps verify certificates, so the server's comes from a dev CA made once per
   `VITE_DEV_MAIL_CA`, read in dev builds only. The local relay runs with
   `TUNNEL_ALLOW_PRIVATE=true`, which lets its tunnel reach `localhost` and any port; the
   production relay (`wrangler.jsonc`) never sets it and allows only mail ports on public hosts.
-- `pnpm dev:desktop`: `NODE_EXTRA_CA_CERTS`, which Electron's main process honors.
+- `pnpm dev:desktop`: `NODE_EXTRA_CA_CERTS`, which the Mac app's backend process honors.
 
 The web app still needs an Otter account to open the tunnel (sign in as usual). Delete
 `.otter-mail/dev-mail/` and rerun `pnpm dev:mail` for a new CA.

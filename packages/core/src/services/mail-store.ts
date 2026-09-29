@@ -144,8 +144,14 @@ function getDb(): SqlDatabase {
       INSERT INTO messages_fts(messages_fts, rowid, subject, fromName, fromEmail, snippet, bodyText)
       VALUES ('delete', old.rowid, old.subject, old.fromName, old.fromEmail, old.snippet, old.bodyText);
     END;
-    CREATE TRIGGER IF NOT EXISTS messages_fts_au
+    -- Only when the indexed text changed: sync rewrites the same headers all
+    -- the time, and re-indexing means re-tokenizing the whole body.
+    DROP TRIGGER IF EXISTS messages_fts_au;
+    CREATE TRIGGER messages_fts_au
       AFTER UPDATE OF subject, fromName, fromEmail, snippet, bodyText ON messages
+      WHEN old.subject IS NOT new.subject OR old.fromName IS NOT new.fromName
+        OR old.fromEmail IS NOT new.fromEmail OR old.snippet IS NOT new.snippet
+        OR old.bodyText IS NOT new.bodyText
     BEGIN
       INSERT INTO messages_fts(messages_fts, rowid, subject, fromName, fromEmail, snippet, bodyText)
       VALUES ('delete', old.rowid, old.subject, old.fromName, old.fromEmail, old.snippet, old.bodyText);
@@ -253,6 +259,23 @@ function rowToDetail(row: MessageRow): GmailMessageDetail {
 
 export function upsertMessages(accountId: string, fetched: GmailMessageSummary[]): void {
   if (fetched.length === 0) return;
+  inTransaction(() => writeSummaries(accountId, fetched));
+}
+
+/** Runs `fn` in one transaction: one commit (and one WAL sync) for many rows. */
+function inTransaction(fn: () => void): void {
+  const d = getDb();
+  d.exec("BEGIN");
+  try {
+    fn();
+    d.exec("COMMIT");
+  } catch (err) {
+    d.exec("ROLLBACK");
+    throw err;
+  }
+}
+
+function writeSummaries(accountId: string, fetched: GmailMessageSummary[]): void {
   // Gmail may not have caught up with changes made here moments ago; keep them.
   const messages = withPendingLabels(accountId, fetched);
   const d = getDb();
@@ -283,53 +306,56 @@ export function upsertMessages(accountId: string, fetched: GmailMessageSummary[]
     "INSERT OR IGNORE INTO message_labels (accountId, messageId, labelId) VALUES (?, ?, ?)",
   );
 
-  d.exec("BEGIN");
-  try {
-    for (const m of messages) {
-      upsert.run(
-        accountId,
-        m.id,
-        m.threadId || m.id,
-        m.fromName,
-        m.fromEmail,
-        m.to,
-        m.subject,
-        m.snippet,
-        m.date,
-        m.unread ? 1 : 0,
-        m.starred ? 1 : 0,
-        m.hasAttachments ? 1 : 0,
-        JSON.stringify(m.labelIds),
-        m.messageIdHeader ?? null,
-        m.referencesHeader ?? null,
-      );
-      delLabels.run(accountId, m.id);
-      for (const lid of m.labelIds) insLabel.run(accountId, m.id, lid);
-    }
-    d.exec("COMMIT");
-  } catch (err) {
-    d.exec("ROLLBACK");
-    throw err;
+  for (const m of messages) {
+    upsert.run(
+      accountId,
+      m.id,
+      m.threadId || m.id,
+      m.fromName,
+      m.fromEmail,
+      m.to,
+      m.subject,
+      m.snippet,
+      m.date,
+      m.unread ? 1 : 0,
+      m.starred ? 1 : 0,
+      m.hasAttachments ? 1 : 0,
+      JSON.stringify(m.labelIds),
+      m.messageIdHeader ?? null,
+      m.referencesHeader ?? null,
+    );
+    delLabels.run(accountId, m.id);
+    for (const lid of m.labelIds) insLabel.run(accountId, m.id, lid);
   }
 }
 
 export function upsertMessageDetail(accountId: string, detail: GmailMessageDetail): void {
-  // Refresh metadata + labels first, then attach the body/attachments.
-  upsertMessages(accountId, [detail]);
-  const d = getDb();
-  d.prepare(`
+  upsertMessageDetails(accountId, [detail]);
+}
+
+/** Whole messages (metadata, labels, bodies, attachments), in one transaction. */
+export function upsertMessageDetails(accountId: string, details: GmailMessageDetail[]): void {
+  if (details.length === 0) return;
+  const setBody = getDb().prepare(`
     UPDATE messages
        SET cc = ?, bodyHtml = ?, bodyText = ?, attachments = ?, hasAttachments = ?, detailFetched = 1
      WHERE accountId = ? AND id = ?
-  `).run(
-    detail.cc ?? null,
-    detail.bodyHtml,
-    detail.bodyText,
-    JSON.stringify(detail.attachments),
-    detail.hasAttachments ? 1 : 0,
-    accountId,
-    detail.id,
-  );
+  `);
+  inTransaction(() => {
+    // Metadata + labels first, then the body/attachments on the same row.
+    writeSummaries(accountId, details);
+    for (const detail of details) {
+      setBody.run(
+        detail.cc ?? null,
+        detail.bodyHtml,
+        detail.bodyText,
+        JSON.stringify(detail.attachments),
+        detail.hasAttachments ? 1 : 0,
+        accountId,
+        detail.id,
+      );
+    }
+  });
 }
 
 /** Recounts the given labels' total/unread from the local cache. */
@@ -706,17 +732,23 @@ export function setReplyHeaders(
     .run(messageIdHeader, referencesHeader, accountId, messageId);
 }
 
-/** Ids of messages whose full body hasn't been downloaded yet (newest first),
-    skipping ones waiting out a retry backoff. */
-export function getUndownloadedMessageIds(accountId: string, limit: number): string[] {
-  const rows = getDb()
+/** Messages whose full body hasn't been downloaded yet, the inbox's first and
+    then newest first, skipping ones waiting out a retry backoff. */
+export function getUndownloadedMessages(
+  accountId: string,
+  limit: number,
+): { id: string; threadId: string }[] {
+  return getDb()
     .prepare(
-      `SELECT id FROM messages
-        WHERE accountId = ? AND detailFetched = 0 AND bodyRetryAt <= ?
-        ORDER BY date DESC LIMIT ?`,
+      `SELECT m.id, m.threadId FROM messages m
+        WHERE m.accountId = ? AND m.detailFetched = 0 AND m.bodyRetryAt <= ?
+        ORDER BY EXISTS (
+          SELECT 1 FROM message_labels ml
+           WHERE ml.accountId = m.accountId AND ml.messageId = m.id AND ml.labelId = 'INBOX'
+        ) DESC, m.date DESC
+        LIMIT ?`,
     )
-    .all(accountId, Date.now(), limit) as unknown as { id: string }[];
-  return rows.map((r) => r.id);
+    .all(accountId, Date.now(), limit) as unknown as { id: string; threadId: string }[];
 }
 
 /** Messages still missing a body that are due for download. */
@@ -877,32 +909,13 @@ export function filterUnknownIds(accountId: string, ids: string[]): string[] {
   return ids.filter((id) => !known.has(id));
 }
 
-/** Deletes an account's cached messages whose ids aren't in `keep` (mail
- *  deleted in Gmail while the history feed was unavailable). Returns the count. */
-export function pruneMessagesNotIn(accountId: string, keep: ReadonlySet<string>): number {
-  const d = getDb();
-  const rows = d
+/** Every cached message's labels, by id (the refresh after the history feed
+    expired compares them with Gmail's). */
+export function getAllMessageLabels(accountId: string): Map<string, string[]> {
+  const rows = getDb()
     .prepare("SELECT id, labelIds FROM messages WHERE accountId = ?")
     .all(accountId) as unknown as { id: string; labelIds: string }[];
-  const gone = rows.filter((r) => !keep.has(r.id));
-  if (gone.length === 0) return 0;
-  const touched = new Set<string>();
-  const delMsg = d.prepare("DELETE FROM messages WHERE accountId = ? AND id = ?");
-  const delLabels = d.prepare("DELETE FROM message_labels WHERE accountId = ? AND messageId = ?");
-  d.exec("BEGIN");
-  try {
-    for (const r of gone) {
-      for (const l of parseLabelIds(r.labelIds)) touched.add(l);
-      delMsg.run(accountId, r.id);
-      delLabels.run(accountId, r.id);
-    }
-    d.exec("COMMIT");
-  } catch (err) {
-    d.exec("ROLLBACK");
-    throw err;
-  }
-  recomputeLabelCounts(accountId, [...touched]);
-  return gone.length;
+  return new Map(rows.map((r) => [r.id, parseLabelIds(r.labelIds)]));
 }
 
 /** Dates of the given cached messages (e.g. to age-gate draft pruning). */

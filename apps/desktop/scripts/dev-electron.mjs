@@ -1,5 +1,5 @@
 // Runs Electron against the Vite dev server and restarts it whenever
-// `vp pack --watch` rewrites the main-process or preload bundle.
+// `vp pack --watch` rewrites the main-process, backend or preload bundle.
 // Started by scripts/dev-runner.ts; expects VITE_DEV_SERVER_URL.
 
 import * as NodeChildProcess from "node:child_process";
@@ -20,9 +20,11 @@ if (!Number.isInteger(devServerPort) || devServerPort <= 0) {
   throw new Error(`VITE_DEV_SERVER_URL must include an explicit port: ${devServerUrl}`);
 }
 
-const watchedFiles = ["dist-electron/main.cjs", "dist-electron/preload.cjs"].map((file) =>
-  NodePath.join(desktopDir, file),
-);
+const watchedFiles = [
+  "dist-electron/main.cjs",
+  "dist-electron/backend.cjs",
+  "dist-electron/preload.cjs",
+].map((file) => NodePath.join(desktopDir, file));
 const waitTimeoutMs = 120_000;
 const restartDebounceMs = 300;
 const forcedShutdownTimeoutMs = 2_000;

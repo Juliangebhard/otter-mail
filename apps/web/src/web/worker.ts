@@ -1,7 +1,7 @@
 /// <reference lib="webworker" />
 /**
  * The web app's backend: @otter-mail/core in a Web Worker, as the desktop app
- * runs it in Electron's main process. The page (bridge.ts) invokes its
+ * runs it in an Electron utility process. The page (bridge.ts) invokes its
  * handlers and receives its pushes; see protocol.ts.
  */
 

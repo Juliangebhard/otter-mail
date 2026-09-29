@@ -346,6 +346,7 @@ function main(): void {
 
   const requiredInputs = [
     NodePath.join(desktopDir, "dist-electron", "main.cjs"),
+    NodePath.join(desktopDir, "dist-electron", "backend.cjs"),
     NodePath.join(desktopDir, "dist-electron", "preload.cjs"),
     NodePath.join(webDir, "dist", "index.html"),
     NodePath.join(webDir, "dist", "tray-popover.html"),

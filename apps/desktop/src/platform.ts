@@ -1,13 +1,12 @@
 /**
- * The desktop's Platform for @otter-mail/core: the mail backend runs in this
- * (Electron main) process, with its data in the state directory (paths.ts),
- * secrets in safeStorage, and macOS for dialogs, notifications and the Dock.
+ * The desktop's Platform for @otter-mail/core, in the mail backend's utility
+ * process (backend.ts): its data in the state directory (paths.ts), SQLite
+ * through node:sqlite, and what only the main process can do (safeStorage,
+ * dialogs, notifications, the Dock) asked of main (main-link.ts).
  */
 
-import { app, dialog, Notification, powerMonitor, safeStorage, shell } from "electron";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { execFileSync } from "node:child_process";
-import { createHash } from "node:crypto";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -15,21 +14,16 @@ import { DatabaseSync } from "node:sqlite";
 
 import type { AsyncContext, Platform, SqlDatabase } from "@otter-mail/core";
 
-import { broadcast } from "./ipc.js";
+import { appInfo } from "./backend-protocol.js";
 import { logger } from "./logger.js";
+import { requestMain, tellMain } from "./main-link.js";
 import { googleAuth } from "./services/gmail-oauth.js";
 import { connectMailSocket } from "./services/mail-socket.js";
 import { claudeProvider } from "./services/agent/claude.js";
 import { codexProvider } from "./services/agent/codex.js";
-import { setPendingOpenMessage } from "./services/open-message-target.js";
 import { appleTranslator } from "./services/translator.js";
-import { refreshTray } from "./services/tray.js";
-import { focusMainWindow } from "./windows/main-window.js";
 
-const home = () => app.getPath("userData");
-
-const MAX_AWAITING_CLICK = 50;
-const notificationsAwaitingClick = new Set<Notification>();
+const home = () => appInfo().stateDir;
 
 /** Writes through a temp file, so a crash never leaves half a file. */
 async function writeFileAtomic(file: string, data: Uint8Array | string): Promise<void> {
@@ -52,54 +46,6 @@ async function readSecrets(): Promise<Record<string, string>> {
   }
 }
 
-const MIME_BY_EXT: Record<string, string> = {
-  pdf: "application/pdf",
-  png: "image/png",
-  jpg: "image/jpeg",
-  jpeg: "image/jpeg",
-  gif: "image/gif",
-  webp: "image/webp",
-  heic: "image/heic",
-  svg: "image/svg+xml",
-  txt: "text/plain",
-  md: "text/markdown",
-  csv: "text/csv",
-  html: "text/html",
-  json: "application/json",
-  xml: "application/xml",
-  ics: "text/calendar",
-  zip: "application/zip",
-  gz: "application/gzip",
-  mp3: "audio/mpeg",
-  m4a: "audio/mp4",
-  wav: "audio/wav",
-  mp4: "video/mp4",
-  mov: "video/quicktime",
-  doc: "application/msword",
-  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  xls: "application/vnd.ms-excel",
-  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  ppt: "application/vnd.ms-powerpoint",
-  pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-};
-
-function sanitizeFilename(name: string): string {
-  const cleaned = name.replace(/[/\\]/g, "_").replace(/^\.+/, "").trim();
-  return cleaned || "attachment";
-}
-
-/**
- * Writes `bytes` to a temp file named `name` (reused while its content is
- * the same) and returns its path: what Preview and Finder drags need.
- */
-export async function tempFile(name: string, bytes: Uint8Array): Promise<string> {
-  const key = createHash("sha256").update(bytes).digest("hex").slice(0, 16);
-  const file = path.join(app.getPath("temp"), "otter-mail-files", key, sanitizeFilename(name));
-  const existing = await fs.stat(file).catch(() => null);
-  if (!existing || existing.size !== bytes.length) await writeFileAtomic(file, bytes);
-  return file;
-}
-
 /** The Mac's name as the user set it ("Chris's MacBook Pro"). */
 function computerName(): string {
   try {
@@ -115,11 +61,14 @@ function openDatabase(): SqlDatabase {
   return db as unknown as SqlDatabase;
 }
 
+/** Listeners for the Mac waking up (main says so, backend.ts). */
+export const resumeListeners = new Set<() => void>();
+
 export function desktopPlatform(): Platform {
   let database: SqlDatabase | null = null;
   return {
     kind: "desktop",
-    appVersion: app.getVersion(),
+    appVersion: appInfo().version,
     log: (level, scope, message, data) => logger[level](scope, message, data),
 
     database: () => (database ??= openDatabase()),
@@ -149,11 +98,11 @@ export function desktopPlatform(): Platform {
     secrets: {
       async get(name) {
         const sealed = (await readSecrets())[name];
-        return sealed ? safeStorage.decryptString(Buffer.from(sealed, "base64")) : null;
+        return sealed ? requestMain("unseal", { sealed }) : null;
       },
       async set(name, value) {
         const secrets = await readSecrets();
-        secrets[name] = safeStorage.encryptString(value).toString("base64");
+        secrets[name] = await requestMain("seal", { text: value });
         await writeFileAtomic(path.join(home(), SECRETS_FILE), JSON.stringify(secrets, null, 2));
       },
       async delete(name) {
@@ -164,30 +113,9 @@ export function desktopPlatform(): Platform {
       },
     },
     userFiles: {
-      async open(name, bytes) {
-        const error = await shell.openPath(await tempFile(name, bytes));
-        if (error) throw new Error(error);
-      },
-      async save(name, bytes) {
-        const result = await dialog.showSaveDialog({ defaultPath: name });
-        if (result.canceled || !result.filePath) return false;
-        await fs.writeFile(result.filePath, bytes);
-        return true;
-      },
-      async pick() {
-        const result = await dialog.showOpenDialog({
-          properties: ["openFile", "multiSelections"],
-        });
-        if (result.canceled) return [];
-        return Promise.all(
-          result.filePaths.map(async (file) => ({
-            name: path.basename(file),
-            mimeType:
-              MIME_BY_EXT[path.extname(file).slice(1).toLowerCase()] ?? "application/octet-stream",
-            bytes: new Uint8Array(await fs.readFile(file)),
-          })),
-        );
-      },
+      open: (name, bytes) => requestMain("openFile", { name, bytes }),
+      save: (name, bytes) => requestMain("saveFile", { name, bytes }),
+      pick: () => requestMain("pickFiles", undefined),
     },
 
     google: googleAuth,
@@ -195,29 +123,12 @@ export function desktopPlatform(): Platform {
     relaySession: "bearer",
     deviceName: computerName(),
 
-    broadcast,
-    notify({ open, ...options }) {
-      if (!Notification.isSupported()) return;
-      const notification = new Notification(options);
-      notificationsAwaitingClick.add(notification);
-      if (notificationsAwaitingClick.size > MAX_AWAITING_CLICK) {
-        notificationsAwaitingClick.delete(notificationsAwaitingClick.values().next().value!);
-      }
-      notification.on("click", () => {
-        notificationsAwaitingClick.delete(notification);
-        // The same handoff as a click in the menu-bar popover.
-        if (open) setPendingOpenMessage(open);
-        void focusMainWindow().then(() => open && broadcast("mail:open"));
-      });
-      notification.show();
-    },
-    setUnreadCount(count) {
-      app.dock?.setBadge(count > 0 ? String(count) : "");
-      void refreshTray();
-    },
+    broadcast: (channel, params) => tellMain({ kind: "broadcast", channel, params }),
+    notify: (notification) => tellMain({ kind: "notify", ...notification }),
+    setUnreadCount: (count) => tellMain({ kind: "unread", count }),
     onResume(listener) {
-      powerMonitor.on("resume", listener);
-      return () => powerMonitor.off("resume", listener);
+      resumeListeners.add(listener);
+      return () => resumeListeners.delete(listener);
     },
     asyncContext<T>(): AsyncContext<T> {
       const storage = new AsyncLocalStorage<T>();

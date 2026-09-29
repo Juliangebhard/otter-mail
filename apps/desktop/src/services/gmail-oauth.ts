@@ -6,14 +6,14 @@
  * HTTP listener on 127.0.0.1, and the code is exchanged for tokens.
  *
  * Tokens live in userData/google-tokens.json, each account's entry encrypted
- * with Electron's safeStorage (Keychain-backed). Access tokens are served from
- * memory and refreshed a little before they expire.
+ * with Electron's safeStorage (Keychain-backed; main does it for the mail
+ * backend this runs in). Access tokens are served from memory and refreshed a
+ * little before they expire.
  *
  * The same flow, with identity scopes only, signs in to the Otter account
  * (otter-account.ts): it needs a Google ID token, not Gmail access.
  */
 
-import { app, safeStorage, shell } from "electron";
 import { createHash, randomBytes } from "node:crypto";
 import * as fs from "node:fs/promises";
 import * as http from "node:http";
@@ -22,14 +22,16 @@ import * as path from "node:path";
 import { GMAIL_SCOPES } from "@otter-mail/contracts";
 import {
   accountStore,
+  broadcast,
+  logger,
   SIGNED_OUT_MESSAGE,
   SignInCancelledError,
   type GmailAccount,
   type GoogleAuth,
 } from "@otter-mail/core";
 
-import { broadcast } from "../ipc.js";
-import { logger } from "../logger.js";
+import { appInfo } from "../backend-protocol.js";
+import { requestMain } from "../main-link.js";
 import { getCredentials } from "./credentials-store.js";
 
 const AUTHORIZE_URL = "https://accounts.google.com/o/oauth2/v2/auth";
@@ -64,21 +66,26 @@ type StoredTokens = {
 type TokenFile = { version: 1; accounts: Record<string, string> };
 
 let storeCache: Map<string, StoredTokens> | null = null;
+let storeLoad: Promise<Map<string, StoredTokens>> | null = null;
 let storeWrite: Promise<void> = Promise.resolve();
 
 function tokenFilePath(): string {
-  return path.join(app.getPath("userData"), "google-tokens.json");
+  return path.join(appInfo().stateDir, "google-tokens.json");
 }
 
-async function loadStore(): Promise<Map<string, StoredTokens>> {
-  if (storeCache) return storeCache;
+/** Read once (each entry is unsealed by main): every caller shares the same map. */
+function loadStore(): Promise<Map<string, StoredTokens>> {
+  return (storeLoad ??= readStore().then((store) => (storeCache = store)));
+}
+
+async function readStore(): Promise<Map<string, StoredTokens>> {
   const store = new Map<string, StoredTokens>();
   const { clientId } = await getCredentials();
   try {
     const file = JSON.parse(await fs.readFile(tokenFilePath(), "utf-8")) as TokenFile;
     for (const [accountId, sealed] of Object.entries(file.accounts ?? {})) {
       try {
-        const plain = safeStorage.decryptString(Buffer.from(sealed, "base64"));
+        const plain = await requestMain("unseal", { sealed });
         const tokens = JSON.parse(plain) as StoredTokens;
         // Issued for another OAuth client (the app switched clients): useless
         // here, so the account reads as signed out and offers to sign in again.
@@ -94,7 +101,6 @@ async function loadStore(): Promise<Map<string, StoredTokens>> {
   } catch {
     // No tokens yet.
   }
-  storeCache = store;
   return store;
 }
 
@@ -102,7 +108,7 @@ async function saveStore(): Promise<void> {
   const store = await loadStore();
   const accounts: Record<string, string> = {};
   for (const [accountId, tokens] of store) {
-    accounts[accountId] = safeStorage.encryptString(JSON.stringify(tokens)).toString("base64");
+    accounts[accountId] = await requestMain("seal", { text: JSON.stringify(tokens) });
   }
   const body = JSON.stringify({ version: 1, accounts } satisfies TokenFile, null, 2);
   // Serialize writes so a slow one never lands after a newer one.
@@ -272,7 +278,7 @@ async function authorizeInBrowser(opts: {
         : { prompt: "select_account" }),
       ...(opts.loginHint ? { login_hint: opts.loginHint } : {}),
     }).toString();
-    shell.openExternal(authorizeUrl.toString()).catch((err: unknown) => {
+    requestMain("openExternal", { url: authorizeUrl.toString() }).catch((err: unknown) => {
       clearTimeout(timer);
       reject(err instanceof Error ? err : new Error(String(err)));
     });

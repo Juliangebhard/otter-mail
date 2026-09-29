@@ -54,6 +54,13 @@ export default defineConfig({
       outputOptions: { codeSplitting: false },
     },
     {
+      // The mail backend's utility process (backend-host.ts forks it).
+      ...shared,
+      entry: ["src/backend.ts"],
+      clean: false,
+      outputOptions: { codeSplitting: false },
+    },
+    {
       // Sandboxed preloads must be self-contained, without shared runtime chunks.
       ...shared,
       entry: ["src/preload.ts"],

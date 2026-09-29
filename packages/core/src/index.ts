@@ -1,6 +1,6 @@
 /**
- * @otter-mail/core: the mail backend. The desktop app runs it in Electron's
- * main process, the web app in a Web Worker; each hands `startCore` its
+ * @otter-mail/core: the mail backend. The desktop app runs it in an Electron
+ * utility process, the web app in a Web Worker; each hands `startCore` its
  * Platform (platform.ts) and serves `registeredHandlers()` to the renderer.
  */
 

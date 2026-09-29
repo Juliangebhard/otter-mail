@@ -6,12 +6,13 @@
  * core caches the results.
  */
 
-import { app } from "electron";
 import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
 import path from "path";
 
 import type { TranslationStatus, Translator } from "@otter-mail/core";
+
+import { appInfo } from "../backend-protocol.js";
 
 const STATUSES: ReadonlySet<string> = new Set(["ok", "notInstalled", "unsupported", "unavailable"]);
 
@@ -19,7 +20,8 @@ const HELPER_TIMEOUT_MS = 60_000;
 
 /** The helper ships in Resources/bin; unpackaged runs use the SwiftPM build. */
 function helperPath(): string {
-  if (app.isPackaged) return path.join(process.resourcesPath, "bin", "translator");
+  const { packaged, resourcesPath } = appInfo();
+  if (packaged) return path.join(resourcesPath, "bin", "translator");
   const packageDir = path.resolve(__dirname, "..", "..", "..", "native", "translator", ".build");
   const candidates = [
     path.join(packageDir, "release", "translator"),

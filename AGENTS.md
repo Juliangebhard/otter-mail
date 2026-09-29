@@ -14,9 +14,13 @@ when a feature lands or goes.
   mail cache, sync, the JSON stores, the Otter account (better-auth client), mailboxes synced
   across devices, realtime push, and the handlers the UI calls. It is plain TypeScript: anything
   platform-specific goes through the `Platform` interface (`src/platform.ts`).
-- `apps/desktop`: the Electron main process (`src/main.ts`), which runs core with the desktop
-  platform (`src/platform.ts`: node:sqlite, safeStorage, dialogs, the Dock), and the preload.
-  - `src/handlers/`: the Mac-only handlers (tray, default mail app, …).
+- `apps/desktop`: the Electron main process (`src/main.ts`: windows, menus, the tray, the Dock,
+  updates), the preload, and the mail backend: core in a utility process (`src/backend.ts`) with
+  the desktop platform (`src/platform.ts`: node:sqlite, and safeStorage, dialogs and
+  notifications asked of main). Main forwards the windows' invokes to it (`src/backend-host.ts`,
+  messages in `src/backend-protocol.ts`), so syncing never holds up the app itself.
+  - `src/handlers/`: the Mac-only handlers (tray, default mail app, …); `backend.ts` there holds
+    the ones the backend serves.
   - `src/services/`: Google sign-in (loopback OAuth), tray, Apple's translator, the local agents
     (Claude, Codex; Hermes is in core), default mail app.
   - `src/windows/`: the main window, the menu-bar popover, and where their pages load from.

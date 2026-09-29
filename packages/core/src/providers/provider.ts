@@ -30,6 +30,14 @@ export interface SyncContext {
   newMail(messages: GmailMessageSummary[]): Promise<void>;
 }
 
+/**
+ * Background work, most urgent first; all of it waits behind the user's own
+ * requests. `sync` keeps the mailbox current (new mail), `backfill` fills or
+ * re-reads the whole mailbox beside it, `prefetch` downloads bodies for
+ * offline reading.
+ */
+export type Lane = "sync" | "backfill" | "prefetch";
+
 /** The account was removed while its sync ran: the run ends without writing. */
 export class SyncCancelled extends Error {
   constructor(accountId: string) {
@@ -82,8 +90,16 @@ export interface MailProvider {
    * push and offline downloads.
    */
   sync(accountId: string, ctx: SyncContext): Promise<void>;
-  /** Runs sync or offline-download work behind the user's own requests. */
-  background<T>(lane: "sync" | "prefetch", fn: () => Promise<T>): Promise<T>;
+  /**
+   * Whether there's long work to do on the whole mailbox (Gmail: the first
+   * sync, or re-reading it after the history feed expired). The engine runs
+   * `backfill` for it in its own lane, so syncs keep bringing new mail.
+   */
+  needsBackfill?(accountId: string): boolean;
+  /** Does that work; resolves once there's none left. Safe to stop and run again. */
+  backfill?(accountId: string, ctx: SyncContext): Promise<void>;
+  /** Runs background work behind the user's own requests (and behind more urgent lanes). */
+  background<T>(lane: Lane, fn: () => Promise<T>): Promise<T>;
   /** The server asked to slow down: offline downloads wait. */
   isCoolingDown?(accountId: string): boolean;
   /** What kind of failure an error is, for the engine to decide what to retry. */
@@ -107,6 +123,8 @@ export interface MailProvider {
   getSummaries(accountId: string, messageIds: string[]): Promise<GmailMessageSummary[]>;
   /** The whole message: bodies and the attachment list. */
   getMessage(accountId: string, messageId: string): Promise<GmailMessageDetail>;
+  /** Every message of a thread, whole, where one request is cheaper than one per message. */
+  getThread?(accountId: string, threadId: string): Promise<GmailMessageDetail[]>;
   fetchAttachment(accountId: string, messageId: string, attachmentId: string): Promise<Uint8Array>;
   /** Message-ID and References, for replying to a message cached without them. */
   getReplyHeaders(
