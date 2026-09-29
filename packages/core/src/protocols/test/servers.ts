@@ -32,7 +32,7 @@ async function start(
   image: string,
   env: Record<string, string>,
   ports: number[],
-  ready: number,
+  ready: { port: number; tls: boolean }[],
 ): Promise<Container> {
   const name = `otter-mail-test-${Math.random().toString(36).slice(2, 10)}`;
   const envArgs = Object.entries(env).flatMap(([key, value]) => ["-e", `${key}=${value}`]);
@@ -52,13 +52,17 @@ async function start(
       await run("docker", ["rm", "-f", name]).catch(() => {});
     },
   };
-  // Ready once the server greets on `ready`.
+  // Ready once the server greets on every port in `ready`: TLS listeners can
+  // come up after the plain ones.
+  const greets = async ({ port, tls }: { port: number; tls: boolean }) => {
+    const stream = await nodeConnect(container.host, container.port(port), { tls });
+    const greeting = await stream.read();
+    stream.close();
+    return Boolean(greeting?.length);
+  };
   for (let attempt = 0; ; attempt++) {
     try {
-      const stream = await nodeConnect(container.host, container.port(ready), { tls: false });
-      const greeting = await stream.read();
-      stream.close();
-      if (greeting?.length) return container;
+      if ((await Promise.all(ready.map(greets))).every(Boolean)) return container;
     } catch {
       // Not listening yet.
     }
@@ -82,8 +86,16 @@ export const startGreenMail = () =>
       ].join(" "),
     },
     [3143, 3993, 3025, 3465],
-    3143,
+    [3143, 3993, 3025, 3465].map((port) => ({ port, tls: port === 3993 || port === 3465 })),
   );
 
 export const startDovecot = () =>
-  start("dovecot/dovecot:2.4.5", { USER_PASSWORD: "pass" }, [31143, 31993], 31143);
+  start(
+    "dovecot/dovecot:2.4.5",
+    { USER_PASSWORD: "pass" },
+    [31143, 31993],
+    [
+      { port: 31143, tls: false },
+      { port: 31993, tls: true },
+    ],
+  );
