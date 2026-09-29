@@ -28,8 +28,8 @@ import { focusMainWindow } from "./windows/main-window.js";
 
 const home = () => app.getPath("userData");
 
-const MAX_HELD_NOTIFICATIONS = 50;
-const shownNotifications = new Set<Notification>();
+const MAX_AWAITING_CLICK = 50;
+const notificationsAwaitingClick = new Set<Notification>();
 
 /** Writes through a temp file, so a crash never leaves half a file. */
 async function writeFileAtomic(file: string, data: Uint8Array | string): Promise<void> {
@@ -199,15 +199,12 @@ export function desktopPlatform(): Platform {
     notify({ open, ...options }) {
       if (!Notification.isSupported()) return;
       const notification = new Notification(options);
-      // Held until clicked (or the oldest of many): a collected notification's
-      // click never fires, and "close" also comes when the banner times out into
-      // Notification Center, where it can still be clicked.
-      shownNotifications.add(notification);
-      if (shownNotifications.size > MAX_HELD_NOTIFICATIONS) {
-        shownNotifications.delete(shownNotifications.values().next().value!);
+      notificationsAwaitingClick.add(notification);
+      if (notificationsAwaitingClick.size > MAX_AWAITING_CLICK) {
+        notificationsAwaitingClick.delete(notificationsAwaitingClick.values().next().value!);
       }
       notification.on("click", () => {
-        shownNotifications.delete(notification);
+        notificationsAwaitingClick.delete(notification);
         // The same handoff as a click in the menu-bar popover.
         if (open) setPendingOpenMessage(open);
         void focusMainWindow().then(() => open && broadcast("mail:open"));
