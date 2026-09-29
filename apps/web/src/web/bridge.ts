@@ -112,6 +112,9 @@ function saveBytes(name: string, bytes: Uint8Array, open: boolean): void {
   setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
+/** The message a clicked notification opens. */
+let pendingOpenMessage: { accountId: string; messageId: string } | null = null;
+
 function applyEffect(effect: PageEffect): void {
   switch (effect.kind) {
     case "notify":
@@ -119,7 +122,13 @@ function applyEffect(effect: PageEffect): void {
         const notification = new Notification(effect.title, {
           body: [effect.subtitle, effect.body].filter(Boolean).join(" · "),
         });
-        notification.addEventListener("click", () => window.focus());
+        notification.addEventListener("click", () => {
+          window.focus();
+          notification.close();
+          if (!effect.open) return;
+          pendingOpenMessage = effect.open;
+          emit("mail:open");
+        });
       }
       break;
     case "badge":
@@ -171,7 +180,11 @@ const pageChannels: Record<string, (params: unknown) => unknown> = {
     settingsTarget = null;
     return target;
   },
-  "window:takePendingOpenMessage": () => null,
+  "window:takePendingOpenMessage": () => {
+    const target = pendingOpenMessage;
+    pendingOpenMessage = null;
+    return target;
+  },
   "window:closeMain": () => {},
   "app:takePendingMailto": () => null,
   "edit:nativeUndo": () => document.execCommand("undo"),
