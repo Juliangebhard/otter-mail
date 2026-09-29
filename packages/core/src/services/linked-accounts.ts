@@ -1,18 +1,23 @@
 /**
  * linked-accounts.ts
  *
- * Keeps this device's Gmail accounts and the Otter account's linked accounts in
+ * Keeps this device's mailboxes and the Otter account's linked accounts in
  * step, so signing in on another device brings every account along. The relay
- * only learns addresses and profiles; each device signs in to Gmail itself,
- * so an account that arrives from the relay shows up signed out here until
- * the user signs in to it (one click, with the address prefilled).
+ * only learns addresses, profiles and IMAP server settings; each device signs
+ * in itself (Gmail with Google, IMAP with the password, which never leaves
+ * the device), so an account that arrives from the relay shows up signed out
+ * here until the user signs in to it (one click, or the password).
  *
  * Reconciling compares the local accounts, the relay's list, and the
  * accounts both had last time (the snapshot): that is what tells "added on
  * another device" apart from "removed on this one".
  */
 
-import type { ListAccountsResponse, RelayAccount } from "@otter-mail/contracts/relay";
+import type {
+  ListAccountsResponse,
+  PutAccountRequest,
+  RelayAccount,
+} from "@otter-mail/contracts/relay";
 
 import { logger } from "../logger.js";
 import { broadcast } from "../ipc.js";
@@ -21,6 +26,7 @@ import { platform } from "../platform.js";
 import { isSignedIn } from "../providers/index.js";
 import * as mailStore from "./mail-store.js";
 import { getOtterUser, relayRequest, RelayError } from "./otter-account.js";
+import { syncedSignature } from "./preferences.js";
 import type { GmailAccount } from "../types.js";
 
 export type LocalAccount = Pick<GmailAccount, "email" | "displayName" | "color"> & {
@@ -28,7 +34,7 @@ export type LocalAccount = Pick<GmailAccount, "email" | "displayName" | "color">
 };
 
 export type ReconcilePlan = {
-  /** On this device only, and new: link them (needs a Gmail sign-in to prove it). */
+  /** On this device only, and new: link them (Gmail needs a sign-in to prove it). */
   link: string[];
   /** Removed on this device since the last reconcile: unlink them. */
   unlink: string[];
@@ -111,13 +117,41 @@ const profile = (account: GmailAccount) => ({
   color: account.color ?? null,
 });
 
-/** Links a signed-in Gmail account to the Otter account. */
-async function link(account: GmailAccount): Promise<void> {
-  const idToken = await platform().google.getIdToken(account.id);
-  await relayRequest("PUT", accountRoute(account.email), { idToken, ...profile(account) });
+/**
+ * What links an account: Gmail proves the sign-in with an ID token; IMAP
+ * sends its server settings (never the password).
+ */
+export async function linkRequest(
+  account: GmailAccount,
+  idToken: (accountId: string) => Promise<string>,
+): Promise<PutAccountRequest> {
+  if (account.provider === "imap") {
+    return { provider: "imap", imap: account.imap, ...profile(account) };
+  }
+  return { idToken: await idToken(account.id), ...profile(account) };
 }
 
-/** After adding (or signing back in to) a Gmail account here. No-op when signed out of Otter. */
+/** Links a signed-in account to the Otter account. */
+async function link(account: GmailAccount): Promise<void> {
+  const body = await linkRequest(account, (id) => platform().google.getIdToken(id));
+  await relayRequest("PUT", accountRoute(account.email), body);
+}
+
+/** An account linked on another device, as this device keeps it: signed out until it signs in. */
+export function accountFromRelay(account: RelayAccount): GmailAccount {
+  const imap = account.provider === "imap" && account.imap;
+  return {
+    id: account.email,
+    email: account.email,
+    name: account.name ?? account.email,
+    ...(imap ? { provider: "imap", imap, signature: syncedSignature(account.email) } : {}),
+    picture: account.picture ?? undefined,
+    displayName: account.displayName ?? undefined,
+    color: account.color ?? undefined,
+  };
+}
+
+/** After adding (or signing back in to) an account here. No-op when signed out of Otter. */
 export async function accountAdded(account: GmailAccount): Promise<void> {
   if (!getOtterUser()) return;
   try {
@@ -129,7 +163,7 @@ export async function accountAdded(account: GmailAccount): Promise<void> {
   }
 }
 
-/** After removing a Gmail account here. */
+/** After removing an account here. */
 export async function accountRemoved(email: string): Promise<void> {
   if (!getOtterUser()) return;
   try {
@@ -188,14 +222,9 @@ export async function reconcileAccounts(
     }
   }
   for (const account of plan.add) {
-    await accountStore.addAccount({
-      id: account.email,
-      email: account.email,
-      name: account.name ?? account.email,
-      picture: account.picture ?? undefined,
-      displayName: account.displayName ?? undefined,
-      color: account.color ?? undefined,
-    });
+    // An IMAP link without its settings can't be reached from here.
+    if (account.provider === "imap" && !account.imap) continue;
+    await accountStore.addAccount(accountFromRelay(account));
   }
   for (const email of plan.remove) {
     await removeLocal(byKey.get(key(email))!.id);

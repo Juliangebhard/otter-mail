@@ -12,6 +12,9 @@ import { LazyReadFunctionReadQueue, startTls, TrustedCert, type RootCertsDatabas
 // '/-BEGIN/{p=1} p; /-END/{p=0}' > roots.pem`).
 import rootsPem from "./roots.pem?raw";
 
+// Dev builds only: the CA of `pnpm dev:mail`'s local server, which `pnpm dev` passes in.
+const devRoots: string = (import.meta.env.DEV && import.meta.env.VITE_DEV_MAIL_CA) || "";
+
 let roots: Promise<RootCertsDatabase> | undefined;
 
 export type TlsStream = {
@@ -25,7 +28,7 @@ export async function negotiateTls(
   read: () => Promise<Uint8Array | null>,
   write: (data: Uint8Array) => void,
 ): Promise<TlsStream> {
-  roots ??= TrustedCert.databaseFromPEM(rootsPem);
+  roots ??= TrustedCert.databaseFromPEM(`${rootsPem}\n${devRoots}`);
   const queue = new LazyReadFunctionReadQueue(async () => (await read()) ?? undefined);
   try {
     return await startTls(host.toLowerCase(), await roots, queue.read.bind(queue), write);

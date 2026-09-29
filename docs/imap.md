@@ -26,8 +26,13 @@ MailProvider                packages/core/src/providers/provider.ts
   Mac-only UI on `features`.
 - An account is `GmailAccount` with `provider` (absent = Gmail) and `imap` settings. Its id is
   its address for both providers.
-- The IMAP password lives in `platform.secrets` under `imap-password:<accountId>`; it is never
-  synced. A mailbox linked on another device shows as signed out until the password is entered.
+- The IMAP password lives in `platform.secrets` under `imap-password:<accountId>`
+  (`services/imap-passwords.ts`); it is never synced. A mailbox linked on another device arrives
+  with its settings and shows as signed out until the password is entered (`gmail:signInImap`).
+- Adding one (`handlers/imap-accounts.ts`): `gmail:discoverImap` finds the servers (known
+  providers, Mozilla's ISPDB, the domain's autoconfig file on the Mac only, as its host rarely
+  allows CORS, then the MX records over DNS-over-HTTPS); `gmail:addImapAccount` logs in to both
+  servers before saving anything.
 
 ## Live mail
 

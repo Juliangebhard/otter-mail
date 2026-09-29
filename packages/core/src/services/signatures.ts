@@ -3,7 +3,8 @@
  * Gmail on the web and on every device. The account keeps a copy for the
  * composer, refreshed from Gmail. A signature from before, kept only in Otter
  * Mail, moves to Gmail once. Mailboxes whose server keeps no signatures
- * (capabilities.serverSignatures) keep just the account's copy.
+ * (capabilities.serverSignatures) keep just the account's copy, which
+ * follows the Otter account as a preference (preferences.ts).
  *
  * Reading needs only the Gmail scope; saving needs gmail.settings.basic,
  * which sign-ins from before it was added lack: saving then asks to sign in
@@ -14,12 +15,18 @@ import { broadcast } from "../ipc.js";
 import { logger } from "../logger.js";
 import { findProvider, isSignedIn } from "../providers/index.js";
 import { listAccounts, updateAccount } from "./account-store.js";
+import { preferenceChanged } from "./preferences.js";
 import type { GmailAccount } from "../types.js";
 
 /** Saves the signature on the server when it keeps them, then keeps its copy. */
 export async function saveSignature(account: GmailAccount, html: string): Promise<GmailAccount> {
   const signatures = findProvider(account)?.signatures;
-  if (!signatures) return updateAccount(account.id, { signature: html });
+  if (!signatures) {
+    // Kept on the device, following the Otter account as a preference.
+    const updated = await updateAccount(account.id, { signature: html });
+    preferenceChanged("signatures");
+    return updated;
+  }
   const saved = await signatures.set(account.id, account.email, html);
   return updateAccount(account.id, { signature: saved, signatureInGmail: true });
 }

@@ -17,6 +17,7 @@ import { findProvider, isSignedIn, providerFor } from "../providers/index.js";
 import {
   getAccount,
   listAccounts,
+  providerKindOf,
   removeAccount as storeRemoveAccount,
   updateAccount as storeUpdateAccount,
 } from "../services/account-store.js";
@@ -26,6 +27,7 @@ import {
   saveAttachment,
 } from "../services/attachment-cache.js";
 import { proxyRemoteImage } from "../services/image-proxy.js";
+import { deleteImapPassword } from "../services/imap-passwords.js";
 import { MAX_ATTACHMENT_TOTAL_BYTES, pickComposeAttachments } from "../services/outgoing.js";
 import * as mailStore from "../services/mail-store.js";
 import { IPC_WRITE_BUDGET_MS, atMost, runAsTask, settleGmailWrite, sleep } from "./ipc-budget.js";
@@ -57,6 +59,7 @@ export async function removeLocalAccount(accountId: string): Promise<void> {
   mailSync.forgetAccount(accountId);
   forgetLiveCursors(accountId);
   await findProvider(accountId)?.removeAccount(accountId);
+  if (providerKindOf(accountId) === "imap") await deleteImapPassword(accountId);
   await storeRemoveAccount(accountId);
   mailStore.removeAccountData(accountId);
   updateDockBadge();
