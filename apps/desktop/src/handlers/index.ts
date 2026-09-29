@@ -1,43 +1,21 @@
 /**
- * Registers every IPC handler the renderer windows call: the mail backend's
- * (@otter-mail/core, served over Electron IPC) and the desktop's own.
+ * Registers the IPC handlers the main process serves itself (the mail
+ * backend's channels are forwarded to it by backend-host.ts).
  */
 
 import { app, ipcMain, nativeImage } from "electron";
 
-import {
-  broadcast,
-  getAttachmentBytes,
-  onSettingsChanged,
-  registeredHandlers,
-  runAsTask,
-} from "@otter-mail/core";
-
+import { invokeBackend, tempFile } from "../backend-host.js";
+import { broadcast } from "../ipc.js";
 import { logger } from "../logger.js";
-import { tempFile } from "../platform.js";
 import { listMailApps, setDefaultMailHandler } from "../services/default-mail.js";
 import { takePendingMailto } from "../services/mailto-target.js";
 import { takePendingOpenMessage } from "../services/open-message-target.js";
-import { createTray, destroyTray } from "../services/tray.js";
 import { focusMainWindow } from "../windows/main-window.js";
 import { setSettingsTarget, takeSettingsTarget } from "../windows/settings-window.js";
 import { registerTrayPopoverHandlers } from "./tray-popover.js";
 
 export function registerHandlers(): void {
-  for (const [channel, handler] of registeredHandlers()) {
-    ipcMain.handle(channel, (_event, params: unknown) => handler(params));
-  }
-
-  onSettingsChanged((settings, patch) => {
-    if (patch.launchAtLogin !== undefined) {
-      app.setLoginItemSettings({ openAtLogin: settings.launchAtLogin });
-    }
-    if (patch.trayEnabled !== undefined) {
-      if (settings.trayEnabled) void createTray();
-      else destroyTray();
-    }
-  });
-
   // Settings live in the main window. Any window can deep-link into a pane
   // (e.g. edit a view from the tray); the main window pulls the target on
   // mount and whenever settings:open is broadcast.
@@ -106,8 +84,12 @@ export function registerHandlers(): void {
     ) {
       throw new Error("Invalid parameters for gmail:dragAttachment.");
     }
-    return runAsTask(typeof taskId === "string" ? taskId : undefined, async () => {
-      const bytes = await getAttachmentBytes(accountId, messageId, attachmentId);
+    const drag = async () => {
+      const bytes = (await invokeBackend("desktop:attachmentBytes", {
+        accountId,
+        messageId,
+        attachmentId,
+      })) as Uint8Array;
       const file = await tempFile(filename, bytes);
       const icon = await nativeImage
         .createThumbnailFromPath(file, { width: 64, height: 64 })
@@ -118,7 +100,15 @@ export function registerHandlers(): void {
         icon: icon.isEmpty() ? await app.getFileIcon(file, { size: "normal" }) : icon,
       });
       return { ok: true };
-    });
+    };
+    // With a taskId (core's runAsTask): answer at once, the outcome follows as task:done.
+    if (typeof taskId !== "string") return drag();
+    void drag().then(
+      (result) => broadcast("task:done", { taskId, result }),
+      (err: unknown) =>
+        broadcast("task:done", { taskId, error: err instanceof Error ? err.message : String(err) }),
+    );
+    return { accepted: true };
   });
 
   registerTrayPopoverHandlers();

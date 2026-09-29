@@ -6,16 +6,14 @@
  * account — anchored under the icon. The icon itself only owns the tooltip
  * (total unread count) and the click-to-toggle wiring.
  *
- * refreshTray() — called from notifier.updateDockBadge() (covers syncs and
- * every message-state mutation) and after account rename/color changes —
+ * setTrayUnread() — called with the Dock badge's count (core's
+ * notifier.updateDockBadge(), after syncs and every message-state mutation) —
  * keeps the tooltip current and tells any open popover to refetch, so
  * neither the icon nor the popover need their own polling.
  */
 
 import { Tray } from "electron";
-import { logger } from "../logger.js";
 import { broadcast } from "../ipc.js";
-import { mailStore, turnedOffMailboxes } from "@otter-mail/core";
 import {
   toggleTrayPopover,
   destroyTrayPopover,
@@ -24,17 +22,19 @@ import {
 import { trayIcons } from "./tray-icons.js";
 
 let tray: Tray | null = null;
+/** Unread in the inboxes of the mailboxes that are on, as the Dock badge shows it. */
+let unread = 0;
 
-/** Refresh the tray tooltip and nudge any open popover to refetch. No-op if the tray isn't created yet. */
-export async function refreshTray(): Promise<void> {
+/** Updates the tooltip and nudges any open popover to refetch. */
+export function setTrayUnread(count: number): void {
+  unread = count;
+  refreshTray();
+}
+
+function refreshTray(): void {
   if (!tray) return;
-  try {
-    const unread = mailStore.countInboxUnreadAll(turnedOffMailboxes());
-    tray.setToolTip(unread > 0 ? `Otter Mail — ${unread} unread` : "Otter Mail");
-    broadcast("tray:refresh");
-  } catch (err) {
-    logger.info("tray", `refresh failed: ${String(err)}`);
-  }
+  tray.setToolTip(unread > 0 ? `Otter Mail — ${unread} unread` : "Otter Mail");
+  broadcast("tray:refresh");
 }
 
 export async function createTray(): Promise<void> {
@@ -47,7 +47,7 @@ export async function createTray(): Promise<void> {
   tray.on("click", (_event, bounds) => {
     void toggleTrayPopover(bounds);
   });
-  await refreshTray();
+  refreshTray();
 }
 
 export function destroyTray(): void {

@@ -1,7 +1,7 @@
 /**
  * What the IMAP and SMTP clients share: how they reach a server, how they log
  * in, and how they fail. Plain TypeScript over a ByteStream, so both run in
- * Electron's main process and in the web app's worker alike.
+ * the Mac app's backend process and in the web app's worker alike.
  */
 
 import type { MailServer } from "@otter-mail/contracts/mail";

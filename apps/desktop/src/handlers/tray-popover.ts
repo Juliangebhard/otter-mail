@@ -1,9 +1,10 @@
 /**
  * tray-popover.ts
  *
- * IPC surface for the tray popover's mini inbox (see
- * renderer/tray-popover/). Reads are served from the local mail cache — the
- * popover doesn't trigger its own syncs, it just reflects whatever the
+ * The tray popover's (see renderer/tray-popover/) main-process channels:
+ * opening mail or the composer in the main window, and the app. Its mini
+ * inbox is read from the mail cache by the backend (handlers/backend.ts) —
+ * the popover doesn't trigger its own syncs, it just reflects whatever the
  * normal sync/notifier pipeline already wrote there.
  */
 
@@ -14,27 +15,6 @@ import { setPendingMailto } from "../services/mailto-target.js";
 import { focusMainWindow } from "../windows/main-window.js";
 import { hideTrayPopover } from "../windows/tray-popover-window.js";
 import { setPendingOpenMessage } from "../services/open-message-target.js";
-import {
-  accountStore,
-  mailStore,
-  syncAllAccounts,
-  turnedOffMailboxes,
-  type GmailAccount,
-  type GmailMessageSummary,
-} from "@otter-mail/core";
-
-const PREVIEW_LIMIT = 15;
-
-export type TrayAccountSnapshot = {
-  account: GmailAccount;
-  unreadCount: number;
-  messages: GmailMessageSummary[];
-};
-
-export type TraySnapshot = {
-  accounts: TrayAccountSnapshot[];
-  totalUnread: number;
-};
 
 function assertString(value: unknown, name: string): string {
   if (typeof value !== "string" || !value) throw new Error(`${name} is required`);
@@ -42,20 +22,6 @@ function assertString(value: unknown, name: string): string {
 }
 
 export function registerTrayPopoverHandlers(): void {
-  ipcMain.handle("tray:getSnapshot", async (_event, params: unknown): Promise<TraySnapshot> => {
-    const p = params as Record<string, unknown> | undefined;
-    const unreadOnly = p?.unreadOnly !== false;
-    const accounts = await accountStore.listAccounts();
-    return {
-      accounts: accounts.map((account) => ({
-        account,
-        unreadCount: mailStore.countInboxUnreadForAccount(account.id),
-        messages: mailStore.listInboxPreview(account.id, PREVIEW_LIMIT, unreadOnly),
-      })),
-      totalUnread: mailStore.countInboxUnreadAll(turnedOffMailboxes()),
-    };
-  });
-
   // Row click: open the thread's latest message in its own window, same as
   // Cmd+click in the main list.
   ipcMain.handle("tray:openThread", async (_event, params: unknown) => {
@@ -88,11 +54,6 @@ export function registerTrayPopoverHandlers(): void {
   // window has its own query cache, so tell it to refresh.
   ipcMain.handle("tray:mailChanged", async () => {
     broadcast("gmail:mail-changed");
-  });
-
-  ipcMain.handle("tray:sync", async () => {
-    await syncAllAccounts({ force: true });
-    return { ok: true };
   });
 
   ipcMain.handle("tray:openApp", async () => {

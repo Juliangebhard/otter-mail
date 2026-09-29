@@ -5,14 +5,13 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 
 import type { NativeThemeInfo, ThemeSource } from "@otter-mail/contracts";
-import { getSettings, shutdownProviders, startCore, syncAllAccounts } from "@otter-mail/core";
+import type { AppSettings } from "@otter-mail/core";
 
+import { invokeBackend, startBackend, stopBackend } from "./backend-host.js";
 import { registerHandlers } from "./handlers/index.js";
 import { broadcast } from "./ipc.js";
-import { logger } from "./logger.js";
+import { logger, logToFile } from "./logger.js";
 import { configureAppPaths } from "./paths.js";
-import { desktopPlatform } from "./platform.js";
-import { migrateHermesKey } from "./services/assistant/local.js";
 import { parseMailtoUrl, setPendingMailto } from "./services/mailto-target.js";
 import { createTray, destroyTray } from "./services/tray.js";
 import { initUpdates } from "./updates.js";
@@ -22,6 +21,7 @@ import { handleRendererProtocol, registerRendererScheme } from "./windows/window
 
 // Each kind of run has its own data home; see paths.ts.
 configureAppPaths();
+logToFile(app.getPath("logs"), !app.isPackaged);
 
 // Logging to a terminal that has gone away (a stopped `pnpm dev`) must not
 // crash the app with EPIPE.
@@ -253,7 +253,7 @@ function setupApplicationMenu(): void {
           accelerator: "Shift+Command+N",
           click: () => {
             logger.info("main", "Menu: Synchronize All Mailboxes");
-            void syncAllAccounts({ force: true });
+            void invokeBackend("tray:sync");
           },
         },
       ],
@@ -275,8 +275,8 @@ app.on("activate", (_event, hasVisibleWindows) => {
 
 app.on("will-quit", () => {
   destroyTray();
-  // Codex app-servers are child processes; don't leave them behind.
-  shutdownProviders();
+  // It stops the assistants' processes (Codex app-servers) on its way out.
+  stopBackend();
 });
 
 // ── App ready ─────────────────────────────────────────────────────────
@@ -294,15 +294,13 @@ void app.whenReady().then(async () => {
     applicationVersion: app.getVersion(),
   });
 
-  // The mail backend (@otter-mail/core) runs in this process.
-  const platform = desktopPlatform();
-  await migrateHermesKey(platform.secrets);
-  await startCore(platform);
+  // The mail backend (@otter-mail/core) runs in its own process.
+  await startBackend();
   registerHandlers();
   setupApplicationMenu();
   initUpdates();
 
-  const startupSettings = await getSettings();
+  const startupSettings = (await invokeBackend("gmail:getSyncSettings")) as AppSettings;
   if (app.isPackaged) {
     app.setLoginItemSettings({ openAtLogin: startupSettings.launchAtLogin });
   }
