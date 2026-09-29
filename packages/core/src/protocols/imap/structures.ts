@@ -239,7 +239,7 @@ function parseParameters(token: ImapToken | undefined): Record<string, string> {
         if (match) [, charset = "utf-8", value = ""] = match;
       }
       if (!piece.encoded) {
-        bytes.push(...utf8Encode(value));
+        for (const byte of utf8Encode(value)) bytes.push(byte);
         continue;
       }
       for (let j = 0; j < value.length; j++) {
@@ -321,15 +321,59 @@ export function uidSet(uids: readonly number[] | string): string {
   return ranges.join(",");
 }
 
-/** "1:3,5" → [1, 2, 3, 5] (in the server's order: COPYUID pairs them up by position). */
-export function parseUidSet(text: string): number[] {
+/** A UID range, both ends included, low to high. */
+export type UidRange = [from: number, to: number];
+
+const MAX_UID = 4_294_967_295;
+
+const isUid = (n: number | undefined): n is number =>
+  n !== undefined && Number.isInteger(n) && n > 0 && n <= MAX_UID;
+
+/** "1:3,5,9:8" → [[1, 3], [5, 5], [8, 9]], never expanded (VANISHED may name 1:4294967295). */
+export function parseUidRanges(text: string): UidRange[] {
+  const ranges: UidRange[] = [];
+  for (const range of text.split(",")) {
+    const [from, to = from] = range.split(":").map(Number);
+    if (!isUid(from) || !isUid(to)) continue;
+    ranges.push(from <= to ? [from, to] : [to, from]);
+  }
+  return ranges;
+}
+
+/** A test for "is this UID in `ranges`?", a binary search per UID however many ranges. */
+export function inUidRanges(ranges: readonly UidRange[]): (uid: number) => boolean {
+  const sorted: UidRange[] = [];
+  for (const [from, to] of [...ranges].sort((a, b) => a[0] - b[0])) {
+    const last = sorted.at(-1);
+    if (last && from <= last[1] + 1) last[1] = Math.max(last[1], to);
+    else sorted.push([from, to]);
+  }
+  return (uid) => {
+    let low = 0;
+    let high = sorted.length - 1;
+    while (low <= high) {
+      const mid = (low + high) >> 1;
+      const [from, to] = sorted[mid]!;
+      if (uid < from) high = mid - 1;
+      else if (uid > to) low = mid + 1;
+      else return true;
+    }
+    return false;
+  };
+}
+
+/**
+ * "1:3,5" → [1, 2, 3, 5] (in the server's order: COPYUID pairs them up by
+ * position); null when that would be more than `limit` UIDs.
+ */
+export function parseUidSet(text: string, limit = 100_000): number[] | null {
   const uids: number[] = [];
   for (const range of text.split(",")) {
-    const [from, to] = range.split(":").map(Number);
-    if (!Number.isFinite(from)) continue;
-    const last = to === undefined || !Number.isFinite(to) ? from! : to;
-    const step = last >= from! ? 1 : -1;
-    for (let uid = from!; uid !== last + step; uid += step) uids.push(uid);
+    const [from, to = from] = range.split(":").map(Number);
+    if (!isUid(from) || !isUid(to)) continue;
+    if (uids.length + Math.abs(to - from) + 1 > limit) return null;
+    const step = to >= from ? 1 : -1;
+    for (let uid = from; uid !== to + step; uid += step) uids.push(uid);
   }
   return uids;
 }

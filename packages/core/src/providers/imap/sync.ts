@@ -18,10 +18,12 @@
 import { logger } from "../../logger.js";
 import {
   ImapError,
+  inUidRanges,
   type FetchedMessage,
   type ImapClient,
   type MailboxStatus,
   type SelectedMailbox,
+  type UidRange,
 } from "../../protocols/index.js";
 import { hasPendingLabelWrites } from "../../services/pending-label-writes.js";
 import * as store from "../../services/mail-store.js";
@@ -108,7 +110,7 @@ export async function syncImap(accountId: string, ctx: SyncContext): Promise<voi
     }
     state[folder.path] = run.state!;
     writeState(accountId, state);
-    if (folder.role === "INBOX") newMail.push(...added);
+    if (folder.role === "INBOX") for (const message of added) newMail.push(message);
   }
 
   ctx.assertActive();
@@ -303,7 +305,9 @@ class FolderSync {
   private async fetchAndStore(uids: number[]): Promise<GmailMessageSummary[]> {
     const stored: GmailMessageSummary[] = [];
     for (let end = uids.length; end > 0; end -= PAGE) {
-      stored.push(...(await this.fetchPage(uids.slice(Math.max(0, end - PAGE), end))));
+      for (const summary of await this.fetchPage(uids.slice(Math.max(0, end - PAGE), end))) {
+        stored.push(summary);
+      }
     }
     return stored;
   }
@@ -354,7 +358,7 @@ class FolderSync {
     mailbox: {
       uidNext: number | null;
       highestModseq: bigint | null;
-      vanished: number[];
+      vanished: UidRange[];
       changed: FetchedMessage[];
     },
     qresynced: boolean,
@@ -395,9 +399,11 @@ class FolderSync {
       if (add.length) ops.push({ kind: "labelsAdded", id, labelIds: add });
       if (remove.length) ops.push({ kind: "labelsRemoved", id, labelIds: remove });
     }
-    for (const uid of mailbox.vanished) {
-      const id = known.get(uid);
-      if (id) {
+    // Ranges may span every UID there could be: checked against the cache, never expanded.
+    if (mailbox.vanished.length > 0) {
+      const vanished = inUidRanges(mailbox.vanished);
+      for (const [uid, id] of known) {
+        if (!vanished(uid)) continue;
         ops.push({ kind: "deleted", id });
         known.delete(uid);
       }
@@ -445,7 +451,9 @@ class FolderSync {
       store.recountLabels(accountId, [...new Set(added.flatMap((m) => m.labelIds))]);
     }
 
-    state.uidNext = Math.max(mailbox.uidNext ?? 0, ...fresh.map((uid) => uid + 1), state.uidNext);
+    let uidNext = Math.max(mailbox.uidNext ?? 0, state.uidNext);
+    for (const uid of fresh) uidNext = Math.max(uidNext, uid + 1);
+    state.uidNext = uidNext;
     if (mailbox.highestModseq !== null) state.modseq = mailbox.highestModseq.toString();
     return added;
   }

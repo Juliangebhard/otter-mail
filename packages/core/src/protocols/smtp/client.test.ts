@@ -88,4 +88,16 @@ describe("SmtpClient against a pretend server", () => {
     ).rejects.toMatchObject({ kind: "server", code: 550 });
     expect(stream.written.at(-1)).toBe("RSET\r\n");
   });
+
+  it("gives up on a reply line that never ends", async () => {
+    const stream = new FakeStream("220 hi\r\n", (text, server) => {
+      if (!text.startsWith("EHLO")) return undefined;
+      for (let i = 0; i < 20; i++) server.send(`250-${"x".repeat(8192)}`);
+      return undefined;
+    });
+    await expect(connectSmtp(options(stream, { security: "tls" }))).rejects.toMatchObject({
+      kind: "protocol",
+    });
+    expect(stream.closed).toBe(true);
+  });
 });

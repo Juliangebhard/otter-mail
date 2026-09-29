@@ -333,12 +333,12 @@ describe.skipIf(!docker)("Dovecot", () => {
         const changes = await client.fetchChanges("1:*", { flags: true, modseq: true }, since);
         expect(changes.messages.map((m) => m.uid)).toEqual([a!.uid]);
         expect(changes.messages[0]!.modseq).toBeGreaterThan(since);
-        expect(changes.vanished).toEqual([b!.uid]);
+        expect(changes.vanished).toEqual([[b!.uid, b!.uid]]);
 
         const resynced = await client.select("INBOX", {
           qresync: { uidValidity: opened.uidValidity, modseq: since },
         });
-        expect(resynced.vanished).toEqual([b!.uid]);
+        expect(resynced.vanished).toEqual([[b!.uid, b!.uid]]);
         expect(resynced.changed.map((m) => m.uid)).toEqual([a!.uid]);
       } finally {
         await client.logout();

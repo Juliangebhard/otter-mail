@@ -28,12 +28,15 @@ export {
 } from "./imap/client.js";
 export {
   decodeHeader,
+  inUidRanges,
+  parseUidRanges,
   parseUidSet,
   uidSet,
   type BodyStructure,
   type FetchedMessage,
   type ImapAddress,
   type ImapEnvelope,
+  type UidRange,
 } from "./imap/structures.js";
 export { decodeMailboxName, encodeMailboxName } from "./imap/utf7.js";
 export {

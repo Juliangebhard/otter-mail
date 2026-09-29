@@ -31,10 +31,12 @@ import {
 import {
   formatInternalDate,
   parseFetch,
+  parseUidRanges,
   parseUidSet,
   toBigInt,
   uidSet,
   type FetchedMessage,
+  type UidRange,
 } from "./structures.js";
 import { decodeMailboxName, encodeMailboxName } from "./utf7.js";
 
@@ -109,8 +111,8 @@ export interface SelectedMailbox {
   highestModseq: bigint | null;
   flags: string[];
   permanentFlags: string[];
-  /** With `qresync`: UIDs expunged since the given modseq … */
-  vanished: number[];
+  /** With `qresync`: UIDs expunged since the given modseq (ranges: they may be huge) … */
+  vanished: UidRange[];
   /** … and the messages whose flags changed since it (UID, FLAGS, MODSEQ). */
   changed: FetchedMessage[];
 }
@@ -153,7 +155,7 @@ export interface CopyResult {
 export type ImapUpdate =
   | { type: "exists"; count: number }
   | { type: "expunge"; seq: number }
-  | { type: "vanished"; uids: number[] }
+  | { type: "vanished"; ranges: UidRange[] }
   | { type: "fetch"; message: FetchedMessage };
 
 export interface IdleSession {
@@ -422,8 +424,9 @@ export class ImapClient {
     for (const response of untagged) {
       if (response.type === "EXISTS") mailbox.exists = response.number ?? 0;
       else if (response.type === "FLAGS") mailbox.flags = texts(response.args[0]);
-      else if (response.type === "VANISHED") mailbox.vanished.push(...vanishedUids(response));
-      else if (response.type === "FETCH") mailbox.changed.push(parseFetch(response));
+      else if (response.type === "VANISHED") {
+        for (const range of vanishedRanges(response)) mailbox.vanished.push(range);
+      } else if (response.type === "FETCH") mailbox.changed.push(parseFetch(response));
       const code = response.code;
       if (!code) continue;
       if (code.name === "UIDVALIDITY") mailbox.uidValidity = tokenNumber(code.args[0]) ?? 0;
@@ -453,7 +456,7 @@ export class ImapClient {
     uids: readonly number[] | string,
     query: FetchQuery,
     changedSince?: bigint,
-  ): Promise<{ messages: FetchedMessage[]; vanished: number[] }> {
+  ): Promise<{ messages: FetchedMessage[]; vanished: UidRange[] }> {
     const set = uidSet(uids);
     if (!set) return { messages: [], vanished: [] };
     const items = ["UID"];
@@ -485,9 +488,11 @@ export class ImapClient {
 
     // A server may split one message's items over several FETCH responses.
     const byUid = new Map<number, FetchedMessage>();
-    const vanished: number[] = [];
+    const vanished: UidRange[] = [];
     for (const response of untagged) {
-      if (response.type === "VANISHED") vanished.push(...vanishedUids(response));
+      if (response.type === "VANISHED") {
+        for (const range of vanishedRanges(response)) vanished.push(range);
+      }
       if (response.type !== "FETCH") continue;
       const message = parseFetch(response);
       if (!message.uid) continue;
@@ -550,7 +555,10 @@ export class ImapClient {
   async copy(uids: readonly number[] | string, destination: string): Promise<CopyResult | null> {
     const set = uidSet(uids);
     if (!set) return null;
-    return copyUid(await this.command(["UID COPY", set, this.mailboxName(destination)]));
+    return copyUid(
+      await this.command(["UID COPY", set, this.mailboxName(destination)]),
+      sentCount(uids),
+    );
   }
 
   /** UID MOVE, or where there's none: COPY, flag \Deleted, expunge those. */
@@ -558,9 +566,12 @@ export class ImapClient {
     const set = uidSet(uids);
     if (!set) return null;
     if (this.has("MOVE")) {
-      return copyUid(await this.command(["UID MOVE", set, this.mailboxName(destination)]));
+      return copyUid(
+        await this.command(["UID MOVE", set, this.mailboxName(destination)]),
+        sentCount(uids),
+      );
     }
-    const copied = await this.copy(set, destination);
+    const copied = await this.copy(uids, destination);
     await this.store(set, { add: ["\\Deleted"] });
     await this.expunge(set);
     return copied;
@@ -806,7 +817,7 @@ export class ImapClient {
         return;
       case "VANISHED":
         if (tokenList(response.args[0]).length === 0) {
-          this.listener?.({ type: "vanished", uids: vanishedUids(response) });
+          this.listener?.({ type: "vanished", ranges: vanishedRanges(response) });
         }
         return;
       case "FETCH":
@@ -870,20 +881,25 @@ function asImapError(err: unknown): ImapError {
   return new ImapError(errorText(err), "network", { cause: err });
 }
 
-function copyUid({ tagged, untagged }: CommandResult): CopyResult | null {
+/** Where copied messages went; `limit`: how many were sent (the server can't have moved more). */
+function copyUid({ tagged, untagged }: CommandResult, limit?: number): CopyResult | null {
   // MOVE sends COPYUID in an untagged OK before its expunges; COPY in the tagged OK.
   const code = [tagged, ...untagged].find((r) => r.code?.name === "COPYUID")?.code;
   if (!code) return null;
   const uidValidity = tokenNumber(code.args[0]);
-  const from = parseUidSet(tokenText(code.args[1]) ?? "");
-  const to = parseUidSet(tokenText(code.args[2]) ?? "");
-  if (uidValidity === null || from.length !== to.length) return null;
+  const from = parseUidSet(tokenText(code.args[1]) ?? "", limit);
+  const to = parseUidSet(tokenText(code.args[2]) ?? "", limit);
+  if (uidValidity === null || !from || !to || from.length !== to.length) return null;
   return { uidValidity, uids: new Map(from.map((uid, i) => [uid, to[i]!])) };
 }
 
-/** `* VANISHED (EARLIER) 1:3,7` → [1, 2, 3, 7]. */
-const vanishedUids = (response: ImapResponse): number[] =>
-  parseUidSet(tokenText(response.args.at(-1)) ?? "");
+/** How many UIDs a command named (a set like "1:*" can't say). */
+const sentCount = (uids: readonly number[] | string): number | undefined =>
+  typeof uids === "string" ? undefined : new Set(uids).size;
+
+/** `* VANISHED (EARLIER) 1:3,7` → [[1, 3], [7, 7]]. */
+const vanishedRanges = (response: ImapResponse): UidRange[] =>
+  parseUidRanges(tokenText(response.args.at(-1)) ?? "");
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 

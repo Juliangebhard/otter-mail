@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vite-plus/test";
 import { utf8Decode, utf8Encode } from "../../bytes.ts";
-import { ResponseReader, parseResponse, tokenText, type ImapResponse } from "./parser.ts";
+import { MAX_LINE, ResponseReader, parseResponse, tokenText, type ImapResponse } from "./parser.ts";
 import {
   formatInternalDate,
   parseFetch,
+  inUidRanges,
   parseInternalDate,
+  parseUidRanges,
   parseUidSet,
   uidSet,
 } from "./structures.ts";
@@ -157,6 +159,19 @@ describe("ResponseReader", () => {
     const [response] = readAll(bytes, 4);
     expect([...parseFetch(response!).source!]).toEqual([0xff, 0x00, 0x80]);
   });
+
+  it("refuses a line that never ends, and an absurd literal", () => {
+    const long = new ResponseReader();
+    expect(() => {
+      for (let sent = 0; sent <= MAX_LINE; sent += 65_536) {
+        long.push(utf8Encode("x".repeat(65_536)));
+        long.next();
+      }
+    }).toThrow(/too long/);
+    const huge = new ResponseReader();
+    huge.push(utf8Encode("* 1 FETCH (UID 1 BODY[] {99999999999}\r\n"));
+    expect(() => huge.next()).toThrow(/too large/);
+  });
 });
 
 describe("parseFetch", () => {
@@ -266,6 +281,20 @@ describe("uid sets and dates", () => {
     expect(uidSet([])).toBe("");
     expect(uidSet("1:*")).toBe("1:*");
     expect(parseUidSet("1:3,5,9:8")).toEqual([1, 2, 3, 5, 9, 8]);
+  });
+
+  it("never expands a huge range", () => {
+    expect(parseUidSet("1:4294967295")).toBeNull();
+    expect(parseUidSet("1:3,7", 3)).toBeNull();
+    expect(parseUidSet("0,x,5")).toEqual([5]);
+    const ranges = parseUidRanges("1:4294967295,9:8,x");
+    expect(ranges).toEqual([
+      [1, 4294967295],
+      [8, 9],
+    ]);
+    expect(inUidRanges(ranges)(123_456_789)).toBe(true);
+    const some = inUidRanges(parseUidRanges("4,2:3,1:10,20:30"));
+    expect([6, 11, 25, 31].map(some)).toEqual([true, false, true, false]);
   });
 
   it("round-trips INTERNALDATE", () => {
