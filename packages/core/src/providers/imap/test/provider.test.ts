@@ -24,7 +24,7 @@ import type { GmailMessageSummary } from "../../../types.ts";
 import type { SyncContext } from "../../provider.ts";
 import { imapProvider } from "../index.ts";
 import { threadIdOf } from "../messages.ts";
-import { useNodePlatform } from "./node-platform.ts";
+import { connectionCount, resumeNow, useNodePlatform } from "./node-platform.ts";
 
 useNodePlatform();
 const docker = dockerAvailable();
@@ -425,10 +425,20 @@ function providerScenario(
       changes = 0;
       await seed.append("INBOX", mail({ subject: "While idling" }).raw);
       await waitFor(() => (changes > 0 ? true : undefined));
+
+      // Woken up (or a browser tab shown again): the same connection, checked, and a catch-up.
+      changes = 0;
+      const connections = connectionCount();
+      resumeNow();
+      await waitFor(() => (changes > 0 ? true : undefined));
+      expect(connectionCount()).toBe(connections);
+      changes = 0;
+      await seed.append("INBOX", mail({ subject: "After waking" }).raw);
+      await waitFor(() => (changes > 0 ? true : undefined));
     } finally {
       stop();
     }
-  });
+  }, 20_000);
 
   it("starts a folder over when its UIDVALIDITY changes", async () => {
     await seed.select("INBOX");

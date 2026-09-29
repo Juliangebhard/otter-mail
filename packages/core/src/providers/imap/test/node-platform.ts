@@ -8,6 +8,17 @@ import { DatabaseSync } from "node:sqlite";
 import { setPlatform, type Platform, type SqlDatabase } from "../../../platform.ts";
 import { nodeConnect } from "../../../protocols/test/node-stream.ts";
 
+const resumeListeners = new Set<() => void>();
+let connections = 0;
+
+/** As if the machine woke from sleep. */
+export function resumeNow(): void {
+  for (const listener of resumeListeners) listener();
+}
+
+/** Connections opened so far. */
+export const connectionCount = () => connections;
+
 export function useNodePlatform(): Platform {
   const files = new Map<string, Uint8Array>();
   const secrets = new Map<string, string>();
@@ -51,13 +62,19 @@ export function useNodePlatform(): Platform {
       getIdToken: unused,
       removeTokens: async () => {},
     },
-    connect: nodeConnect,
+    connect: (...args) => {
+      connections++;
+      return nodeConnect(...args);
+    },
     relayUrl: "http://127.0.0.1:1",
     relaySession: "bearer",
     broadcast: () => {},
     notify: () => {},
     setUnreadCount: () => {},
-    onResume: () => () => {},
+    onResume: (listener) => {
+      resumeListeners.add(listener);
+      return () => resumeListeners.delete(listener);
+    },
     asyncContext: () => ({ run: (_value, fn) => fn(), get: () => undefined }),
     offlineDownloads: false,
   };

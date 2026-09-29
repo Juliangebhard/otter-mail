@@ -7,9 +7,14 @@
  * ends IDLE right away is asked again no sooner than every 30 seconds.
  * Servers without IDLE are left to the sync timer. A missing or refused
  * password ends the watch: retrying would only fail again.
+ *
+ * Back from sleep or offline (in the browser, also a tab shown again), the
+ * connection is checked rather than replaced: ending IDLE shows whether the
+ * server is still there, and only a dead one is reconnected, at once.
  */
 
 import { logger } from "../../logger.js";
+import { platform } from "../../platform.js";
 import type { IdleSession, ImapClient } from "../../protocols/index.js";
 import { isSignInFailure, openImap } from "./connection.js";
 
@@ -28,6 +33,8 @@ export function watchInbox(accountId: string, onChange: () => void): () => void 
   let session: IdleSession | null = null;
   let wake: (() => void) | null = null;
   let debounce: ReturnType<typeof setTimeout> | undefined;
+  /** Resumed: IDLE again (or reconnect) without waiting, and catch up. */
+  let resumed = false;
 
   const changed = () => {
     clearTimeout(debounce);
@@ -64,10 +71,15 @@ export function watchInbox(accountId: string, onChange: () => void): () => void 
             await session.done;
           } finally {
             clearTimeout(renew);
+            session = null;
           }
           const lasted = Date.now() - started;
           if (lasted >= HEALTHY_MS) attempt = 0;
-          else if (!stopped.signal.aborted) await pause(Math.max(0, IDLE_GAP_MS - lasted));
+          if (resumed) {
+            // Still connected after all: IDLE again, and catch up.
+            resumed = false;
+            changed();
+          } else if (!stopped.signal.aborted) await pause(Math.max(0, IDLE_GAP_MS - lasted));
         }
       } catch (err) {
         if (stopped.signal.aborted) break;
@@ -79,7 +91,8 @@ export function watchInbox(accountId: string, onChange: () => void): () => void 
           changed();
           return;
         }
-        const delay = Math.min(RETRY_MIN_MS * 2 ** attempt, RETRY_MAX_MS);
+        const delay = resumed ? 0 : Math.min(RETRY_MIN_MS * 2 ** attempt, RETRY_MAX_MS);
+        resumed = false;
         logger.info(
           "imap-watch",
           `IDLE for ${accountId} dropped (${String(err)}); again in ${delay / 1000}s`,
@@ -92,7 +105,15 @@ export function watchInbox(accountId: string, onChange: () => void): () => void 
   };
   void run();
 
+  const stopResume = platform().onResume(() => {
+    resumed = true;
+    // Idling: DONE answers if the connection lived; waiting to retry: now.
+    if (session) void session.stop();
+    else wake?.();
+  });
+
   return () => {
+    stopResume();
     stopped.abort();
     clearTimeout(debounce);
     wake?.();

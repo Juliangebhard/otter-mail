@@ -109,22 +109,15 @@ export function setPushedAccounts(accountIds: Iterable<string>): void {
 // ── Watches ──────────────────────────────────────────────────────────────
 // Providers that watch the mailbox from the device (IMAP IDLE) instead of
 // through the relay: started with the account's first sync, stopped when
-// it's removed or turned off, restarted after sleep. Once a watch reports,
-// the account counts as pushed.
+// it's removed or turned off; after sleep each checks its own connection.
+// Once a watch reports, the account counts as pushed.
 
 const watches = new Map<string, () => void>();
 const watched = new Set<string>();
-let stopWatchingResume: (() => void) | null = null;
 
 function startWatch(accountId: string): void {
   const watch = findProvider(accountId)?.watch;
   if (!watch || watches.has(accountId)) return;
-  stopWatchingResume ??= platform().onResume(() => {
-    for (const id of Array.from(watches.keys())) {
-      stopWatch(id);
-      startWatch(id);
-    }
-  });
   watches.set(
     accountId,
     watch(accountId, () => {
