@@ -22,9 +22,11 @@ export const googleKeys = (env: Env) => remoteKeys(env.GOOGLE_JWKS_URL || GOOGLE
 
 /** The audiences of ID tokens from Otter Mail's own Google sign-ins (desktop, web and iPhone). */
 export const googleClientIds = (env: Env) =>
-  [env.GOOGLE_WEB_CLIENT_ID, env.GOOGLE_CLIENT_ID, env.GOOGLE_IOS_CLIENT_ID].filter(
-    (id): id is string => Boolean(id),
-  );
+  [
+    env.GOOGLE_WEB_CLIENT_ID,
+    env.GOOGLE_CLIENT_ID,
+    ...(env.GOOGLE_IOS_CLIENT_ID ?? "").split(","),
+  ].filter((id): id is string => Boolean(id));
 
 const hub = (env: Env, userId: string) => env.USER_HUB.get(env.USER_HUB.idFromName(userId));
 

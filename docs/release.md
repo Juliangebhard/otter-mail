@@ -21,6 +21,13 @@ Dock → Quit, logging out).
    with notes generated since the previous release, and commits the new version to
    `apps/*/package.json` on `main`.
 
+4. Ship the iPhone app from a Mac with Xcode 27: `pnpm release:ios` builds `main` at the same
+   version and uploads it to App Store Connect. About half an hour later it's in TestFlight for
+   internal testers (everyone on the App Store Connect team). To put it in the App Store, pick the
+   build in App Store Connect (Otter Mail: Calm Email → App Store) and submit it for review. It
+   runs from a laptop because GitHub's Mac runners don't have Xcode 27 yet; see
+   [The iPhone app](#the-iphone-app).
+
 To release a specific commit instead (say, a fix on a release branch), push a tag:
 `git tag v1.2.4 <commit> && git push origin v1.2.4`. A version with a suffix (`1.3.0-rc.1`) is
 published as a GitHub prerelease with no update feed, for testing by hand.
@@ -74,3 +81,20 @@ Optional repository variable: `XCODE_APP`, the Xcode to build with on the runner
 --signed` builds what CI builds. On a Mac that has the Developer ID identity in its keychain,
 `CSC_NAME="Christophe Nicolas Kafrouni (838JVGY7W4)"` can stand in for `CSC_LINK` and
 `CSC_KEY_PASSWORD`.
+
+## The iPhone app
+
+`scripts/release-ios.ts` (`pnpm release:ios [--version x.y.z]`) archives `apps/ios` in Release,
+signs it for the App Store and uploads it. The version defaults to the Mac app's; the build number
+is the time (YYYYMMDDhhmm). What it needs on the Mac:
+
+- The "Apple Distribution: Christophe Nicolas Kafrouni (838JVGY7W4)" identity in the keychain.
+- The "Otter Mail App Store" provisioning profile (Xcode › Settings › Accounts, or downloaded from
+  the developer portal) for `dev.otterware.mail`.
+- An App Store Connect API key, from `~/.otter-mail/signing/AuthKey_<id>.p8` or
+  `OTTER_MAIL_ASC_KEY`, `OTTER_MAIL_ASC_KEY_ID` and `OTTER_MAIL_ASC_ISSUER`.
+
+The App Store app is "Otter Mail: Calm Email" (ID 6817249947); on the phone it's "Otter Mail".
+Release builds sign in to Google with their own "iOS" OAuth client (for `dev.otterware.mail`);
+development builds use the one for `dev.otterware.mail.dev`. The relay accepts both
+(`GOOGLE_IOS_CLIENT_ID`). The demo mailbox shows only in development and TestFlight builds.

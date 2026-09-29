@@ -11,8 +11,11 @@ import Foundation
  */
 @MainActor
 final class GoogleAuth {
-    /** The otter-mail project's "iOS" client (not a secret; the relay lists it too). */
-    static let clientID = "187875144740-tegr2te43tofcdogbr72tesmfcg3vbk3.apps.googleusercontent.com"
+    /**
+     * The otter-mail project's "iOS" client for this build's bundle ID (not a
+     * secret; the relay lists it too), from Info.plist's GoogleClientID.
+     */
+    static let clientID = Bundle.main.object(forInfoDictionaryKey: "GoogleClientID") as? String ?? ""
     static let scopes = ["https://mail.google.com/", "openid", "email", "profile"]
 
     struct Tokens {
