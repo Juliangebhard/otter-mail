@@ -773,6 +773,7 @@ export function MessageList({
   const selectedRow = visibleMessages.find((m) => m.id === selectedMessageId) ?? null;
   const selectedOwner = selectedRow ? (selectedRow.accountId ?? accountId) : null;
   const selectedCapabilities = useCapabilities(selectedOwner);
+  const { multipleLabels } = useCapabilities(accountId);
 
   // Conversations opened up in place (Apple Mail), keyed `${owner}:${threadId}`;
   // cleared with the multi-selection when the view changes.
@@ -1569,7 +1570,9 @@ export function MessageList({
                 ? "Everything here has been read."
                 : searchQuery
                   ? "No messages match your search."
-                  : "This label is empty."
+                  : multipleLabels
+                    ? "This label is empty."
+                    : "This folder is empty."
             }
           />
         ) : (

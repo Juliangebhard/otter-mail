@@ -500,6 +500,8 @@ function labelIcon(label?: GmailLabel): ReactNode {
 }
 
 type LabelActions = {
+  /** "label", or "folder" in a mailbox whose mail sits in one folder (IMAP). */
+  noun: string;
   onRename: (label: GmailLabel) => void;
   /** Absent when the mailbox's labels have no colors. */
   onRecolor?: (label: GmailLabel) => void;
@@ -636,7 +638,7 @@ function LabelNode({
             </ContextMenuItem>
             <ContextMenuSeparator />
             <ContextMenuItem icon="trash" color="red" onSelect={() => actions.onDelete(label)}>
-              Delete label
+              Delete {actions.noun}
             </ContextMenuItem>
           </ContextMenuContent>
         </ContextMenu>
@@ -987,6 +989,7 @@ function SidebarPage({
   };
 
   const labelActions: LabelActions = {
+    noun: labelNoun.toLowerCase(),
     onRename: (label) => {
       setRenameValue(label.name);
       setRenameTarget(label);
@@ -1247,7 +1250,7 @@ function SidebarPage({
           onOpenChange={(o) => {
             if (!o) setRenameTarget(null);
           }}
-          title="Rename Label"
+          title={`Rename ${labelNoun}`}
           confirmLabel="Rename"
           confirmVariant="accent"
           confirmDisabled={!renameValue.trim()}
@@ -1297,14 +1300,15 @@ function SidebarPage({
           onOpenChange={(o) => {
             if (!o) setDeleteTarget(null);
           }}
-          title="Delete Label"
+          title={`Delete ${labelNoun}`}
           confirmLabel="Delete"
           confirmVariant="accent"
           onConfirm={handleDeleteConfirm}
         >
           <Text variant="small">
-            Delete "{deleteTarget?.name}"? It is removed from every message; the messages themselves
-            and any nested labels are kept.
+            {capabilities.multipleLabels
+              ? `Delete "${deleteTarget?.name}"? It is removed from every message; the messages themselves and any nested labels are kept.`
+              : `Delete "${deleteTarget?.name}"? Its mail moves to Archive.`}
           </Text>
         </Dialog>
 
