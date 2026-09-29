@@ -1,16 +1,17 @@
 import type { ReactNode } from "react";
 import { DropdownMenu as RadixMenu } from "radix-ui";
 import {
-  CheckIcon,
   ChevronDownIcon,
   LayersIcon,
   PanelLeftCloseIcon,
   PanelLeftIcon,
   PanelRightIcon,
 } from "lucide-react";
-import { IconBtn, HintTooltip, cn, restoreFocusForKeyboardOnly } from "./ui";
+import { IconBtn, HintTooltip, UnreadPill, cn, restoreFocusForKeyboardOnly } from "./ui";
 import { COMBINED_ACCOUNT_ID } from "./custom-views";
 import { getAccountColor, getAccountDisplayName } from "./account-style";
+import { useAllAccountLabels } from "./hooks";
+import { DropdownMenuSeparator } from "./menu";
 import type { GmailAccount } from "./types";
 import type { KeybindingCommand } from "../keybindings/commands";
 import { shortcutLabelFor, useKeybindingsState } from "../keybindings/store";
@@ -151,6 +152,18 @@ export function useMailboxOptions(accounts: GmailAccount[]): MailboxOption[] {
   ];
 }
 
+/** Unread in each mailbox's Inbox (as its sidebar shows it), and their sum for All mailboxes. */
+function useInboxUnread(accounts: GmailAccount[]): Record<string, number> {
+  const counts = Object.fromEntries(
+    useAllAccountLabels(accounts.map((a) => a.id)).map(({ accountId, labels }) => [
+      accountId,
+      labels.find((l) => l.id === "INBOX")?.unread ?? 0,
+    ]),
+  );
+  const total = Object.values(counts).reduce((sum, n) => sum + n, 0);
+  return { ...counts, [COMBINED_ACCOUNT_ID]: total };
+}
+
 /**
  * Dia's profile dots for the sidebar's footer: one dot per mailbox, the
  * current one lit; click one to switch. Empty with a single mailbox.
@@ -198,19 +211,25 @@ export function MailboxDots({
   );
 }
 
-/** Mailbox switcher, the sidebar's heading; aligned with the rows below it. */
+/**
+ * Mailbox switcher, the sidebar's heading; aligned with the rows below it.
+ * `children` are more items after the mailboxes (the sidebar's app menu).
+ */
 export function MailboxSwitcher({
   accounts,
   selectedAccountId,
   onSelectAccount,
   className,
+  children,
 }: {
   accounts: GmailAccount[];
   selectedAccountId: string | null;
   onSelectAccount: (accountId: string) => void;
   className?: string;
+  children?: ReactNode;
 }) {
   const options = useMailboxOptions(accounts);
+  const unread = useInboxUnread(accounts);
   const isCombined = selectedAccountId === COMBINED_ACCOUNT_ID;
   const selectedAccount = isCombined
     ? null
@@ -266,15 +285,19 @@ export function MailboxSwitcher({
                   <MailboxMark account={option.account} className="text-muted-foreground" />
                 </span>
                 <span className="min-w-0 flex-1 truncate">{option.name}</span>
-                {selected ? (
-                  <CheckIcon className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
-                ) : null}
+                <UnreadPill count={unread[option.id] ?? 0} />
                 <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
                   {option.shortcut}
                 </span>
               </RadixMenu.Item>
             );
           })}
+          {children ? (
+            <>
+              <DropdownMenuSeparator className="bg-foreground/15" />
+              {children}
+            </>
+          ) : null}
         </RadixMenu.Content>
       </RadixMenu.Portal>
     </RadixMenu.Root>

@@ -946,19 +946,20 @@ export function getMessageIdsForLabel(accountId: string, labelId: string): strin
   return rows.map((r) => r.id);
 }
 
-/** Total unread INBOX messages across every account — drives the dock badge. */
-export function countInboxUnreadAll(): number {
+/** Total unread INBOX messages across accounts, leaving out `except` — drives the dock badge. */
+export function countInboxUnreadAll(except: ReadonlySet<string> = new Set()): number {
   const d = getDb();
-  const row = d
+  const rows = d
     .prepare(`
-      SELECT COUNT(*) AS n
+      SELECT m.accountId, COUNT(*) AS n
         FROM messages m
         JOIN message_labels ml
           ON ml.accountId = m.accountId AND ml.messageId = m.id AND ml.labelId = 'INBOX'
        WHERE m.unread = 1
+       GROUP BY m.accountId
     `)
-    .get() as unknown as { n: number } | undefined;
-  return row?.n ?? 0;
+    .all() as unknown as { accountId: string; n: number }[];
+  return rows.reduce((sum, r) => (except.has(r.accountId) ? sum : sum + r.n), 0);
 }
 
 /** Total unread INBOX messages for a single account — drives the tray menu sublabels. */
