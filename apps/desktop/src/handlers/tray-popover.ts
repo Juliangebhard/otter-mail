@@ -18,6 +18,7 @@ import {
   accountStore,
   mailStore,
   syncAllAccounts,
+  turnedOffMailboxes,
   type GmailAccount,
   type GmailMessageSummary,
 } from "@otter-mail/core";
@@ -51,7 +52,7 @@ export function registerTrayPopoverHandlers(): void {
         unreadCount: mailStore.countInboxUnreadForAccount(account.id),
         messages: mailStore.listInboxPreview(account.id, PREVIEW_LIMIT, unreadOnly),
       })),
-      totalUnread: mailStore.countInboxUnreadAll(),
+      totalUnread: mailStore.countInboxUnreadAll(turnedOffMailboxes()),
     };
   });
 

@@ -6,12 +6,14 @@
  * Notifications fire only for messages newly added by an incremental sync's
  * history feed (mail-sync calls notifyNewMail with them) — never for full
  * syncs, body backfills, or an account's first sync. The badge mirrors
- * total INBOX unread across accounts after syncs and local mutations.
+ * total INBOX unread across the mailboxes that are on, after syncs, local
+ * mutations, and turning a mailbox on or off.
  */
 
 import { logger } from "../logger.js";
 import { platform } from "../platform.js";
 import { getAccount } from "./account-store.js";
+import { turnedOffMailboxes } from "./mail-sync.js";
 import { getSettings } from "./settings-store.js";
 import * as mailStore from "./mail-store.js";
 import type { GmailAccount, GmailMessageSummary } from "../types.js";
@@ -74,10 +76,10 @@ export async function notifyNewMail(
   }
 }
 
-/** Mirror total INBOX unread (all accounts) onto the badge; clear at 0. */
+/** Mirror total INBOX unread (mailboxes that are on) onto the badge; clear at 0. */
 export function updateDockBadge(): void {
   try {
-    platform().setUnreadCount(mailStore.countInboxUnreadAll());
+    platform().setUnreadCount(mailStore.countInboxUnreadAll(turnedOffMailboxes()));
   } catch (err) {
     logger.info("notifier", `badge update failed: ${String(err)}`);
   }

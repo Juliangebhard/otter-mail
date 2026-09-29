@@ -150,6 +150,8 @@ const isPushed = (accountId: string) => pushedAccounts.has(accountId) || watched
  */
 let turnedOff = new Set<string>();
 
+export const turnedOffMailboxes = (): ReadonlySet<string> => turnedOff;
+
 export function followMailboxArrangement(value: string | undefined): void {
   let off: string[] = [];
   try {
@@ -162,6 +164,7 @@ export function followMailboxArrangement(value: string | undefined): void {
   turnedOff = new Set(off);
   for (const id of turnedOff) stopWatch(id);
   for (const id of was) if (!turnedOff.has(id)) syncAccount(id, { force: true });
+  updateDockBadge();
 }
 
 export function syncAccount(
