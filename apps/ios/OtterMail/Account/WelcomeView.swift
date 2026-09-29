@@ -1,0 +1,74 @@
+import SwiftUI
+
+/** First launch, or signed out: sign in with Google, or look around the demo mailbox. */
+struct WelcomeView: View {
+    @Environment(Session.self) private var session
+    @Environment(\.palette) private var palette
+    @State private var error: String?
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Spacer()
+            Image("OtterMark")
+                .resizable()
+                .scaledToFill()
+                .frame(width: 112, height: 112)
+                .clipShape(.rect(cornerRadius: 26))
+                .padding(.bottom, 28)
+            Text("Otter Mail")
+                .font(.system(size: 34, weight: .semibold))
+                .foregroundStyle(palette.text)
+            Text("A calm, fast Gmail client.")
+                .font(.title3)
+                .foregroundStyle(palette.muted)
+                .padding(.top, 6)
+            Spacer()
+
+            VStack(spacing: 12) {
+                Button {
+                    Task {
+                        do {
+                            try await session.signIn()
+                            await session.requestNotifications()
+                        } catch GoogleAuth.Failure.cancelled {
+                        } catch {
+                            self.error = error.localizedDescription
+                        }
+                    }
+                } label: {
+                    Label(session.busy ?? "Sign in with Google", systemImage: "person.crop.circle")
+                        .font(.headline)
+                        .foregroundStyle(palette.actionText)
+                        .frame(maxWidth: .infinity, minHeight: 34)
+                }
+                .buttonStyle(.glassProminent)
+                .disabled(session.busy != nil)
+
+                Button {
+                    session.tryDemo()
+                } label: {
+                    Text("Try the demo mailbox")
+                        .font(.headline)
+                        .frame(maxWidth: .infinity, minHeight: 34)
+                }
+                .buttonStyle(.glass)
+                .disabled(session.busy != nil)
+
+                Text("Your mail goes straight between this iPhone and Gmail. Your mailboxes, themes and settings follow your Otter account to the Mac and the web.")
+                    .font(.footnote)
+                    .foregroundStyle(palette.muted)
+                    .multilineTextAlignment(.center)
+                    .padding(.top, 8)
+            }
+            .padding(.horizontal, 28)
+            .padding(.bottom, 24)
+        }
+        .frame(maxWidth: .infinity)
+        .background(palette.canvas)
+        .alert("Couldn't sign in", isPresented: .constant(error != nil)) {
+            Button("OK") { error = nil }
+        } message: {
+            Text(error ?? "")
+        }
+    }
+}

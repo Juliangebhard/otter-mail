@@ -1,0 +1,239 @@
+import SwiftUI
+
+/**
+ * Settings › Mailboxes, as on the desktop: "All mailboxes", each mailbox on
+ * or off, their order (Edit, then drag), and adding one. The arrangement
+ * and the mailboxes follow the Otter account to every device.
+ */
+struct MailboxesSettings: View {
+    @Environment(Session.self) private var session
+    @Environment(MailStore.self) private var store
+    @Environment(Preferences.self) private var preferences
+    @Environment(\.palette) private var palette
+    @State private var error: String?
+
+    var body: some View {
+        SettingsForm {
+            Section {
+                Toggle(isOn: Binding(
+                    get: { preferences.arrangement.combined },
+                    set: { preferences.arrangement.combined = $0 }
+                )) {
+                    Label {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("All mailboxes")
+                            Text("One inbox for every mailbox").font(.subheadline).foregroundStyle(palette.muted)
+                        }
+                    } icon: {
+                        Image(systemName: "square.stack")
+                    }
+                }
+            }
+
+            Section {
+                let shown = store.shownMailboxes
+                ForEach(store.arrangedMailboxes) { mailbox in
+                    let on = shown.contains(mailbox)
+                    NavigationLink {
+                        MailboxSettings(email: mailbox.email)
+                    } label: {
+                        HStack(spacing: 12) {
+                            MailboxMark(mailbox: mailbox, size: 30)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(mailbox.displayName).foregroundStyle(palette.text)
+                                Text(mailbox.signedOut ? "Sign in on this iPhone" : mailbox.email)
+                                    .font(.subheadline)
+                                    .foregroundStyle(mailbox.signedOut ? palette.warning : palette.muted)
+                            }
+                            Spacer()
+                            Toggle("Show \(mailbox.displayName)", isOn: Binding(
+                                get: { on },
+                                set: { store.setOn($0, mailbox) }
+                            ))
+                            .labelsHidden()
+                            // The last mailbox on stays on.
+                            .disabled(on && shown.count == 1)
+                        }
+                    }
+                }
+                .onMove { store.move(from: $0, to: $1) }
+
+                if !store.isDemo {
+                    Button {
+                        Task {
+                            do { try await session.addMailbox() } catch GoogleAuth.Failure.cancelled {} catch {
+                                self.error = error.localizedDescription
+                            }
+                        }
+                    } label: {
+                        Label(session.busy ?? "Add mailbox", systemImage: "plus")
+                    }
+                    .disabled(session.busy != nil)
+                }
+            } footer: {
+                Text("Turned-off mailboxes stay signed in but aren't shown or synced, on every device.")
+            }
+        }
+        .navigationTitle("Mailboxes")
+        .toolbarTitleDisplayMode(.inline)
+        .toolbar { EditButton() }
+        .alert("Couldn't add the mailbox", isPresented: .constant(error != nil)) {
+            Button("OK") { error = nil }
+        } message: {
+            Text(error ?? "")
+        }
+    }
+}
+
+/** One mailbox: signing in here, its name and color, its signature in Gmail, and removing it. */
+struct MailboxSettings: View {
+    @Environment(Session.self) private var session
+    @Environment(MailStore.self) private var store
+    @Environment(\.palette) private var palette
+    @Environment(\.dismiss) private var dismiss
+
+    let email: String
+    @State private var name = ""
+    @State private var confirmRemove = false
+    @State private var error: String?
+
+    var body: some View {
+        if let mailbox = store.mailbox(email) {
+            form(mailbox)
+        }
+    }
+
+    private func form(_ mailbox: Mailbox) -> some View {
+        SettingsForm {
+            if mailbox.signedOut {
+                Section {
+                    Button {
+                        Task {
+                            do { try await session.signIn(mailbox: email) } catch GoogleAuth.Failure.cancelled {} catch {
+                                self.error = error.localizedDescription
+                            }
+                        }
+                    } label: {
+                        Label(session.busy ?? "Sign in to \(email)", systemImage: "person.crop.circle.badge.checkmark")
+                    }
+                    .disabled(session.busy != nil)
+                } footer: {
+                    Text("Linked to your Otter account, but this iPhone isn't signed in to it yet. Your mail goes straight between the iPhone and Gmail.")
+                }
+            }
+
+            Section {
+                LabeledContent("Display name") {
+                    TextField("Name", text: $name)
+                        .multilineTextAlignment(.trailing)
+                        .onSubmit { rename(mailbox) }
+                }
+                ColorPicker("Color", selection: Binding(
+                    get: { Color(hex: mailbox.color) },
+                    set: { var m = mailbox; m.color = $0.hex; session.update(m) }
+                ), supportsOpacity: false)
+            } footer: {
+                Text("Shown in the sidebar and on its mail, on every device. Only used in Otter Mail.")
+            }
+
+            if !mailbox.signedOut {
+                Section {
+                    SignatureEditor(html: mailbox.signature) { html in
+                        try await session.setSignature(html, for: email)
+                    }
+                } header: {
+                    Text("Signature")
+                } footer: {
+                    Text("Added to new messages, replies and forwards from this mailbox. Saved in Gmail, so it's the same there and on every device.")
+                }
+            }
+
+            Section {
+                Button("Remove mailbox", role: .destructive) { confirmRemove = true }
+                    .confirmationDialog("Remove \(mailbox.displayName)?", isPresented: $confirmRemove, titleVisibility: .visible) {
+                        Button("Remove", role: .destructive) {
+                            dismiss()
+                            Task { await session.remove(mailbox) }
+                        }
+                    } message: {
+                        Text("Removes it from your Otter account on every device and signs this iPhone out of it. Nothing is deleted from Gmail.")
+                    }
+            }
+        }
+        .navigationTitle(mailbox.displayName)
+        .toolbarTitleDisplayMode(.inline)
+        .onAppear { name = mailbox.displayName }
+        .onDisappear { rename(mailbox) }
+        .alert("Couldn't sign in", isPresented: .constant(error != nil)) {
+            Button("OK") { error = nil }
+        } message: {
+            Text(error ?? "")
+        }
+    }
+
+    private func rename(_ mailbox: Mailbox) {
+        let trimmed = name.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty, trimmed != mailbox.displayName else { return }
+        var m = mailbox
+        m.displayName = trimmed
+        session.update(m)
+    }
+}
+
+/** Settings › Languages I read: the first is where translations go. */
+struct LanguagesSettings: View {
+    @Environment(Preferences.self) private var preferences
+    @Environment(\.palette) private var palette
+
+    private static let choices = ["en", "fr", "de", "es", "it", "pt", "nl", "sv", "pl", "tr", "ru", "uk", "ar", "hi", "vi", "ja", "ko", "zh"]
+
+    var body: some View {
+        let read = preferences.effectiveReadLanguages
+        SettingsForm {
+            Section {
+                ForEach(read, id: \.self) { code in
+                    Text(name(code))
+                }
+                .onMove { preferences.readLanguages = moved(read, $0, $1) }
+                .onDelete { offsets in
+                    var next = read
+                    next.remove(atOffsets: offsets)
+                    if !next.isEmpty { preferences.readLanguages = next }
+                }
+            } footer: {
+                Text("Mail in these isn't translated. The first is the language translations go into.")
+            }
+
+            Section("Add") {
+                ForEach(Self.choices.filter { !read.contains($0) }, id: \.self) { code in
+                    Button(name(code)) { preferences.readLanguages = read + [code] }
+                        .foregroundStyle(palette.text)
+                }
+            }
+        }
+        .navigationTitle("Languages I read")
+        .toolbarTitleDisplayMode(.inline)
+        .toolbar { EditButton() }
+    }
+
+    private func name(_ code: String) -> String {
+        Locale.current.localizedString(forLanguageCode: code) ?? code
+    }
+
+    private func moved(_ list: [String], _ from: IndexSet, _ to: Int) -> [String] {
+        var list = list
+        list.move(fromOffsets: from, toOffset: to)
+        return list
+    }
+}
+
+extension Color {
+    /** "#rrggbb", as the other apps store colors. */
+    var hex: String {
+        let c = UIColor(self).resolvedColor(with: .current)
+        var (r, g, b, a): (CGFloat, CGFloat, CGFloat, CGFloat) = (0, 0, 0, 0)
+        c.getRed(&r, green: &g, blue: &b, alpha: &a)
+        let byte = { (v: CGFloat) in Int((min(max(v, 0), 1) * 255).rounded()) }
+        return String(format: "#%02x%02x%02x", byte(r), byte(g), byte(b))
+    }
+}

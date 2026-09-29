@@ -22,9 +22,10 @@
   // Secrets (`wrangler secret put`): BETTER_AUTH_SECRET, GOOGLE_WEB_CLIENT_SECRET.
   "vars": {
     "BETTER_AUTH_URL": "https://relay.mail.otterware.dev",
-    // The apps' OAuth clients in the otter-mail project: "Desktop app", and
-    // "Web application" (the web app's Otter and Gmail sign-in).
+    // The apps' OAuth clients in the otter-mail project: "Desktop app", "iOS"
+    // (the iPhone app), and "Web application" (the web app's Otter and Gmail sign-in).
     "GOOGLE_CLIENT_ID": "187875144740-aspevse90oidb4ra3t2fcdfmbagm6jep.apps.googleusercontent.com",
+    "GOOGLE_IOS_CLIENT_ID": "187875144740-tegr2te43tofcdogbr72tesmfcg3vbk3.apps.googleusercontent.com",
     "GOOGLE_WEB_CLIENT_ID": "187875144740-drhr59ablkv4ovonrjisd7fj5dv28d6o.apps.googleusercontent.com",
     // The web app: trusted for CORS and sign-in redirects; shares the session cookie.
     "APP_ORIGIN": "https://mail.otterware.dev",

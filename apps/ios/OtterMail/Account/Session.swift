@@ -1,0 +1,341 @@
+import Foundation
+import Observation
+import UserNotifications
+
+/**
+ * Who's using the app and with which mail: the demo, or an Otter account
+ * with its mailboxes. Signed in, it follows the account the way core does
+ * on the Mac (otter-account.ts, linked-accounts.ts, preferences.ts,
+ * realtime.ts): mailboxes linked on any device show up here, preferences
+ * sync both ways, and the relay's events trigger syncs.
+ */
+@Observable
+final class Session {
+    enum State: Equatable {
+        case welcome
+        case demo
+        case signedIn(Relay.User)
+    }
+
+    private(set) var state: State
+    private(set) var store: MailStore
+    /** Set while a sign-in sheet or first sync is running, with what it's doing. */
+    private(set) var busy: String?
+    /** A thread to open (from a notification). */
+    var opening: String?
+
+    let preferences: Preferences
+    let assistant = Assistant()
+    @ObservationIgnored let relay = Relay()
+    @ObservationIgnored let google = GoogleAuth()
+    @ObservationIgnored private var sync: MailSync?
+    @ObservationIgnored private var pushTopic: String?
+    /** The account's `ui` and `settings` sections as last seen, so writes keep the keys only other apps have. */
+    @ObservationIgnored private var remoteSections: [String: [String: Any]] = [:]
+    @ObservationIgnored private var pushingPreferences: Task<Void, Never>?
+
+    private static let userKey = "otter:user"
+    private static let demoKey = "otter:demo"
+
+    init(preferences: Preferences) {
+        self.preferences = preferences
+        if relay.isSignedIn, let data = UserDefaults.standard.data(forKey: Self.userKey),
+           let user = try? JSONDecoder().decode(Relay.User.self, from: data) {
+            state = .signedIn(user)
+            store = MailStore(preferences: preferences)
+        } else if UserDefaults.standard.bool(forKey: Self.demoKey) {
+            state = .demo
+            store = .demo(preferences: preferences)
+        } else {
+            state = .welcome
+            store = MailStore(preferences: preferences)
+        }
+        relay.onSignedOut = { [weak self] in self?.endSession() }
+        preferences.onChange = { [weak self] section in self?.preferenceChanged(section) }
+        assistant.onChange = { [weak self] section in self?.preferenceChanged(section) }
+        Task { [assistant] in await assistant.check() }
+        if case .signedIn = state { startLive() }
+    }
+
+    var user: Relay.User? {
+        if case .signedIn(let user) = state { user } else { nil }
+    }
+
+    // ── Starting ─────────────────────────────────────────────────────────────
+
+    func tryDemo() {
+        UserDefaults.standard.set(true, forKey: Self.demoKey)
+        store = .demo(preferences: preferences)
+        state = .demo
+    }
+
+    /** "Sign in with Google": the Otter account, and that Google account as its first mailbox. */
+    func signIn() async throws {
+        busy = "Signing in…"
+        defer { busy = nil }
+        let (profile, tokens) = try await google.signIn()
+        guard let idToken = tokens.idToken else { throw GoogleAuth.Failure.google("Google didn't return an ID token.") }
+        let user = try await relay.signIn(idToken: idToken)
+        UserDefaults.standard.set(try? JSONEncoder().encode(user), forKey: Self.userKey)
+        UserDefaults.standard.set(false, forKey: Self.demoKey)
+        store = MailStore(preferences: preferences)
+        state = .signedIn(user)
+        startLive()
+        try await link(profile, idToken: idToken)
+        busy = "Loading your mail…"
+        await refreshAccount()
+    }
+
+    private func startLive() {
+        let sync = MailSync(store: store, google: google)
+        self.sync = sync
+        store.sync = sync
+        let cached = (try? JSONDecoder().decode([Mailbox].self, from: UserDefaults.standard.data(forKey: "otter:mailboxes") ?? Data())) ?? []
+        for mailbox in cached { store.upsert(mailbox: mailbox) }
+        sync.loadCache(for: cached.map(\.email))
+        Task { await refreshAccount() }
+    }
+
+    /** Everything from the relay, then mail from Gmail: on launch, and when the app comes back. */
+    func refreshAccount() async {
+        guard case .signedIn = state else { return }
+        async let preferences: Void = pullPreferences()
+        async let accounts: Void = pullAccounts()
+        _ = await (preferences, accounts)
+        if pushTopic == nil { pushTopic = try? await relay.me().pushTopic }
+        connect()
+        await sync?.syncAll()
+        if let pushTopic { await sync?.watch(topic: pushTopic) }
+        await updateBadge()
+    }
+
+    /** Listens to the relay while the app is open. */
+    func connect() {
+        relay.connect { [weak self] event in
+            guard let self else { return }
+            Task {
+                switch event {
+                case .mail(let email):
+                    if let mailbox = self.store.mailboxes.first(where: { $0.email.lowercased() == email }) {
+                        await self.sync?.sync(mailbox.email, notify: true)
+                        await self.updateBadge()
+                    }
+                case .accounts: await self.pullAccounts()
+                case .preferences: await self.pullPreferences()
+                }
+            }
+        }
+    }
+
+    func disconnect() { relay.disconnect() }
+
+    /** A background refresh: catch up and say what's new. */
+    func backgroundRefresh() async {
+        guard case .signedIn = state else { return }
+        await sync?.syncAll(notify: true)
+        await updateBadge()
+    }
+
+    // ── Mailboxes ────────────────────────────────────────────────────────────
+
+    /** Signs in to another Google account and links it to the Otter account. */
+    func addMailbox() async throws {
+        busy = "Adding the mailbox…"
+        defer { busy = nil }
+        let (profile, tokens) = try await google.signIn()
+        guard let idToken = tokens.idToken else { throw GoogleAuth.Failure.google("Google didn't return an ID token.") }
+        try await link(profile, idToken: idToken)
+        await sync?.sync(profile.email)
+    }
+
+    /** Signs in to Google for a mailbox linked on another device (or whose sign-in lapsed). */
+    func signIn(mailbox email: String) async throws {
+        busy = "Signing in…"
+        defer { busy = nil }
+        let (profile, _) = try await google.signIn(loginHint: email)
+        guard profile.email.lowercased() == email.lowercased() else {
+            await google.signOut(profile.email)
+            throw GoogleAuth.Failure.google("That's \(profile.email). Sign in as \(email).")
+        }
+        store.setSignedOut(false, email)
+        saveMailboxes()
+        await sync?.sync(email)
+    }
+
+    private func link(_ profile: GoogleAuth.Profile, idToken: String) async throws {
+        let existing = store.mailbox(profile.email)
+        let mailbox = Mailbox(
+            email: profile.email,
+            name: profile.name ?? profile.email,
+            displayName: existing?.displayName ?? profile.name ?? profile.email,
+            color: existing?.color ?? Self.defaultColor(profile.email),
+            signature: existing?.signature ?? "",
+            labels: existing?.labels ?? [],
+            picture: profile.picture
+        )
+        store.upsert(mailbox: mailbox)
+        saveMailboxes()
+        try await relay.putAccount(profile.email, idToken: idToken, profile: .init(
+            email: profile.email, name: profile.name, picture: profile.picture,
+            displayName: existing?.displayName, color: existing?.color
+        ))
+    }
+
+    /** A mailbox's name and color, here and on every device. */
+    func update(_ mailbox: Mailbox) {
+        store.upsert(mailbox: mailbox)
+        saveMailboxes()
+        guard !store.isDemo else { return }
+        Task {
+            try? await relay.putAccount(mailbox.email, profile: .init(
+                email: mailbox.email, name: mailbox.name, picture: mailbox.picture,
+                displayName: mailbox.displayName, color: mailbox.color
+            ))
+        }
+    }
+
+    /** Saves the signature in Gmail (the demo just keeps it). */
+    func setSignature(_ html: String, for email: String) async throws {
+        if let sync {
+            try await sync.setSignature(html, for: email)
+        } else if var mailbox = store.mailbox(email) {
+            mailbox.signature = html
+            store.upsert(mailbox: mailbox)
+        }
+    }
+
+    /** Removes the mailbox from the Otter account (every device) and signs it out of Google here. */
+    func remove(_ mailbox: Mailbox) async {
+        store.remove(mailbox: mailbox.email)
+        saveMailboxes()
+        guard !store.isDemo else { return }
+        sync?.forget(mailbox.email)
+        await google.signOut(mailbox.email)
+        try? await relay.unlink(mailbox.email)
+    }
+
+    private func pullAccounts() async {
+        guard let accounts = try? await relay.accounts() else { return }
+        let linked = Set(accounts.map { $0.email.lowercased() })
+        for account in accounts {
+            let existing = store.mailbox(account.email)
+            store.upsert(mailbox: Mailbox(
+                email: account.email,
+                name: account.name ?? account.email,
+                displayName: account.displayName ?? account.name ?? account.email,
+                color: account.color ?? Self.defaultColor(account.email),
+                signature: existing?.signature ?? "",
+                labels: existing?.labels ?? [],
+                picture: account.picture,
+                signedOut: !google.isSignedIn(account.email)
+            ))
+        }
+        // Unlinked on another device: gone here too.
+        for mailbox in store.mailboxes where !linked.contains(mailbox.email.lowercased()) {
+            store.remove(mailbox: mailbox.email)
+            sync?.forget(mailbox.email)
+            await google.signOut(mailbox.email)
+        }
+        saveMailboxes()
+    }
+
+    private func saveMailboxes() {
+        guard !store.isDemo else { return }
+        UserDefaults.standard.set(try? JSONEncoder().encode(store.mailboxes), forKey: "otter:mailboxes")
+    }
+
+    /** The desktop's fallback color for a mailbox without one (account-style.ts). */
+    static func defaultColor(_ email: String) -> String {
+        let palette = ["#ff3b30", "#ff9500", "#ffcc00", "#34c759", "#00c7be", "#007aff", "#5856d6", "#af52de", "#ff2d55", "#a2845e"]
+        var hash: Int32 = 0
+        for unit in email.utf16 { hash = hash &* 31 &+ Int32(unit) }
+        return palette[Int(hash.magnitude) % palette.count]
+    }
+
+    // ── Preferences ──────────────────────────────────────────────────────────
+
+    private func pullPreferences() async {
+        guard let (sections, hermesKey) = try? await relay.preferences() else { return }
+        let ui = sections["ui"] as? [String: Any]
+        let settings = sections["settings"] as? [String: Any]
+        remoteSections["ui"] = ui ?? [:]
+        remoteSections["settings"] = settings ?? [:]
+        preferences.apply(ui: ui ?? [:], settings: settings ?? [:])
+        assistant.apply(section: sections["assistant"] as? [String: Any], key: hermesKey)
+        // A section the account doesn't have yet is seeded from here, as core does.
+        if ui == nil { preferenceChanged("ui") }
+        if settings == nil { preferenceChanged("settings") }
+    }
+
+    private func preferenceChanged(_ section: String) {
+        guard case .signedIn = state else { return }
+        if section == "hermesKey" {
+            let key = assistant.key
+            Task { try? await relay.putPreferences(["assistant": assistant.syncedSection], hermesKey: .some(key)) }
+            return
+        }
+        if section == "assistant" {
+            Task { try? await relay.putPreferences(["assistant": assistant.syncedSection]) }
+            return
+        }
+        let ours: [String: Any] = section == "ui" ? preferences.uiSection : preferences.settingsSection
+        let merged = (remoteSections[section] ?? [:]).merging(ours) { _, mine in mine }
+        remoteSections[section] = merged
+        pushingPreferences?.cancel()
+        pushingPreferences = Task {
+            try? await Task.sleep(for: .milliseconds(400))
+            guard !Task.isCancelled else { return }
+            try? await relay.putPreferences(remoteSections.mapValues { $0 })
+        }
+    }
+
+    // ── Devices and signing out ──────────────────────────────────────────────
+
+    func signOut() async {
+        await relay.signOut()
+        endSession()
+    }
+
+    func deleteAccount() async throws {
+        try await relay.deleteUser()
+        endSession()
+    }
+
+    /** Back to the welcome screen, with nothing of the account left here. */
+    private func endSession() {
+        let emails = store.mailboxes.map(\.email)
+        relay.disconnect()
+        sync?.forgetAll()
+        sync = nil
+        Task { for email in emails { await google.signOut(email) } }
+        UserDefaults.standard.removeObject(forKey: Self.userKey)
+        UserDefaults.standard.removeObject(forKey: "otter:mailboxes")
+        UserDefaults.standard.set(false, forKey: Self.demoKey)
+        store = MailStore(preferences: preferences)
+        state = .welcome
+        assistant.newChat()
+        assistant.forgetKey()
+        Task { try? await UNUserNotificationCenter.current().setBadgeCount(0) }
+    }
+
+    /** The demo ends the same way. */
+    func leaveDemo() {
+        UserDefaults.standard.set(false, forKey: Self.demoKey)
+        store = MailStore(preferences: preferences)
+        state = .welcome
+    }
+
+    // ── The app icon ─────────────────────────────────────────────────────────
+
+    /** Unread in the inbox, on the icon (the Dock badge on the Mac). */
+    private func updateBadge() async {
+        guard preferences.notifications != .off else { return }
+        try? await UNUserNotificationCenter.current().setBadgeCount(store.unreadCount(in: .inbox, scope: nil))
+    }
+
+    /** Asks once to show notifications (when they're on in Settings). */
+    func requestNotifications() async {
+        guard preferences.notifications != .off else { return }
+        _ = try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound])
+    }
+}

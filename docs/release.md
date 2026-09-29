@@ -71,4 +71,6 @@ Optional repository variable: `XCODE_APP`, the Xcode to build with on the runner
 
 `pnpm dist:desktop:dmg` builds an unsigned DMG for this Mac. With the secrets above exported
 (`APPLE_API_KEY` as a path to the `.p8`), `node scripts/build-desktop-artifact.ts --arch both
---signed` builds what CI builds.
+--signed` builds what CI builds. On a Mac that has the Developer ID identity in its keychain,
+`CSC_NAME="Christophe Nicolas Kafrouni (838JVGY7W4)"` can stand in for `CSC_LINK` and
+`CSC_KEY_PASSWORD`.

@@ -22,6 +22,12 @@ auto-update.
   `tray-popover.html` the menu-bar mini inbox. UI primitives live in `src/components/ui/`.
   `src/web/` is the browser shell: core in a Web Worker (SQLite WASM on OPFS) hosted by one
   tab for every open tab (`backend.ts`), and the bridge that stands in for the preload. What only the Mac app has is off in `desktopBridge.features`.
+- `apps/ios`: Otter Mail for iPhone, a native SwiftUI app (iOS 27, Liquid Glass): ChatGPT's
+  layout (a drawer of mailboxes you swipe through), Otter Code's list rows. Its own Swift code,
+  not the TypeScript core: it signs in to Google itself (the "iOS" OAuth client, PKCE), talks to
+  Gmail directly, caches on disk, and follows the Otter account through the relay (mailboxes,
+  preferences under the same keys, live events). `Resources/` holds the themes and demo mailbox,
+  exported from `apps/web` by `pnpm ios:resources`. See its README.
 - `packages/contracts`: types shared by both sides, including `DesktopBridge`, the
   `window.desktopBridge` API the preload exposes, and the relay's API (`src/relay.ts`).
 - `infra/relay`: https://relay.mail.otterware.dev, a Cloudflare Worker (Hono, better-auth,
@@ -60,6 +66,8 @@ it; the web app needs it (the relay keeps its Gmail sign-ins alive).
   a browser, e.g. the T3 preview). `pnpm dev:desktop` runs the Mac app (Vite dev server +
   main-process watcher + Electron with reload); `pnpm dev:web` the web app alone. Both apps render
   the same `apps/web`, so UI work is checked in the browser. See docs/development.md.
+- `pnpm dev:ios`: the iPhone app in the simulator (it has the same demo mailbox, from the welcome
+  screen).
 - `pnpm dev:demo`: the web app on a seeded demo mailbox (a pretend Gmail, no Google or Otter
   account, no relay). Build and test against it rather than the user's real accounts; see the
   `test-otter-mail` skill (`.agents/skills`).
@@ -84,6 +92,8 @@ Before handing work back, run and fix:
 - `pnpm fmt`
 
 For UI or behavior changes, run the app and check the change in it, at a 1600x1000 viewport.
+For the iPhone app, build it (`pnpm dev:ios`, or `xcodebuild` as its README shows) and check the
+change in the simulator, in light and dark.
 
 ## Taste
 

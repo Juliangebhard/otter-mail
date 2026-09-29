@@ -44,7 +44,8 @@ Options:
   --skip-build              Reuse existing apps/web/dist, apps/desktop/dist-electron
                             and translator builds.
   --keep-stage              Keep the temporary staging directory.
-  --signed                  Sign with Developer ID (CSC_LINK, CSC_KEY_PASSWORD) and
+  --signed                  Sign with Developer ID (CSC_LINK and CSC_KEY_PASSWORD, or
+                            CSC_NAME for an identity in the keychain) and
                             notarize (APPLE_API_KEY, APPLE_API_KEY_ID,
                             APPLE_API_ISSUER). Unsigned builds are ad hoc.
   --verbose                 Print electron-builder debug output.
@@ -403,9 +404,9 @@ function main(): void {
     if (value === "") delete buildEnv[key];
   }
   if (options.signed) {
+    // CI imports the .p12 (CSC_LINK); on a Mac that has the identity, CSC_NAME names it.
     const required = [
-      "CSC_LINK",
-      "CSC_KEY_PASSWORD",
+      ...(buildEnv.CSC_NAME ? [] : ["CSC_LINK", "CSC_KEY_PASSWORD"]),
       "APPLE_API_KEY",
       "APPLE_API_KEY_ID",
       "APPLE_API_ISSUER",

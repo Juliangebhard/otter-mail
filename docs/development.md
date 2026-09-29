@@ -16,6 +16,8 @@
 | `pnpm dev:desktop`       | Vite dev server + main-process watcher + Electron, restarting on main changes.     |
 | `pnpm dev:web`           | The web app alone, against `VITE_RELAY_URL`.                                       |
 | `pnpm dev:demo`          | The web app on a made-up mailbox, no accounts (see [Demo mailbox](#demo-mailbox)). |
+| `pnpm dev:ios`           | Builds the iPhone app and runs it in the simulator (see `apps/ios/README.md`).     |
+| `pnpm ios:resources`     | Re-exports the themes and demo mailbox the iPhone app bundles.                     |
 | `pnpm start`             | Runs the built app unpackaged (`pnpm build` first).                                |
 | `pnpm build`             | Builds `apps/web/dist` and `apps/desktop/dist-electron`.                           |
 | `pnpm build:translator`  | Builds the Swift translator helper.                                                |

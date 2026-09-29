@@ -30,3 +30,4 @@ tmp/
 
 # Wrangler local secrets (infra/relay)
 .dev.vars
+apps/ios/.build/
