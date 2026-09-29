@@ -2,6 +2,7 @@ import { useRef, useState, type DragEvent } from "react";
 import { toast } from "./toast";
 import { PaperclipIcon, XIcon } from "lucide-react";
 import { gmailApi } from "./api";
+import { AttachmentPreview, attachmentPreview } from "./attachment-preview";
 import type { ComposeAttachment } from "./types";
 
 /** Mirror of the backend cap (core services/outgoing.ts) so renderer-side drops fail early. */
@@ -174,7 +175,13 @@ export function AttachmentChips({
   attachments: ComposeAttachment[] | null;
   onRemove: (index: number) => void;
 }) {
+  const [previewing, setPreviewing] = useState<ComposeAttachment | null>(null);
   if (!attachments || attachments.length === 0) return null;
+  const openInApp = (att: ComposeAttachment) => {
+    void gmailApi
+      .openComposeAttachment({ name: att.name, base64: att.base64 })
+      .catch(() => toast.error("Could not open attachment"));
+  };
   return (
     <div className="flex flex-wrap items-center gap-1.5 px-5 pb-1 pt-2">
       {attachments.map((att, i) => (
@@ -186,11 +193,9 @@ export function AttachmentChips({
             type="button"
             title={att.name}
             aria-label={`Open ${att.name}`}
-            onClick={() => {
-              void gmailApi
-                .openComposeAttachment({ name: att.name, base64: att.base64 })
-                .catch(() => toast.error("Could not open attachment"));
-            }}
+            onClick={() =>
+              attachmentPreview(att.name, att.mimeType) ? setPreviewing(att) : openInApp(att)
+            }
             className="flex min-w-0 cursor-pointer items-center gap-1.5 hover:text-foreground"
           >
             <PaperclipIcon className="size-3 shrink-0 text-muted-foreground/70" />
@@ -207,6 +212,18 @@ export function AttachmentChips({
           </button>
         </span>
       ))}
+      <AttachmentPreview
+        file={
+          previewing && {
+            name: previewing.name,
+            mimeType: previewing.mimeType,
+            size: attachmentBytes(previewing),
+            load: async () => previewing.base64,
+            onOpen: () => openInApp(previewing),
+          }
+        }
+        onClose={() => setPreviewing(null)}
+      />
     </div>
   );
 }

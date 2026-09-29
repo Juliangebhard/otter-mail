@@ -325,7 +325,8 @@ export type GetAttachmentParams = {
   mimeType: string;
 };
 
-export type GetAttachmentResult = { saved: boolean; path?: string };
+/** `saved` is false when the save dialog was cancelled. */
+export type GetAttachmentResult = { saved: boolean };
 
 export type GetAttachmentDataParams = {
   accountId: string;

@@ -56,6 +56,8 @@ export interface BridgeFeatures {
   translation: boolean;
   /** Dragging attachments out to Finder. */
   dragOut: boolean;
+  /** Opening an attachment in its default app (Preview, Pages, …). */
+  openFiles: boolean;
 }
 
 export interface DesktopBridge {

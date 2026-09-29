@@ -22,20 +22,20 @@ Swift code (`apps/ios`). Gmail and IMAP are noted where they differ.
 
 ## Reading
 
-| Feature                                                            | Mac                                  | Web                              | iPhone                       |
-| ------------------------------------------------------------------ | ------------------------------------ | -------------------------------- | ---------------------------- |
-| Conversations, earlier messages collapsed                          | ✓                                    | ✓                                | ✓                            |
-| HTML mail, inline (cid) images                                     | ✓                                    | ✓                                | ✓                            |
-| Remote images                                                      | load; broken ones proxied by backend | load; proxy only where CORS lets | load                         |
-| Remote-image blocking                                              | —                                    | —                                | —                            |
-| Quoted text collapsed                                              | ✓ (HTML and plain text)              | ✓                                | plain text only              |
-| Attachments                                                        | download, open, drag out to Finder   | download, open                   | Quick Look (no save / share) |
-| Unsubscribe (one-click, web, mailto)                               | ✓                                    | ✓                                | ✓                            |
-| Conversation summary (people, files, list)                         | ✓                                    | ✓                                | —                            |
-| Sender hover card (write, search, ask)                             | ✓                                    | ✓                                | —                            |
-| Gmail category chips                                               | Gmail                                | Gmail                            | —                            |
-| Folders: Inbox, Starred, Sent, Drafts, Important, All, Junk, Trash | ✓ (Important: Gmail)                 | ✓                                | ✓ (Important: Gmail)         |
-| Print, show original                                               | —                                    | —                                | —                            |
+| Feature                                                            | Mac                                                           | Web                              | iPhone                       |
+| ------------------------------------------------------------------ | ------------------------------------------------------------- | -------------------------------- | ---------------------------- |
+| Conversations, earlier messages collapsed                          | ✓                                                             | ✓                                | ✓                            |
+| HTML mail, inline (cid) images                                     | ✓                                                             | ✓                                | ✓                            |
+| Remote images                                                      | load; broken ones proxied by backend                          | load; proxy only where CORS lets | load                         |
+| Remote-image blocking                                              | —                                                             | —                                | —                            |
+| Quoted text collapsed                                              | ✓ (HTML and plain text)                                       | ✓                                | plain text only              |
+| Attachments                                                        | preview in app, save, open in default app, drag out to Finder | preview in app, save             | Quick Look (no save / share) |
+| Unsubscribe (one-click, web, mailto)                               | ✓                                                             | ✓                                | ✓                            |
+| Conversation summary (people, files, list)                         | ✓                                                             | ✓                                | —                            |
+| Sender hover card (write, search, ask)                             | ✓                                                             | ✓                                | —                            |
+| Gmail category chips                                               | Gmail                                                         | Gmail                            | —                            |
+| Folders: Inbox, Starred, Sent, Drafts, Important, All, Junk, Trash | ✓ (Important: Gmail)                                          | ✓                                | ✓ (Important: Gmail)         |
+| Print, show original                                               | —                                                             | —                                | —                            |
 
 ## Organizing
 

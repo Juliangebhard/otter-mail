@@ -3,16 +3,11 @@ import { getAccountColor, getAccountDisplayName } from "./account-style";
 import { parseAddressEntry, splitAddressList } from "./address";
 import { useAccounts, useMessage } from "./hooks";
 import { SenderAvatar } from "./sender-avatar";
-import type { GmailMessageSummary } from "./types";
+import type { GmailMessageDetail, GmailMessageSummary } from "./types";
 import { HintTooltip, cn } from "./ui";
 import { UnsubscribeLink } from "./unsubscribe-link";
 
-type Download = (
-  messageId: string,
-  attachmentId: string,
-  filename: string,
-  mimeType: string,
-) => void;
+type OpenFile = (messageId: string, attachment: GmailMessageDetail["attachments"][number]) => void;
 
 /**
  * A conversation at a glance (Codex's pinned summary): where it lives and
@@ -26,7 +21,7 @@ export function ConversationSummary({
   rows,
   onComposeTo,
   onSearchSender,
-  onDownload,
+  onOpenFile,
   className,
 }: {
   accountId: string;
@@ -34,7 +29,7 @@ export function ConversationSummary({
   rows: GmailMessageSummary[];
   onComposeTo?: (email: string) => void;
   onSearchSender?: (email: string) => void;
-  onDownload: Download;
+  onOpenFile: OpenFile;
   className?: string;
 }) {
   const account = useAccounts().data?.find((a) => a.id === accountId);
@@ -145,7 +140,7 @@ export function ConversationSummary({
               key={m.id}
               accountId={accountId}
               messageId={m.id}
-              onDownload={onDownload}
+              onOpenFile={onOpenFile}
             />
           ))}
         </Section>
@@ -202,11 +197,11 @@ function PersonAction({
 function MessageFiles({
   accountId,
   messageId,
-  onDownload,
+  onOpenFile,
 }: {
   accountId: string;
   messageId: string;
-  onDownload: Download;
+  onOpenFile: OpenFile;
 }) {
   const detail = useMessage(accountId, messageId).data;
   // Inline images (a content id) are part of the body, not files people sent.
@@ -215,8 +210,8 @@ function MessageFiles({
     <button
       key={a.id}
       type="button"
-      title={`Save ${a.filename}`}
-      onClick={() => onDownload(messageId, a.id, a.filename, a.mimeType)}
+      title={`Open ${a.filename}`}
+      onClick={() => onOpenFile(messageId, a)}
       className="flex h-8 w-full min-w-0 cursor-pointer items-center gap-2.5 rounded-lg px-2 text-left hover:bg-foreground/[0.06]"
     >
       <FileTextIcon className="size-4 shrink-0 text-muted-foreground" />

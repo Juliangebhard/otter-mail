@@ -31,6 +31,7 @@ const bridge: DesktopBridge = {
     defaultMailApp: true,
     translation: true,
     dragOut: true,
+    openFiles: true,
   },
   invoke: <T>(channel: string, params?: unknown) =>
     ipcRenderer.invoke(channel, params) as Promise<T>,
