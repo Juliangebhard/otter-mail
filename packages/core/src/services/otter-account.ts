@@ -139,8 +139,13 @@ function createClient() {
       credentials: usesCookie() ? "include" : "omit",
       auth: { type: "Bearer", token: () => session?.token ?? undefined },
       // How this device appears in the account's device list (browsers send their own).
+      // Percent-encoded: headers only take Latin-1, and Macs are named "Laurin’s MacBook Pro".
       ...(deviceName
-        ? { headers: { "User-Agent": `Otter Mail/${appVersion} (${deviceName})` } }
+        ? {
+            headers: {
+              "User-Agent": `Otter Mail/${appVersion} (${encodeURIComponent(deviceName)})`,
+            },
+          }
         : {}),
     },
   });
@@ -214,7 +219,13 @@ export async function signOut(): Promise<void> {
 function deviceName(userAgent: string | null | undefined): string {
   const ua = userAgent ?? "";
   const mac = /^Otter Mail\/\S+ \((.+)\)$/.exec(ua)?.[1];
-  if (mac) return mac;
+  if (mac) {
+    try {
+      return decodeURIComponent(mac);
+    } catch {
+      return mac;
+    }
+  }
   const browser = /Edg\//.test(ua)
     ? "Edge"
     : /Firefox\//.test(ua)
