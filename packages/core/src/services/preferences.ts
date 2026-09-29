@@ -1,8 +1,9 @@
 /**
  * Preferences that follow the Otter account to every device (the relay's
  * `/v1/preferences`): app settings, views, keybindings, the assistant's
- * settings and Hermes key, and the renderer's UI choices (`ui`, which it
- * mirrors from localStorage). Each section is replaced whole; the last write
+ * settings and Hermes key, the renderer's UI choices (`ui`, which it
+ * mirrors from localStorage), and the signatures of mailboxes whose server
+ * keeps none (IMAP; Gmail keeps its own). Each section is replaced whole; the last write
  * wins.
  *
  * On connecting (and on the relay's `preferences` event) this device takes
@@ -29,6 +30,7 @@ import { getHermesKey } from "./assistant/settings.js";
 import { readKeybindings, writeKeybindings } from "./keybindings-store.js";
 import { configureAutoSync, followMailboxArrangement } from "./mail-sync.js";
 import { getOtterUser, relayRequest } from "./otter-account.js";
+import { listAccounts, updateAccount } from "./account-store.js";
 import { getSettings, updateSettings, type AppSettings } from "./settings-store.js";
 import { listViews, writeViews } from "./views-store.js";
 import type { MailView } from "../types.js";
@@ -122,6 +124,31 @@ const SECTIONS = {
       if (value && typeof value === "object") await writeUiPreferences(value as UiPreferences);
     },
   },
+  // By address, lower-cased. Keeps the mailboxes this device doesn't have, so
+  // it never drops another device's.
+  signatures: {
+    async read() {
+      const signatures = syncedSignatures();
+      for (const account of await listAccounts()) {
+        if (account.provider !== "imap") continue;
+        signatures[account.email.toLowerCase()] = account.signature ?? "";
+      }
+      return signatures;
+    },
+    async apply(value) {
+      if (!value || typeof value !== "object") return;
+      const signatures = value as Record<string, string>;
+      let changed = false;
+      for (const account of await listAccounts()) {
+        const signature = signatures[account.email.toLowerCase()];
+        if (account.provider !== "imap" || signature === undefined) continue;
+        if ((account.signature ?? "") === signature) continue;
+        await updateAccount(account.id, { signature });
+        changed = true;
+      }
+      if (changed) broadcast("gmail:accounts-changed");
+    },
+  },
 } satisfies Record<string, Section>;
 
 export type SectionName = keyof typeof SECTIONS;
@@ -129,6 +156,19 @@ const SECTION_NAMES = Object.keys(SECTIONS) as SectionName[];
 
 /** What each section (and the Hermes key) was when last synced, as JSON. */
 const synced = new Map<SectionName | "hermesKey", string>();
+
+function syncedSignatures(): Record<string, string> {
+  try {
+    return JSON.parse(synced.get("signatures") ?? "{}") as Record<string, string>;
+  } catch {
+    return {};
+  }
+}
+
+/** The account's signature for an IMAP mailbox new to this device, as last synced. */
+export function syncedSignature(email: string): string | undefined {
+  return syncedSignatures()[email.toLowerCase()] || undefined;
+}
 
 // The Hermes key is full control of someone's agent, and a device can be shared: this remembers
 // which Otter account a key synced with, so it never reaches another account, and it leaves the

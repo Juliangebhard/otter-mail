@@ -63,6 +63,11 @@ export interface Env {
   GOOGLE_TOKEN_URL?: string;
   /** A "host:port" the tunnel may reach despite its rules; only tests set it (a local server). */
   TUNNEL_TEST_TARGET?: string;
+  /**
+   * "true" lets the tunnel reach any host and port, a mail server on this
+   * machine included. Only `pnpm dev` sets it; never in wrangler.jsonc.
+   */
+  TUNNEL_ALLOW_PRIVATE?: string;
 }
 
 type Session = { id: string; user: RelayUser };
@@ -316,7 +321,8 @@ authed.get(
       throw new HTTPException(403, { message: "Not from the web app." });
     }
     const { host, port } = c.req.valid("query");
-    if (!tunnel.allowed(host, port, c.env.TUNNEL_TEST_TARGET)) {
+    const anywhere = c.env.TUNNEL_ALLOW_PRIVATE === "true";
+    if (!anywhere && !tunnel.allowed(host, port, c.env.TUNNEL_TEST_TARGET)) {
       throw new HTTPException(400, { message: "Only mail ports on public hosts." });
     }
     return tunnel.open(host, port);

@@ -201,6 +201,9 @@ async function main(): Promise<void> {
         `APP_ORIGIN:${devServerUrl}`,
         "--var",
         "COOKIE_DOMAIN:",
+        // A local IMAP server for the web app (docs/development.md); never in production.
+        "--var",
+        "TUNNEL_ALLOW_PRIVATE:true",
       ],
       cwd: NodePath.join(repoRoot, "infra/relay"),
     });
@@ -261,6 +264,10 @@ async function main(): Promise<void> {
     });
   }
 
+  // `pnpm dev:mail`'s CA, for its local mail server (docs/development.md).
+  const devMailCa = NodePath.join(repoRoot, ".otter-mail/dev-mail/ca.pem");
+  const trustDevMail = mode !== "dev:demo" && NodeFS.existsSync(devMailCa);
+
   const env: NodeJS.ProcessEnv = {
     ...process.env,
     OTTER_MAIL_HOME: dataHome,
@@ -269,6 +276,12 @@ async function main(): Promise<void> {
     VITE_DEV_SERVER_URL: devServerUrl,
     ...(mode === "dev" ? { VITE_RELAY_URL: relayUrl } : {}),
     ...(mode === "dev:demo" ? { VITE_DEMO: "1" } : {}),
+    ...(trustDevMail
+      ? {
+          VITE_DEV_MAIL_CA: NodeFS.readFileSync(devMailCa, "utf8"),
+          NODE_EXTRA_CA_CERTS: devMailCa,
+        }
+      : {}),
     FORCE_COLOR: process.env.FORCE_COLOR ?? (process.stdout.isTTY ? "1" : "0"),
   };
 
