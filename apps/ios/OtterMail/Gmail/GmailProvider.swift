@@ -13,6 +13,7 @@ final class GmailProvider: MailProvider {
     }
 
     var capabilities: MailCapabilities { .gmail }
+    var takesTurns: Bool { false }
 
     // ── Reading ──────────────────────────────────────────────────────────────
 

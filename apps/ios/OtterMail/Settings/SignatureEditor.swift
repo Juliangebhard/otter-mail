@@ -8,6 +8,8 @@ import WebKit
 struct SignatureEditor: View {
     @Environment(\.palette) private var palette
     let html: String
+    /** Where saving puts it ("Gmail", "your Otter account"). */
+    var savedIn = "Gmail"
     let onSave: (String) async throws -> Void
 
     @State private var page = WebPage()
@@ -65,7 +67,7 @@ struct SignatureEditor: View {
         do {
             status = "Saving…"
             try await onSave(edited)
-            status = "Saved in Gmail"
+            status = "Saved in \(savedIn)"
         } catch {
             status = error.localizedDescription
         }

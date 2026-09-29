@@ -157,7 +157,7 @@ struct MailboxSettings: View {
 
             if !mailbox.signedOut {
                 Section {
-                    SignatureEditor(html: mailbox.signature) { html in
+                    SignatureEditor(html: mailbox.signature, savedIn: mailbox.capabilities.serverSignatures ? "Gmail" : "your Otter account") { html in
                         try await session.setSignature(html, for: email)
                     }
                 } header: {
@@ -165,7 +165,7 @@ struct MailboxSettings: View {
                 } footer: {
                     Text(mailbox.capabilities.serverSignatures
                         ? "Added to new messages, replies and forwards from this mailbox. Saved in Gmail, so it's the same there and on every device."
-                        : "Added to new messages, replies and forwards from this mailbox. Kept on this iPhone.")
+                        : "Added to new messages, replies and forwards from this mailbox. Saved with your Otter account, so it's the same on every device.")
                 }
             }
 
