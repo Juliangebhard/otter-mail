@@ -13,6 +13,9 @@ nonisolated struct Person: Hashable, Codable {
 
     /** The name, or the address when there's none. */
     var label: String { name.isEmpty ? email : name }
+
+    /** Whether this is `address` (a mailbox's own, say), whatever its case. */
+    func isAddress(_ address: String) -> Bool { email.caseInsensitiveCompare(address) == .orderedSame }
 }
 
 nonisolated struct Mailbox: Identifiable, Hashable, Codable {

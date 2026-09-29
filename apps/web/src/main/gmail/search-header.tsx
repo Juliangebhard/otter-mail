@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import type { GmailAccount, GmailMessageSummary } from "./types";
 import { capabilitiesOf } from "./capabilities";
+import { senderLabel } from "./address";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -167,7 +168,12 @@ function SuggestionRow({
               <span className="font-medium">{suggestion.message.subject || "(no subject)"}</span>
               <span className="text-muted-foreground">
                 {" "}
-                — {suggestion.message.fromName || suggestion.message.fromEmail}
+                —{" "}
+                {senderLabel(
+                  suggestion.message.fromName,
+                  suggestion.message.fromEmail,
+                  suggestion.message.accountId,
+                )}
               </span>
             </span>
           </>

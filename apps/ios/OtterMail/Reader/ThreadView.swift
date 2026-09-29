@@ -163,7 +163,7 @@ struct ThreadView: View {
 
     private func replyName(_ thread: MailThread, _ mailbox: Mailbox) -> String {
         let last = thread.sent.last ?? thread.latest
-        let person = last.from.email == mailbox.email ? last.to.first ?? last.from : last.from
+        let person = last.from.isAddress(mailbox.email) ? last.to.first ?? last.from : last.from
         return person.label.split(separator: " ").first.map(String.init) ?? person.label
     }
 
