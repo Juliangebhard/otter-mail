@@ -342,7 +342,10 @@ async function runSyncNow(accountId: string, provider: MailProvider): Promise<vo
     }
     recordFailure(accountId);
     logger.error("mail-sync", `sync failed for ${accountId}: ${describeSyncError(accountId, err)}`);
-    update(accountId, { ...laneStatus(accountId, false), error: describeSyncError(accountId, err) });
+    update(accountId, {
+      ...laneStatus(accountId, false),
+      error: describeSyncError(accountId, err),
+    });
     // The server refused the sign-in (the provider set it aside): nothing more
     // to try, IDLE included, until the user signs in again.
     if (!isSignedIn(accountId)) stopWatch(accountId);
@@ -516,7 +519,12 @@ async function downloadBodies(accountId: string, provider: MailProvider): Promis
       });
       assertActive(accountId);
       // Not mail the feed deleted meanwhile.
-      const gone = new Set(store.filterUnknownIds(accountId, details.map((m) => m.id)));
+      const gone = new Set(
+        store.filterUnknownIds(
+          accountId,
+          details.map((m) => m.id),
+        ),
+      );
       store.upsertMessageDetails(
         accountId,
         details.filter((m) => !gone.has(m.id)),

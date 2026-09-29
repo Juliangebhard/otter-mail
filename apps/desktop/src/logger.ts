@@ -52,7 +52,9 @@ export function logToFile(dir: string, debug: boolean): void {
 }
 
 /** The backend: hand lines elsewhere (to main), with `data` already formatted. */
-export function sendLogsTo(send: (level: Level, scope: string, message: string, data?: string) => void) {
+export function sendLogsTo(
+  send: (level: Level, scope: string, message: string, data?: string) => void,
+) {
   sink = (level, scope, message, data) =>
     send(level, scope, message, data === undefined ? undefined : format(data));
 }

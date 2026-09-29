@@ -120,7 +120,12 @@ async function fetchAndStore(
 ): Promise<GmailMessageSummary[]> {
   const uncached = <T extends GmailMessageSummary>(fetched: T[]): T[] => {
     if (!skipCached) return fetched;
-    const unknown = new Set(store.filterUnknownIds(accountId, fetched.map((m) => m.id)));
+    const unknown = new Set(
+      store.filterUnknownIds(
+        accountId,
+        fetched.map((m) => m.id),
+      ),
+    );
     return fetched.filter((m) => unknown.has(m.id));
   };
   if (platform().offlineDownloads) {

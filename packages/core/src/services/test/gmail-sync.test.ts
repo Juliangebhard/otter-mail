@@ -85,8 +85,12 @@ async function fakeFetch(input: string | URL | Request): Promise<Response> {
   }
   if (path === "/history") {
     const start = Number(url.searchParams.get("startHistoryId"));
-    if (start < historyFloor) return json({ error: { message: "Requested entity was not found." } }, 404);
-    return json({ history: history.filter((h) => Number(h.id) > start), historyId: String(historyId) });
+    if (start < historyFloor)
+      return json({ error: { message: "Requested entity was not found." } }, 404);
+    return json({
+      history: history.filter((h) => Number(h.id) > start),
+      historyId: String(historyId),
+    });
   }
   if (path === "/messages") {
     const labelIds = url.searchParams.getAll("labelIds");
@@ -290,7 +294,10 @@ describe("Gmail sync", () => {
     remove("b");
     relabel("c", ["STARRED"], []);
     mailSync.syncAccount(account.id, { force: true, trigger: "push" });
-    await until(() => mailStore.getSyncState(account.id).historyId === String(historyId), "the push");
+    await until(
+      () => mailStore.getSyncState(account.id).historyId === String(historyId),
+      "the push",
+    );
 
     // Then the fill's older copies land.
     release();
