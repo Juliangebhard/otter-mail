@@ -11,6 +11,7 @@ import { IconBtn, HintTooltip, UnreadPill, cn, restoreFocusForKeyboardOnly } fro
 import { COMBINED_ACCOUNT_ID } from "./custom-views";
 import { getAccountColor, getAccountDisplayName } from "./account-style";
 import { useAllAccountLabels } from "./hooks";
+import { DropdownMenuSeparator } from "./menu";
 import type { GmailAccount } from "./types";
 import type { KeybindingCommand } from "../keybindings/commands";
 import { shortcutLabelFor, useKeybindingsState } from "../keybindings/store";
@@ -210,17 +211,22 @@ export function MailboxDots({
   );
 }
 
-/** Mailbox switcher, the sidebar's heading; aligned with the rows below it. */
+/**
+ * Mailbox switcher, the sidebar's heading; aligned with the rows below it.
+ * `children` are more items after the mailboxes (the sidebar's app menu).
+ */
 export function MailboxSwitcher({
   accounts,
   selectedAccountId,
   onSelectAccount,
   className,
+  children,
 }: {
   accounts: GmailAccount[];
   selectedAccountId: string | null;
   onSelectAccount: (accountId: string) => void;
   className?: string;
+  children?: ReactNode;
 }) {
   const options = useMailboxOptions(accounts);
   const unread = useInboxUnread(accounts);
@@ -286,6 +292,12 @@ export function MailboxSwitcher({
               </RadixMenu.Item>
             );
           })}
+          {children ? (
+            <>
+              <DropdownMenuSeparator />
+              {children}
+            </>
+          ) : null}
         </RadixMenu.Content>
       </RadixMenu.Portal>
     </RadixMenu.Root>
