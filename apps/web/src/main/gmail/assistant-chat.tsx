@@ -817,6 +817,7 @@ export function AssistantChatPanel({
   quote,
   onClearQuote,
   closeTabRef,
+  onClosePanel,
 }: {
   /** Account of the open conversation (context attach), null when none. */
   accountId: string | null;
@@ -828,6 +829,8 @@ export function AssistantChatPanel({
   onClearQuote?: () => void;
   /** ⌘W: closes the active tab (true), or false when it's the only one. */
   closeTabRef?: MutableRefObject<(() => boolean) | null>;
+  /** Closing the last tab closes the panel. */
+  onClosePanel?: () => void;
 }) {
   const [store, setStore] = useState<Store>(() => loadStore());
   const { conversations, activeId } = store;
@@ -1504,9 +1507,10 @@ export function AssistantChatPanel({
 
   /**
    * Closes a tab; the chat stays in history (a running turn finishes there).
-   * The last tab gives way to a fresh "New chat".
+   * The last tab closes the panel, leaving a fresh "New chat" for next time.
    */
   const closeTab = (id: string) => {
+    if (storeRef.current.tabs.length < 2) onClosePanel?.();
     setStore((s) => {
       if (s.tabs.length < 2) {
         const current = s.conversations.find((c) => c.id === id);

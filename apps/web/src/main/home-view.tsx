@@ -329,6 +329,11 @@ export function HomeView() {
       return !open;
     });
   };
+  const closeChat = () => {
+    localStorage.setItem("gmail:chat-open", "0");
+    setChatOpen(false);
+    setPendingQuote(null);
+  };
   const openChat = () => {
     localStorage.setItem("gmail:chat-open", "1");
     setChatOpen(true);
@@ -1238,6 +1243,7 @@ export function HomeView() {
                   >
                     <AssistantChatPanel
                       closeTabRef={closeChatTabRef}
+                      onClosePanel={closeChat}
                       accountId={selectedMessageId ? readerAccount : null}
                       messageId={selectedMessageId}
                       selectedRows={chatSelection}
