@@ -15,6 +15,7 @@ import {
   DialogTitle,
 } from "~/components/ui/dialog";
 import { CheckIcon } from "lucide-react";
+import { useCapabilities } from "./capabilities";
 import { useLabels } from "./hooks";
 import { buildLabelTree, flattenLabelTree, isAssignableLabel } from "./label-tree";
 import { labelDisplayName } from "./label-names";
@@ -47,6 +48,8 @@ export function LabelOverlay({
 }) {
   const [query, setQuery] = useState("");
   const labelsQuery = useLabels(open ? accountId : null);
+  // One folder per message (IMAP): labelling is moving, to Inbox too.
+  const folders = !useCapabilities(accountId).multipleLabels;
   const applied = new Set(appliedLabelIds);
 
   useEffect(() => {
@@ -60,7 +63,7 @@ export function LabelOverlay({
     .filter((l): l is GmailLabel => l != null);
 
   const choices: { id: string; name: string; color?: string }[] = [];
-  if (mode === "move" && currentLabelId !== "INBOX") {
+  if ((mode === "move" && currentLabelId !== "INBOX") || (mode === "label" && folders)) {
     choices.push({ id: "INBOX", name: "Inbox" });
   }
   for (const label of userLabels) {
@@ -72,7 +75,7 @@ export function LabelOverlay({
     });
   }
 
-  const title = mode === "move" ? "Move to" : "Label as";
+  const title = mode === "move" ? "Move to" : folders ? "Move to folder" : "Label as";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

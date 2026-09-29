@@ -6,6 +6,7 @@ import {
   useLayoutEffect,
   useRef,
   useState,
+  type ComponentProps,
   type CSSProperties,
   type DragEvent as ReactDragEvent,
   type ReactNode,
@@ -81,6 +82,8 @@ import { OtterAvatar } from "../settings/otter-account-pane";
 import type { SettingsPane } from "./api";
 import type { OtterAccountState } from "@otter-mail/contracts";
 import { UpdateCard } from "../updates";
+import { AddMailboxMenu } from "./add-mailbox";
+import { useCapabilities } from "./capabilities";
 
 const LABEL_DRAG_MIME = "application/x-gmail-label";
 
@@ -425,11 +428,11 @@ function SectionAddButton({ label, onClick }: { label: string; onClick: () => vo
 }
 
 /** "+ Add …" footer row for a section. */
-function AddRow({ label, onClick }: { label: string; onClick: () => void }) {
+function AddRow({ label, ...props }: { label: string } & ComponentProps<"button">) {
   return (
     <button
       type="button"
-      onClick={onClick}
+      {...props}
       className={`${SIDEBAR_ROW} px-(--sidebar-row-content-inset) text-sidebar-foreground/90 hover:bg-sidebar-row-hover hover:text-sidebar-foreground`}
     >
       <PlusIcon className="size-4 shrink-0 text-sidebar-muted-foreground" />
@@ -498,7 +501,8 @@ function labelIcon(label?: GmailLabel): ReactNode {
 
 type LabelActions = {
   onRename: (label: GmailLabel) => void;
-  onRecolor: (label: GmailLabel) => void;
+  /** Absent when the mailbox's labels have no colors. */
+  onRecolor?: (label: GmailLabel) => void;
   onDelete: (label: GmailLabel) => void;
   onMove: (source: LabelDragPayload, targetParentName: string | null) => void;
   /** Conversations dropped from the message list; `keep` = ⌥ held (label only). */
@@ -618,9 +622,11 @@ function LabelNode({
             <ContextMenuItem icon="pencil" onSelect={() => actions.onRename(label)}>
               Rename…
             </ContextMenuItem>
-            <ContextMenuItem icon="paintpalette" onSelect={() => actions.onRecolor(label)}>
-              Change color…
-            </ContextMenuItem>
+            {actions.onRecolor ? (
+              <ContextMenuItem icon="paintpalette" onSelect={() => actions.onRecolor?.(label)}>
+                Change color…
+              </ContextMenuItem>
+            ) : null}
             <ContextMenuItem
               icon="keyboard"
               accelerator={actions.shortcutFor(label)}
@@ -818,6 +824,9 @@ function SidebarPage({
   const isCombined = selectedAccountId === COMBINED_ACCOUNT_ID;
 
   const labelsQuery = useLabels(isCombined ? null : selectedAccountId);
+  const capabilities = useCapabilities(isCombined ? null : selectedAccountId);
+  // Mail in one folder at a time (IMAP): its labels are folders.
+  const labelNoun = capabilities.multipleLabels ? "Label" : "Folder";
   const addAccount = useAddAccount();
   const createLabel = useCreateLabel();
 
@@ -954,7 +963,9 @@ function SidebarPage({
       return;
     }
     const removeId =
-      !keep && payload.fromLabelId && isMoveSourceLabel(payload.fromLabelId, label.id)
+      (!keep || !capabilities.multipleLabels) &&
+      payload.fromLabelId &&
+      isMoveSourceLabel(payload.fromLabelId, label.id)
         ? payload.fromLabelId
         : null;
     console.log("[AccountsSidebar:dropThreads]", {
@@ -980,7 +991,7 @@ function SidebarPage({
       setRenameValue(label.name);
       setRenameTarget(label);
     },
-    onRecolor: (label) => setColorTarget(label),
+    onRecolor: capabilities.labelColors ? (label) => setColorTarget(label) : undefined,
     onDelete: (label) => setDeleteTarget(label),
     onMove: handleMoveLabel,
     onDropThreads: handleDropThreads,
@@ -1162,9 +1173,12 @@ function SidebarPage({
 
               {selectedAccountId ? (
                 <Section
-                  title="Labels"
+                  title={`${labelNoun}s`}
                   action={
-                    <SectionAddButton label="Add label" onClick={() => setCreateLabelOpen(true)} />
+                    <SectionAddButton
+                      label={`Add ${labelNoun.toLowerCase()}`}
+                      onClick={() => setCreateLabelOpen(true)}
+                    />
                   }
                   dropZone={{
                     active: rootDropActive,
@@ -1198,7 +1212,12 @@ function SidebarPage({
               ) : null}
 
               {accounts.length === 0 ? (
-                <AddRow label="Add Gmail account" onClick={() => void handleAddAccount()} />
+                <AddMailboxMenu
+                  onGmail={() => void handleAddAccount()}
+                  onAdded={(account) => onSelectAccount(account.id)}
+                >
+                  <AddRow label="Add mailbox" />
+                </AddMailboxMenu>
               ) : null}
             </>
           )}
@@ -1207,7 +1226,7 @@ function SidebarPage({
         <Dialog
           open={createLabelOpen}
           onOpenChange={setCreateLabelOpen}
-          title="New Label"
+          title={`New ${labelNoun}`}
           confirmLabel="Create"
           confirmVariant="accent"
           confirmDisabled={!newLabelName.trim() || createLabel.isPending}

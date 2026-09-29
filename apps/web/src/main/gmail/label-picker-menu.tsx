@@ -5,25 +5,32 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuCheckboxItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuSub,
 } from "./menu";
+import { useCapabilities } from "./capabilities";
 import { useLabels, useModifyThread } from "./hooks";
 import { buildLabelTree, type LabelTreeNode, isAssignableLabel } from "./label-tree";
+import type { GmailLabel } from "./types";
 
-type LabelPickerMenuProps = {
+type LabelChoicesParams = {
   /** Owning account of the message (per-row account in Combined mode). */
   accountId: string;
   /** The conversation to label (labels apply to the whole thread, like Gmail). */
   threadId: string;
   /** Labels currently on the conversation (union over its messages). */
   labelIds: string[];
+};
+
+type LabelPickerMenuProps = LabelChoicesParams & {
   /** Trigger element (rendered via asChild — must accept a ref). */
   children: React.ReactNode;
 };
 
 /** Menu-component set: DropdownMenu* and ContextMenu* both satisfy this shape. */
 export type LabelMenuKit = {
+  Item: React.ComponentType<{ disabled?: boolean; children: React.ReactNode }>;
   CheckboxItem: React.ComponentType<{
     checked: boolean;
     onCheckedChange: (checked: boolean) => void;
@@ -79,15 +86,45 @@ export function renderLabelMenuNodes(
   return nodes.map(renderNode);
 }
 
-export function LabelPickerMenu({ accountId, threadId, labelIds, children }: LabelPickerMenuProps) {
+/**
+ * Moving a conversation to one folder, for mailboxes whose mail sits in one
+ * folder at a time (IMAP: no `multipleLabels`): the folder is added and the
+ * folders it was in (Inbox, or another of `labels`) come off.
+ */
+export function moveToFolder(labelIds: string[], folderId: string, labels: GmailLabel[]) {
+  const folders = new Set(["INBOX", ...labels.filter(isAssignableLabel).map((l) => l.id)]);
+  return {
+    addLabelIds: [folderId],
+    removeLabelIds: labelIds.filter((id) => id !== folderId && folders.has(id)),
+  };
+}
+
+/**
+ * A conversation's label checklist: the labels it can take, and toggling one.
+ * In a mailbox with one folder per message it becomes "Move to folder": Inbox
+ * first, and picking a folder moves the conversation there.
+ */
+export function useLabelChoices({ accountId, threadId, labelIds }: LabelChoicesParams) {
   const labelsQuery = useLabels(accountId);
   const modifyThread = useModifyThread();
-
-  const tree = buildLabelTree((labelsQuery.data ?? []).filter(isAssignableLabel));
+  const { multipleLabels } = useCapabilities(accountId);
+  const labels = labelsQuery.data ?? [];
+  const tree = buildLabelTree(labels.filter(isAssignableLabel));
   const applied = new Set(labelIds);
 
-  const handleToggle = (labelId: string, checked: boolean) => {
+  const toggle = (labelId: string, checked: boolean) => {
     console.log("[LabelPickerMenu:toggle]", { accountId, threadId, labelId, checked });
+    if (!multipleLabels) {
+      // Unchecking the folder it's in has nowhere to move it.
+      if (checked) {
+        void modifyThread.mutateAsync({
+          accountId,
+          threadId,
+          ...moveToFolder(labelIds, labelId, labels),
+        });
+      }
+      return;
+    }
     void modifyThread.mutateAsync({
       accountId,
       threadId,
@@ -96,52 +133,61 @@ export function LabelPickerMenu({ accountId, threadId, labelIds, children }: Lab
     });
   };
 
+  return { tree, applied, toggle, folders: !multipleLabels };
+}
+
+/** The checklist's items: "No labels", or the tree (after Inbox, for folders). */
+export function renderLabelChoices(
+  { tree, applied, toggle, folders }: ReturnType<typeof useLabelChoices>,
+  kit: LabelMenuKit,
+): React.ReactNode {
+  if (!folders) {
+    return tree.length === 0 ? (
+      <kit.Item disabled>No labels</kit.Item>
+    ) : (
+      renderLabelMenuNodes(tree, applied, toggle, kit)
+    );
+  }
+  return (
+    <>
+      <kit.CheckboxItem
+        checked={applied.has("INBOX")}
+        onCheckedChange={(checked) => toggle("INBOX", checked)}
+      >
+        Inbox
+      </kit.CheckboxItem>
+      {tree.length > 0 ? <kit.Separator /> : null}
+      {renderLabelMenuNodes(tree, applied, toggle, kit)}
+    </>
+  );
+}
+
+const DROPDOWN_KIT: LabelMenuKit = {
+  Item: DropdownMenuItem,
+  CheckboxItem: DropdownMenuCheckboxItem,
+  Sub: DropdownMenuSub,
+  Separator: DropdownMenuSeparator,
+};
+
+export function LabelPickerMenu({ children, ...params }: LabelPickerMenuProps) {
+  const choices = useLabelChoices(params);
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>{children}</DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        {tree.length === 0 ? (
-          <DropdownMenuItem disabled>No labels</DropdownMenuItem>
-        ) : (
-          renderLabelMenuNodes(tree, applied, handleToggle, {
-            CheckboxItem: DropdownMenuCheckboxItem,
-            Sub: DropdownMenuSub,
-            Separator: DropdownMenuSeparator,
-          })
-        )}
+        {choices.folders ? <DropdownMenuLabel>Move to folder</DropdownMenuLabel> : null}
+        {renderLabelChoices(choices, DROPDOWN_KIT)}
       </DropdownMenuContent>
     </DropdownMenu>
   );
 }
 
 /** The same label checklist as a submenu ("Label ▸"), for overflow menus. */
-export function LabelSubmenu({
-  accountId,
-  threadId,
-  labelIds,
-}: Omit<LabelPickerMenuProps, "children">) {
-  const labelsQuery = useLabels(accountId);
-  const modifyThread = useModifyThread();
-  const tree = buildLabelTree((labelsQuery.data ?? []).filter(isAssignableLabel));
-  const applied = new Set(labelIds);
-  const handleToggle = (labelId: string, checked: boolean) =>
-    void modifyThread.mutateAsync({
-      accountId,
-      threadId,
-      addLabelIds: checked ? [labelId] : undefined,
-      removeLabelIds: checked ? undefined : [labelId],
-    });
+export function LabelSubmenu(params: LabelChoicesParams) {
+  const choices = useLabelChoices(params);
   return (
-    <DropdownMenuSub label="Label">
-      {tree.length === 0 ? (
-        <DropdownMenuItem disabled>No labels</DropdownMenuItem>
-      ) : (
-        renderLabelMenuNodes(tree, applied, handleToggle, {
-          CheckboxItem: DropdownMenuCheckboxItem,
-          Sub: DropdownMenuSub,
-          Separator: DropdownMenuSeparator,
-        })
-      )}
+    <DropdownMenuSub label={choices.folders ? "Move to folder" : "Label"}>
+      {renderLabelChoices(choices, DROPDOWN_KIT)}
     </DropdownMenuSub>
   );
 }
