@@ -12,6 +12,11 @@ import Foundation
  */
 protocol MailProvider: AnyObject {
     var capabilities: MailCapabilities { get }
+    /**
+     * Calls on a mailbox must run one at a time: they rewrite the copy (IMAP
+     * moves change message ids), so each has to start from what the last left.
+     */
+    var takesTurns: Bool { get }
 
     /** Catches `state` up with the server (from scratch when it's empty). `known` is this mailbox's copy. */
     func sync(_ state: inout MailboxState, known: [MailThread]) async throws -> MailDelta
@@ -21,7 +26,7 @@ protocol MailProvider: AnyObject {
     func search(_ query: String, known: [MailThread]) async throws -> (ids: [String], threads: [MailThread])
     /** The mailbox's own labels (IMAP: its folders). */
     func labels() async throws -> [MailLabel]
-    /** The signature the server keeps; nil when it's kept on this iPhone. */
+    /** The signature the server keeps; nil when the app keeps it (following the Otter account). */
     func signature() async throws -> String?
     /** Saves the signature; answers it as kept. */
     func setSignature(_ html: String) async throws -> String

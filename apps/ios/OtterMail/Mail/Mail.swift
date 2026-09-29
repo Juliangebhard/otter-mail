@@ -22,7 +22,7 @@ nonisolated struct Mailbox: Identifiable, Hashable, Codable {
     /** Set in Settings › Mailboxes; shown in the sidebar and on rows. */
     var displayName: String
     var color: String
-    /** The address's signature, as HTML: Gmail's, or kept on this iPhone for IMAP. */
+    /** The address's signature, as HTML: Gmail's, or for IMAP the Otter account's (preferences, `signatures`). */
     var signature: String
     var labels: [MailLabel]
     var picture: String? = nil

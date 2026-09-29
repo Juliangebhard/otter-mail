@@ -38,6 +38,7 @@ final class ImapProvider: MailProvider {
     }
 
     var capabilities: MailCapabilities { .imap }
+    var takesTurns: Bool { true }
 
     // ── The password ─────────────────────────────────────────────────────────
 
@@ -660,7 +661,7 @@ final class ImapProvider: MailProvider {
 
     // ── Settings ─────────────────────────────────────────────────────────────
 
-    /** Signatures are kept on this iPhone (the mailbox's copy), not by the server. */
+    /** The server keeps no signatures: the mailbox keeps one, following the Otter account (Session, `signatures`). */
     func signature() async throws -> String? { nil }
     func setSignature(_ html: String) async throws -> String { html }
 

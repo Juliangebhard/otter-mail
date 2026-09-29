@@ -41,29 +41,33 @@ final class MailSync {
 
     /**
      * Runs `body` with the mailbox's provider and state, then shows what it
-     * answers. One at a time per mailbox, so each starts from what the last
-     * left (a sync that IDLE starts while a move is under way would otherwise
-     * bring the thread back as it was).
+     * answers. For a provider whose calls rewrite what's here (`takesTurns`:
+     * IMAP moves re-key messages), one at a time per mailbox, so each starts
+     * from what the last left: a sync that IDLE starts while a move is under
+     * way would otherwise bring the thread back as it was. Gmail's calls run
+     * side by side, as bulk actions want.
      */
     @discardableResult
     private func run(
         _ email: String, _ body: (any MailProvider, inout MailboxState, [MailThread]) async throws -> MailDelta
     ) async throws -> MailDelta {
-        if busy.contains(email) {
+        let provider = provider(email)
+        let turns = provider.takesTurns
+        if turns, busy.contains(email) {
             await withCheckedContinuation { waiting[email, default: []].append($0) }
-        } else {
+        } else if turns {
             busy.insert(email)
         }
         defer {
-            if let next = waiting[email]?.first {
+            if turns, let next = waiting[email]?.first {
                 waiting[email]?.removeFirst()
                 next.resume()
-            } else {
+            } else if turns {
                 busy.remove(email)
             }
         }
         var state = states[email] ?? MailboxState()
-        let delta = try await body(provider(email), &state, store.allThreads(of: email))
+        let delta = try await body(provider, &state, store.allThreads(of: email))
         states[email] = state
         store.remove(threadIDs: delta.removed.subtracting(delta.threads.map(\.id)))
         store.upsert(threads: delta.threads)
@@ -154,10 +158,13 @@ final class MailSync {
             let before = Dictionary(store.allThreads(of: email).map { ($0.id, $0) }) { a, _ in a }
             let delta = try await run(email) { provider, state, known in try await provider.sync(&state, known: known) }
             if notify { await announce(delta.threads, before: before) }
+            let provider = provider(email)
+            let labels = try await provider.labels()
+            let signature = try await provider.signature()
+            // Read after the awaits, so what changed meanwhile (a synced signature) isn't written over.
             if var mailbox = store.mailbox(email) {
-                let provider = provider(email)
-                mailbox.labels = try await provider.labels()
-                if let signature = try await provider.signature() { mailbox.signature = signature }
+                mailbox.labels = labels
+                if let signature { mailbox.signature = signature }
                 store.upsert(mailbox: mailbox)
             }
             scheduleSave()

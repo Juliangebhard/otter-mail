@@ -244,10 +244,14 @@ final class Session {
         }
     }
 
-    /** Saves the signature in Gmail (the demo just keeps it). */
+    /** Saves the signature in Gmail, or here and on the Otter account for IMAP (the demo just keeps it). */
     func setSignature(_ html: String, for email: String) async throws {
         if let sync {
             try await sync.setSignature(html, for: email)
+            if store.mailbox(email)?.capabilities.serverSignatures == false {
+                saveMailboxes()
+                preferenceChanged("signatures")
+            }
         } else if var mailbox = store.mailbox(email) {
             mailbox.signature = html
             store.upsert(mailbox: mailbox)
@@ -284,7 +288,8 @@ final class Session {
                 name: account.name ?? (imap == nil ? account.email : ""),
                 displayName: account.displayName ?? account.name ?? account.email,
                 color: account.color ?? Self.defaultColor(account.email),
-                signature: existing?.signature ?? "",
+                // New here: an IMAP mailbox's signature as the account keeps it.
+                signature: existing?.signature ?? (imap == nil ? "" : remoteSignatures[account.email.lowercased()] ?? ""),
                 labels: existing?.labels ?? [],
                 picture: account.picture,
                 signedOut: imap == nil ? !google.isSignedIn(account.email) : ImapProvider.password(account.email) == nil,
@@ -323,9 +328,35 @@ final class Session {
         remoteSections["settings"] = settings ?? [:]
         preferences.apply(ui: ui ?? [:], settings: settings ?? [:])
         assistant.apply(section: sections["assistant"] as? [String: Any], key: hermesKey)
+        let signatures = sections["signatures"] as? [String: String]
+        remoteSections["signatures"] = signatures ?? [:]
+        applySignatures()
         // A section the account doesn't have yet is seeded from here, as core does.
         if ui == nil { preferenceChanged("ui") }
         if settings == nil { preferenceChanged("settings") }
+        if signatures == nil { preferenceChanged("signatures") }
+    }
+
+    /** The account's IMAP signatures (by lower-cased address), as last pulled or written. */
+    private var remoteSignatures: [String: String] {
+        (remoteSections["signatures"] as? [String: String]) ?? [:]
+    }
+
+    /** IMAP servers keep no signatures: the account's (core's `signatures` section) are theirs. */
+    private func applySignatures() {
+        var changed = false
+        for var mailbox in store.mailboxes where !mailbox.capabilities.serverSignatures {
+            guard let signature = remoteSignatures[mailbox.email.lowercased()], signature != mailbox.signature else { continue }
+            mailbox.signature = signature
+            store.upsert(mailbox: mailbox)
+            changed = true
+        }
+        if changed { saveMailboxes() }
+    }
+
+    /** This device's IMAP signatures, written over the account's; mailboxes it doesn't have keep theirs. */
+    private var signaturesSection: [String: Any] {
+        Dictionary(store.mailboxes.filter { !$0.capabilities.serverSignatures }.map { ($0.email.lowercased(), $0.signature) }) { a, _ in a }
     }
 
     private func preferenceChanged(_ section: String) {
@@ -339,7 +370,13 @@ final class Session {
             Task { try? await relay.putPreferences(["assistant": assistant.syncedSection]) }
             return
         }
-        let ours: [String: Any] = section == "ui" ? preferences.uiSection : preferences.settingsSection
+        // Not pulled yet: writing now would drop the other devices' signatures.
+        if section == "signatures", remoteSections["signatures"] == nil { return }
+        let ours: [String: Any] = switch section {
+        case "ui": preferences.uiSection
+        case "signatures": signaturesSection
+        default: preferences.settingsSection
+        }
         let merged = (remoteSections[section] ?? [:]).merging(ours) { _, mine in mine }
         remoteSections[section] = merged
         pushingPreferences?.cancel()
