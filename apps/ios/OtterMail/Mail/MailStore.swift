@@ -95,6 +95,15 @@ final class MailStore {
         inScope(scope).filter { $0.unread && matches($0, folder) }.count
     }
 
+    /** A folder's count in the sidebar, as on the desktop: its unread mail, but every draft in Drafts and none on All Mail. */
+    func badge(in folder: Folder, scope: String?) -> Int {
+        switch folder {
+        case .allMail: 0
+        case .drafts: inScope(scope).filter { matches($0, .drafts) }.reduce(0) { $0 + $1.messages.filter(\.draft).count }
+        default: unreadCount(in: folder, scope: scope)
+        }
+    }
+
     func thread(_ id: String) -> MailThread? { threads.first { $0.id == id } }
 
     func allThreads(of email: String) -> [MailThread] { threads.filter { $0.mailbox == email } }
