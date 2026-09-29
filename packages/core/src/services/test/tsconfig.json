@@ -1,0 +1,10 @@
+{
+  // Core's realtime tests run on a Node platform (node:sqlite): Node's types,
+  // which the rest of core must not see.
+  "extends": "../../../tsconfig.json",
+  "compilerOptions": {
+    "types": ["node"]
+  },
+  "include": ["."],
+  "exclude": []
+}

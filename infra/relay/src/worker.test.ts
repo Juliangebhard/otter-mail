@@ -990,3 +990,72 @@ describe("tunnel", () => {
     expect(frames).toEqual([]);
   });
 });
+
+describe("Gmail pushes next to IMAP mailboxes", () => {
+  const imap = (username: string) => ({
+    provider: "imap",
+    imap: {
+      username,
+      imap: { host: "imap.gmail.test", port: 993, security: "tls" },
+      smtp: { host: "smtp.gmail.test", port: 465, security: "tls" },
+    },
+  });
+  const put = (token: string, email: string, body: unknown) =>
+    call("PUT", `/v1/accounts/${encodeURIComponent(email)}`, token, body);
+  const mailEvents = (events: (RelayEvent | string)[]) =>
+    events.filter((e) => typeof e !== "string" && e.type === "mail");
+
+  it("reach everyone who linked the address as Gmail, and nobody who linked it over IMAP", async () => {
+    // Two Otter accounts linked the same Gmail account; one has an IMAP mailbox too.
+    const owner = await signIn("push-owner@example.com");
+    const partner = await signIn("push-partner@example.com");
+    const stranger = await signIn("push-stranger@example.com");
+    expect((await link(owner.token, "Shared@Gmail.test")).status).toBe(204);
+    expect((await link(partner.token, "shared@gmail.test")).status).toBe(204);
+    expect((await put(owner.token, "owner@fastmail.test", imap("owner"))).status).toBe(204);
+    // Someone else claims the address over IMAP: it proves nothing, and takes nothing away.
+    expect((await put(stranger.token, "shared@gmail.test", imap("shared"))).status).toBe(204);
+    // Editing the Gmail link's profile (no provider, as every client sends it) keeps it Gmail.
+    expect((await put(owner.token, "shared@gmail.test", { displayName: "Shared" })).status).toBe(
+      204,
+    );
+
+    const devices = await Promise.all(
+      [owner, owner, partner, stranger].map((user) => connect(user.token)),
+    );
+    const [ownerMac, ownerWeb, partnerMac, strangerMac] = devices;
+
+    expect((await push({ emailAddress: "SHARED@gmail.test", historyId: "9001" })).status).toBe(204);
+    const event = { type: "mail", email: "shared@gmail.test", historyId: "9001" };
+    for (const device of [ownerMac, ownerWeb, partnerMac]) {
+      await until(() => mailEvents(device.events).length > 0, "the mail event");
+    }
+
+    // Gmail never publishes for an IMAP mailbox; a notification for one reaches nobody.
+    expect((await push({ emailAddress: "owner@fastmail.test", historyId: "1" })).status).toBe(204);
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    for (const device of [ownerMac, ownerWeb, partnerMac]) {
+      expect(mailEvents(device.events)).toEqual([event]);
+    }
+    expect(mailEvents(strangerMac.events)).toEqual([]);
+
+    expect((await listAccounts(owner.token)).map((a) => [a.email, a.provider])).toEqual([
+      ["shared@gmail.test", "gmail"],
+      ["owner@fastmail.test", "imap"],
+    ]);
+    for (const device of devices) device.socket.close();
+  });
+
+  it("stop with the Gmail link, and don't come back with an IMAP link in its place", async () => {
+    const { token } = await signIn("push-relinker@example.com");
+    const route = `/v1/accounts/${encodeURIComponent("relinked@gmail.test")}`;
+    await link(token, "relinked@gmail.test");
+    const device = await connect(token);
+    expect((await call("DELETE", route, token)).status).toBe(204);
+    expect((await put(token, "relinked@gmail.test", imap("relinked"))).status).toBe(204);
+    await push({ emailAddress: "relinked@gmail.test", historyId: "2" });
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(mailEvents(device.events)).toEqual([]);
+    device.socket.close();
+  });
+});
