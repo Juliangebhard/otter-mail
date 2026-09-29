@@ -161,7 +161,11 @@ struct MailboxSettings: View {
 
             if !mailbox.signedOut {
                 Section {
-                    SignatureEditor(html: mailbox.signature, savedIn: mailbox.capabilities.serverSignatures ? "Gmail" : "your Otter account") { html in
+                    SignatureEditor(
+                        html: mailbox.signature,
+                        savedIn: mailbox.capabilities.serverSignatures ? "Gmail" : "your Otter account",
+                        signIn: mailbox.imap == nil ? { try await session.signIn(mailbox: email) } : nil
+                    ) { html in
                         try await session.setSignature(html, for: email)
                     }
                 } header: {

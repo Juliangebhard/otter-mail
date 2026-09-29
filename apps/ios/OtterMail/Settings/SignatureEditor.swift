@@ -10,11 +10,14 @@ struct SignatureEditor: View {
     let html: String
     /** Where saving puts it ("Gmail", "your Otter account"). */
     var savedIn = "Gmail"
+    /** Signs the mailbox in again, for a sign-in that may not save signatures in Gmail. */
+    var signIn: (() async throws -> Void)?
     let onSave: (String) async throws -> Void
 
     @State private var page = WebPage()
     @State private var height: CGFloat = 120
     @State private var status: String?
+    @State private var needsSignIn = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -27,6 +30,20 @@ struct SignatureEditor: View {
                     Text(status).font(.footnote).foregroundStyle(palette.muted)
                 }
                 Spacer()
+                if needsSignIn, let signIn {
+                    Button("Sign in again") {
+                        Task {
+                            do {
+                                try await signIn()
+                                needsSignIn = false
+                                await save()
+                            } catch GoogleAuth.Failure.cancelled {} catch {
+                                status = error.localizedDescription
+                            }
+                        }
+                    }
+                    .buttonStyle(.glass)
+                }
                 Button("Save signature") { Task { await save() } }
                     .buttonStyle(.glass)
             }
@@ -68,6 +85,9 @@ struct SignatureEditor: View {
             status = "Saving…"
             try await onSave(edited)
             status = "Saved in \(savedIn)"
+        } catch let failure as GmailAPI.Failure where failure.insufficientScope {
+            status = "Sign in to this account again to allow saving signatures in Gmail."
+            needsSignIn = true
         } catch {
             status = error.localizedDescription
         }
