@@ -35,13 +35,18 @@ import type { Lane } from "../provider.js";
 
 /** Gmail's per-minute limit for this project, per user. */
 const UNITS_PER_MINUTE_LIMIT = 6_000;
-/** What a minute may spend: a full minute of refill plus one full burst. */
-const BUDGET = UNITS_PER_MINUTE_LIMIT * 0.95;
+/**
+ * What a minute may spend (a full minute of refill plus one full burst): it
+ * starts below the limit, where a big sync settled on a real mailbox (Gmail
+ * counts a little more than the table), and never goes past MAX_BUDGET.
+ */
+const START_BUDGET = UNITS_PER_MINUTE_LIMIT * 0.8;
+const MAX_BUDGET = UNITS_PER_MINUTE_LIMIT * 0.95;
 /** Burst capacity of the bucket: a page of messages the user opens at once. */
 const CAPACITY = 600;
 /** After a refusal the budget never drops below this, and climbs back this much a minute. */
-const MIN_BUDGET = BUDGET * 0.2;
-const RECOVERY_PER_MINUTE = BUDGET * 0.05;
+const MIN_BUDGET = UNITS_PER_MINUTE_LIMIT * 0.2;
+const RECOVERY_PER_MINUTE = UNITS_PER_MINUTE_LIMIT * 0.01;
 /** Units each tier leaves in the bucket for the ones ahead of it (the user's next action first). */
 const RESERVE: Record<Lane, number> = { sync: 100, backfill: 200, prefetch: 300 };
 /** Background tiers, most urgent first: each yields to those before it. */
@@ -52,7 +57,7 @@ const COOLDOWN_MS = 60_000;
 type Bucket = {
   tokens: number;
   updatedAt: number;
-  /** Units a minute this account may spend: BUDGET until Gmail says otherwise. */
+  /** Units a minute this account may spend, as Gmail has shown it. */
   budget: number;
   /** Background work waits until then after a quota error. */
   cooldownUntil: number;
@@ -96,7 +101,7 @@ function bucketFor(accountId: string): Bucket {
     bucket = {
       tokens: CAPACITY,
       updatedAt: Date.now(),
-      budget: BUDGET,
+      budget: START_BUDGET,
       cooldownUntil: 0,
       foregroundWaiting: 0,
       waiting: { sync: 0, backfill: 0, prefetch: 0 },
@@ -105,7 +110,7 @@ function bucketFor(accountId: string): Bucket {
   }
   const now = Date.now();
   const elapsed = now - bucket.updatedAt;
-  bucket.budget = Math.min(BUDGET, bucket.budget + (elapsed / 60_000) * RECOVERY_PER_MINUTE);
+  bucket.budget = Math.min(MAX_BUDGET, bucket.budget + (elapsed / 60_000) * RECOVERY_PER_MINUTE);
   bucket.tokens = Math.min(CAPACITY, bucket.tokens + (elapsed / 1000) * unitsPerSecond(bucket));
   bucket.updatedAt = now;
   return bucket;

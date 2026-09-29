@@ -50,21 +50,23 @@ describe("Gmail quota", () => {
     expect(quotaCost("GET", "/profile")).toBe(1);
   });
 
-  it("brings a minute's budget down to what Gmail let through, then climbs back", async () => {
+  it("brings a minute's budget down when Gmail refuses, then climbs back slowly", async () => {
     const account = "a@gmail.test";
-    expect(budgetOf(account)).toBe(5700);
+    expect(budgetOf(account)).toBe(4800);
     for (let i = 0; i < 12; i++) await acquireQuota(account, 50);
     expect(spentLastMinute(account)).toBe(600);
 
     // Refused after spending little (another device, a restart): a trim.
     expect(reportQuotaExceeded(account, 0)).toBe(true);
-    expect(budgetOf(account)).toBe(4560);
+    expect(budgetOf(account)).toBe(3840);
     // The other requests in flight are refused too: the same event.
     expect(reportQuotaExceeded(account, 0)).toBe(false);
-    expect(budgetOf(account)).toBe(4560);
+    expect(budgetOf(account)).toBe(3840);
 
-    // Quiet for ten minutes: back to the full budget.
+    // Quiet for ten minutes: 60 units a minute back, up to 95% of the limit.
     vi.setSystemTime(Date.now() + 10 * 60_000);
+    expect(budgetOf(account)).toBe(4440);
+    vi.setSystemTime(Date.now() + 60 * 60_000);
     expect(budgetOf(account)).toBe(5700);
   });
 
