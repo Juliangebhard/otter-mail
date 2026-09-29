@@ -90,7 +90,7 @@ struct HomeView: View {
         .onAppear {
             if !store.offersCombined { place.scope = store.shownMailboxes.first?.email }
         }
-        .onChange(of: session.opening) { _, thread in
+        .onChange(of: session.opening, initial: true) { _, thread in
             // A notification was tapped: open its thread.
             guard let thread, store.thread(thread) != nil else { return }
             session.opening = nil
