@@ -67,12 +67,39 @@ function pickFiles(): Promise<PageRequests["pickFiles"]["result"]> {
 
 let signInPopup: Window | null = null;
 
+type SignInMessage = { result?: GoogleSignInResult; error?: string };
+
+/**
+ * A sign-in finished in this tab: when the browser blocks the popup, Google's
+ * consent opens here instead, and the relay sends the answer back in the URL.
+ */
+let returnedSignIn: SignInMessage | null = (() => {
+  const match = /^#gmail-sign-in=(.+)$/.exec(location.hash);
+  if (!match) return null;
+  history.replaceState(null, "", location.pathname + location.search);
+  try {
+    return JSON.parse(decodeURIComponent(match[1]!)) as SignInMessage;
+  } catch {
+    return null;
+  }
+})();
+
 /** The relay's Gmail sign-in popup; resolves with what it posts back. */
 function googleSignIn(loginHint?: string): Promise<GoogleSignInResult> {
+  const returned = returnedSignIn;
+  returnedSignIn = null;
+  if (returned?.result) return Promise.resolve(returned.result);
+  if (returned) return Promise.reject(new Error(returned.error ?? "Google sign-in failed."));
+
   const url = new URL(`${RELAY_URL}/v1/gmail/authorize`);
   if (loginHint) url.searchParams.set("login_hint", loginHint);
   signInPopup?.close();
   const popup = window.open(url, "otter-gmail-sign-in", "popup,width=520,height=680");
+  if (!popup) {
+    // Popup blocked: sign in in this tab; the answer comes back when it reloads.
+    location.assign(url);
+    return new Promise(() => {});
+  }
   signInPopup = popup;
   return new Promise((resolve, reject) => {
     const done = () => {
@@ -298,6 +325,9 @@ export async function requireOtterAccount(): Promise<void> {
   if (__DEMO__) return;
   const state = await invoke<{ user: unknown }>("otter:getState");
   if (!state.user) await invoke("otter:signIn");
+  // Back from signing in to Gmail in this tab: finish adding the mailbox.
+  if (returnedSignIn?.result)
+    void invoke("gmail:addAccount", { email: returnedSignIn.result.email });
   webBridge.on("otter:state", (next) => {
     if (!(next as { user: unknown }).user) location.assign("/");
   });

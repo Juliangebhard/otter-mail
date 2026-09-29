@@ -151,6 +151,15 @@ export function popupResponse(env: Env, message: { result?: SignInResult; error?
   const html = `<!doctype html><meta charset="utf-8"><title>Otter Mail</title>
 <body style="font:15px -apple-system,BlinkMacSystemFont,sans-serif;display:grid;place-items:center;height:90vh">
 <p>${message.error ? "Sign-in didn't work. You can close this window." : "Signed in. You can close this window."}</p>
-<script>window.opener?.postMessage(${payload}, ${JSON.stringify(env.APP_ORIGIN)}); window.close();</script>`;
+<script>
+const message = ${payload};
+if (window.opener) {
+  window.opener.postMessage(message, ${JSON.stringify(env.APP_ORIGIN)});
+  window.close();
+} else {
+  // Signed in in the app's own tab (the browser blocked the popup): take the answer back there.
+  location.replace(${JSON.stringify(`${env.APP_ORIGIN}/app`)} + "#gmail-sign-in=" + encodeURIComponent(JSON.stringify(message)));
+}
+</script>`;
   return new Response(html, { headers: { "Content-Type": "text/html; charset=utf-8" } });
 }
