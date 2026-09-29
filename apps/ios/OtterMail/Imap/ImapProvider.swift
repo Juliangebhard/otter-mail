@@ -9,7 +9,9 @@ import Foundation
  *   A message sits in one folder, so labeling, archiving and trashing move it.
  * - Flags: no \Seen is unread, \Flagged is starred.
  * - Messages are `<uidvalidity>:<uid>:<folder>`; threads join by the root of
- *   their References.
+ *   their References, when the subject agrees (anyone can write References).
+ * - \Deleted mail is as good as gone: without UIDPLUS, what we delete can
+ *   stay marked until the folder is expunged (ImapClient.delete).
  * - Each folder synced keeps its UIDVALIDITY, UIDNEXT and HIGHESTMODSEQ: new
  *   mail is what's past UIDNEXT, flag changes come since the mod-sequence
  *   (CONDSTORE/QRESYNC), or from a listing of what's here without it.
@@ -35,6 +37,7 @@ final class ImapProvider: MailProvider {
     init(email: String, settings: ImapSettings) {
         self.email = email
         self.settings = settings
+        Self.migratePassword(email)
     }
 
     var capabilities: MailCapabilities { .imap }
@@ -44,7 +47,10 @@ final class ImapProvider: MailProvider {
 
     private static func key(_ email: String) -> String { "imap-password:\(email.lowercased())" }
     static func password(_ email: String) -> String? { Keychain.get(key(email)) }
-    static func setPassword(_ password: String?, for email: String) { Keychain.set(key(email), password) }
+    /** Kept on this iPhone alone: not in backups, nor restored to another device. */
+    static func setPassword(_ password: String?, for email: String) { Keychain.set(key(email), password, thisDeviceOnly: true) }
+    /** A password kept before it was this iPhone's alone. */
+    static func migratePassword(_ email: String) { Keychain.makeThisDeviceOnly(key(email)) }
 
     /** Logs in to the IMAP and SMTP servers, to check settings before they're saved. */
     static func verify(_ settings: ImapSettings, password: String) async throws {
@@ -245,8 +251,8 @@ final class ImapProvider: MailProvider {
         let capabilities = await client.capabilities
         let condstore = capabilities.contains("CONDSTORE") || capabilities.contains("QRESYNC")
         let qresync = capabilities.contains("QRESYNC")
-        // Nothing new: servers with CONDSTORE say so without the folder being opened.
-        if condstore, saved.highestModSeq != nil, let status = try? await client.status(path),
+        // Nothing new: servers with CONDSTORE say so without the folder being opened (the open one's STATUS can be stale).
+        if condstore, saved.highestModSeq != nil, await client.selected != path, let status = try? await client.status(path),
            status.uidValidity == saved.uidValidity, status.uidNext == saved.uidNext, status.highestModSeq == saved.highestModSeq {
             return
         }
@@ -259,7 +265,7 @@ final class ImapProvider: MailProvider {
         }
         if status.uidNext > saved.uidNext {
             // New mail (the newest couple of hundred, after a flood).
-            let uids = try await client.search("UID \(saved.uidNext):*").filter { $0 >= saved.uidNext }.suffix(200)
+            let uids = try await client.search("UID \(saved.uidNext):* UNDELETED").filter { $0 >= saved.uidNext }.suffix(200)
             changes.new += try await messages(Array(uids), in: path, validity: status.uidValidity, client)
         }
         let uids = Set(mine.filter { $0.validity == status.uidValidity }.map(\.uid))
@@ -269,10 +275,13 @@ final class ImapProvider: MailProvider {
             var present: Set<UInt32>?
             if condstore, let modseq = saved.highestModSeq {
                 responses = try await client.fetch("\(low):*", "(UID FLAGS)", modifiers: qresync ? "(CHANGEDSINCE \(modseq) VANISHED)" : "(CHANGEDSINCE \(modseq))")
-                if !qresync { present = Set(try await client.search("UID \(low):*")) }
+                if !qresync { present = Set(try await client.search("UID \(low):* UNDELETED")) }
             } else {
                 responses = try await client.fetch("\(low):*", "(UID FLAGS)")
-                present = Set(responses.compactMap { $0.values.first?.pairs["UID"]?.number.map { UInt32(clamping: $0) } })
+                present = Set(responses.compactMap { response in
+                    let items = response.values.first?.pairs ?? [:]
+                    return Self.isDeleted(items) ? nil : items["UID"]?.number.map { UInt32(clamping: $0) }
+                })
             }
             for response in responses {
                 if response.kind == "VANISHED" {
@@ -283,7 +292,7 @@ final class ImapProvider: MailProvider {
                 let items = response.values.first?.pairs ?? [:]
                 guard let uid = items["UID"]?.number, let flags = items["FLAGS"] else { continue }
                 let id = ImapID(validity: status.uidValidity, uid: UInt32(clamping: uid), path: path).id
-                changes.flags[id] = Set(flags.list.compactMap { $0.text?.lowercased() })
+                if Self.isDeleted(items) { changes.gone.insert(id) } else { changes.flags[id] = Set(flags.list.compactMap { $0.text?.lowercased() }) }
             }
             if let present {
                 changes.gone.formUnion(uids.subtracting(present).map { ImapID(validity: status.uidValidity, uid: $0, path: path).id })
@@ -300,7 +309,7 @@ final class ImapProvider: MailProvider {
         var saved = state.folders?[path]
             ?? ImapFolderState(uidValidity: status.uidValidity, uidNext: status.uidNext, highestModSeq: status.highestModSeq, oldest: status.uidNext)
         guard saved.uidValidity == status.uidValidity else { return } // The next sync starts it over.
-        let older = saved.oldest > 1 ? try await client.search("UID 1:\(saved.oldest - 1)").filter { $0 < saved.oldest } : []
+        let older = saved.oldest > 1 ? try await client.search("UID 1:\(saved.oldest - 1) UNDELETED").filter { $0 < saved.oldest } : []
         let page = older.sorted().suffix(Self.page)
         changes.new += try await messages(Array(page), in: path, validity: status.uidValidity, client)
         saved.oldest = page.min() ?? saved.oldest
@@ -385,7 +394,7 @@ final class ImapProvider: MailProvider {
 
     /** A FETCH's items (ENVELOPE, BODYSTRUCTURE, …) as a message. */
     private static func fetched(_ items: [String: ImapValue], path: String, validity: UInt32, inDrafts: Bool) -> Fetched? {
-        guard let uid = items["UID"]?.number else { return nil }
+        guard let uid = items["UID"]?.number, !isDeleted(items) else { return nil }
         let flags = Set(items["FLAGS"]?.list.compactMap { $0.text?.lowercased() } ?? [])
         let envelope = items["ENVELOPE"]?.list ?? []
         let field = { (i: Int) in i < envelope.count ? envelope[i] : .none }
@@ -428,6 +437,21 @@ final class ImapProvider: MailProvider {
         return Fetched(message: message, subject: subject.isEmpty ? "(no subject)" : subject, root: root, bodies: bodies)
     }
 
+    /** Marked \Deleted: on its way out (see ImapClient.delete), so not shown. */
+    private static func isDeleted(_ items: [String: ImapValue]) -> Bool {
+        items["FLAGS"]?.list.contains { $0.text?.lowercased() == "\\deleted" } ?? false
+    }
+
+    /** A subject without its "Re:", "Fwd:", "AW:", "SV:"…: what a thread's messages share. */
+    static func topic(_ subject: String) -> String {
+        var topic = subject.trimmingCharacters(in: .whitespaces)
+        while let prefix = topic.prefixMatch(of: /(?i)(re|fwd?|aw|sv|wg)(\[\d+\])?\s*:\s*/) {
+            topic = String(topic[prefix.range.upperBound...])
+        }
+        topic = topic.lowercased()
+        return topic == "(no subject)" ? "" : topic
+    }
+
     /** Folds what a sync found into the mailbox's threads: whole threads that changed, and those left empty. */
     private func merge(_ known: [MailThread], _ changes: Changes) -> MailDelta {
         var threads = Dictionary(known.map { ($0.id, $0) }) { a, _ in a }
@@ -448,7 +472,11 @@ final class ImapProvider: MailProvider {
             touched.insert(thread)
         }
         for fetched in changes.new {
-            let id = owner[fetched.message.id] ?? "\(email) \(fetched.root)"
+            var id = owner[fetched.message.id] ?? "\(email) \(fetched.root)"
+            // References (and Message-IDs) are the sender's to write: a thread is only joined on the same subject.
+            if owner[fetched.message.id] == nil, let thread = threads[id], Self.topic(thread.subject) != Self.topic(fetched.subject) {
+                id = "\(email) \(fetched.message.id)"
+            }
             if threads[id] == nil {
                 threads[id] = MailThread(id: id, mailbox: email, subject: fetched.subject, labels: [], messages: [])
             }
@@ -508,10 +536,17 @@ final class ImapProvider: MailProvider {
             case .untrash:
                 moved = try await move(ids.filter { role($0.path) == .trash }, to: roles[.inbox] ?? "INBOX", &state, client)
             case .delete:
-                for (path, group) in Dictionary(grouping: ids, by: \.path) {
+                // Only what's in Trash or Junk (where it's offered): the rest of the thread stays.
+                let doomed = ids.filter { [.trash, .junk].contains(role($0.path)) }
+                for (path, group) in Dictionary(grouping: doomed, by: \.path) {
                     try await client.open(path)
-                    try await client.expunge(group.map(\.uid))
+                    try await client.delete(group.map(\.uid))
                 }
+                var kept = thread
+                kept.messages.removeAll { message in doomed.contains { $0.id == message.id } }
+                guard !kept.messages.isEmpty else { return MailDelta(removed: [thread.id]) }
+                kept.labels = labels(of: kept)
+                return MailDelta(threads: [kept])
             }
             guard !moved.isEmpty else { return MailDelta() }
             // The messages under their new ids (those the server didn't say come with the next sync).
@@ -571,7 +606,7 @@ final class ImapProvider: MailProvider {
                 guard (try? await client.select(path)) != nil else { continue }
                 for response in try await client.fetch(imapSet(group.map(\.uid)), "(UID FLAGS)") {
                     let items = response.values.first?.pairs ?? [:]
-                    guard let uid = items["UID"]?.number else { continue }
+                    guard let uid = items["UID"]?.number, !Self.isDeleted(items) else { continue }
                     let id = ImapID(validity: group[0].validity, uid: UInt32(clamping: uid), path: path).id
                     flags[id] = Set(items["FLAGS"]?.list.compactMap { $0.text?.lowercased() } ?? [])
                 }
@@ -604,10 +639,7 @@ final class ImapProvider: MailProvider {
                     try await track(sent, &state, client)
                     _ = try await client.append(message.raw, to: sent, flags: #"\Seen"#)
                 }
-                if let draft = message.draft.flatMap(ImapID.init) {
-                    try await client.open(draft.path)
-                    try await client.expunge([draft.uid])
-                }
+                if let draft = message.draft.flatMap(ImapID.init) { try await deleteDraft(draft, known: known, client) }
                 var changes = Changes()
                 try await catchUp(&state, known: known, client, &changes)
                 return merge(known, changes)
@@ -627,10 +659,7 @@ final class ImapProvider: MailProvider {
             let drafts = try await path(.drafts, client)
             try await track(drafts, &state, client)
             _ = try await client.append(message.raw, to: drafts, flags: #"\Draft \Seen"#)
-            if let previous = message.draft.flatMap(ImapID.init) {
-                try await client.open(previous.path)
-                try await client.expunge([previous.uid])
-            }
+            if let previous = message.draft.flatMap(ImapID.init) { try await deleteDraft(previous, known: known, client) }
             var changes = Changes()
             try await catchUp(&state, known: known, client, &changes)
             return merge(known, changes)
@@ -639,10 +668,32 @@ final class ImapProvider: MailProvider {
 
     func deleteDraft(_ messageID: String, _ state: inout MailboxState) async throws {
         guard let id = ImapID(messageID) else { return }
-        try await session { client in
-            try await client.open(id.path)
-            try await client.expunge([id.uid])
+        try await session { client in try await deleteDraft(id, known: [], client) }
+    }
+
+    /**
+     * Deletes a draft's earlier version, only if its UID still names it: the
+     * folder's UIDVALIDITY unchanged, a draft, and (when the copy here has
+     * one) the same Message-ID.
+     */
+    private func deleteDraft(_ id: ImapID, known: [MailThread], _ client: ImapClient) async throws {
+        guard try await client.select(id.path).uidValidity == id.validity else { return }
+        let response = try await client.fetch("\(id.uid)", "(UID FLAGS BODY.PEEK[HEADER.FIELDS (MESSAGE-ID)])").first
+        let items = response?.values.first?.pairs ?? [:]
+        let flags = items["FLAGS"]?.list.compactMap { $0.text?.lowercased() } ?? []
+        guard items["UID"]?.number == UInt64(id.uid), flags.contains("\\draft") || role(id.path) == .drafts else { return }
+        let expected = known.lazy.flatMap(\.messages).first { $0.id == id.id }?.headers["Message-ID"]
+        if let expected = expected.flatMap(Self.messageID) {
+            let header = items.first { $0.key.hasPrefix("BODY[HEADER") }?.value.text ?? ""
+            guard MailDecoding.header("Message-ID", in: header).flatMap(Self.messageID) == expected else { return }
         }
+        try await client.delete([id.uid])
+    }
+
+    /** A Message-ID as `<local@domain>`, or nil when it isn't one (empty, or without its brackets). */
+    private static func messageID(_ text: String) -> String? {
+        let text = text.trimmingCharacters(in: .whitespaces)
+        return text.wholeMatch(of: /<[^<>\s]+>/) != nil ? text : nil
     }
 
     func attachment(_ attachment: Attachment, of message: Message) async throws -> Data {
@@ -671,7 +722,8 @@ final class ImapProvider: MailProvider {
      * IDLE on the inbox, on a connection of its own, while the app is open:
      * each change there syncs. A new IDLE every 25 minutes (servers drop them
      * after 30), reconnecting with backoff. Servers without IDLE sync when
-     * the app opens or is pulled to refresh.
+     * the app opens or is pulled to refresh. A refused password stops it:
+     * retrying would only get the account locked.
      */
     func watch(pushTopic: String?, _ state: inout MailboxState, onChange: @escaping () -> Void) async -> Task<Void, Never>? {
         guard let password = Self.password(email) else { return nil }
@@ -685,10 +737,19 @@ final class ImapProvider: MailProvider {
                     defer { client.close() }
                     guard await client.capabilities.contains("IDLE") else { return }
                     try await client.select(inbox)
-                    delay = .seconds(2)
                     while !Task.isCancelled {
+                        let started = ContinuousClock.now
                         if try await client.idle(for: .seconds(25 * 60)) { onChange() }
+                        let lasted = ContinuousClock.now - started
+                        // Only an IDLE that held a while says the server is well.
+                        if lasted > .seconds(60) { delay = .seconds(2) }
+                        // A server that ends every IDLE at once mustn't be asked again at once.
+                        if lasted < .seconds(5) { try await Task.sleep(for: .seconds(5) - lasted) }
                     }
+                } catch ImapError.authentication {
+                    // The sync this starts meets the same refusal and asks for the password (MailSync).
+                    onChange()
+                    return
                 } catch {
                     try? await Task.sleep(for: delay)
                     delay = min(delay * 2, .seconds(300))

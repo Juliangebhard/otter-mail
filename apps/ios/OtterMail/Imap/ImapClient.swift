@@ -22,6 +22,8 @@ nonisolated enum ImapError: LocalizedError {
     case authentication(String)
     /** The server said NO or BAD (IMAP), or 4xx/5xx (SMTP). */
     case server(String)
+    /** Busy or unwell (UNAVAILABLE, SERVERBUG, LIMIT, INUSE): a refused login then isn't a wrong password. */
+    case unavailable(String)
     case protocolError(String)
 
     var isSignedOut: Bool {
@@ -36,7 +38,7 @@ nonisolated enum ImapError: LocalizedError {
         case .closed: "The mail server closed the connection."
         case .signedOut: "Enter the password for this mailbox in Settings › Mailboxes."
         case .authentication(let text): text.isEmpty ? "The server didn't accept the username or password." : text
-        case .server(let text), .protocolError(let text): text
+        case .server(let text), .unavailable(let text), .protocolError(let text): text
         }
     }
 }
@@ -188,7 +190,11 @@ actor ImapClient {
                 untagged.append(ImapParser.response(Data(line.dropFirst(2))))
             } else if line.starts(with: "\(tag) ".utf8) {
                 let status = ImapParser.response(Data(line.dropFirst(tag.count + 1)))
-                guard status.kind == "OK" else { throw ImapError.server(status.text) }
+                guard status.kind == "OK" else {
+                    let code = status.values.first?.text?.uppercased() ?? ""
+                    throw ["UNAVAILABLE", "SERVERBUG", "LIMIT", "INUSE"].contains(code)
+                        ? ImapError.unavailable(status.text) : ImapError.server(status.text)
+                }
                 return Reply(untagged: untagged, code: status.values)
             }
         }
@@ -205,6 +211,8 @@ actor ImapClient {
                 let open = line.lastIndex(of: UInt8(ascii: "{")),
                 let count = Int(String(decoding: line[(open + 1)..<(line.endIndex - 1)], as: UTF8.self).replacingOccurrences(of: "+", with: ""))
             else { return out }
+            // A message is seldom past a few tens of MB: a server offering more is broken or hostile.
+            guard out.count + count <= MailSocket.maxLiteral else { throw ImapError.protocolError("The mail server sent too much at once.") }
             out.append(Data("\r\n".utf8))
             out.append(try await socket.read(count))
         }
@@ -301,18 +309,28 @@ actor ImapClient {
             reply = try await command("UID MOVE \(imapSet(uids)) \(Self.quote(path))")
         } else {
             reply = try await command("UID COPY \(imapSet(uids)) \(Self.quote(path))")
-            try await expunge(uids)
+            try await delete(uids)
         }
         let codes = [reply.code] + reply.untagged.filter { $0.kind == "OK" }.map(\.values)
         guard let copy = codes.first(where: { $0.first?.text?.uppercased() == "COPYUID" }), copy.count == 4 else { return [:] }
         return Dictionary(zip(imapUIDs(copy[2].text ?? ""), imapUIDs(copy[3].text ?? ""))) { a, _ in a }
     }
 
-    /** Deletes messages for good. */
-    func expunge(_ uids: [UInt32]) async throws {
+    /**
+     * Deletes messages for good: marks them \Deleted and expunges just those
+     * (UID EXPUNGE). Without UIDPLUS, EXPUNGE takes every \Deleted message in
+     * the folder, other clients' pending deletes too, so it runs only when
+     * nothing but ours is marked; otherwise ours stay marked (sync hides
+     * \Deleted mail) until the folder is expunged.
+     */
+    func delete(_ uids: [UInt32]) async throws {
         guard !uids.isEmpty else { return }
         try await store(uids, #"+FLAGS.SILENT (\Deleted)"#)
-        try await command(capabilities.contains("UIDPLUS") ? "UID EXPUNGE \(imapSet(uids))" : "EXPUNGE")
+        if capabilities.contains("UIDPLUS") {
+            try await command("UID EXPUNGE \(imapSet(uids))")
+        } else if Set(try await search("DELETED")).isSubset(of: uids) {
+            try await command("EXPUNGE")
+        }
     }
 
     /** Adds a message to a folder; answers its UIDVALIDITY and UID there (when the server says, UIDPLUS). */

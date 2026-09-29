@@ -283,6 +283,11 @@ final class Session {
         for account in accounts {
             let existing = store.mailbox(account.email)
             let imap = account.provider == .imap ? account.imap : nil
+            if let before = existing?.imap, let imap, Self.hosts(before) != Self.hosts(imap) {
+                // Moved to other servers on another device: the password isn't sent there until it's entered again for them.
+                ImapProvider.setPassword(nil, for: account.email)
+                sync?.stop(account.email)
+            }
             store.upsert(mailbox: Mailbox(
                 email: account.email,
                 name: account.name ?? (imap == nil ? account.email : ""),
@@ -303,6 +308,10 @@ final class Session {
             await signOut(mailbox)
         }
         saveMailboxes()
+    }
+
+    private static func hosts(_ settings: ImapSettings) -> [String] {
+        [settings.imap.host.lowercased(), settings.smtp.host.lowercased()]
     }
 
     private func saveMailboxes() {

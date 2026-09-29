@@ -128,6 +128,12 @@ final class MailSync {
         try? FileManager.default.removeItem(at: Self.file(email))
     }
 
+    /** Signed out (or moved to other servers): the provider and its IDLE go; the copy stays. */
+    func stop(_ email: String) {
+        providers[email] = nil
+        watching.removeValue(forKey: email)?.cancel()
+    }
+
     func forgetAll() {
         for email in Set(states.keys).union(providers.keys) { forget(email) }
         try? FileManager.default.removeItem(at: Self.folder)
@@ -172,7 +178,7 @@ final class MailSync {
             // A password the server refuses is no use kept (as GoogleAuth drops a revoked sign-in).
             if store.mailbox(email)?.imap != nil { ImapProvider.setPassword(nil, for: email) }
             store.setSignedOut(true, email)
-            providers[email] = nil
+            stop(email)
         } catch {
             // Offline or the server refused: the copy stands, and the next sync tries again.
         }
