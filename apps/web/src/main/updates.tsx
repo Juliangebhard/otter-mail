@@ -62,6 +62,69 @@ export function UpdateNotifier() {
 }
 
 /**
+ * ⌘K "Update Otter Mail": checks, downloads and restarts into the new version
+ * in one go, a toast following along. It picks up wherever the updater is: a
+ * download underway is waited for, a downloaded update installs at once.
+ */
+export function updateNow(): void {
+  const updates = window.desktopBridge.updates;
+  console.log("[Updates:updateNow]");
+  const id = toast.loading("Checking for updates…");
+  const fail = (title: string, s: UpdateState) => {
+    off();
+    const url = s.manualDownloadUrl;
+    toast.update(id, "error", title, {
+      description: s.message ?? undefined,
+      timeout: 0,
+      action: url
+        ? { label: "Download", onClick: () => void window.desktopBridge.openExternal(url) }
+        : { label: "Try again", onClick: updateNow },
+    });
+  };
+  const step = (s: UpdateState) => {
+    if (s.manualDownloadUrl)
+      return fail(`Otter Mail ${s.availableVersion} can't install itself`, s);
+    switch (s.status) {
+      case "available":
+        void updates.download();
+        return;
+      case "downloading":
+        toast.update(id, "loading", `Downloading Otter Mail ${s.availableVersion}`, {
+          description: `${s.downloadPercent ?? 0}% · restarts when it's done`,
+          timeout: 0,
+        });
+        return;
+      case "downloaded":
+        off();
+        toast.update(id, "loading", `Restarting into Otter Mail ${s.availableVersion}…`, {
+          timeout: 0,
+        });
+        void updates.install();
+        return;
+      case "up-to-date":
+        off();
+        toast.update(id, "success", "Otter Mail is up to date", {
+          description: `Version ${s.currentVersion}`,
+        });
+        return;
+      case "error":
+        return fail("Couldn't update Otter Mail", s);
+      case "disabled":
+        return fail("Updates are unavailable", s);
+    }
+  };
+  const off = updates.onState(step);
+  void updates.getState().then((s) => {
+    if (s.status === "downloaded" || s.status === "downloading" || s.status === "available")
+      step(s);
+    // A download that failed goes again; otherwise ask GitHub.
+    else if (s.status === "error" && s.availableVersion && !s.manualDownloadUrl)
+      void updates.download();
+    else void updates.check();
+  });
+}
+
+/**
  * A small card at the bottom of the sidebar while an update downloads and once
  * it's ready: "Restart to update" (it also installs when the app quits).
  */

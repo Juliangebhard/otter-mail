@@ -10,6 +10,7 @@ import {
 import { createPortal } from "react-dom";
 import {
   ArchiveXIcon,
+  ArrowDownCircleIcon,
   ArrowDownIcon,
   ArrowUpIcon,
   BookmarkIcon,
@@ -48,6 +49,7 @@ import type { GmailAccount, GmailMessageSummary, MailView } from "./types";
 import type { KeybindingCommand } from "../keybindings/commands";
 import { shortcutLabelFor, useKeybindingsState } from "../keybindings/store";
 import { requestTour, startSetup } from "../onboarding/onboarding";
+import { updateNow, useUpdateState } from "../updates";
 
 /**
  * Command palette (⌘K), modeled on Otter Code's: a frosted card anchored near
@@ -157,6 +159,7 @@ export function CommandPalette({
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const themeChoice = useThemeChoice();
+  const update = useUpdateState();
   const [scheme, setScheme] = useState<"system" | "light" | "dark">("system");
 
   // Each opening starts fresh, set while rendering so the first frame
@@ -289,6 +292,21 @@ export function CommandPalette({
         shortcut: "⌘,",
         run: onOpenSettings,
       },
+      ...(update && update.status !== "disabled"
+        ? [
+            {
+              id: "update",
+              icon: <ArrowDownCircleIcon className={ICON} />,
+              title:
+                update.status === "downloaded"
+                  ? `Restart to update to ${update.availableVersion}`
+                  : "Update Otter Mail",
+              description: `Version ${update.currentVersion}`,
+              keywords: "upgrade install restart new version check for updates",
+              run: updateNow,
+            },
+          ]
+        : []),
       {
         id: "tour",
         icon: <SignpostIcon className={ICON} />,
@@ -397,6 +415,7 @@ export function CommandPalette({
     query,
     scheme,
     themeChoice,
+    update,
     accounts,
     views,
     selectedAccountId,
