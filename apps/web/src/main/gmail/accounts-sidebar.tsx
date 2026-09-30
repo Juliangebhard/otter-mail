@@ -22,7 +22,6 @@ import {
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuSeparator,
-  DropdownMenuItem,
 } from "./menu";
 import {
   InboxIcon,
@@ -34,16 +33,12 @@ import {
   ArchiveXIcon,
   XIcon,
   Trash2Icon,
-  SettingsIcon,
-  MessageSquareIcon,
   PlusIcon,
   ChevronDownIcon,
   LayersIcon,
   TagIcon,
   SearchIcon,
   SquarePenIcon,
-  RotateCwIcon,
-  LogInIcon,
 } from "lucide-react";
 import {
   useLabels,
@@ -71,12 +66,9 @@ import { renameLabelKeybindings, useKeybindingsState } from "../keybindings/stor
 import { formatShortcut, parseShortcut } from "../keybindings/keys";
 import { LabelShortcutDialog } from "../settings/keybindings-pane";
 import { UnreadPill, HintTooltip } from "./ui";
-import { MailboxDots, MailboxSwitcher, WindowTitle, useMailboxOptions } from "./top-bar";
-import { useOtterAccount } from "../otter-account";
+import { SidebarTitle, useMailboxOptions } from "./top-bar";
+import { getAccountDisplayName } from "./account-style";
 import { useMailboxes } from "../mailboxes";
-import { OtterAvatar } from "../settings/otter-account-pane";
-import type { SettingsPane } from "./api";
-import { requestProblemReport } from "../support/report-problem";
 import { UpdateCard } from "../updates";
 import { AddMailboxMenu } from "./add-mailbox";
 import { useCapabilities } from "./capabilities";
@@ -202,60 +194,6 @@ function SearchRow({
         </span>
       }
     />
-  );
-}
-
-/**
- * The app's menu, at the end of the mailbox switcher: the Otter account (or
- * Sign in), Settings, and Sync now (only while push isn't live, as before;
- * ⌘, and ⌘R work either way).
- */
-function AccountMenuItems({
-  onOpenSettings,
-  onSync,
-  syncing,
-}: {
-  onOpenSettings: (pane?: SettingsPane) => void;
-  onSync: () => void;
-  syncing: boolean;
-}) {
-  const otter = useOtterAccount();
-  const user = otter?.user ?? null;
-  return (
-    <>
-      {user ? (
-        <DropdownMenuItem
-          icon={<OtterAvatar user={user} className="size-5" />}
-          onSelect={() => onOpenSettings("otter")}
-          className="h-auto py-1.5"
-        >
-          <span className="block truncate text-foreground">{user.name ?? user.email}</span>
-          {user.name ? (
-            <span className="block truncate text-[13px] text-muted-foreground">{user.email}</span>
-          ) : null}
-        </DropdownMenuItem>
-      ) : (
-        <DropdownMenuItem icon={<LogInIcon />} onSelect={() => onOpenSettings("otter")}>
-          Sign in to Otter Mail
-        </DropdownMenuItem>
-      )}
-      <DropdownMenuItem icon={<SettingsIcon />} accelerator="⌘," onSelect={() => onOpenSettings()}>
-        Settings
-      </DropdownMenuItem>
-      <DropdownMenuItem icon={<MessageSquareIcon />} onSelect={requestProblemReport}>
-        Send feedback
-      </DropdownMenuItem>
-      {otter?.realtime === "live" ? null : (
-        <DropdownMenuItem
-          icon={<RotateCwIcon className={syncing ? "animate-spin" : undefined} />}
-          accelerator="⌘R"
-          disabled={syncing}
-          onSelect={onSync}
-        >
-          {syncing ? "Syncing…" : "Sync now"}
-        </DropdownMenuItem>
-      )}
-    </>
   );
 }
 
@@ -642,12 +580,8 @@ function LabelNode({
 }
 
 type AccountsSidebarProps = {
-  /** The app's menu: Settings (a pane, General by default) and Sync now. */
-  onOpenSettings: (pane?: SettingsPane) => void;
   /** Opens Settings → Views on a view ("new" to create one) for a mailbox. */
   onEditView: (viewId: string, mailbox: string | null) => void;
-  onSync: () => void;
-  syncing: boolean;
   selectedAccountId: string | null;
   onSelectAccount: (accountId: string) => void;
   selectedLabelId: string;
@@ -671,7 +605,7 @@ type AccountsSidebarProps = {
  * The swipe is the platform's own scrolling: macOS follows the fingers,
  * carries the momentum, rubber-bands at the ends and settles on a page with
  * its own physics. Where it comes to rest picks the mailbox; the other
- * switches (the dots, ⌘1…, the menu) scroll there.
+ * switches (the rail, ⌘1…) scroll there.
  */
 export function AccountsSidebar(props: AccountsSidebarProps) {
   const { selectedAccountId, onSelectAccount } = props;
@@ -735,7 +669,7 @@ export function AccountsSidebar(props: AccountsSidebarProps) {
 
   return (
     <div className="flex h-full min-w-0 flex-col">
-      <WindowTitle history />
+      <SidebarTitle />
 
       <div
         ref={scroller}
@@ -774,16 +708,6 @@ export function AccountsSidebar(props: AccountsSidebarProps) {
       </div>
 
       <UpdateCard />
-
-      {/* Footer: the mailbox dots, centered. */}
-      <div className="flex shrink-0 items-center px-(--sidebar-content-inset) pb-(--sidebar-content-inset) pt-1">
-        <MailboxDots
-          accounts={accounts}
-          selectedAccountId={selectedAccountId}
-          onSelectAccount={onSelectAccount}
-          className="min-w-0 flex-1 justify-center"
-        />
-      </div>
     </div>
   );
 }
@@ -791,9 +715,6 @@ export function AccountsSidebar(props: AccountsSidebarProps) {
 /** One mailbox's page of the sidebar: its heading, rows, views and labels. */
 function SidebarPage({
   active,
-  onOpenSettings,
-  onSync,
-  syncing,
   onEditView,
   selectedAccountId,
   onSelectAccount,
@@ -840,6 +761,12 @@ function SidebarPage({
   const { rules: keybindingRules } = useKeybindingsState();
 
   const { accounts } = useMailboxes();
+  const account = accounts.find((a) => a.id === selectedAccountId);
+  const mailboxName = isCombined
+    ? "All mailboxes"
+    : account
+      ? getAccountDisplayName(account)
+      : "Mailbox";
   const labels: GmailLabel[] = labelsQuery.data ?? [];
   // Views belong to one mailbox; each mailbox (account or Combined) lists its own.
   const countScope = isCombined ? accounts : accounts.filter((a) => a.id === selectedAccountId);
@@ -1057,18 +984,12 @@ function SidebarPage({
   return (
     <SearchRowsContext.Provider value={renderSearchRows}>
       <div className="flex h-full min-w-0 flex-col" inert={!active}>
-        {/* Mailbox switcher, the sidebar's heading (Codex's "Codex ⌄"). */}
-        <div
-          className="shrink-0 px-(--sidebar-content-inset) pb-2"
-          data-tour={active ? "mailbox" : undefined}
-        >
-          <MailboxSwitcher
-            accounts={accounts}
-            selectedAccountId={selectedAccountId}
-            onSelectAccount={onSelectAccount}
-          >
-            <AccountMenuItems onOpenSettings={onOpenSettings} onSync={onSync} syncing={syncing} />
-          </MailboxSwitcher>
+        {/* The mailbox's name, the sidebar's heading (Codex's "Codex"), past
+            the panel's rounded corner; the rail beside it switches. */}
+        <div className="shrink-0 px-(--sidebar-content-inset) pb-2 pt-(--radius-xl)">
+          <h2 className="flex h-9 items-center px-(--sidebar-row-content-inset) text-base font-semibold tracking-tight text-sidebar-foreground">
+            <span className="truncate">{mailboxName}</span>
+          </h2>
         </div>
 
         {/* New message (Codex's "New chat"), then Search, which is a mailbox:

@@ -25,6 +25,7 @@ to another app. This page is where they're compared.
 | Add an IMAP mailbox, servers discovered     | ✓                  | ✓ (no domain autoconfig file: CORS) | ✓                       |
 | IMAP through the relay tunnel               | — (direct)         | ✓ (TLS 1.3 servers only)            | — (direct)              |
 | Several mailboxes: on/off, reorder          | ✓                  | ✓                                   | ✓                       |
+| Mailbox rail: switch, unread dots, add      | ✓                  | ✓                                   | — (drawer)              |
 | Combined mailbox (all accounts)             | ✓                  | ✓                                   | ✓ ("All")               |
 | Rename and color a mailbox (synced)         | ✓                  | ✓                                   | ✓                       |
 | Google profile picture per mailbox          | ✓ (kept current)   | ✓ (kept current)                    | —                       |
@@ -138,6 +139,7 @@ to another app. This page is where they're compared.
 | Your own themes (Otter Code's editor): duplicate, edit, import/export | ✓   | ✓   | ✓ (worn and picked; made on the Mac or the web)                            |
 | Panel animations                                                      | ✓   | ✓   | —                                                                          |
 | Contrast, glass opacity, font size, reading width                     | ✓   | ✓   | —                                                                          |
+| Frosted window frame (title bar and rail, by glass opacity)           | ✓   | —   | —                                                                          |
 | Keyboard shortcuts, rebindable (incl. move to label)                  | ✓   | ✓   | —                                                                          |
 | Command palette (⌘K)                                                  | ✓   | ✓   | —                                                                          |
 | Recently viewed, back and forward (Mac: title bar; web: browser's)    | ✓   | ✓   | —                                                                          |

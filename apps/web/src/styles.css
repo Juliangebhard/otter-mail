@@ -34,12 +34,16 @@
   --workspace-controls-right: 1rem;
   --workspace-titlebar-control-size: 1.75rem;
   --workspace-titlebar-control-gap: 0.5rem;
-  /* Recently viewed, back and forward after the pinned toggle, sidebar hidden (the Mac app's HistoryControls). */
-  --workspace-history-controls-width: calc(3 * var(--workspace-titlebar-control-size));
+  /* Recently viewed, back and forward after the pinned toggle, sidebar hidden
+     (the Mac app's HistoryControls): three buttons, each after a 0.25rem gap. */
+  --workspace-history-controls-width: calc(3 * (var(--workspace-titlebar-control-size) + 0.25rem));
   --workspace-titlebar-content-left: calc(
     var(--workspace-controls-left) + var(--workspace-titlebar-control-size) +
       var(--workspace-titlebar-control-gap)
   );
+  /* The rail of mailboxes down the window's left edge (mailbox-rail.tsx),
+     under the title band; the panes start after it. */
+  --workspace-rail-width: 52px;
   --app-scrollbar-width: 6px;
   /* Height of the fade under borderless top bars (Otter Code). */
   --workspace-titlebar-scroll-fade-height: 1.5rem;
@@ -47,6 +51,9 @@
   --app-scrollbar-thumb-hover: rgb(191 191 191);
   --glass-blur: 12px;
   --glass-opacity: 80%;
+  /* The Mac window's frame over its glass (home-view.tsx): thinner than
+     Glass opacity (80% → 70%), and still solid at 100%. */
+  --frame-opacity: max(0%, calc(var(--glass-opacity) * 1.5 - 50%));
   --glass-saturation: 1.14;
   /* Contrast (Settings › Appearance; interface-settings.ts sets the first
      three): text fades toward its surface below 100% and goes toward
@@ -109,6 +116,14 @@
     var(--sidebar-muted-foreground) 60%,
     var(--sidebar-surface)
   );
+  /* The sidebar's body in the panel (home-view.tsx): halfway from the
+     frame's surface to the canvas (ChatGPT's), so the rail stands apart.
+     Resolved here, from the window's palette, not the sidebar's own scope. */
+  --sidebar-panel-surface: color-mix(in srgb, var(--sidebar-surface) 50%, var(--canvas));
+  /* The panel's edge against the frame: the frame's surface a little of the
+     way to the text (ChatGPT's lighter rim in dark, a darker one in light),
+     so it shows in every theme, whatever its border role is. */
+  --panel-edge: color-mix(in srgb, var(--foreground) 7%, var(--sidebar-surface));
   --code-background: color-mix(in srgb, var(--card) 90%, var(--canvas));
   --code-foreground: var(--foreground);
   /* The composer's glass card (agent chat, reply editor, new message). */
@@ -117,9 +132,11 @@
   --chat-composer-highlight: transparent;
 }
 
-/* A browser tab has no traffic lights to clear. */
+/* A browser tab has no traffic lights to clear: the sidebar toggle sits over the rail. */
 html[data-platform="web"] {
-  --workspace-controls-left: 1rem;
+  --workspace-controls-left: calc(
+    (var(--workspace-rail-width) - var(--workspace-titlebar-control-size)) / 2
+  );
 }
 .dark {
   --app-scrollbar-thumb: rgb(255 255 255 / 8%);

@@ -33,7 +33,6 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "./menu";
 import { useRecentlyViewed, type RecentIcon } from "../recently-viewed";
@@ -230,27 +229,27 @@ export function PanelControlSlot() {
   return <span aria-hidden className="w-(--workspace-titlebar-control-size) shrink-0" />;
 }
 
-/** Room left at the start of the leftmost band (sidebar hidden): traffic lights, toggle, arrows. */
+/**
+ * Room left at the start of the band next to the rail (sidebar hidden) for
+ * what sits over it: traffic lights, toggle, arrows.
+ */
 export function TitlebarInset() {
-  // The band's own px-4 already covers 1rem of it.
+  // The band's own px-4 already covers 1rem of it, and the rail its width.
   return (
     <span
       aria-hidden
       className={cn(
         "shrink-0",
         features.historyButtons
-          ? "w-[calc(var(--workspace-titlebar-content-left)+var(--workspace-history-controls-width)-1rem)]"
-          : "w-[calc(var(--workspace-titlebar-content-left)-1rem)]",
+          ? "w-[max(0px,calc(var(--workspace-titlebar-content-left)+var(--workspace-history-controls-width)-1rem-var(--workspace-rail-width)))]"
+          : "w-[max(0px,calc(var(--workspace-titlebar-content-left)-1rem-var(--workspace-rail-width)))]",
       )}
     />
   );
 }
 
-/**
- * The sidebar's title band: room for the traffic lights and pinned toggle,
- * then the wordmark, and back/forward at its end (`history`).
- */
-export function WindowTitle({ className, history }: { className?: string; history?: boolean }) {
+/** The setup's title band: room for the traffic lights, then the wordmark. */
+export function WindowTitle({ className }: { className?: string }) {
   return (
     <div
       className={cn(
@@ -263,7 +262,18 @@ export function WindowTitle({ className, history }: { className?: string; histor
         <span className="text-foreground">Otter</span>
         <span className="truncate text-muted-foreground">Mail</span>
       </span>
-      {history ? <HistoryControls className="-me-1.5 ml-auto" /> : null}
+    </div>
+  );
+}
+
+/**
+ * The sidebar's title band in the main window: the traffic lights and the
+ * pinned toggle over its start, back/forward at its end.
+ */
+export function SidebarTitle() {
+  return (
+    <div className="drag-region flex h-(--workspace-topbar-height) shrink-0 items-center justify-end pr-3">
+      <HistoryControls className="-me-1.5" />
     </div>
   );
 }
@@ -304,7 +314,7 @@ export function useMailboxOptions(accounts: GmailAccount[]): MailboxOption[] {
 }
 
 /** Unread in each mailbox's Inbox (as its sidebar shows it), and their sum for All mailboxes. */
-function useInboxUnread(accounts: GmailAccount[]): Record<string, number> {
+export function useInboxUnread(accounts: GmailAccount[]): Record<string, number> {
   const counts = Object.fromEntries(
     useAllAccountLabels(accounts.map((a) => a.id)).map(({ accountId, labels }) => [
       accountId,
@@ -315,69 +325,17 @@ function useInboxUnread(accounts: GmailAccount[]): Record<string, number> {
   return { ...counts, [COMBINED_ACCOUNT_ID]: total };
 }
 
-/**
- * Dia's profile dots for the sidebar's footer: one dot per mailbox, the
- * current one lit; click one to switch. Empty with a single mailbox.
- */
-export function MailboxDots({
-  accounts,
-  selectedAccountId,
-  onSelectAccount,
-  className,
-}: {
-  accounts: GmailAccount[];
-  selectedAccountId: string | null;
-  onSelectAccount: (accountId: string) => void;
-  className?: string;
-}) {
-  const options = useMailboxOptions(accounts);
-  if (options.length < 2) return <span className={className} />;
-  return (
-    <div role="tablist" aria-label="Mailboxes" className={cn("flex items-center", className)}>
-      {options.map((option) => {
-        const selected = option.id === selectedAccountId;
-        return (
-          <HintTooltip key={option.id} label={option.name} hint={option.shortcut}>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={selected}
-              aria-label={option.name}
-              onClick={() => onSelectAccount(option.id)}
-              className="group/dot flex size-5 cursor-pointer items-center justify-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
-            >
-              <span
-                className={cn(
-                  "size-2 rounded-full transition-colors",
-                  selected
-                    ? "bg-sidebar-foreground"
-                    : "bg-sidebar-muted-foreground/40 group-hover/dot:bg-sidebar-muted-foreground/80",
-                )}
-              />
-            </button>
-          </HintTooltip>
-        );
-      })}
-    </div>
-  );
-}
-
-/**
- * Mailbox switcher, the sidebar's heading; aligned with the rows below it.
- * `children` are more items after the mailboxes (the sidebar's app menu).
- */
+/** Mailbox switcher, the menu-bar popover's heading. */
 export function MailboxSwitcher({
   accounts,
   selectedAccountId,
   onSelectAccount,
   className,
-  children,
 }: {
   accounts: GmailAccount[];
   selectedAccountId: string | null;
   onSelectAccount: (accountId: string) => void;
   className?: string;
-  children?: ReactNode;
 }) {
   const options = useMailboxOptions(accounts);
   const unread = useInboxUnread(accounts);
@@ -443,12 +401,6 @@ export function MailboxSwitcher({
               </RadixMenu.Item>
             );
           })}
-          {children ? (
-            <>
-              <DropdownMenuSeparator className="bg-foreground/15" />
-              {children}
-            </>
-          ) : null}
         </RadixMenu.Content>
       </RadixMenu.Portal>
     </RadixMenu.Root>
