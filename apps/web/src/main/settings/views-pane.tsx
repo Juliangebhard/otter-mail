@@ -26,6 +26,7 @@ import {
 import type { GmailAccount, GmailLabel, MailView } from "../gmail/types";
 import { Btn, IconBtn } from "../gmail/ui";
 import { SettingsGroup, SettingsPageContainer, SettingsRow, SettingsSection } from "./settings-ui";
+import { searchableSetting } from "./settings-search";
 
 /**
  * Settings › Views: custom views grouped by the mailbox that owns them. Each
@@ -272,6 +273,7 @@ export function ViewsPane({
 
   return (
     <SettingsPageContainer
+      searchId={searchableSetting("views").id}
       title="Views"
       description="Saved filters, shown in the sidebar of the mailbox they belong to."
       action={newViewMenu}

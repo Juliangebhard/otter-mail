@@ -134,6 +134,7 @@ The Mac app supports Apple Silicon Macs (arm64).
 | Panel animations                                           | ✓   | ✓   | —                                                                          |
 | Keyboard shortcuts, rebindable (incl. move to label)       | ✓   | ✓   | —                                                                          |
 | Command palette (⌘K)                                       | ✓   | ✓   | —                                                                          |
+| Settings search (/ or ⌘F in Settings)                      | ✓   | ✓   | —                                                                          |
 | Changelog (opens the site's, from ⌘K and Settings' ? menu) | ✓   | ✓   | —                                                                          |
 | Custom views (rules across mailboxes)                      | ✓   | ✓   | —                                                                          |
 | Preferences synced through the Otter account               | ✓   | ✓   | ✓ (theme, advance, mailboxes, notifications, languages, agent, signatures) |

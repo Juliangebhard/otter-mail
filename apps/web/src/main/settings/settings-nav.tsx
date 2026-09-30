@@ -1,4 +1,12 @@
-import { useEffect, useState, type ComponentType } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ComponentType,
+  type KeyboardEvent,
+} from "react";
 import {
   ArrowLeftIcon,
   ArrowUpRightIcon,
@@ -13,6 +21,8 @@ import {
   MessageSquareIcon,
   MousePointer2Icon,
   ScrollTextIcon,
+  SearchIcon,
+  XIcon,
 } from "lucide-react";
 import { changelogUrl } from "@otter-mail/shared/changelog";
 import { gmailApi, type SettingsPane } from "../gmail/api";
@@ -24,27 +34,31 @@ import {
 } from "../gmail/menu";
 import { HintTooltip, IconBtn, cn } from "../gmail/ui";
 import { features } from "../features";
+import { useCommandHandlers } from "../keybindings/dispatch";
+import {
+  searchSettings,
+  SETTINGS_SECTION_LABELS,
+  type SettingsSearchItem,
+} from "./settings-search";
 import { requestProblemReport } from "../support/report-problem";
 
-type SettingsSection = {
-  id: SettingsPane;
-  label: string;
-  icon: ComponentType<{ className?: string }>;
+const SETTINGS_SECTION_ICONS: Readonly<
+  Record<SettingsPane, ComponentType<{ className?: string }>>
+> = {
+  general: Settings2Icon,
+  otter: CircleUserRoundIcon,
+  appearance: PaletteIcon,
+  keybindings: KeyboardIcon,
+  accounts: MailIcon,
+  views: LayersIcon,
+  agents: MousePointer2Icon,
 };
 
-export const SETTINGS_SECTIONS: ReadonlyArray<SettingsSection> = [
-  { id: "general", label: "General", icon: Settings2Icon },
-  { id: "otter", label: "Account", icon: CircleUserRoundIcon },
-  { id: "appearance", label: "Appearance", icon: PaletteIcon },
-  { id: "keybindings", label: "Keybindings", icon: KeyboardIcon },
-  { id: "accounts", label: "Mailboxes", icon: MailIcon },
-  { id: "views", label: "Views", icon: LayersIcon },
-  { id: "agents", label: "Agents", icon: MousePointer2Icon },
-];
-
-export function settingsSectionLabel(pane: SettingsPane): string {
-  return SETTINGS_SECTIONS.find((s) => s.id === pane)?.label ?? "Settings";
-}
+const SETTINGS_SECTIONS = (Object.keys(SETTINGS_SECTION_LABELS) as SettingsPane[]).map((id) => ({
+  id,
+  label: SETTINGS_SECTION_LABELS[id],
+  icon: SETTINGS_SECTION_ICONS[id],
+}));
 
 /** The mail sidebar's row (Codex): 14px regular text, muted icon, rounded pill. */
 const ROW =
@@ -53,43 +67,189 @@ const ROW =
 const ROW_IDLE =
   "text-sidebar-foreground/90 hover:bg-sidebar-row-hover hover:text-sidebar-foreground [&>svg]:text-sidebar-muted-foreground hover:[&>svg]:text-sidebar-foreground";
 
-/** Sidebar contents while the settings page is open: the sections, then Back. */
+/**
+ * Sidebar contents while the settings page is open: search (Otter Code's,
+ * styled after ChatGPT's), the sections, then Back. While searching, the
+ * results replace the sections; picking one opens its pane at that setting.
+ */
 export function SettingsNav({
   pane,
   onSelect,
   onBack,
 }: {
   pane: SettingsPane;
-  onSelect: (pane: SettingsPane) => void;
+  onSelect: (pane: SettingsPane, target?: string) => void;
   onBack: () => void;
 }) {
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const [query, setQuery] = useState("");
+  const [activeResultIndex, setActiveResultIndex] = useState(0);
+  const results = useMemo(() => searchSettings(query), [query]);
+  const isSearching = query.trim().length > 0;
+  const hasResults = results.length > 0;
+
+  // "/" and ⌘F search settings (the Keybindings pane, mounted later, takes
+  // them for its own search).
+  useCommandHandlers({
+    "search.focus": () => {
+      searchInputRef.current?.focus();
+      searchInputRef.current?.select();
+    },
+  });
+
+  useEffect(() => {
+    const result = results[activeResultIndex];
+    if (!result) return;
+    document
+      .getElementById(`settings-search-result-${result.id}`)
+      ?.scrollIntoView({ block: "nearest" });
+  }, [activeResultIndex, results]);
+
+  const clearSearch = useCallback(() => {
+    setQuery("");
+    setActiveResultIndex(0);
+  }, []);
+  const openResult = (item: SettingsSearchItem) => {
+    console.log("[SettingsNav:openResult]", { id: item.id });
+    clearSearch();
+    onSelect(item.pane, item.targetId ?? item.id);
+  };
+  const handleSearchKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Escape" && isSearching) {
+      event.preventDefault();
+      clearSearch();
+      return;
+    }
+    if (results.length === 0) return;
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setActiveResultIndex((index) => (index + 1) % results.length);
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setActiveResultIndex((index) => (index - 1 + results.length) % results.length);
+    } else if (event.key === "Enter") {
+      event.preventDefault();
+      const result = results[activeResultIndex];
+      if (result) openResult(result);
+    }
+  };
+
   return (
     <>
       <div className="flex min-h-0 flex-1 flex-col gap-0.5 scroll-fade-y overflow-y-auto px-(--sidebar-content-inset) pb-8 pt-3">
         <h2 className="mb-1 flex h-8 items-center px-(--sidebar-row-content-inset) text-base font-semibold text-sidebar-foreground">
           Settings
         </h2>
-        {SETTINGS_SECTIONS.map((section) => {
-          const Icon = section.icon;
-          const active = section.id === pane;
-          return (
+        <div className="mb-2 flex h-9 shrink-0 items-center gap-2 rounded-full bg-foreground/[0.06] ps-3 pe-2.5 transition-colors focus-within:bg-foreground/[0.08]">
+          <SearchIcon className="size-4 shrink-0 text-sidebar-muted-foreground" />
+          <input
+            ref={searchInputRef}
+            type="text"
+            value={query}
+            onChange={(event) => {
+              setQuery(event.currentTarget.value);
+              setActiveResultIndex(0);
+            }}
+            onKeyDown={handleSearchKeyDown}
+            placeholder="Search"
+            spellCheck={false}
+            aria-label="Search settings"
+            role="combobox"
+            aria-autocomplete="list"
+            aria-expanded={isSearching && hasResults}
+            aria-controls={isSearching && hasResults ? "settings-search-results" : undefined}
+            aria-activedescendant={
+              isSearching && results[activeResultIndex]
+                ? `settings-search-result-${results[activeResultIndex].id}`
+                : undefined
+            }
+            className="h-full min-w-0 flex-1 bg-transparent text-sm text-sidebar-foreground outline-none placeholder:text-sidebar-muted-foreground"
+          />
+          {isSearching ? (
             <button
-              key={section.id}
               type="button"
-              onClick={() => onSelect(section.id)}
-              aria-current={active ? "page" : undefined}
-              className={cn(
-                ROW,
-                active
-                  ? "bg-sidebar-row-selected text-sidebar-foreground [&>svg]:text-sidebar-foreground"
-                  : ROW_IDLE,
-              )}
+              aria-label="Clear settings search"
+              onClick={() => {
+                clearSearch();
+                searchInputRef.current?.focus();
+              }}
+              className="flex size-4 shrink-0 cursor-pointer items-center justify-center rounded-full bg-sidebar-muted-foreground text-canvas outline-none transition-colors hover:bg-sidebar-foreground focus-visible:ring-2 focus-visible:ring-focus-ring"
             >
-              <Icon />
-              <span className="truncate">{section.label}</span>
+              <XIcon className="size-2.5" strokeWidth={3} />
             </button>
-          );
-        })}
+          ) : null}
+        </div>
+        {isSearching ? (
+          hasResults ? (
+            <div
+              id="settings-search-results"
+              role="listbox"
+              aria-label="Settings search results"
+              className="flex flex-col gap-0.5"
+            >
+              {results.map((item, index) => {
+                const Icon = SETTINGS_SECTION_ICONS[item.pane];
+                const active = index === activeResultIndex;
+                return (
+                  <button
+                    key={item.id}
+                    id={`settings-search-result-${item.id}`}
+                    type="button"
+                    role="option"
+                    aria-selected={active}
+                    tabIndex={-1}
+                    onMouseMove={() => setActiveResultIndex(index)}
+                    onClick={() => openResult(item)}
+                    className={cn(
+                      ROW,
+                      "h-auto min-h-11 items-start py-1.5 [&>svg]:mt-0.5",
+                      active
+                        ? "bg-sidebar-row-hover text-sidebar-foreground [&>svg]:text-sidebar-foreground"
+                        : ROW_IDLE,
+                    )}
+                  >
+                    <Icon />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate">{item.title}</span>
+                      <span className="block truncate text-xs text-sidebar-muted-foreground">
+                        {SETTINGS_SECTION_LABELS[item.pane]}
+                      </span>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <p
+              role="status"
+              className="px-(--sidebar-row-content-inset) py-6 text-center text-xs text-sidebar-muted-foreground"
+            >
+              No settings found
+            </p>
+          )
+        ) : (
+          SETTINGS_SECTIONS.map((section) => {
+            const Icon = section.icon;
+            const active = section.id === pane;
+            return (
+              <button
+                key={section.id}
+                type="button"
+                onClick={() => onSelect(section.id)}
+                aria-current={active ? "page" : undefined}
+                className={cn(
+                  ROW,
+                  active
+                    ? "bg-sidebar-row-selected text-sidebar-foreground [&>svg]:text-sidebar-foreground"
+                    : ROW_IDLE,
+                )}
+              >
+                <Icon />
+                <span className="truncate">{section.label}</span>
+              </button>
+            );
+          })
+        )}
       </div>
       <div className="flex shrink-0 flex-col gap-0.5 px-(--sidebar-content-inset) pt-1 pb-(--sidebar-content-inset)">
         {features.defaultMailApp ? <DefaultMailRow /> : null}

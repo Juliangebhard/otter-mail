@@ -28,6 +28,7 @@ import {
   SettingsRow,
   SettingsSection,
 } from "./settings-ui";
+import { searchableSetting } from "./settings-search";
 
 export type ColorScheme = "system" | "light" | "dark";
 
@@ -338,7 +339,7 @@ export function AppearancePane() {
 
   return (
     <SettingsPageContainer title="Appearance">
-      <SettingsSection title="Color scheme" variant="plain">
+      <SettingsSection {...searchableSetting("color-scheme")} variant="plain">
         <div className="grid grid-cols-3 gap-3">
           {(["system", "light", "dark"] as const).map((s) => (
             <SchemeCard
@@ -354,7 +355,7 @@ export function AppearancePane() {
       </SettingsSection>
 
       <SettingsSection
-        title="Themes"
+        {...searchableSetting("themes")}
         description="Click a theme to use it everywhere, or a single orb to use it for light or dark mode only."
         variant="plain"
       >
@@ -374,7 +375,7 @@ export function AppearancePane() {
 
       <SettingsSection title="Dock">
         <SettingsRow
-          title="Show unread count on Dock icon"
+          {...searchableSetting("dock-badge")}
           description={
             features.dockBadge
               ? "A badge with the number of unread messages in your inboxes."
@@ -393,7 +394,7 @@ export function AppearancePane() {
 
       <SettingsSection title="Motion">
         <SettingsRow
-          title="Panel animations"
+          {...searchableSetting("panel-animations")}
           description="Set how fast panels open and close."
           control={
             <div className="grid w-full grid-cols-[5rem_minmax(0,1fr)] items-center gap-3 sm:w-auto sm:grid-cols-[7rem_13rem] sm:gap-4">

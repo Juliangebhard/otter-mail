@@ -1083,7 +1083,9 @@ function MailHome() {
                       <WindowTitle />
                       <SettingsNav
                         pane={settingsRoute.pane}
-                        onSelect={(pane) => setSettingsRoute({ pane, viewId: null, mailbox: null })}
+                        onSelect={(pane, target) =>
+                          setSettingsRoute({ pane, viewId: null, mailbox: null, target })
+                        }
                         onBack={() => setSettingsRoute(null)}
                       />
                     </>

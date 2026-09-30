@@ -34,6 +34,7 @@ import {
   SettingsSection,
   TextInput,
 } from "./settings-ui";
+import { searchableSetting } from "./settings-search";
 import { RUNTIME_MODE_OPTIONS } from "../gmail/model-picker";
 import {
   modelKey,
@@ -229,7 +230,7 @@ function ModelsSection({
 
   return (
     <SettingsSection
-      title="Models"
+      {...searchableSetting("agent-models")}
       description={`Favorites and visibility are saved on this Mac.${
         onPick ? " Click a model to make it the default for new chats." : ""
       }`}
@@ -452,7 +453,7 @@ function HermesEditor({
 
   return (
     <>
-      <SettingsSection title="Connection">
+      <SettingsSection {...searchableSetting("hermes-connection")}>
         <SettingsRow
           title="Base URL"
           description={HERMES_URL_HINT}
@@ -540,7 +541,7 @@ function AgentEditor({
     <>
       <SettingsSection title="Runtime">
         <SettingsRow
-          title="Binary path"
+          {...searchableSetting("agent-binary-path")}
           description={`Path to the ${meta.name} binary. Empty uses \`${meta.binary}\` from your shell's PATH.`}
           control={
             <DraftInput
@@ -581,7 +582,7 @@ function AgentEditor({
           />
         ) : null}
         <SettingsRow
-          title="Access"
+          {...searchableSetting("agent-access")}
           description="Default for new turns; also switchable from the composer (⇧⌘A)."
           control={
             <Select
@@ -681,7 +682,7 @@ export function ProvidersPane() {
         </Btn>
       }
     >
-      <SettingsSection title="Providers">
+      <SettingsSection {...searchableSetting("agent-providers")}>
         {providers.map((p) => (
           <ProviderListRow
             key={p.kind}
@@ -714,7 +715,7 @@ function FollowUpSection() {
   return (
     <SettingsSection title="Chat">
       <SettingsRow
-        title="Follow-up behavior"
+        {...searchableSetting("follow-up-behavior")}
         description="Queue follow-ups while the agent runs or steer the current run. Press ⌘ + Enter to do the opposite for one message."
         control={
           <Select

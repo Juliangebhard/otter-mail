@@ -31,8 +31,10 @@ import {
   SettingsGroup,
   SettingsPageContainer,
   SettingsRow,
+  SettingsSearchTarget,
   SettingsSection,
 } from "./settings-ui";
+import { searchableSetting } from "./settings-search";
 
 /**
  * Settings › Mailboxes: the list of mailboxes (turn on or off, drag to
@@ -367,7 +369,11 @@ function AccountListRow({
 /** "All mailboxes", the combined inbox: pinned first, only turned on or off. */
 function AllMailboxesRow({ on, onToggle }: { on: boolean; onToggle: (on: boolean) => void }) {
   return (
-    <div data-slot="settings-row" className="flex min-h-[60px] items-center gap-3 px-4 py-2.5">
+    <SettingsSearchTarget
+      id={searchableSetting("all-mailboxes").id}
+      data-slot="settings-row"
+      className="flex min-h-[60px] items-center gap-3 px-4 py-2.5"
+    >
       <span className={cn("contents", !on && "[&>*]:opacity-50")}>
         <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-foreground/[0.06] text-muted-foreground">
           <LayersIcon className="size-4" />
@@ -380,7 +386,7 @@ function AllMailboxesRow({ on, onToggle }: { on: boolean; onToggle: (on: boolean
         </span>
       </span>
       <Switch checked={on} onCheckedChange={onToggle} aria-label="All mailboxes on" />
-    </div>
+    </SettingsSearchTarget>
   );
 }
 
@@ -466,6 +472,7 @@ function AccountEditor({ account }: { account: GmailAccount }) {
         headerAction={<span className="text-xs text-muted-foreground">{account.email}</span>}
       >
         <SettingsRow
+          id={searchableSetting("mailbox-status").id}
           title="Status"
           description={<StatusText status={status} />}
           control={
@@ -484,7 +491,7 @@ function AccountEditor({ account }: { account: GmailAccount }) {
           }
         />
         <SettingsRow
-          title="Display name"
+          {...searchableSetting("mailbox-display-name")}
           description="Shown in the sidebar and account switcher. Only used in Otter Mail."
           control={
             <DraftInput
@@ -500,6 +507,7 @@ function AccountEditor({ account }: { account: GmailAccount }) {
           }
         />
         <SettingsRow
+          id={searchableSetting("mailbox-color").id}
           title="Color"
           description="Marks this account's mail in combined mailboxes."
           control={
@@ -515,7 +523,7 @@ function AccountEditor({ account }: { account: GmailAccount }) {
       </SettingsSection>
 
       <SettingsSection
-        title="Signature"
+        {...searchableSetting("signature")}
         description={
           capabilities.serverSignatures
             ? "Added to new messages, replies and forwards from this account. Saved in Gmail, so it's the same there and on every device."
@@ -539,7 +547,7 @@ function AccountEditor({ account }: { account: GmailAccount }) {
 
       <SettingsSection title="Remove">
         <SettingsRow
-          title="Remove account"
+          {...searchableSetting("remove-mailbox")}
           description={`Stops syncing and deletes the local copy. Nothing is deleted from ${mailServerName(account)}.`}
           control={
             <Btn size="sm" variant="destructive" onClick={() => setConfirmRemove(true)}>
@@ -599,6 +607,7 @@ export function AccountsPane() {
 
   return (
     <SettingsPageContainer
+      searchId={searchableSetting("mailboxes").id}
       title="Mailboxes"
       description="Turn mailboxes on or off and drag them into order, on every device."
       action={<SignInButton label="Add mailbox" />}

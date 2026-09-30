@@ -7,6 +7,7 @@ import { ArrowDownCircleIcon, SparklesIcon, XIcon } from "lucide-react";
 import { Btn } from "./gmail/ui";
 import { toast } from "./gmail/toast";
 import { SettingsRow, SettingsSection } from "./settings/settings-ui";
+import { searchableSetting } from "./settings/settings-search";
 
 /** Live auto-update state from the main process. */
 export function useUpdateState(): UpdateState | null {
@@ -282,7 +283,7 @@ export function UpdatesSection() {
   );
 
   return (
-    <SettingsSection title="Updates">
+    <SettingsSection {...searchableSetting("updates")}>
       <SettingsRow
         title={`Otter Mail ${state.currentVersion}`}
         description={statusLine(state)}
