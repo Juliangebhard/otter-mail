@@ -24,7 +24,8 @@ Dock → Quit, logging out).
 
 3. The workflow builds `main`'s HEAD for arm64 on `macos-15` (DMG + ZIP, with
    `latest-mac.yml` and blockmaps for the updater), publishes the GitHub Release as the latest
-   with notes generated since the previous release, and commits the new version to
+   with the version's changelog note (`changelog/<version>.md`, if `main` has one) above notes
+   generated since the previous release, and commits the new version to
    `apps/*/package.json` on `main`.
 
 To release a specific commit instead (say, a fix on a release branch), push a tag:

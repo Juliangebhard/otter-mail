@@ -160,6 +160,22 @@ jobs:
     permissions:
       contents: write
     steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.preflight.outputs.ref }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: package.json
+          package-manager-cache: false
+
+      # The version's changelog note (if main has one) goes above GitHub's
+      # generated notes, so the release and the site's changelog say the same.
+      - name: Changelog note
+        run: node scripts/changelog-release-notes.ts "${{ needs.preflight.outputs.version }}" > "$RUNNER_TEMP/notes.md"
+
       - name: Download artifacts
         uses: actions/download-artifact@v8
         with:
@@ -172,6 +188,7 @@ jobs:
           tag_name: ${{ needs.preflight.outputs.tag }}
           target_commitish: ${{ needs.preflight.outputs.ref }}
           name: ${{ needs.preflight.outputs.name }}
+          body_path: ${{ runner.temp }}/notes.md
           generate_release_notes: true
           previous_tag: ${{ needs.preflight.outputs.previous_tag }}
           prerelease: ${{ needs.preflight.outputs.prerelease }}

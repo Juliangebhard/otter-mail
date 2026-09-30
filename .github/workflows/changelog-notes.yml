@@ -1,0 +1,72 @@
+name: Changelog notes
+
+# A changelog note written (or edited) after its release: put it on the GitHub
+# release too, above GitHub's generated notes, the way the Release workflow
+# does for notes that are on main before it runs. Versions not released yet
+# are skipped; the Release workflow picks their notes up.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "changelog/*.md"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version whose release notes to refresh (e.g. 0.5.17)
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    name: Sync release notes
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: package.json
+          package-manager-cache: false
+
+      - name: Update releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          if [[ -n "$VERSION" ]]; then
+            versions="${VERSION#v}"
+          elif [[ "$BEFORE" =~ ^0+$ ]]; then
+            echo "No previous commit to compare with; run this by hand with a version."
+            exit 0
+          else
+            versions=$(git diff --name-only --diff-filter=AM "$BEFORE" HEAD -- 'changelog/*.md' \
+              | sed -nE 's#^changelog/([0-9]+\.[0-9]+\.[0-9]+)\.md$#\1#p')
+          fi
+          for version in $versions; do
+            tag="v$version"
+            if ! gh release view "$tag" > /dev/null 2>&1; then
+              echo "$tag isn't released yet; the Release workflow will add its note."
+              continue
+            fi
+            previous=$(git tag -l 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | grep -A1 -x "$tag" | sed -n 2p || true)
+            generated=$(gh api "repos/$GITHUB_REPOSITORY/releases/generate-notes" \
+              -f tag_name="$tag" ${previous:+-f previous_tag_name="$previous"} --jq .body)
+            {
+              node scripts/changelog-release-notes.ts "$version"
+              echo
+              echo "$generated"
+            } > "$RUNNER_TEMP/notes.md"
+            gh release edit "$tag" --notes-file "$RUNNER_TEMP/notes.md"
+            echo "Updated $tag's notes from changelog/$version.md."
+          done
