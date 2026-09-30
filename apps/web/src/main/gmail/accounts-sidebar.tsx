@@ -334,10 +334,13 @@ function Section({
   action,
   children,
   dropZone,
+  tour,
 }: {
   title: string;
   action?: ReactNode;
   children: ReactNode;
+  /** Its `data-tour` part, for the tour's spotlight. */
+  tour?: string;
   dropZone?: {
     active: boolean;
     onDragOver: (e: ReactDragEvent<HTMLDivElement>) => void;
@@ -347,7 +350,7 @@ function Section({
 }) {
   const [open, setOpen] = useState(true);
   return (
-    <div className="mt-4">
+    <div className="mt-4" data-tour={tour}>
       <div
         className={[
           "group flex h-8 items-center gap-1 rounded-lg pr-1",
@@ -1034,7 +1037,10 @@ function SidebarPage({
     <SearchRowsContext.Provider value={renderSearchRows}>
       <div className="flex h-full min-w-0 flex-col" inert={!active}>
         {/* Mailbox switcher, the sidebar's heading (Codex's "Codex ⌄"). */}
-        <div className="shrink-0 px-(--sidebar-content-inset) pb-2">
+        <div
+          className="shrink-0 px-(--sidebar-content-inset) pb-2"
+          data-tour={active ? "mailbox" : undefined}
+        >
           <MailboxSwitcher
             accounts={accounts}
             selectedAccountId={selectedAccountId}
@@ -1046,7 +1052,10 @@ function SidebarPage({
 
         {/* New message (Codex's "New chat"), then Search, which is a mailbox:
             selecting it opens Gmail search in the list. */}
-        <div className="flex shrink-0 flex-col gap-0.5 px-(--sidebar-content-inset)">
+        <div
+          className="flex shrink-0 flex-col gap-0.5 px-(--sidebar-content-inset)"
+          data-tour={active ? "compose" : undefined}
+        >
           <HintTooltip label="New message" shortcut="compose.new">
             <button
               type="button"
@@ -1093,6 +1102,7 @@ function SidebarPage({
 
               <Section
                 title="Views"
+                tour={active ? "views" : undefined}
                 action={<SectionAddButton label="Add view" onClick={() => openViewEditor("new")} />}
               >
                 {combinedViews.map(viewRow)}
@@ -1135,6 +1145,7 @@ function SidebarPage({
 
               <Section
                 title="Views"
+                tour={active ? "views" : undefined}
                 action={<SectionAddButton label="Add view" onClick={() => openViewEditor("new")} />}
               >
                 {accountViews.map(viewRow)}

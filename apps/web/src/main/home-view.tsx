@@ -5,7 +5,6 @@ import {
   type CSSProperties,
   type PointerEvent as ReactPointerEvent,
 } from "react";
-import { Button } from "~/components/ui/button";
 import { EmptyState } from "~/components/ui/empty-state";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast, type ToastId } from "./gmail/toast";
@@ -17,7 +16,6 @@ import { NewMessageView } from "./gmail/new-message-view";
 import { CommandPalette } from "./gmail/command-palette";
 import { AgentChatPanel } from "./gmail/agent-chat";
 import { SEARCH_MAILBOX } from "./gmail/gmail-query";
-import { ImapAccountDialog } from "./gmail/add-mailbox";
 import { searchTabId, searchTitle, type SearchTab } from "./gmail/search-tabs";
 import {
   PanelControl,
@@ -29,7 +27,6 @@ import {
 } from "./gmail/top-bar";
 import { SettingsPage, type SettingsRoute } from "./settings/settings-page";
 import { SettingsNav } from "./settings/settings-nav";
-import { OtterSignInOnboardingLink } from "./settings/otter-account-pane";
 import { isTypingTarget } from "./gmail/keyboard";
 import { cn } from "./gmail/ui";
 import { usePanelAnimationSettings, usePanelPresence } from "./panel-animations";
@@ -42,7 +39,6 @@ import {
 import { MAILBOX_JUMP_COMMANDS } from "./keybindings/commands";
 import {
   useAccounts,
-  useAddAccount,
   useAccountSync,
   useGlobalSyncStatus,
   useGmailWriteFailureToasts,
@@ -66,7 +62,7 @@ import {
 import { getAccountColor, getAccountContrastColor } from "./gmail/account-style";
 import { gmailApi, type MailtoTarget } from "./gmail/api";
 import type { QuoteContext } from "./gmail/chat-context";
-import type { GmailAccount, GmailMessageSummary } from "./gmail/types";
+import type { GmailMessageSummary } from "./gmail/types";
 import {
   useMailViews,
   resolveRules,
@@ -82,6 +78,16 @@ import {
 import { ALL_MAIL_LABEL_ID } from "./gmail/label-names";
 import { useMonochromeTheme } from "./theme/apply-theme";
 import { useMailboxes } from "./mailboxes";
+import { SetupFlow } from "./onboarding/setup";
+import { Tour } from "./onboarding/tour";
+import {
+  endTour,
+  getSetupStage,
+  markSetUp,
+  offerTour,
+  useSetupStage,
+  useTourRequested,
+} from "./onboarding/onboarding";
 
 /** Narrowest the reader gets when the chat panel is dragged wider. */
 const READER_MIN_WIDTH = 360;
@@ -194,7 +200,22 @@ const PANE_CHAT = `${PANE} relative before:pointer-events-none before:absolute b
 const PANE_FRAME =
   "flex min-h-0 shrink-0 overflow-hidden [[data-panel-animations=true]_&]:transition-[width] [[data-panel-animations=true]_&]:[transition-duration:var(--panel-animation-duration)] [[data-panel-animations=true]_&]:ease-out";
 
+/**
+ * The main window: the setup while there's no mailbox yet (or until it's
+ * finished), else mail. The setup stands in for the whole view, so none of
+ * mail's shortcuts run under it.
+ */
 export function HomeView() {
+  const accountsQuery = useAccounts();
+  const stage = useSetupStage();
+  const loaded = !accountsQuery.isLoading;
+  if (loaded && ((accountsQuery.data ?? []).length === 0 || stage === "setup")) {
+    return <SetupFlow />;
+  }
+  return <MailHome />;
+}
+
+function MailHome() {
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
   const [selectedLabelId, setSelectedLabelId] = useState<string>("INBOX");
   const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
@@ -272,7 +293,6 @@ export function HomeView() {
   const [initialized, setInitialized] = useState(false);
 
   const accountsQuery = useAccounts();
-  const addAccount = useAddAccount();
   const { views } = useMailViews();
 
   // The mailboxes shown: turned-on accounts, in the user's order (Settings →
@@ -341,6 +361,22 @@ export function HomeView() {
     localStorage.setItem("gmail:chat-open", "1");
     setChatOpen(true);
   };
+  // Getting started. A device whose mail was already here skips the setup,
+  // and is offered the tour, once.
+  useEffect(() => {
+    if (accountsQuery.isLoading || accounts.length === 0 || getSetupStage()) return;
+    markSetUp();
+    offerTour();
+  }, [accountsQuery.isLoading, accounts.length]);
+  // The tour walks the mail view: out of Settings and the composer, with the sidebar showing.
+  const tourRequested = useTourRequested();
+  useEffect(() => {
+    if (!tourRequested) return;
+    setSettingsRoute(null);
+    setComposeOpen(false);
+    if (!sidebarOpen) toggleSidebar();
+  }, [tourRequested]);
+
   // A highlighted excerpt handed from the reader to the chat panel (one-shot).
   const [pendingQuote, setPendingQuote] = useState<QuoteContext | null>(null);
 
@@ -959,23 +995,6 @@ export function HomeView() {
     setReaderAccountId(null);
   };
 
-  const [imapOpen, setImapOpen] = useState(false);
-  const showAdded = (account: GmailAccount) => {
-    setSelectedAccountId(account.id);
-    setSelectedLabelId("INBOX");
-  };
-  const handleAddAccount = async () => {
-    console.log("[HomeView:addAccount]");
-    try {
-      const account = await addAccount.mutateAsync();
-      if (account) showAdded(account);
-    } catch (err) {
-      toast.error("Couldn't add the account", {
-        description: err instanceof Error ? err.message : String(err),
-      });
-    }
-  };
-
   // Manual refresh: spin from the click until every account's sync settles
   // (any phase — the passive indicator only shows long full/body syncs), and
   // for at least a beat so a fast incremental sync still reads as feedback.
@@ -1006,37 +1025,6 @@ export function HomeView() {
   const syncNowRef = useRef(syncNow);
   syncNowRef.current = syncNow;
   useEffect(() => window.desktopBridge.on("mail:syncNow", () => syncNowRef.current()), []);
-
-  // No accounts connected (turned-off ones count: they're still connected)
-  if (!accountsQuery.isLoading && (accountsQuery.data ?? []).length === 0) {
-    return (
-      <div className="h-full flex items-center justify-center bg-canvas">
-        <EmptyState
-          title="Add your first mailbox"
-          description="Sign in to Gmail, or any mailbox that works with IMAP, to start reading your mail."
-          actions={
-            addAccount.isPending ? (
-              <Button variant="outline" onClick={() => void gmailApi.cancelAddAccount()}>
-                Cancel sign-in
-              </Button>
-            ) : (
-              <>
-                <Button variant="accent" onClick={() => void handleAddAccount()}>
-                  Add a Gmail account
-                </Button>
-                <Button variant="ghost" onClick={() => setImapOpen(true)}>
-                  Other mail (IMAP)
-                </Button>
-              </>
-            )
-          }
-        >
-          <ImapAccountDialog open={imapOpen} onOpenChange={setImapOpen} onAdded={showAdded} />
-          <OtterSignInOnboardingLink />
-        </EmptyState>
-      </div>
-    );
-  }
 
   const composeAccountId = isCombined ? firstRealAccountId : effectiveAccountId;
   const readerAccount = readerAccountId ?? (isCombined ? firstRealAccountId : effectiveAccountId);
@@ -1159,6 +1147,7 @@ export function HomeView() {
                   ref={listPane.paneRef}
                   style={{ width: listPane.width }}
                   className={`${PANE_LIST} shrink-0`}
+                  data-tour="list"
                 >
                   <MessageList
                     headerLeading={sidebarOpen ? null : <TitlebarInset />}
@@ -1206,7 +1195,7 @@ export function HomeView() {
                 <PaneResizer onPointerDown={listPane.start} />
               </>
             ) : null}
-            <div className={`${PANE_MAIN} flex min-w-0 flex-1 flex-col`}>
+            <div className={`${PANE_MAIN} flex min-w-0 flex-1 flex-col`} data-tour="reader">
               {readerOwnsBand ? null : titleControls}
               <div className="flex min-h-0 flex-1 flex-col">
                 {settingsRoute ? (
@@ -1262,6 +1251,7 @@ export function HomeView() {
                 {chatVisible ? <PaneResizer onPointerDown={chatPane.start} /> : null}
                 <div
                   ref={chatPane.frameRef}
+                  data-tour="agent"
                   style={{ width: chatVisible ? chatPane.width : 0 }}
                   className={cn(
                     PANE_FRAME,
@@ -1300,6 +1290,22 @@ export function HomeView() {
             if (chatOpen) setPendingQuote(null);
             toggleChat();
           }}
+        />
+      ) : null}
+
+      {tourRequested && initialized ? (
+        <Tour
+          actions={{
+            agentOpen: chatOpen,
+            setAgentOpen: (open) => (open ? openChat() : closeChat()),
+            openMessage: () => {
+              if (!selectedMessageId)
+                document
+                  .querySelector<HTMLElement>("[data-message-row]:not([data-draft])")
+                  ?.click();
+            },
+          }}
+          onClose={endTour}
         />
       ) : null}
 

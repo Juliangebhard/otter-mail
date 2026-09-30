@@ -19,6 +19,7 @@ import {
   FileIcon,
   InboxIcon,
   LayersIcon,
+  ListChecksIcon,
   MonitorIcon,
   MoonIcon,
   PaletteIcon,
@@ -29,6 +30,7 @@ import {
   SearchIcon,
   SendIcon,
   SettingsIcon,
+  SignpostIcon,
   SquarePenIcon,
   StarIcon,
   SunIcon,
@@ -45,6 +47,7 @@ import { previewTheme, setThemeForAppearance, useThemeChoice } from "../theme/ap
 import type { GmailAccount, GmailMessageSummary, MailView } from "./types";
 import type { KeybindingCommand } from "../keybindings/commands";
 import { shortcutLabelFor, useKeybindingsState } from "../keybindings/store";
+import { requestTour, startSetup } from "../onboarding/onboarding";
 
 /**
  * Command palette (⌘K), modeled on Otter Code's: a frosted card anchored near
@@ -285,6 +288,20 @@ export function CommandPalette({
         title: "Settings",
         shortcut: "⌘,",
         run: onOpenSettings,
+      },
+      {
+        id: "tour",
+        icon: <SignpostIcon className={ICON} />,
+        title: "Take the tour",
+        keywords: "help guide onboarding getting started",
+        run: requestTour,
+      },
+      {
+        id: "setup",
+        icon: <ListChecksIcon className={ICON} />,
+        title: "Run setup again",
+        keywords: "welcome onboarding getting started",
+        run: () => startSetup(),
       },
     ];
 

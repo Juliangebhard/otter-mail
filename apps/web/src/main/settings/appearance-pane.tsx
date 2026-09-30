@@ -26,7 +26,7 @@ import {
   SettingsSection,
 } from "./settings-ui";
 
-type ColorScheme = "system" | "light" | "dark";
+export type ColorScheme = "system" | "light" | "dark";
 
 // ---------------------------------------------------------------------------
 // Color scheme cards: a miniature window painted with the chosen theme.
@@ -83,7 +83,7 @@ function MiniWindow({ colors }: { colors: ThemeColors }) {
   );
 }
 
-function SchemeCard({
+export function SchemeCard({
   scheme,
   selected,
   light,
@@ -217,7 +217,7 @@ function ThemeOrb({
   );
 }
 
-function ThemeCard({
+export function ThemeCard({
   theme,
   pickedModes,
   onPick,
@@ -264,9 +264,9 @@ function ThemeCard({
 // Pane
 // ---------------------------------------------------------------------------
 
-export function AppearancePane() {
+/** The app's color scheme (System, Light, Dark), and a setter that syncs it with the account. */
+export function useColorScheme(): [ColorScheme, (next: ColorScheme) => Promise<void>] {
   const [themeInfo, setThemeInfo] = useState<NativeThemeInfo | null>(null);
-  const choice = useThemeChoice();
 
   const refreshThemeInfo = async () => {
     try {
@@ -290,6 +290,12 @@ export function AppearancePane() {
       toast.error(`Failed to set color scheme: ${error}`);
     }
   };
+  return [scheme, setScheme];
+}
+
+export function AppearancePane() {
+  const choice = useThemeChoice();
+  const [scheme, setScheme] = useColorScheme();
 
   const panelAnimationDurationMs = usePanelAnimationDurationMs();
   const panelAnimationDurationRatio =
