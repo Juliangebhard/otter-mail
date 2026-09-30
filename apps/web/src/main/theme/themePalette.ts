@@ -7,7 +7,7 @@
  * map, preference resolution and light/dark "halves" are left out.
  */
 import "culori/css";
-import { converter, formatCss, interpolate, parse } from "culori/fn";
+import { converter, parse } from "culori/fn";
 import {
   APP_THEMES,
   EMBER_THEME,
@@ -24,6 +24,7 @@ import {
   type ThemeDefinition,
   type ThemeVariants,
 } from "@otter-mail/shared/themes";
+import { softenThemeColors } from "@otter-mail/shared/theme-display";
 import { setSyncedPreference } from "../synced-preferences";
 
 // Mail: every built-in (Otter Code's stock palette is Mail's "otter" theme, and
@@ -1056,43 +1057,6 @@ export function getThemeDefinition(theme: ThemePreference): ThemeDefinition | nu
     getCustomThemes().find((definition) => definition.id === themeId) ??
     null
   );
-}
-
-/**
- * Mail: the structure roles apply-theme.ts blends toward the surface they sit
- * on for a built-in that isn't `exact` (keeping `keep` of the role), so the
- * built-ins match the stock palette's quiet contrast. Custom themes are
- * painted exactly as stored, like Otter Code paints them.
- */
-export const SOFTENED_ROLES: Readonly<
-  Partial<Record<ThemeColorRole, readonly [over: ThemeColorRole, keep: number]>>
-> = {
-  surface: ["canvas", 0.6],
-  surfaceRaised: ["canvas", 0.45],
-  secondary: ["canvas", 0.55],
-  muted: ["canvas", 0.55],
-  accentSurface: ["canvas", 0.45],
-  messageSurface: ["canvas", 0.7],
-  border: ["canvas", 0.35],
-  input: ["canvas", 0.5],
-  codeBackground: ["canvas", 0.6],
-  sidebarControlSurface: ["sidebar", 0.5],
-  sidebarRowHover: ["sidebar", 0.45],
-  sidebarRowActive: ["sidebar", 0.5],
-  sidebarRowSelected: ["sidebar", 0.5],
-  sidebarBorder: ["sidebar", 0.3],
-};
-
-/** Mail: `colors` with the structure roles blended as CSS's color-mix(in oklab) would. */
-export function softenThemeColors(colors: ThemeColors): ThemeColors {
-  const softened: Record<ThemeColorRole, string> = { ...colors };
-  for (const [role, [over, keep]] of Object.entries(SOFTENED_ROLES) as Array<
-    [ThemeColorRole, readonly [ThemeColorRole, number]]
-  >) {
-    const mixed = interpolate([colors[over], colors[role]], "oklab")(keep);
-    softened[role] = toCanonicalThemeColor(formatCss(mixed)) ?? colors[role];
-  }
-  return softened;
 }
 
 const displayedThemes = new Map<string, ThemeDefinition>();

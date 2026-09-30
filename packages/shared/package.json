@@ -6,6 +6,7 @@
   "type": "module",
   "exports": {
     "./themes": "./src/theme-palettes.ts",
+    "./theme-display": "./src/theme-display.ts",
     "./demo-mailboxes": "./src/demo-mailboxes.ts",
     "./support": "./src/support.ts",
     "./changelog": "./src/changelog.ts"
