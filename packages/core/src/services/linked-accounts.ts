@@ -81,7 +81,8 @@ export function planReconcile(
       else plan.add.push(account);
     } else {
       // A signed-in Gmail account refreshes its name and picture from Google
-      // itself; the relay's copy could be staler. A null one never blanks ours.
+      // itself; the relay's copy could be staler, so even an update for its
+      // label or color leaves them alone. A null one never blanks ours.
       const followsProfile = !(here.signedIn && !here.imap);
       if (
         (here.displayName ?? null) !== account.displayName ||
@@ -89,7 +90,7 @@ export function planReconcile(
         (followsProfile && account.name !== null && here.name !== account.name) ||
         (followsProfile && account.picture !== null && (here.picture ?? null) !== account.picture)
       ) {
-        plan.update.push(account);
+        plan.update.push(followsProfile ? account : { ...account, name: null, picture: null });
       }
       if (here.signedIn && here.imap && account.imap && !sameServers(here.imap, account.imap)) {
         plan.moved.push(account.email);

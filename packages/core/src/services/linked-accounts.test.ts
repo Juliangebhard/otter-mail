@@ -64,6 +64,16 @@ describe("planReconcile", () => {
     expect(plan).toEqual(none);
   });
 
+  it("a signed-in Gmail account recolored elsewhere still keeps its own picture", () => {
+    const there = remote("a@x.com", { name: "Other", picture: "new", color: "#f00" });
+    const plan = planReconcile(
+      [local("a@x.com", { picture: "old" })],
+      [there],
+      new Set(["a@x.com"]),
+    );
+    expect(plan).toEqual({ ...none, update: [{ ...there, name: null, picture: null }] });
+  });
+
   it("a relay row without a picture never blanks the local one", () => {
     const here = local("a@x.com", { signedIn: false, picture: "mine" });
     expect(planReconcile([here], [remote("a@x.com")], new Set(["a@x.com"]))).toEqual(none);
