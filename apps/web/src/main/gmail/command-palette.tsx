@@ -44,6 +44,7 @@ import { getAccountColor, getAccountDisplayName } from "./account-style";
 import { senderLabel } from "./address";
 import { cn } from "./ui";
 import { COMBINED_ACCOUNT_ID } from "./custom-views";
+import { changelogUrl } from "@otter-mail/shared/changelog";
 import { APP_THEMES } from "@otter-mail/shared/themes";
 import { previewTheme, setThemeForAppearance, useThemeChoice } from "../theme/apply-theme";
 import type { GmailAccount, GmailMessageSummary, MailView } from "./types";
@@ -328,7 +329,7 @@ export function CommandPalette({
         icon: <SparklesIcon className={ICON} />,
         title: "What's new",
         keywords: "changelog release notes new version",
-        run: () => onOpenSettings("changelog"),
+        run: () => void window.desktopBridge.openExternal(changelogUrl()),
       },
       ...(update && update.status !== "disabled"
         ? [

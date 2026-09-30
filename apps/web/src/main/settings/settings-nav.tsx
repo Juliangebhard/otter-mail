@@ -1,6 +1,7 @@
 import { useEffect, useState, type ComponentType } from "react";
 import {
   ArrowLeftIcon,
+  CircleHelpIcon,
   CircleUserRoundIcon,
   KeyboardIcon,
   LayersIcon,
@@ -9,10 +10,10 @@ import {
   MailIcon,
   MailCheckIcon,
   MousePointer2Icon,
-  SparklesIcon,
 } from "lucide-react";
+import { changelogUrl } from "@otter-mail/shared/changelog";
 import { gmailApi, type SettingsPane } from "../gmail/api";
-import { HintTooltip, cn } from "../gmail/ui";
+import { HintTooltip, IconBtn, cn } from "../gmail/ui";
 import { features } from "../features";
 
 type SettingsSection = {
@@ -29,7 +30,6 @@ export const SETTINGS_SECTIONS: ReadonlyArray<SettingsSection> = [
   { id: "accounts", label: "Mailboxes", icon: MailIcon },
   { id: "views", label: "Views", icon: LayersIcon },
   { id: "agents", label: "Agents", icon: MousePointer2Icon },
-  { id: "changelog", label: "What's new", icon: SparklesIcon },
 ];
 
 export function settingsSectionLabel(pane: SettingsPane): string {
@@ -83,10 +83,21 @@ export function SettingsNav({
       </div>
       <div className="flex shrink-0 flex-col gap-0.5 px-(--sidebar-content-inset) pt-1 pb-(--sidebar-content-inset)">
         {features.defaultMailApp ? <DefaultMailRow /> : null}
-        <button type="button" onClick={onBack} className={cn(ROW, ROW_IDLE)}>
-          <ArrowLeftIcon />
-          <span className="truncate">Back</span>
-        </button>
+        <div className="flex items-center gap-1">
+          <button type="button" onClick={onBack} className={cn(ROW, ROW_IDLE, "min-w-0 flex-1")}>
+            <ArrowLeftIcon />
+            <span className="truncate">Back</span>
+          </button>
+          {/* What's new: the changelog, on the site. */}
+          <HintTooltip label="What's new">
+            <IconBtn
+              label="What's new"
+              onClick={() => void window.desktopBridge.openExternal(changelogUrl())}
+            >
+              <CircleHelpIcon className="size-4" />
+            </IconBtn>
+          </HintTooltip>
+        </div>
       </div>
     </>
   );

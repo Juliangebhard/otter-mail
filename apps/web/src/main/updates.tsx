@@ -164,8 +164,8 @@ export function UpdateCard() {
                   ? "It will try again later."
                   : `${percent}%`}
           </p>
-          {/* The site's changelog: this build doesn't carry newer notes, and not every
-              release has one, so the index rather than the version's page. */}
+          {/* The site's changelog: not every release has a note, so the index rather
+              than the version's page. */}
           {state.status === "downloading" || state.status === "downloaded" ? (
             <button
               type="button"
