@@ -47,6 +47,7 @@ import {
 import { PanelAnimationsPreview } from "./panel-animations-preview";
 import {
   SettingResetButton,
+  SettingsGroup,
   SettingsPageContainer,
   SettingsRow,
   SettingsSection,
@@ -116,21 +117,26 @@ export function SchemeCard({
   light,
   dark,
   onSelect,
+  compact = false,
 }: {
   scheme: ColorScheme;
   selected: boolean;
   light: ThemeColors;
   dark: ThemeColors;
   onSelect: () => void;
+  /** Just the little window, named by a tooltip (Settings' row, as ChatGPT has it). */
+  compact?: boolean;
 }) {
   const label = scheme === "system" ? "System" : scheme === "light" ? "Light" : "Dark";
-  return (
+  const card = (
     <button
       type="button"
       aria-pressed={selected}
+      aria-label={compact ? label : undefined}
       onClick={onSelect}
       className={cn(
         "flex cursor-pointer flex-col items-center gap-2 rounded-xl border bg-card p-2 pb-2.5 text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-focus-ring",
+        compact && "w-24 rounded-lg p-1",
         selected
           ? "border-focus-ring text-foreground ring-1 ring-focus-ring"
           : "border-border/60 text-muted-foreground hover:border-input hover:text-foreground",
@@ -150,9 +156,10 @@ export function SchemeCard({
           <MiniWindow colors={scheme === "light" ? light : dark} />
         )}
       </span>
-      <span className={selected ? "font-medium" : undefined}>{label}</span>
+      {compact ? null : <span className={selected ? "font-medium" : undefined}>{label}</span>}
     </button>
   );
+  return compact ? <HintTooltip label={label}>{card}</HintTooltip> : card;
 }
 
 // ---------------------------------------------------------------------------
@@ -208,13 +215,13 @@ function ThemeOrb({
           onPick();
         }}
         className={cn(
-          "relative flex size-[68px] shrink-0 cursor-pointer items-center justify-center rounded-full p-1 outline-none transition-transform focus-visible:ring-2 focus-visible:ring-focus-ring",
+          "relative flex size-[60px] shrink-0 cursor-pointer items-center justify-center rounded-full p-1 outline-none transition-transform focus-visible:ring-2 focus-visible:ring-focus-ring",
           !picked && "hover:scale-105",
         )}
       >
         <span
           aria-hidden
-          className="relative block size-14 overflow-hidden rounded-full border-2 border-canvas"
+          className="relative block size-12 overflow-hidden rounded-full border-2 border-canvas"
           style={{
             boxShadow:
               mode === "dark"
@@ -278,11 +285,11 @@ export function ThemeCard({
         }
       }}
       className={cn(
-        "flex cursor-pointer flex-col gap-2 rounded-xl border bg-card pb-3.5 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-focus-ring",
+        "flex cursor-pointer flex-col gap-1.5 rounded-xl border bg-card pb-2.5 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-focus-ring",
         active ? "border-foreground/25" : "border-border/60 hover:border-input",
       )}
     >
-      <div className="flex min-h-16 items-center justify-center gap-2.5 px-3 pt-3">
+      <div className="flex min-h-14 items-center justify-center gap-2 px-3 pt-2">
         {modes.map((mode) => (
           <ThemeOrb
             key={mode}
@@ -347,7 +354,7 @@ function ThemeGroup({ title, children }: { title: string; children: ReactNode })
   return (
     <div className="space-y-2">
       <h4 className="px-[17px] text-xs text-muted-foreground">{title}</h4>
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3">{children}</div>
+      <div className="grid grid-cols-2 gap-2 md:grid-cols-3">{children}</div>
     </div>
   );
 }
@@ -450,7 +457,6 @@ function ThemeLibrary() {
   return (
     <SettingsSection
       {...searchableSetting("themes")}
-      description="Duplicate a built-in theme to make it your own."
       variant="plain"
       headerAction={
         <div className="flex items-center gap-2">
@@ -614,20 +620,26 @@ export function AppearancePane() {
 
   return (
     <SettingsPageContainer title="Appearance">
-      <SettingsSection {...searchableSetting("color-scheme")} variant="plain">
-        <div className="grid grid-cols-3 gap-3">
-          {(["system", "light", "dark"] as const).map((s) => (
-            <SchemeCard
-              key={s}
-              scheme={s}
-              selected={scheme === s}
-              light={light}
-              dark={dark}
-              onSelect={() => void setScheme(s)}
-            />
-          ))}
-        </div>
-      </SettingsSection>
+      <SettingsGroup>
+        <SettingsRow
+          {...searchableSetting("color-scheme")}
+          control={
+            <div className="flex gap-2">
+              {(["system", "light", "dark"] as const).map((s) => (
+                <SchemeCard
+                  key={s}
+                  compact
+                  scheme={s}
+                  selected={scheme === s}
+                  light={light}
+                  dark={dark}
+                  onSelect={() => void setScheme(s)}
+                />
+              ))}
+            </div>
+          }
+        />
+      </SettingsGroup>
 
       <ThemeLibrary />
 
