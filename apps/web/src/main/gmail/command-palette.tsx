@@ -25,7 +25,6 @@ import {
   MonitorIcon,
   MoonIcon,
   PaletteIcon,
-  PanelLeftIcon,
   MousePointer2Icon,
   PlusIcon,
   RotateCwIcon,
@@ -54,6 +53,7 @@ import {
   useThemeChoice,
 } from "../theme/apply-theme";
 import type { GmailAccount, GmailMessageSummary, MailView } from "./types";
+import { PaneIcon } from "./top-bar";
 import type { SettingsPane } from "./api";
 import type { KeybindingCommand } from "../keybindings/commands";
 import { shortcutLabelFor, useKeybindingsState } from "../keybindings/store";
@@ -305,7 +305,7 @@ export function CommandPalette({
       },
       {
         id: "sidebar",
-        icon: <PanelLeftIcon className={ICON} />,
+        icon: <PaneIcon side="left" open className={ICON} />,
         title: "Toggle sidebar",
         shortcut: sc("sidebar.toggle"),
         run: onToggleSidebar,

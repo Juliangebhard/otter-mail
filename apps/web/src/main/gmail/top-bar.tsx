@@ -19,9 +19,6 @@ import {
   StarIcon,
   TagIcon,
   Trash2Icon,
-  PanelLeftCloseIcon,
-  PanelLeftIcon,
-  PanelRightIcon,
 } from "lucide-react";
 import { IconBtn, HintTooltip, UnreadPill, cn, restoreFocusForKeyboardOnly } from "./ui";
 import { COMBINED_ACCOUNT_ID } from "./custom-views";
@@ -167,6 +164,50 @@ export function HistoryControls({ className }: { className?: string }) {
 }
 
 /**
+ * The sidebar and agent panel toggles' icon: ChatGPT's and Linear's soft
+ * frame, in Lucide's strokes so it sits with the rest. The pane is filled
+ * while it's open, a thin bar while it's closed.
+ */
+export function PaneIcon({
+  side,
+  open,
+  className,
+}: {
+  side: "left" | "right";
+  open: boolean;
+  className?: string;
+}) {
+  const x = side === "left" ? 8 : 16;
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+      className={className}
+    >
+      <rect x="3" y="4" width="18" height="16" rx="4" />
+      {open ? (
+        <rect
+          x={x - 1.5}
+          y="7.5"
+          width="3"
+          height="9"
+          rx="1"
+          fill="currentColor"
+          strokeWidth="1.5"
+        />
+      ) : (
+        <path d={`M${x} 8v8`} strokeWidth="1.5" />
+      )}
+    </svg>
+  );
+}
+
+/**
  * The sidebar toggle, pinned at one window position (Otter Code's
  * SidebarControl): right of the traffic lights, whether the sidebar is open
  * or not. The bands under it leave room (`WindowTitle`, `TitlebarInset`).
@@ -186,11 +227,7 @@ export function SidebarControl({
           className="no-drag pointer-events-auto"
           onClick={onToggleSidebar}
         >
-          {sidebarOpen ? (
-            <PanelLeftCloseIcon className="size-4" />
-          ) : (
-            <PanelLeftIcon className="size-4" />
-          )}
+          <PaneIcon side="left" open={sidebarOpen} className="size-4" />
         </IconBtn>
       </HintTooltip>
       {sidebarOpen ? null : <HistoryControls />}
@@ -213,11 +250,10 @@ export function PanelControl({ open, onToggle }: { open: boolean; onToggle: () =
       >
         <IconBtn
           label="Toggle agent panel"
-          active={open}
           className="no-drag pointer-events-auto"
           onClick={onToggle}
         >
-          <PanelRightIcon className="size-4" />
+          <PaneIcon side="right" open={open} className="size-4" />
         </IconBtn>
       </HintTooltip>
     </div>
