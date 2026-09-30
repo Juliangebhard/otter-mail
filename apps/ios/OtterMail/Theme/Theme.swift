@@ -15,6 +15,10 @@ struct Theme: Identifiable, Decodable {
     let monochrome: Bool
     let light: [String: String]
     let dark: [String: String]
+    /** The appearances it has palettes for: a theme of your own may have one only (`CustomThemes`). */
+    var modes: [ColorScheme] = [.light, .dark]
+
+    private enum CodingKeys: String, CodingKey { case id, label, exact, monochrome, light, dark }
 
     static let all: [Theme] = {
         guard
@@ -104,7 +108,8 @@ struct RGB {
     /** "#rrggbb", or "oklch(L C H)" as some themes are written. */
     init(css: String) {
         if css.hasPrefix("oklch(") {
-            let parts = css.dropFirst(6).dropLast().split(separator: " ").compactMap { Double($0) }
+            // L C H, then maybe "/ alpha" (which the phone doesn't paint).
+            let parts = css.dropFirst(6).dropLast().split(separator: " ").prefix(3).compactMap { Double($0) }
             let (l, c, h) = parts.count == 3 ? (parts[0], parts[1], parts[2] * .pi / 180) : (0.5, 0, 0)
             self.init(oklab: (l, c * cos(h), c * sin(h)))
         } else {
