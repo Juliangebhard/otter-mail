@@ -43,6 +43,8 @@ export type SeedAccount = {
   name: string;
   displayName: string;
   color: string;
+  /** The profile picture, like Google's: an image URL. */
+  picture?: string;
   signature: string;
   /** User labels; "A/B" nests B under A. */
   labels: { name: string; color?: { backgroundColor: string; textColor: string } }[];
@@ -91,6 +93,18 @@ function picture(label: string, sky: string, ground: string): string {
   <rect y="300" width="640" height="100" fill="#1e3a8a" opacity=".55"/>
   <text x="24" y="380" font-family="system-ui, sans-serif" font-size="28" fill="#fff">${label}</text>
 </svg>`;
+}
+
+/** A friendly head-and-shoulders profile picture, as Google shows for an account. */
+function portrait(background: string, skin: string, hair: string): string {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96">
+  <rect width="96" height="96" fill="${background}"/>
+  <path d="M14 96 C14 74 30 68 48 68 C66 68 82 74 82 96 Z" fill="#fff" opacity=".9"/>
+  <path d="M41 56 H55 V70 C52 73 44 73 41 70 Z" fill="${skin}"/>
+  <circle cx="48" cy="40" r="19" fill="${skin}"/>
+  <path d="M28 40 C26 22 38 16 50 17 C62 18 70 28 68 40 C63 33 54 29 44 29 C37 29 31 33 28 40 Z" fill="${hair}"/>
+</svg>`;
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
 }
 
 const icsStamp = (time: number) =>
@@ -204,6 +218,7 @@ const personal: SeedAccount = {
   name: "Robin Otter",
   displayName: "Personal",
   color: "#0ea5e9",
+  picture: portrait("#7dd3fc", "#f1c27d", "#5b3a29"),
   signature: "<div>Robin</div>",
   labels: [
     { name: "Family", color: { backgroundColor: "#fb4c2f", textColor: "#ffffff" } },
@@ -687,6 +702,7 @@ const work: SeedAccount = {
   name: "Sam Park",
   displayName: "Work",
   color: "#f97316",
+  picture: portrait("#fdba74", "#c68642", "#1f1a17"),
   signature: "<div>Sam Park<br>Engineering Manager, Acme</div>",
   labels: [
     { name: "Clients" },

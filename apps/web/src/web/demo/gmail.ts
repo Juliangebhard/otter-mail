@@ -829,6 +829,13 @@ function answer(url: URL, method: string, headers: Headers, rawBody: unknown): R
   if (url.hostname === "www.googleapis.com" && url.pathname.startsWith("/calendar/")) {
     return json({ items: [] });
   }
+  // The account's name and picture, as Google keeps them.
+  if (url.hostname === "www.googleapis.com" && url.pathname === "/oauth2/v3/userinfo") {
+    const account = /^Bearer demo:(.+)$/.exec(headers.get("Authorization") ?? "")?.[1];
+    const seed = DEMO_ACCOUNTS.find((s) => s.email === account);
+    if (!seed) return json({ error: "Not a demo account." }, 401);
+    return json({ email: seed.email, name: seed.name, picture: seed.picture });
+  }
   if (url.hostname === "people.googleapis.com") return json({ results: [] });
   // Avatars: the demo's people have no photos or favicons to find.
   if (
@@ -874,6 +881,7 @@ function demoAccount(seed: SeedAccount): GmailAccount {
     name: seed.name,
     displayName: seed.displayName,
     color: seed.color,
+    picture: seed.picture,
   };
 }
 

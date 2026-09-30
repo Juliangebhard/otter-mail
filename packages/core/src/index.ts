@@ -24,6 +24,7 @@ import {
 import { loadOtterAccount } from "./services/otter-account.js";
 import { getUiPreferences, preferenceChanged, setUiPreference } from "./services/preferences.js";
 import { getSettings, onSettingsChanged } from "./services/settings-store.js";
+import { refreshProfiles } from "./services/google-profile.js";
 import { refreshSignatures } from "./services/signatures.js";
 
 /** Starts the backend: restores sign-ins, registers every handler, and syncs. */
@@ -62,6 +63,7 @@ export async function startCore(platform: Platform): Promise<void> {
   configureAutoSync((await getSettings()).syncIntervalSeconds);
   void pruneAttachmentCache();
   void refreshSignatures();
+  void refreshProfiles();
 }
 
 export { broadcast, handle, registeredHandlers, type Handler } from "./ipc.js";

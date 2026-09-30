@@ -26,7 +26,8 @@ import {
   type SyncSettings,
 } from "../gmail/api";
 import { ImapAccountDialog, readableError } from "../gmail/add-mailbox";
-import { getAccountColor, getAccountDisplayName } from "../gmail/account-style";
+import { getAccountDisplayName } from "../gmail/account-style";
+import { AccountPicture } from "../gmail/account-picture";
 import {
   getAdvanceDirection,
   setAdvanceDirection,
@@ -459,13 +460,7 @@ function ConnectedMailbox({ account }: { account: GmailAccount }) {
   const busy = !!status && (status.syncing || status.download != null);
   return (
     <div className="flex items-center gap-3 px-4 py-3">
-      <span
-        className="flex size-7 shrink-0 items-center justify-center rounded-md text-xs font-semibold text-white"
-        style={{ background: getAccountColor(account) }}
-        aria-hidden
-      >
-        {(getAccountDisplayName(account)[0] ?? "?").toUpperCase()}
-      </span>
+      <AccountPicture account={account} className="size-7 text-xs" />
       <div className="min-w-0 flex-1">
         <div className="truncate text-sm text-foreground">{getAccountDisplayName(account)}</div>
         <div className="truncate text-[13px] text-muted-foreground">{account.email}</div>
