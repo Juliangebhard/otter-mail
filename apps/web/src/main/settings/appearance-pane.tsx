@@ -2,18 +2,41 @@ import { setSyncedPreference } from "../synced-preferences";
 import { Switch } from "~/components/ui/switch";
 import { features } from "../features";
 import { gmailApi } from "../gmail/api";
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { toast } from "../gmail/toast";
 import type { NativeThemeInfo } from "@otter-mail/contracts";
-import { MoonIcon, SunIcon } from "lucide-react";
+import {
+  CopyIcon,
+  MoonIcon,
+  PaintbrushIcon,
+  PenLineIcon,
+  PlusIcon,
+  SunIcon,
+  Trash2Icon,
+  UploadIcon,
+} from "lucide-react";
 import { cn, HintTooltip } from "../gmail/ui";
-import { setThemeForAppearance, themeColors, useThemeChoice } from "../theme/apply-theme";
+import {
+  appearance,
+  INITIAL_THEME_ID,
+  setThemeForAppearance,
+  themeColors,
+  useAppThemes,
+  useThemeChoice,
+} from "../theme/apply-theme";
 import {
   APP_THEMES,
+  getThemeColorsForAppearance,
   type ThemeAppearance,
   type ThemeColors,
   type ThemeDefinition,
 } from "@otter-mail/shared/themes";
+import { getThemeModes, removeCustomTheme, serializeThemeFile } from "../theme/themePalette";
+import { Button } from "~/components/ui/button";
+import { Dialog } from "~/components/ui/dialog";
+import { Tooltip, TooltipPopup, TooltipProvider, TooltipTrigger } from "~/components/ui/tooltip";
+import { ThemeImportDialog } from "./theme/ThemeImportDialog";
+import { useThemeEditorStore } from "./theme/themeEditorStore";
 import {
   DEFAULT_PANEL_ANIMATION_DURATION_MS,
   MAX_PANEL_ANIMATION_DURATION_MS,
@@ -24,6 +47,7 @@ import {
 import { PanelAnimationsPreview } from "./panel-animations-preview";
 import {
   SettingResetButton,
+  SettingsGroup,
   SettingsPageContainer,
   SettingsRow,
   SettingsSection,
@@ -93,21 +117,26 @@ export function SchemeCard({
   light,
   dark,
   onSelect,
+  compact = false,
 }: {
   scheme: ColorScheme;
   selected: boolean;
   light: ThemeColors;
   dark: ThemeColors;
   onSelect: () => void;
+  /** Just the little window, named by a tooltip (Settings' row, as ChatGPT has it). */
+  compact?: boolean;
 }) {
   const label = scheme === "system" ? "System" : scheme === "light" ? "Light" : "Dark";
-  return (
+  const card = (
     <button
       type="button"
       aria-pressed={selected}
+      aria-label={compact ? label : undefined}
       onClick={onSelect}
       className={cn(
         "flex cursor-pointer flex-col items-center gap-2 rounded-xl border bg-card p-2 pb-2.5 text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-focus-ring",
+        compact && "w-24 rounded-lg p-1",
         selected
           ? "border-focus-ring text-foreground ring-1 ring-focus-ring"
           : "border-border/60 text-muted-foreground hover:border-input hover:text-foreground",
@@ -127,9 +156,10 @@ export function SchemeCard({
           <MiniWindow colors={scheme === "light" ? light : dark} />
         )}
       </span>
-      <span className={selected ? "font-medium" : undefined}>{label}</span>
+      {compact ? null : <span className={selected ? "font-medium" : undefined}>{label}</span>}
     </button>
   );
+  return compact ? <HintTooltip label={label}>{card}</HintTooltip> : card;
 }
 
 // ---------------------------------------------------------------------------
@@ -185,13 +215,13 @@ function ThemeOrb({
           onPick();
         }}
         className={cn(
-          "relative flex size-[68px] shrink-0 cursor-pointer items-center justify-center rounded-full p-1 outline-none transition-transform focus-visible:ring-2 focus-visible:ring-focus-ring",
+          "relative flex size-[60px] shrink-0 cursor-pointer items-center justify-center rounded-full p-1 outline-none transition-transform focus-visible:ring-2 focus-visible:ring-focus-ring",
           !picked && "hover:scale-105",
         )}
       >
         <span
           aria-hidden
-          className="relative block size-14 overflow-hidden rounded-full border-2 border-canvas"
+          className="relative block size-12 overflow-hidden rounded-full border-2 border-canvas"
           style={{
             boxShadow:
               mode === "dark"
@@ -225,31 +255,42 @@ export function ThemeCard({
   theme,
   pickedModes,
   onPick,
+  actions,
 }: {
   theme: ThemeDefinition;
   pickedModes: ThemeAppearance[];
   onPick: (modes: ThemeAppearance[]) => void;
+  /** Buttons by the label (Otter Code's Duplicate, Edit, Export, Remove). */
+  actions?: ReactNode;
 }) {
   const active = pickedModes.length > 0;
+  // A theme of your own may have one palette only, as in Otter Code.
+  const modes = (["light", "dark"] as const).filter((mode) =>
+    getThemeColorsForAppearance(theme, mode),
+  );
+  const label =
+    modes.length > 1
+      ? `Use ${theme.label} for light and dark mode`
+      : `Use ${theme.label} for ${modes[0]} mode`;
   return (
     <div
       role="button"
       tabIndex={0}
-      aria-label={`Use ${theme.label} for light and dark mode`}
-      onClick={() => onPick(["light", "dark"])}
+      aria-label={label}
+      onClick={() => onPick([...modes])}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
-          onPick(["light", "dark"]);
+          onPick([...modes]);
         }
       }}
       className={cn(
-        "flex cursor-pointer flex-col gap-2 rounded-xl border bg-card pb-3.5 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-focus-ring",
+        "flex cursor-pointer flex-col gap-1.5 rounded-xl border bg-card pb-2.5 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-focus-ring",
         active ? "border-foreground/25" : "border-border/60 hover:border-input",
       )}
     >
-      <div className="flex min-h-16 items-center justify-center gap-2.5 px-3 pt-3">
-        {(["light", "dark"] as const).map((mode) => (
+      <div className="flex min-h-14 items-center justify-center gap-2 px-3 pt-2">
+        {modes.map((mode) => (
           <ThemeOrb
             key={mode}
             theme={theme}
@@ -259,8 +300,248 @@ export function ThemeCard({
           />
         ))}
       </div>
-      <span className="px-4 text-sm text-foreground">{theme.label}</span>
+      <div className="flex min-h-6 items-center gap-2 px-4">
+        <span className="min-w-0 flex-1 truncate text-sm text-foreground">{theme.label}</span>
+        {actions ? (
+          <span
+            className="-me-2 flex shrink-0 items-center gap-0.5"
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => e.stopPropagation()}
+          >
+            {actions}
+          </span>
+        ) : null}
+      </div>
     </div>
+  );
+}
+
+/** One of a card's actions, as Otter Code's library cards have them. */
+function ThemeAction({
+  label,
+  tooltip,
+  onClick,
+  destructive,
+  children,
+}: {
+  label: string;
+  tooltip: string;
+  onClick: () => void;
+  destructive?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <Button
+            aria-label={label}
+            size="icon-xs"
+            variant={destructive ? "ghost-destructive" : "ghost"}
+            onClick={onClick}
+          >
+            {children}
+          </Button>
+        }
+      />
+      <TooltipPopup>{tooltip}</TooltipPopup>
+    </Tooltip>
+  );
+}
+
+/** The built-in or your own themes, under a small heading. */
+function ThemeGroup({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div className="space-y-2">
+      <h4 className="px-[17px] text-xs text-muted-foreground">{title}</h4>
+      <div className="grid grid-cols-2 gap-2 md:grid-cols-3">{children}</div>
+    </div>
+  );
+}
+
+// Otter Code's (ThemeSettings.tsx).
+function downloadThemeFile(filename: string, contents: string): void {
+  const url = URL.createObjectURL(new Blob([contents], { type: "application/json" }));
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  // Revoking synchronously can abort the download in some browsers; give the
+  // browser time to open the stream first.
+  setTimeout(() => URL.revokeObjectURL(url), 30_000);
+}
+
+/**
+ * The Themes grid, as Otter Code's theme library: every theme can be
+ * duplicated into the editor (settings/theme, Otter Code's), your own can be
+ * edited, exported as a file and removed, and themes come in from files
+ * (Otter Code's and VS Code's).
+ */
+function ThemeLibrary() {
+  const choice = useThemeChoice();
+  const themes = useAppThemes();
+  const openThemeEditor = useThemeEditorStore((store) => store.openThemeEditor);
+  const [isImportOpen, setIsImportOpen] = useState(false);
+  const [removing, setRemoving] = useState<ThemeDefinition | null>(null);
+
+  // Wears a theme wherever it has a palette: a one-palette theme takes its own side only.
+  const wear = (theme: ThemeDefinition) => {
+    for (const mode of getThemeModes(theme)) setThemeForAppearance(mode, theme.id);
+  };
+
+  // Built-ins are never changed: duplicating one is how you make it yours.
+  const card = (theme: ThemeDefinition, custom: boolean) => (
+    <ThemeCard
+      key={theme.id}
+      theme={theme}
+      pickedModes={(["light", "dark"] as const).filter((m) => choice[m] === theme.id)}
+      onPick={(modes) => {
+        for (const mode of modes) setThemeForAppearance(mode, theme.id);
+      }}
+      actions={
+        <>
+          <ThemeAction
+            label={`Duplicate ${theme.label}`}
+            tooltip="Duplicate theme"
+            onClick={() =>
+              openThemeEditor({
+                editingThemeId: null,
+                seedThemeId: theme.id,
+                seedName: `${theme.label} copy`,
+                initialAppearance: appearance(),
+              })
+            }
+          >
+            <CopyIcon />
+          </ThemeAction>
+          {custom ? (
+            <>
+              <ThemeAction
+                label={`Edit ${theme.label}`}
+                tooltip="Edit theme"
+                onClick={() =>
+                  openThemeEditor({
+                    editingThemeId: theme.id,
+                    seedThemeId: null,
+                    seedName: null,
+                    initialAppearance: appearance(),
+                  })
+                }
+              >
+                <PenLineIcon />
+              </ThemeAction>
+              <ThemeAction
+                label={`Export ${theme.label}`}
+                tooltip="Export theme file"
+                onClick={() => downloadThemeFile(`${theme.id}.json`, serializeThemeFile(theme))}
+              >
+                <UploadIcon />
+              </ThemeAction>
+              <ThemeAction
+                label={`Remove ${theme.label}`}
+                tooltip="Remove theme"
+                destructive
+                onClick={() => setRemoving(theme)}
+              >
+                <Trash2Icon />
+              </ThemeAction>
+            </>
+          ) : null}
+        </>
+      }
+    />
+  );
+  const builtIn = themes.filter((theme) => APP_THEMES.includes(theme));
+  const custom = themes.filter((theme) => !APP_THEMES.includes(theme));
+
+  return (
+    <SettingsSection
+      {...searchableSetting("themes")}
+      variant="plain"
+      headerAction={
+        <div className="flex items-center gap-2">
+          <Button
+            size="xs"
+            variant="outline"
+            onClick={() =>
+              // Starts from what's on screen, as in Otter Code.
+              openThemeEditor({
+                editingThemeId: null,
+                seedThemeId: choice[appearance()],
+                seedName: null,
+                initialAppearance: appearance(),
+              })
+            }
+          >
+            <PaintbrushIcon />
+            Create theme
+          </Button>
+          <Button size="xs" variant="outline" onClick={() => setIsImportOpen(true)}>
+            <PlusIcon />
+            Add theme
+          </Button>
+        </div>
+      }
+    >
+      <TooltipProvider>
+        <div className="space-y-4">
+          <ThemeGroup title="Built-in">{builtIn.map((theme) => card(theme, false))}</ThemeGroup>
+          <ThemeGroup title="Custom">
+            {custom.length > 0 ? (
+              custom.map((theme) => card(theme, true))
+            ) : (
+              <p className="col-span-full rounded-xl border border-dashed border-border/70 px-4 py-6 text-center text-sm text-muted-foreground">
+                No themes of your own yet.
+              </p>
+            )}
+          </ThemeGroup>
+        </div>
+      </TooltipProvider>
+      <ThemeImportDialog
+        open={isImportOpen}
+        onOpenChange={setIsImportOpen}
+        onImported={(imported) => {
+          wear(imported);
+          const modes = getThemeModes(imported);
+          toast.success(`${imported.label} added`, {
+            description:
+              modes.length === 1 ? `It’s now your ${modes[0]} theme.` : "It’s now active.",
+          });
+          return true;
+        }}
+        onImportedMany={(imported, { updated }) => {
+          const verb = updated ? "updated" : "added";
+          toast.success(
+            imported.length === 1
+              ? `${imported[0]!.label} ${verb}`
+              : `${imported.length} themes ${verb}`,
+            { description: imported.map((theme) => theme.label).join(", ") },
+          );
+        }}
+      />
+      <Dialog
+        open={removing !== null}
+        onOpenChange={(open) => {
+          if (!open) setRemoving(null);
+        }}
+        title={`Remove “${removing?.label}”?`}
+        description="It’s removed on all your devices. You can bring it back anytime by importing its JSON file."
+        confirmLabel="Remove theme"
+        confirmVariant="destructive"
+        onConfirm={() => {
+          if (!removing) return;
+          // Whatever wore it goes back to the theme a fresh install wears.
+          for (const mode of ["light", "dark"] as const) {
+            if (choice[mode] === removing.id) setThemeForAppearance(mode, INITIAL_THEME_ID);
+          }
+          try {
+            removeCustomTheme(removing.id);
+          } catch {
+            toast.error("Couldn’t remove theme", { description: "Try again." });
+          }
+        }}
+      />
+    </SettingsSection>
   );
 }
 
@@ -339,39 +620,28 @@ export function AppearancePane() {
 
   return (
     <SettingsPageContainer title="Appearance">
-      <SettingsSection {...searchableSetting("color-scheme")} variant="plain">
-        <div className="grid grid-cols-3 gap-3">
-          {(["system", "light", "dark"] as const).map((s) => (
-            <SchemeCard
-              key={s}
-              scheme={s}
-              selected={scheme === s}
-              light={light}
-              dark={dark}
-              onSelect={() => void setScheme(s)}
-            />
-          ))}
-        </div>
-      </SettingsSection>
+      <SettingsGroup>
+        <SettingsRow
+          {...searchableSetting("color-scheme")}
+          control={
+            <div className="flex gap-2">
+              {(["system", "light", "dark"] as const).map((s) => (
+                <SchemeCard
+                  key={s}
+                  compact
+                  scheme={s}
+                  selected={scheme === s}
+                  light={light}
+                  dark={dark}
+                  onSelect={() => void setScheme(s)}
+                />
+              ))}
+            </div>
+          }
+        />
+      </SettingsGroup>
 
-      <SettingsSection
-        {...searchableSetting("themes")}
-        description="Click a theme to use it everywhere, or a single orb to use it for light or dark mode only."
-        variant="plain"
-      >
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-          {APP_THEMES.map((theme) => (
-            <ThemeCard
-              key={theme.id}
-              theme={theme}
-              pickedModes={(["light", "dark"] as const).filter((m) => choice[m] === theme.id)}
-              onPick={(modes) => {
-                for (const mode of modes) setThemeForAppearance(mode, theme.id);
-              }}
-            />
-          ))}
-        </div>
-      </SettingsSection>
+      <ThemeLibrary />
 
       <SettingsSection title="Dock">
         <SettingsRow

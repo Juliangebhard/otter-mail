@@ -108,7 +108,7 @@ struct Themed<Content: View>: View {
 
         var body: some View {
             let id = colorScheme == .dark ? preferences.darkTheme : preferences.lightTheme
-            let palette = (Theme.named(id) ?? Theme.named(Preferences.initialTheme))?.palette(colorScheme)
+            let palette = (preferences.theme(id) ?? Theme.named(Preferences.initialTheme))?.palette(colorScheme)
             content
                 .environment(\.palette, palette ?? EnvironmentValues().palette)
                 .tint(palette?.action)

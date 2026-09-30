@@ -1,5 +1,5 @@
 import { setSyncedPreference } from "../synced-preferences";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import {
   APP_THEMES,
   OTTER_DARK_THEME_COLORS,
@@ -7,14 +7,18 @@ import {
   OTTER_THEME,
   getThemeColorsForAppearance,
   type ThemeAppearance,
+  type ThemeColorRole,
   type ThemeColors,
+  type ThemeDefinition,
 } from "@otter-mail/shared/themes";
+import { getCustomThemes, subscribeToCustomThemes } from "./themePalette";
 
 /**
  * App color themes, the Otter Code model: each appearance (light, dark)
  * independently wears one theme. The choice lives in localStorage (shared by
  * every window of the app), and a `storage` event re-themes the other windows
- * live. "otter" is the stock palette defined in styles.css.
+ * live. "otter" is the stock palette defined in styles.css. Themes of your
+ * own (themePalette.ts, Otter Code's library) are worn the same way.
  */
 
 export const DEFAULT_THEME_ID = OTTER_THEME.id;
@@ -27,12 +31,23 @@ const STORAGE_KEY: Record<ThemeAppearance, "otter:theme:light" | "otter:theme:da
 };
 const CHANGE_EVENT = "otter:theme-change";
 
+/** A built-in, or one of your own. */
+function findTheme(id: string): ThemeDefinition | undefined {
+  return APP_THEMES.find((t) => t.id === id) ?? getCustomThemes().find((t) => t.id === id);
+}
+
+/** Every theme to pick from: the built-ins, then your own. */
+export function useAppThemes(): ReadonlyArray<ThemeDefinition> {
+  const custom = useSyncExternalStore(subscribeToCustomThemes, getCustomThemes);
+  return [...APP_THEMES, ...custom];
+}
+
 export type ThemeChoice = Record<ThemeAppearance, string>;
 
 export function getThemeChoice(): ThemeChoice {
   const read = (mode: ThemeAppearance) => {
     const id = localStorage.getItem(STORAGE_KEY[mode]);
-    return id && APP_THEMES.some((t) => t.id === id) ? id : INITIAL_THEME_ID;
+    return id && findTheme(id) ? id : INITIAL_THEME_ID;
   };
   return { light: read("light"), dark: read("dark") };
 }
@@ -45,7 +60,7 @@ export function setThemeForAppearance(mode: ThemeAppearance, themeId: string): v
 }
 
 export function themeColors(themeId: string, mode: ThemeAppearance): ThemeColors {
-  const theme = APP_THEMES.find((t) => t.id === themeId) ?? OTTER_THEME;
+  const theme = findTheme(themeId) ?? OTTER_THEME;
   return (
     getThemeColorsForAppearance(theme, mode) ??
     (mode === "dark" ? OTTER_DARK_THEME_COLORS : OTTER_LIGHT_THEME_COLORS)
@@ -63,57 +78,70 @@ function softenColor(color: string, over: string, keep: number): string {
   return `color-mix(in oklab, ${color} ${keep}%, ${over})`;
 }
 
-/** Theme role → the app's CSS variables (mirrors Otter Code's index.css mapping). */
+/**
+ * Theme role → the app's CSS variables it paints (mirrors Otter Code's
+ * index.css mapping). A softened variable is blended toward another role,
+ * keeping that percentage, unless the theme is `exact`. Roles missing here
+ * (the toolbar, terminal and update ones, `accent`) have nothing to paint in Mail.
+ */
+const VARIABLES: ReadonlyArray<
+  readonly [variable: string, role: ThemeColorRole, soften?: readonly [ThemeColorRole, number]]
+> = [
+  ["--canvas", "canvas"],
+  ["--app-chrome-background", "chrome"],
+  ["--foreground", "text"],
+  ["--card", "surface", ["canvas", 60]],
+  ["--card-foreground", "text"],
+  ["--popover", "surfaceOverlay"],
+  ["--popover-foreground", "text"],
+  ["--surface-raised", "surfaceRaised", ["canvas", 45]],
+  ["--chat-composer-surface", "surfaceRaised", ["canvas", 45]],
+  ["--primary", "messageAction"],
+  ["--primary-foreground", "messageActionForeground"],
+  ["--secondary", "secondary", ["canvas", 55]],
+  ["--secondary-foreground", "secondaryForeground"],
+  ["--muted", "muted", ["canvas", 55]],
+  ["--muted-foreground", "mutedForeground"],
+  ["--placeholder", "placeholder"],
+  ["--secondary-label", "secondaryLabel"],
+  ["--icon-muted", "iconMuted"],
+  ["--accent-surface", "accentSurface", ["canvas", 45]],
+  ["--accent-surface-foreground", "accentSurfaceForeground"],
+  ["--message-surface", "messageSurface", ["canvas", 70]],
+  ["--message-foreground", "messageForeground"],
+  ["--error", "error"],
+  ["--error-foreground", "errorForeground"],
+  ["--error-surface", "errorSurface"],
+  ["--destructive", "error"],
+  ["--destructive-foreground", "errorForeground"],
+  ["--warning", "warning"],
+  ["--warning-foreground", "warningForeground"],
+  ["--warning-surface", "warningSurface"],
+  ["--border", "border", ["canvas", 35]],
+  ["--input", "input", ["canvas", 50]],
+  ["--ring", "focus"],
+  ["--sidebar-surface", "sidebar"],
+  ["--sidebar-foreground", "sidebarForeground"],
+  ["--sidebar-muted-foreground", "sidebarMutedForeground"],
+  ["--sidebar-control-surface", "sidebarControlSurface", ["sidebar", 50]],
+  ["--sidebar-row-hover", "sidebarRowHover", ["sidebar", 45]],
+  ["--sidebar-row-active", "sidebarRowActive", ["sidebar", 50]],
+  ["--sidebar-row-selected", "sidebarRowSelected", ["sidebar", 50]],
+  ["--sidebar-line", "sidebarBorder", ["sidebar", 30]],
+  ["--code-background", "codeBackground", ["canvas", 60]],
+  ["--code-foreground", "codeForeground"],
+];
+
 function cssVariables(c: ThemeColors, exact: boolean): string {
-  const soften = exact ? (color: string) => color : softenColor;
-  const vars: Record<string, string> = {
-    "--canvas": c.canvas,
-    "--app-chrome-background": c.chrome,
-    "--foreground": c.text,
-    "--card": soften(c.surface, c.canvas, 60),
-    "--card-foreground": c.text,
-    "--popover": c.surfaceOverlay,
-    "--popover-foreground": c.text,
-    "--surface-raised": soften(c.surfaceRaised, c.canvas, 45),
-    "--chat-composer-surface": soften(c.surfaceRaised, c.canvas, 45),
-    "--primary": c.messageAction,
-    "--primary-foreground": c.messageActionForeground,
-    "--secondary": soften(c.secondary, c.canvas, 55),
-    "--secondary-foreground": c.secondaryForeground,
-    "--muted": soften(c.muted, c.canvas, 55),
-    "--muted-foreground": c.mutedForeground,
-    "--placeholder": c.placeholder,
-    "--secondary-label": c.secondaryLabel,
-    "--icon-muted": c.iconMuted,
-    "--accent-surface": soften(c.accentSurface, c.canvas, 45),
-    "--accent-surface-foreground": c.accentSurfaceForeground,
-    "--message-surface": soften(c.messageSurface, c.canvas, 70),
-    "--message-foreground": c.messageForeground,
-    "--error": c.error,
-    "--error-foreground": c.errorForeground,
-    "--error-surface": c.errorSurface,
-    "--destructive": c.error,
-    "--destructive-foreground": c.errorForeground,
-    "--warning": c.warning,
-    "--warning-foreground": c.warningForeground,
-    "--warning-surface": c.warningSurface,
-    "--border": soften(c.border, c.canvas, 35),
-    "--input": soften(c.input, c.canvas, 50),
-    "--ring": c.focus,
-    "--sidebar-surface": c.sidebar,
-    "--sidebar-foreground": c.sidebarForeground,
-    "--sidebar-muted-foreground": c.sidebarMutedForeground,
-    "--sidebar-control-surface": soften(c.sidebarControlSurface, c.sidebar, 50),
-    "--sidebar-row-hover": soften(c.sidebarRowHover, c.sidebar, 45),
-    "--sidebar-row-active": soften(c.sidebarRowActive, c.sidebar, 50),
-    "--sidebar-row-selected": soften(c.sidebarRowSelected, c.sidebar, 50),
-    "--sidebar-line": soften(c.sidebarBorder, c.sidebar, 30),
-    "--code-background": soften(c.codeBackground, c.canvas, 60),
-    "--code-foreground": c.codeForeground,
-  };
-  return Object.entries(vars)
-    .map(([k, v]) => `  ${k}: ${v};`)
-    .join("\n");
+  return VARIABLES.map(([variable, role, soften]) => {
+    const value = soften && !exact ? softenColor(c[role], c[soften[0]], soften[1]) : c[role];
+    return `  ${variable}: ${value};`;
+  }).join("\n");
+}
+
+/** The CSS variables a role paints (the theme editor's spotlight probes them). */
+export function themeRoleVariables(role: ThemeColorRole): ReadonlyArray<string> {
+  return VARIABLES.filter(([, r]) => r === role).map(([variable]) => variable);
 }
 
 const STYLE_ID = "otter-app-theme";
@@ -122,7 +150,7 @@ const STYLE_ID = "otter-app-theme";
  * Light or dark. The desktop app's appearance setting flips the media query
  * itself; the web app stores an explicit choice instead (src/web/bridge.ts).
  */
-function appearance(): ThemeAppearance {
+export function appearance(): ThemeAppearance {
   const chosen = localStorage.getItem("otter:theme-source");
   if (chosen === "light" || chosen === "dark") return chosen;
   return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
@@ -130,6 +158,24 @@ function appearance(): ThemeAppearance {
 
 /** A theme shown in this window without being chosen (the palette's preview). */
 let previewId: string | null = null;
+
+/** The theme editor's draft (settings/theme), painted here until the editor closes. */
+let draft: { colors: ThemeColors; appearance: ThemeAppearance } | null = null;
+
+/** Paints the editor's draft on the app, in its appearance; nothing is stored or synced. */
+export function applyThemeColorPreview(colors: ThemeColors, appearance: ThemeAppearance): void {
+  draft = { colors, appearance };
+  window.dispatchEvent(new Event(CHANGE_EVENT));
+}
+
+/** Back to the chosen theme, once the editor closes. */
+export function refreshTheme(): void {
+  draft = null;
+  window.dispatchEvent(new Event(CHANGE_EVENT));
+}
+
+/** Your own themes are painted as stored, and keep their own primary. */
+const isCustom = (id: string) => !APP_THEMES.some((t) => t.id === id);
 
 /** Paints `themeId` here until cleared with null; nothing is stored or synced. */
 export function previewTheme(themeId: string | null): void {
@@ -155,10 +201,10 @@ function withoutTransitions(root: HTMLElement): void {
 
 /** Applies the theme for the current system/app appearance to this window. */
 export function applyAppTheme(): void {
-  const mode = appearance();
-  const themeId = previewId ?? getThemeChoice()[mode];
-  const colors = themeColors(themeId, mode);
-  const exact = APP_THEMES.find((t) => t.id === themeId)?.exact ?? false;
+  const mode = draft?.appearance ?? appearance();
+  const themeId = draft ? "__preview" : (previewId ?? getThemeChoice()[mode]);
+  const colors = draft?.colors ?? themeColors(themeId, mode);
+  const exact = draft !== null || isCustom(themeId) || (findTheme(themeId)?.exact ?? false);
 
   const root = document.documentElement;
   withoutTransitions(root);
@@ -190,17 +236,20 @@ export function startAppTheme(): () => void {
   mq.addEventListener("change", applyAppTheme);
   window.addEventListener(CHANGE_EVENT, applyAppTheme);
   window.addEventListener("storage", onStorage);
+  const unsubscribe = subscribeToCustomThemes(applyAppTheme);
   return () => {
     mq.removeEventListener("change", applyAppTheme);
     window.removeEventListener(CHANGE_EVENT, applyAppTheme);
     window.removeEventListener("storage", onStorage);
+    unsubscribe();
   };
 }
 
 /** Whether the theme this window wears keeps its own primary (no per-account color). */
 function isMonochrome(): boolean {
+  if (draft) return true;
   const id = previewId ?? getThemeChoice()[appearance()];
-  return APP_THEMES.find((t) => t.id === id)?.monochrome ?? false;
+  return isCustom(id) || (findTheme(id)?.monochrome ?? false);
 }
 
 /** `isMonochrome`, re-read on theme picks and appearance switches. */

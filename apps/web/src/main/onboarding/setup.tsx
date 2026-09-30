@@ -17,7 +17,6 @@ import {
   ZapIcon,
 } from "lucide-react";
 import { Switch } from "~/components/ui/switch";
-import { APP_THEMES } from "@otter-mail/shared/themes";
 import {
   gmailApi,
   type NotificationsMode,
@@ -56,7 +55,12 @@ import { OtterSignInOnboardingLink } from "../settings/otter-account-pane";
 import { SchemeCard, ThemeCard, useColorScheme } from "../settings/appearance-pane";
 import { SettingsGroup, SettingsRow, TextInput } from "../settings/settings-ui";
 import { HERMES_URL_HINT, useConnectHermes } from "../settings/providers-pane";
-import { setThemeForAppearance, themeColors, useThemeChoice } from "../theme/apply-theme";
+import {
+  setThemeForAppearance,
+  themeColors,
+  useAppThemes,
+  useThemeChoice,
+} from "../theme/apply-theme";
 import { features } from "../features";
 import { KEY_DRILL_COUNT, KeyTrainer } from "./key-trainer";
 import { MailField } from "./mail-field";
@@ -492,6 +496,7 @@ function ConnectedMailbox({ account }: { account: GmailAccount }) {
 
 function LookStep() {
   const choice = useThemeChoice();
+  const themes = useAppThemes();
   const [scheme, setScheme] = useColorScheme();
   const light = themeColors(choice.light, "light");
   const dark = themeColors(choice.dark, "dark");
@@ -514,7 +519,7 @@ function LookStep() {
         ))}
       </div>
       <div className="mt-6 grid grid-cols-4 gap-3">
-        {APP_THEMES.map((theme) => (
+        {themes.map((theme) => (
           <ThemeCard
             key={theme.id}
             theme={theme}

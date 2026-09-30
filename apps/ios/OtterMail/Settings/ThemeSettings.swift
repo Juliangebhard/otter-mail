@@ -2,7 +2,9 @@ import SwiftUI
 
 /**
  * Themes, as in the desktop's Settings › Appearance: tap a theme to wear it
- * in light and dark, or one of its orbs for that appearance only.
+ * in light and dark, or one of its orbs for that appearance only. Your own
+ * themes (made on the Mac or the web) follow the stock ones; one with a single
+ * palette is worn for that appearance only.
  */
 struct ThemeSettings: View {
     @Environment(Preferences.self) private var preferences
@@ -11,7 +13,7 @@ struct ThemeSettings: View {
     var body: some View {
         ScrollView {
             LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
-                ForEach(Theme.all) { theme in
+                ForEach(preferences.themes) { theme in
                     ThemeCard(
                         theme: theme,
                         light: preferences.lightTheme == theme.id,
@@ -43,8 +45,7 @@ private struct ThemeCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 0) {
-                preview(theme.palette(.light))
-                preview(theme.palette(.dark))
+                ForEach(theme.modes, id: \.self) { preview(theme.palette($0)) }
             }
             .frame(height: 76)
             .clipShape(.rect(cornerRadius: 12))
@@ -55,8 +56,8 @@ private struct ThemeCard: View {
                     .foregroundStyle(palette.text)
                     .lineLimit(1)
                 Spacer()
-                orb(.light, picked: light)
-                orb(.dark, picked: dark)
+                if theme.modes.contains(.light) { orb(.light, picked: light) }
+                if theme.modes.contains(.dark) { orb(.dark, picked: dark) }
             }
         }
         .padding(10)
@@ -66,7 +67,7 @@ private struct ThemeCard: View {
                 .strokeBorder(light || dark ? palette.focus : palette.border, lineWidth: light && dark ? 2 : 1)
         }
         .contentShape(.rect(cornerRadius: 18))
-        .onTapGesture { onPick([.light, .dark]) }
+        .onTapGesture { onPick(Set(theme.modes)) }
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(light && dark ? .isSelected : [])
     }
