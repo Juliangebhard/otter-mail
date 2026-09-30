@@ -5,8 +5,8 @@ import Observation
  * The agent, as on the desktop (core's agent service and the renderer's
  * chat). Hermes runs anywhere, so it runs here, with the same chats (they
  * live on the Hermes server) and the same settings and key (they follow the
- * Otter account). Codex and Claude are local agents on the Mac; the phone
- * lists them, off.
+ * Otter account). Codex and Claude are local agents on the Mac, so the
+ * phone doesn't show them.
  */
 @Observable
 final class Agent {
@@ -160,6 +160,9 @@ final class Agent {
 
     private(set) var status: Status = .notConfigured
     private(set) var models: [Hermes.Model] = []
+
+    /** Whether the phone has an agent on: Hermes, the one that runs here (Codex and Claude run on the Mac). Off, the agent's buttons go. */
+    var isOn: Bool { hermes.enabled }
 
     private var client: Hermes? {
         guard hermes.enabled, !hermes.baseUrl.isEmpty, let key else { return nil }

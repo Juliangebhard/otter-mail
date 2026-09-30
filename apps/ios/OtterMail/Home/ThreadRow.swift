@@ -1,67 +1,70 @@
 import SwiftUI
 
 /**
- * One thread, three lines, as Otter Code lists tasks: who (with the mailbox's
- * mark in all mailboxes) and when, the subject, then a line of the latest
- * message with what's attached and how many there are.
+ * One thread, three lines, as the desktop lists them: who (the unread dot
+ * before, the mailbox's dot in all mailboxes) and when, the subject, then a
+ * line of the latest message. No avatars, no dividers; read mail recedes.
  */
 struct ThreadRow: View {
     @Environment(\.palette) private var palette
+    @Environment(\.colorScheme) private var colorScheme
     let thread: MailThread
     /** Set in all mailboxes: whose mail it is. */
     let mailbox: Mailbox?
 
     var body: some View {
         let latest = thread.latest
-        VStack(alignment: .leading, spacing: 5) {
-            HStack(spacing: 8) {
-                SenderAvatar(person: latest.from, size: 22)
-                Text(senders)
-                    .font(.subheadline)
-                    .foregroundStyle(palette.muted)
-                    .lineLimit(1)
-                if let mailbox {
-                    MailboxMark(mailbox: mailbox)
+        let unread = thread.unread
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 6) {
+                if unread {
+                    Circle().fill(palette.action).frame(width: 7, height: 7)
                 }
+                Text(senders)
+                    .font(.subheadline.weight(unread ? .medium : .regular))
+                    .foregroundStyle(palette.text)
+                    .lineLimit(1)
                 Spacer(minLength: 8)
                 if thread.starred {
                     Image(systemName: "star.fill")
-                        .font(.caption)
-                        .foregroundStyle(palette.warning)
+                        .font(.caption2)
+                        .foregroundStyle(palette.text)
                 }
-                Text(RelativeTime.short(latest.date))
-                    .font(.subheadline)
-                    .foregroundStyle(thread.unread ? palette.focus : palette.muted)
-                    .monospacedDigit()
-            }
-
-            Text(thread.subject)
-                .font(.body.weight(thread.unread ? .semibold : .regular))
-                .foregroundStyle(palette.text)
-                .lineLimit(1)
-
-            HStack(spacing: 8) {
-                Text(thread.isDraft ? "Draft · \(latest.snippet)" : latest.snippet)
-                    .font(.subheadline)
-                    .foregroundStyle(palette.muted)
-                    .lineLimit(1)
-                Spacer(minLength: 8)
                 if thread.hasAttachments {
                     Image(systemName: "paperclip")
-                        .font(.caption)
+                        .font(.caption2)
                         .foregroundStyle(palette.muted)
                 }
                 if thread.messages.count > 1 {
                     Text("\(thread.messages.count)")
-                        .font(.caption.weight(.medium))
+                        .font(.footnote)
                         .foregroundStyle(palette.muted)
                         .monospacedDigit()
                 }
-                if thread.unread {
-                    Circle().fill(palette.focus).frame(width: 8, height: 8)
+                if let mailbox {
+                    Circle()
+                        .fill(Color(hex: mailbox.color))
+                        .frame(width: 7, height: 7)
+                        .accessibilityLabel(mailbox.displayName)
                 }
+                Text(RelativeTime.short(latest.date))
+                    .font(.footnote)
+                    .foregroundStyle(palette.muted)
+                    .monospacedDigit()
             }
+
+            Text(thread.subject)
+                .font(.subheadline)
+                .foregroundStyle(unread ? palette.text : palette.muted)
+                .lineLimit(1)
+
+            Text(thread.isDraft ? "Draft · \(latest.snippet)" : latest.snippet)
+                .font(.subheadline)
+                .foregroundStyle(palette.muted.opacity(0.8))
+                .lineLimit(1)
         }
+        // Read mail recedes, as on the desktop.
+        .opacity(unread || thread.isDraft ? 1 : colorScheme == .dark ? 0.75 : 0.85)
         .contentShape(.rect)
         .accessibilityElement(children: .combine)
     }
@@ -97,27 +100,28 @@ struct MailboxMark: View {
     }
 }
 
-/** Initials on a color picked from the address, so each person keeps theirs. */
+/** The sender's initial on a color picked from the address, the desktop's tile (sender-avatar.tsx). */
 struct SenderAvatar: View {
     let person: Person
-    var size: CGFloat = 36
-
-    private static let colors = ["#ef4444", "#f97316", "#eab308", "#22c55e", "#14b8a6", "#0ea5e9", "#6366f1", "#a855f7", "#ec4899"]
+    var size: CGFloat = 32
 
     var body: some View {
-        let hash = person.email.unicodeScalars.reduce(0) { ($0 &* 31 &+ Int($1.value)) & 0xffff }
-        Text(initials)
-            .font(.system(size: size * 0.4, weight: .semibold))
+        Text(person.label.prefix(1).uppercased())
+            .font(.system(size: size * 0.42, weight: .medium))
             .foregroundStyle(.white)
             .frame(width: size, height: size)
-            .background(Color(hex: Self.colors[hash % Self.colors.count]).gradient, in: .circle)
+            .background(color, in: .rect(cornerRadius: size * 0.22))
             .accessibilityHidden(true)
     }
 
-    private var initials: String {
-        let words = person.label.split(separator: " ").filter { $0.first?.isLetter ?? false }
-        let letters = words.count > 1 ? [words.first!, words.last!].compactMap(\.first) : Array(person.label.prefix(1))
-        return String(letters).uppercased()
+    /** The desktop's hue for the address, at hsl(h 48% 52%) (as hue, saturation and brightness). */
+    private var color: Color {
+        var hash: Int32 = 0
+        for unit in person.email.trimmingCharacters(in: .whitespaces).lowercased().utf16 {
+            hash = hash &* 31 &+ Int32(unit)
+        }
+        let hue = ((Int(hash) % 360) + 360) % 360
+        return Color(hue: Double(hue) / 360, saturation: 0.614, brightness: 0.75)
     }
 }
 

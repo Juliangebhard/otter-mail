@@ -52,7 +52,7 @@ struct AgentView: View {
         case .notConfigured:
             unavailable(
                 "Connect Hermes",
-                "Hermes, your agent server, runs everywhere: connect it once and it's on every device. Codex and Claude run in the Mac app."
+                "Hermes, your agent server, runs everywhere: connect it once and it's on every device."
             )
         case .failed(let message):
             unavailable("Hermes isn't answering", message)
@@ -63,7 +63,11 @@ struct AgentView: View {
 
     private func unavailable(_ title: String, _ message: String) -> some View {
         ContentUnavailableView {
-            Label(title, systemImage: "cursorarrow")
+            Label {
+                Text(title)
+            } icon: {
+                Image("AgentCursor").resizable().scaledToFit().frame(width: 44, height: 44)
+            }
         } description: {
             Text(message)
         } actions: {
@@ -112,7 +116,7 @@ struct AgentView: View {
     private var welcome: some View {
         VStack(spacing: 18) {
             Text("What can I help with?")
-                .font(.system(size: 26, weight: .semibold))
+                .font(.title2.weight(.semibold))
                 .foregroundStyle(palette.text)
             if !context.isEmpty {
                 VStack(spacing: 8) {

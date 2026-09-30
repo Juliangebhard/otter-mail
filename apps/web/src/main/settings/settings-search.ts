@@ -1,3 +1,4 @@
+import { features } from "../features";
 import type { SettingsPane } from "../gmail/api";
 import { commandLabel, DEFAULT_KEYBINDINGS, KEYBINDING_COMMANDS } from "../keybindings/commands";
 
@@ -20,6 +21,8 @@ export interface SettingsSearchItem {
    * panes, so "notifications" still leads with Notifications, not a command.
    */
   readonly secondary?: boolean;
+  /** False where this app doesn't have the setting (only the Mac app does): search skips it. */
+  readonly available?: boolean;
 }
 
 /**
@@ -69,18 +72,21 @@ export const SETTINGS_SEARCH_ITEMS = [
     id: "launch-at-login",
     title: "Launch at login",
     pane: "general",
+    available: features.launchAtLogin,
     searchTerms: ["startup open automatically log in mac"],
   },
   {
     id: "menu-bar-icon",
     title: "Show menu-bar icon",
     pane: "general",
+    available: features.menuBar,
     searchTerms: ["tray status bar unread inbox popover"],
   },
   {
     id: "dock-badge",
     title: "Show unread count on Dock icon",
     pane: "general",
+    available: features.dockBadge,
     searchTerms: ["badge number unread"],
   },
   {
@@ -105,18 +111,21 @@ export const SETTINGS_SEARCH_ITEMS = [
     id: "read-languages",
     title: "Languages I read",
     pane: "general",
+    available: features.translation,
     searchTerms: ["translation translate language foreign"],
   },
   {
     id: "auto-translate",
     title: "Translate automatically",
     pane: "general",
+    available: features.translation,
     searchTerms: ["translation language foreign auto"],
   },
   {
     id: "default-mail-app",
     title: "Default email app",
     pane: "general",
+    available: features.defaultMailApp,
     searchTerms: ["mailto links handler mac system"],
   },
   {
@@ -274,12 +283,14 @@ export const SETTINGS_SEARCH_ITEMS = [
     id: "agent-binary-path",
     title: "Binary path",
     pane: "agents",
+    available: features.localAgents,
     searchTerms: ["agents cli claude codex runtime home config directory launch arguments"],
   },
   {
     id: "agent-access",
     title: "Access",
     pane: "agents",
+    available: features.localAgents,
     searchTerms: ["agents permissions runtime mode full access supervised approvals"],
   },
   {
@@ -341,6 +352,7 @@ export function searchSettings(
         normalizeSearchText(SETTINGS_SECTION_LABELS[item.pane]),
         ...(item.searchTerms ?? []).map(normalizeSearchText),
       ];
+      if (item.available === false) return [];
       if (!queryTokens.every((token) => fields.some((field) => field.includes(token)))) return [];
 
       const exactPhraseField = fields.findIndex((field) => field.includes(normalizedQuery));

@@ -19,9 +19,9 @@ struct SettingsView: View {
             SettingsForm {
                 Section {
                     VStack(spacing: 8) {
-                        ProfilePicture(url: session.user?.picture, size: 88)
+                        ProfilePicture(url: session.user?.picture, size: 64)
                         Text(session.user.map { $0.name ?? $0.email } ?? "Demo mailbox")
-                            .font(.title3.weight(.semibold))
+                            .font(.headline)
                             .foregroundStyle(palette.text)
                         Text(session.user?.email ?? "Pretend mail, to try Otter Mail. Nothing here reaches Google.")
                             .font(.subheadline)
@@ -73,14 +73,14 @@ struct SettingsView: View {
                     Text("Mail in other languages is translated on this iPhone, by Apple's Translation.")
                 }
 
-                Section("Agents") {
+                Section {
                     NavigationLink {
                         AgentSettings()
                     } label: {
                         LabeledContent {
-                            Text(session.agent.status == .ready ? "Hermes" : "Off")
+                            Text(session.agent.isOn && session.agent.status == .ready ? "Hermes" : "Off")
                         } label: {
-                            Label("Agents", systemImage: "cursorarrow")
+                            Label("Agents", image: "AgentCursor")
                         }
                     }
                 }
@@ -89,7 +89,7 @@ struct SettingsView: View {
                     Picker(selection: $preferences.scheme) {
                         ForEach(Preferences.Scheme.allCases) { Text($0.title).tag($0) }
                     } label: {
-                        Label("Appearance", systemImage: "circle.lefthalf.filled")
+                        Label("Color scheme", systemImage: "circle.lefthalf.filled")
                     }
                     NavigationLink {
                         ThemeSettings()
@@ -166,3 +166,4 @@ struct SettingsForm<Content: View>: View {
         .background(palette.canvas)
     }
 }
+

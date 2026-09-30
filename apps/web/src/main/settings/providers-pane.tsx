@@ -146,7 +146,6 @@ function ProviderListRow({
       <span className="flex h-5 shrink-0 items-center">
         <Switch
           checked={provider.enabled}
-          disabled={provider.macAppOnly}
           onCheckedChange={(checked: boolean) => onToggle(Boolean(checked))}
           aria-label={`Enable ${provider.displayName}`}
         />
@@ -188,7 +187,7 @@ function capabilityLabels(model: ProviderModel): string[] {
 
 /**
  * Models, as T3 Code's ProviderModelsSection: favorites and picker visibility
- * (stored on this Mac), a filter for long catalogs, and Enable / Disable all.
+ * (stored on this device), a filter for long catalogs, and Enable / Disable all.
  * Clicking a name makes it the provider's default model.
  */
 function ModelsSection({
@@ -231,7 +230,7 @@ function ModelsSection({
   return (
     <SettingsSection
       {...searchableSetting("agent-models")}
-      description={`Favorites and visibility are saved on this Mac.${
+      description={`Favorites and visibility are saved on this device.${
         onPick ? " Click a model to make it the default for new chats." : ""
       }`}
     >
@@ -699,7 +698,7 @@ export function ProvidersPane() {
         isDefault={current.kind === state.selected}
         onMakeDefault={() => update({ selected: current.kind })}
       />
-      {current.macAppOnly ? null : current.kind === "hermes" ? (
+      {current.kind === "hermes" ? (
         <HermesEditor state={state} provider={current} update={update} />
       ) : (
         <AgentEditor kind={current.kind} state={state} provider={current} update={update} />

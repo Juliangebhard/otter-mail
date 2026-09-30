@@ -286,6 +286,7 @@ export const webBridge: DesktopBridge = {
     dragOut: false,
     openFiles: false,
     externalAgent: false,
+    localAgents: false,
   },
   invoke,
   on(channel, listener) {

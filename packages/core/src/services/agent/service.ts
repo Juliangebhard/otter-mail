@@ -6,8 +6,8 @@
  * fire-and-forget; their events stream as `agent:chatEvent`.
  *
  * Hermes is a server, so it works everywhere; Codex and Claude are local
- * CLIs, which the Mac app hands over as `Platform.agentProviders`. The
- * web app lists them, off (`macAppOnly`).
+ * CLIs, which the Mac app hands over as `Platform.agentProviders`. Only what
+ * the platform runs is listed: the web app doesn't show the Mac's agents.
  */
 
 import { broadcast } from "../../ipc.js";
@@ -88,17 +88,7 @@ function pendingSnapshot(kind: ProviderKind, settings: ProviderSettings): Provid
 
 async function getState(): Promise<ProvidersState> {
   const settings = await getProviderSettings();
-  const snapshots = PROVIDER_KINDS.map((kind) => {
-    if (!available()[kind]) {
-      return {
-        ...pendingSnapshot(kind, settings),
-        enabled: false,
-        status: "disabled",
-        checkedAt: 0,
-        message: "Available in the Mac app.",
-        macAppOnly: true,
-      } satisfies ProviderSnapshot;
-    }
+  const snapshots = PROVIDER_KINDS.filter((kind) => available()[kind]).map((kind) => {
     const snapshot = checked.get(kind) ?? pendingSnapshot(kind, settings);
     const enabled = settings[kind].enabled;
     const chosen = settings[kind].model;
@@ -162,7 +152,7 @@ function check(kind: ProviderKind): Promise<void> {
 export async function providersState(): Promise<ProvidersState> {
   const state = await getState();
   for (const p of state.providers) {
-    if (p.enabled && !p.macAppOnly && (!p.checkedAt || Date.now() - p.checkedAt > STALE_AFTER_MS))
+    if (p.enabled && (!p.checkedAt || Date.now() - p.checkedAt > STALE_AFTER_MS))
       void check(p.kind);
   }
   return state;

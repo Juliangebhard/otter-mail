@@ -60,8 +60,6 @@ export type ProviderSnapshot = {
   model: string | null;
   /** Chats persist on the provider and can be listed/resumed. */
   sessions: boolean;
-  /** A local agent the web app can't run: listed, off, pointing to the Mac app. */
-  macAppOnly?: boolean;
 };
 
 /** Everything the renderer needs for the provider picker and settings. */

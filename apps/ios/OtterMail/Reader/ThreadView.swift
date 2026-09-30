@@ -33,13 +33,13 @@ struct ThreadView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 Text(thread.subject)
-                    .font(.system(size: 26, weight: .semibold))
+                    .font(.title2.weight(.semibold))
                     .foregroundStyle(palette.text)
                     .textSelection(.enabled)
-                    .padding(.bottom, 10)
+                    .padding(.bottom, 8)
 
                 labels(thread, mailbox)
-                    .padding(.bottom, 18)
+                    .padding(.bottom, 20)
 
                 ForEach(thread.messages) { message in
                     let open = message.id == thread.messages.last?.id || message.unread || expanded.contains(message.id)
@@ -51,7 +51,7 @@ struct ThreadView: View {
                         }
                     }
                     if message.id != thread.messages.last?.id {
-                        Divider().overlay(palette.border).padding(.vertical, 14)
+                        Spacer().frame(height: 20)
                     }
                 }
             }
@@ -62,15 +62,16 @@ struct ThreadView: View {
         .background(palette.canvas)
         .contentMargins(.bottom, 24, for: .scrollContent)
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button("Ask the agent", systemImage: "cursorarrow") { asking = [MailContext(thread)] }
+            if session.agent.isOn {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button { asking = [MailContext(thread)] } label: { Label("Ask the agent", image: "AgentCursor") }
+                }
+                ToolbarSpacer(.fixed, placement: .topBarTrailing)
             }
-            ToolbarSpacer(.fixed, placement: .topBarTrailing)
             ToolbarItem(placement: .topBarTrailing) {
                 Button(thread.starred ? "Unstar" : "Star", systemImage: thread.starred ? "star.fill" : "star") {
                     store.toggleStar(thread.id)
                 }
-                .tint(thread.starred ? palette.warning : nil)
             }
             ToolbarItem(placement: .topBarTrailing) {
                 Menu("More", systemImage: "ellipsis") {
@@ -110,17 +111,18 @@ struct ThreadView: View {
     private func labels(_ thread: MailThread, _ mailbox: Mailbox) -> some View {
         let userLabels = mailbox.labels.filter { thread.labels.contains($0.id) }
         HStack(spacing: 6) {
-            MailboxMark(mailbox: mailbox, size: 18)
+            Circle().fill(Color(hex: mailbox.color)).frame(width: 7, height: 7)
             Text(mailbox.displayName)
-                .font(.subheadline)
+                .font(.footnote)
                 .foregroundStyle(palette.muted)
+                .padding(.trailing, 2)
             ForEach(userLabels) { label in
                 Text(label.leaf)
-                    .font(.caption.weight(.medium))
+                    .font(.caption2.weight(.medium))
                     .foregroundStyle(palette.text)
-                    .padding(.horizontal, 8)
-                    .frame(height: 22)
-                    .background((label.color.map(Color.init(hex:)) ?? palette.muted).opacity(0.22), in: .capsule)
+                    .padding(.horizontal, 7)
+                    .frame(height: 20)
+                    .background((label.color.map(Color.init(hex:)) ?? palette.muted).opacity(0.18), in: .capsule)
             }
         }
     }

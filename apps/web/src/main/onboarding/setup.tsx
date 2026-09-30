@@ -20,7 +20,6 @@ import { Switch } from "~/components/ui/switch";
 import {
   gmailApi,
   type NotificationsMode,
-  type ProviderSnapshot,
   type ProvidersState,
   type SyncSettings,
 } from "../gmail/api";
@@ -777,9 +776,6 @@ function HermesConnect({ state, onConnected }: { state: ProvidersState; onConnec
   );
 }
 
-/** A provider that can take a chat here (the Mac's agents are off on the web). */
-const canAnswer = (p: ProviderSnapshot) => isProviderUsable(p) && !p.macAppOnly;
-
 function AgentStep({ firstRun }: { firstRun: boolean }) {
   const query = useAgentProviders();
   const setState = useSetProvidersState();
@@ -795,10 +791,10 @@ function AgentStep({ firstRun }: { firstRun: boolean }) {
   // that one, once every check is in. Run again, a choice stays as it was.
   useEffect(() => {
     if (!firstRun) return;
-    if (!state || state.providers.some((p) => p.checkedAt === null && !p.macAppOnly)) return;
+    if (!state || state.providers.some((p) => p.checkedAt === null)) return;
     const current = state.providers.find((p) => p.kind === state.selected);
-    const ready = state.providers.find(canAnswer);
-    if (ready && !(current && canAnswer(current))) pick(ready.kind);
+    const ready = state.providers.find(isProviderUsable);
+    if (ready && !(current && isProviderUsable(current))) pick(ready.kind);
   }, [state]);
 
   return (
@@ -844,9 +840,9 @@ function AgentStep({ firstRun }: { firstRun: boolean }) {
           ) : (
             <div className="flex flex-col gap-2">
               {state.providers.map((p) => {
-                const usable = canAnswer(p);
+                const usable = isProviderUsable(p);
                 // Hermes connects right here; the Mac's CLIs are set up outside the app.
-                const connectable = !usable && p.kind === "hermes" && !p.macAppOnly;
+                const connectable = !usable && p.kind === "hermes";
                 const selected = usable && state.selected === p.kind;
                 const open = connectable && hermesOpen;
                 return (
