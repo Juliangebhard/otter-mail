@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vite-plus/test";
+import type { ImapSettings } from "@otter-mail/contracts";
 import type { RelayAccount } from "@otter-mail/contracts/relay";
 
 vi.mock("electron", () => ({ app: {}, safeStorage: {}, shell: {}, BrowserWindow: {} }));
@@ -7,9 +8,19 @@ const { accountFromRelay, linkRequest, planReconcile } = await import("./linked-
 
 const local = (
   email: string,
-  extra: { signedIn?: boolean; displayName?: string; color?: string } = {},
+  extra: {
+    signedIn?: boolean;
+    displayName?: string;
+    color?: string;
+    name?: string;
+    picture?: string;
+    imap?: ImapSettings;
+  } = {},
 ) => ({
   email,
+  name: extra.name ?? "A",
+  picture: extra.picture,
+  imap: extra.imap,
   signedIn: extra.signedIn ?? true,
   displayName: extra.displayName,
   color: extra.color,
@@ -32,6 +43,40 @@ describe("planReconcile", () => {
   it("does nothing when both sides agree", () => {
     const plan = planReconcile([local("a@x.com")], [remote("a@x.com")], new Set(["a@x.com"]));
     expect(plan).toEqual(none);
+  });
+
+  it("a signed-out Gmail account follows the relay's name and picture", () => {
+    const here = local("a@x.com", { signedIn: false, picture: "old" });
+    const there = remote("a@x.com", { name: "A", picture: "new" });
+    expect(planReconcile([here], [there], new Set(["a@x.com"]))).toEqual({
+      ...none,
+      update: [there],
+    });
+  });
+
+  it("a signed-in Gmail account keeps its own name and picture", () => {
+    const there = remote("a@x.com", { name: "Other", picture: "new" });
+    const plan = planReconcile(
+      [local("a@x.com", { picture: "old" })],
+      [there],
+      new Set(["a@x.com"]),
+    );
+    expect(plan).toEqual(none);
+  });
+
+  it("a relay row without a picture never blanks the local one", () => {
+    const here = local("a@x.com", { signedIn: false, picture: "mine" });
+    expect(planReconcile([here], [remote("a@x.com")], new Set(["a@x.com"]))).toEqual(none);
+  });
+
+  it("an IMAP account follows the relay's picture", () => {
+    const settings = { imap: { host: "i" }, smtp: { host: "s" } } as ImapSettings;
+    const there = remote("a@x.com", { provider: "imap", imap: settings, picture: "new" });
+    const here = local("a@x.com", { imap: settings, picture: "old" });
+    expect(planReconcile([here], [there], new Set(["a@x.com"]))).toEqual({
+      ...none,
+      update: [there],
+    });
   });
 
   it("first sign-in merges: links what's here, adds what's there", () => {
