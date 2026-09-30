@@ -658,6 +658,64 @@ const FONT_SIZE_OPTIONS = Array.from(
   (_, i) => String(INTERFACE_FONT_SIZE.min + i),
 ).map((size) => ({ value: size, label: `${size} px` }));
 
+/** Font size, in Appearance and setup's Look step (`id`: Settings' search target). */
+export function FontSizeRow({ id }: { id?: string }) {
+  const fontSize = useInterfaceSetting(INTERFACE_FONT_SIZE);
+  return (
+    <SettingsRow
+      id={id}
+      title="Font size"
+      description="Text and controls across the app, messages included."
+      control={
+        <RowSelect
+          ariaLabel="Font size"
+          value={String(fontSize)}
+          onValueChange={(size) => setInterfaceSetting(INTERFACE_FONT_SIZE, Number(size))}
+          options={FONT_SIZE_OPTIONS}
+        />
+      }
+      resetAction={
+        fontSize !== INTERFACE_FONT_SIZE.defaultValue ? (
+          <SettingResetButton
+            label="font size"
+            onClick={() =>
+              setInterfaceSetting(INTERFACE_FONT_SIZE, INTERFACE_FONT_SIZE.defaultValue)
+            }
+          />
+        ) : null
+      }
+    />
+  );
+}
+
+/** Reading width, in Appearance and setup's Look step. */
+export function ReadingWidthRow({ id }: { id?: string }) {
+  const readingWidth = useReadingWidth();
+  return (
+    <SettingsRow
+      id={id}
+      title="Reading width"
+      description="How wide emails and threads can grow on large screens."
+      control={
+        <RowSelect
+          ariaLabel="Reading width"
+          value={readingWidth}
+          onValueChange={(width) => setReadingWidth(width as ReadingWidth)}
+          options={Object.entries(READING_WIDTHS).map(([value, { label }]) => ({ value, label }))}
+        />
+      }
+      resetAction={
+        readingWidth !== DEFAULT_READING_WIDTH ? (
+          <SettingResetButton
+            label="reading width"
+            onClick={() => setReadingWidth(DEFAULT_READING_WIDTH)}
+          />
+        ) : null
+      }
+    />
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Pane
 // ---------------------------------------------------------------------------
@@ -696,8 +754,6 @@ export function AppearancePane() {
   const [scheme, setScheme] = useColorScheme();
 
   const panelAnimationDurationMs = usePanelAnimationDurationMs();
-  const fontSize = useInterfaceSetting(INTERFACE_FONT_SIZE);
-  const readingWidth = useReadingWidth();
 
   const light = themeColors(choice.light, "light");
   const dark = themeColors(choice.dark, "dark");
@@ -738,51 +794,8 @@ export function AppearancePane() {
           label="Glass opacity"
           description="Higher values make menus, popovers and dialogs more solid."
         />
-        <SettingsRow
-          {...searchableSetting("font-size")}
-          description="Text and controls across the app, messages included."
-          control={
-            <RowSelect
-              ariaLabel="Font size"
-              value={String(fontSize)}
-              onValueChange={(size) => setInterfaceSetting(INTERFACE_FONT_SIZE, Number(size))}
-              options={FONT_SIZE_OPTIONS}
-            />
-          }
-          resetAction={
-            fontSize !== INTERFACE_FONT_SIZE.defaultValue ? (
-              <SettingResetButton
-                label="font size"
-                onClick={() =>
-                  setInterfaceSetting(INTERFACE_FONT_SIZE, INTERFACE_FONT_SIZE.defaultValue)
-                }
-              />
-            ) : null
-          }
-        />
-        <SettingsRow
-          {...searchableSetting("reading-width")}
-          description="How wide emails and threads can grow on large screens."
-          control={
-            <RowSelect
-              ariaLabel="Reading width"
-              value={readingWidth}
-              onValueChange={(width) => setReadingWidth(width as ReadingWidth)}
-              options={Object.entries(READING_WIDTHS).map(([value, { label }]) => ({
-                value,
-                label,
-              }))}
-            />
-          }
-          resetAction={
-            readingWidth !== DEFAULT_READING_WIDTH ? (
-              <SettingResetButton
-                label="reading width"
-                onClick={() => setReadingWidth(DEFAULT_READING_WIDTH)}
-              />
-            ) : null
-          }
-        />
+        <FontSizeRow id={searchableSetting("font-size").id} />
+        <ReadingWidthRow id={searchableSetting("reading-width").id} />
       </SettingsSection>
 
       <SettingsSection title="Motion">

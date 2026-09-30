@@ -10,7 +10,8 @@ import { getPreloadPath, getWindowUrl } from "./window-paths.js";
 import { savedFrame, trackFrame } from "./window-state.js";
 
 const FRAME_KEY = "main";
-const TOPBAR_HEIGHT = 52;
+/** The renderer's --workspace-topbar-height: the traffic lights sit centered in it. */
+const TOPBAR_HEIGHT = 42;
 const WINDOW_BUTTON_RADIUS = 7;
 
 let mainWindow: BrowserWindow | null = null;
@@ -61,7 +62,7 @@ export async function createMainWindow(): Promise<BrowserWindow> {
       title: app.getName(),
       show: false,
       titleBarStyle: "hiddenInset",
-      trafficLightPosition: { x: 16, y: TOPBAR_HEIGHT / 2 - WINDOW_BUTTON_RADIUS },
+      trafficLightPosition: { x: 14, y: TOPBAR_HEIGHT / 2 - WINDOW_BUTTON_RADIUS },
       // Native glass: the renderer keeps its base layers transparent and
       // paints a translucent frame over the vibrancy material.
       transparent: true,

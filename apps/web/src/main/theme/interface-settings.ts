@@ -42,7 +42,7 @@ export const INTERFACE_FONT_SIZE: InterfaceSetting = {
   min: 12,
   max: 20,
   step: 1,
-  defaultValue: 16,
+  defaultValue: 14,
 };
 
 const SETTINGS = [CONTRAST, GLASS_OPACITY, INTERFACE_FONT_SIZE];
@@ -128,9 +128,7 @@ export function applyInterfaceSettings(): void {
   if (glass === 100) style.setProperty("--glass-blur", "0px");
   else style.removeProperty("--glass-blur");
 
-  // The default leaves the browser's own size (a web user's may differ).
-  const fontSize = getInterfaceSetting(INTERFACE_FONT_SIZE);
-  style.fontSize = fontSize === INTERFACE_FONT_SIZE.defaultValue ? "" : `${fontSize}px`;
+  style.fontSize = `${getInterfaceSetting(INTERFACE_FONT_SIZE)}px`;
 
   style.setProperty("--reading-width", READING_WIDTHS[getReadingWidth()].maxWidth);
 }

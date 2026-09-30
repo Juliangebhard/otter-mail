@@ -735,7 +735,7 @@ export function AccountsSidebar(props: AccountsSidebarProps) {
 
   return (
     <div className="flex h-full min-w-0 flex-col">
-      <WindowTitle />
+      <WindowTitle history />
 
       <div
         ref={scroller}

@@ -22,7 +22,7 @@ const rootRoute = createRootRouteWithContext<{
   notFoundComponent: () => {
     return (
       <div className="flex flex-col items-center justify-center h-screen">
-        <div className="drag-region fixed top-0 left-0 right-0 h-13" />
+        <div className="drag-region fixed top-0 left-0 right-0 h-(--workspace-topbar-height)" />
         <p className="text-[13px] text-muted-foreground">Route not found</p>
       </div>
     );

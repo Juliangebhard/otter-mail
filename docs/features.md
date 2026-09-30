@@ -137,6 +137,7 @@ The Mac app supports Apple Silicon Macs (arm64).
 | Contrast, glass opacity, font size, reading width                     | ✓   | ✓   | —                                                                          |
 | Keyboard shortcuts, rebindable (incl. move to label)                  | ✓   | ✓   | —                                                                          |
 | Command palette (⌘K)                                                  | ✓   | ✓   | —                                                                          |
+| Recently viewed, back and forward (Mac: title bar; web: browser's)    | ✓   | ✓   | —                                                                          |
 | Settings search (/ or ⌘F in Settings)                                 | ✓   | ✓   | —                                                                          |
 | Changelog (opens the site's, from ⌘K and Settings' ? menu)            | ✓   | ✓   | —                                                                          |
 | Custom views (rules across mailboxes)                                 | ✓   | ✓   | —                                                                          |

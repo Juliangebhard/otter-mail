@@ -277,6 +277,7 @@ export const webBridge: DesktopBridge = {
   platform: "web",
   features: {
     trafficLights: false,
+    historyButtons: false,
     menuBar: false,
     launchAtLogin: false,
     dockBadge: false,

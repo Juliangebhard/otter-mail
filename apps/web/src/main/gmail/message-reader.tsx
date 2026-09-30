@@ -588,7 +588,7 @@ function HtmlBody({
   const inviteRef = useRef(inviteMessageId);
   inviteRef.current = inviteMessageId;
   const dark = useDarkAppearance();
-  // 15px at the default interface font size, and scaled with it.
+  // 15px at a 16px interface (the size the app is drawn at), scaled with it.
   const bodyFontSize = (15 * useInterfaceSetting(INTERFACE_FONT_SIZE)) / 16;
   // Light: white card, email's own dark-mode CSS disabled, white-on-white
   // rescued. Dark: transparent canvas, email's dark CSS honored, dark-on-dark

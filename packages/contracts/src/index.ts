@@ -47,6 +47,8 @@ export interface UpdateState {
 export interface BridgeFeatures {
   /** macOS window chrome: traffic lights over the window's top-left corner. */
   trafficLights: boolean;
+  /** Back and forward buttons in the title bar (a browser has its own). */
+  historyButtons: boolean;
   /** The menu-bar icon and mini inbox. */
   menuBar: boolean;
   launchAtLogin: boolean;
