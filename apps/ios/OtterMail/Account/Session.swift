@@ -237,9 +237,9 @@ final class Session {
         saveMailboxes()
         guard !store.isDemo else { return }
         Task {
+            // Not the name and picture: the devices signed in to Google send those, and ours may be older.
             try? await relay.putAccount(mailbox.email, profile: .init(
-                email: mailbox.email, name: mailbox.name, picture: mailbox.picture,
-                displayName: mailbox.displayName, color: mailbox.color
+                email: mailbox.email, displayName: mailbox.displayName, color: mailbox.color
             ))
         }
     }

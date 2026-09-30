@@ -290,7 +290,9 @@ export function registerGmailHandlers(): void {
       let updated = await storeUpdateAccount(accountId, { displayName, color });
       if (signature !== undefined) updated = await saveSignature(updated, signature);
       broadcast("gmail:accounts-changed");
-      if (displayName !== undefined || color !== undefined) void accountEdited(updated);
+      if (displayName !== undefined || color !== undefined) {
+        void accountEdited(updated, ["displayName", "color"]);
+      }
       updateDockBadge();
       return updated;
     } catch (err) {
