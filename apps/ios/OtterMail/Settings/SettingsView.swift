@@ -144,8 +144,10 @@ struct SettingsView: View {
     }
 
     private var themeSummary: String {
-        let light = Theme.named(preferences.lightTheme)?.label ?? ""
-        let dark = Theme.named(preferences.darkTheme)?.label ?? ""
+        // A theme this app doesn't have (a custom one from the desktop) is worn as the initial one.
+        let label = { (id: String) in (Theme.named(id) ?? Theme.named(Preferences.initialTheme))?.label ?? "" }
+        let light = label(preferences.lightTheme)
+        let dark = label(preferences.darkTheme)
         return light == dark ? light : "\(light), \(dark)"
     }
 }

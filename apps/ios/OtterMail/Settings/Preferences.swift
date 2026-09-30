@@ -114,8 +114,8 @@ final class Preferences {
         applying = true
         defer { applying = false }
         if let value = (ui["otter:theme-source"] as? String).flatMap(Scheme.init), value != scheme { scheme = value }
-        if let value = ui["otter:theme:light"] as? String, Theme.named(value) != nil, value != lightTheme { lightTheme = value }
-        if let value = ui["otter:theme:dark"] as? String, Theme.named(value) != nil, value != darkTheme { darkTheme = value }
+        if let value = ui["otter:theme:light"] as? String, value != lightTheme { lightTheme = value }
+        if let value = ui["otter:theme:dark"] as? String, value != darkTheme { darkTheme = value }
         if let value = (ui["gmail:advance-direction"] as? String).flatMap(Advance.init), value != advance { advance = value }
         if let value = (ui["mail:mailboxes"] as? String)?.data(using: .utf8),
            let decoded = try? JSONDecoder().decode(Arrangement.self, from: value), decoded != arrangement {
