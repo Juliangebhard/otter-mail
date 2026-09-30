@@ -238,7 +238,14 @@ export function useMailViews() {
   const deleteView = useCallback((id: string) => deleteMutation.mutateAsync(id), [deleteMutation]);
   const resetView = useCallback((id: string) => resetMutation.mutateAsync(id), [resetMutation]);
 
-  return { views: query.data ?? DEFAULT_VIEWS, saveView, deleteView, resetView };
+  return {
+    views: query.data ?? DEFAULT_VIEWS,
+    /** False while `views` are only the built-in ones, before the saved views load. */
+    loaded: !query.isPlaceholderData,
+    saveView,
+    deleteView,
+    resetView,
+  };
 }
 
 // ── Last location (restore where the user left off) ─────────────────────────

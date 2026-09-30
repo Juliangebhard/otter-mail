@@ -2,13 +2,20 @@ import { describe, expect, it, vi } from "vite-plus/test";
 
 import worker from "./worker.ts";
 
-function serve(url: string, cookie?: string) {
-  const fetch = vi.fn(async (_request: Request) => new Response("asset"));
+/** The site's files: anything else is missing (the 404 page). */
+const FILES = ["/", "/app", "/privacy/", "/changelog/"];
+
+function serve(url: string, cookie?: string, accept?: string) {
+  const fetch = vi.fn(async (request: Request) => {
+    const { pathname } = new URL(request.url);
+    const file = FILES.includes(pathname) || pathname.startsWith("/changelog/images/");
+    return new Response(file ? "asset" : "not found", { status: file ? 200 : 404 });
+  });
   const env = { ASSETS: { fetch } as unknown as Fetcher };
-  const response = worker.fetch(
-    new Request(url, { headers: cookie ? { cookie } : undefined }),
-    env,
-  );
+  const headers = new Headers();
+  if (cookie) headers.set("cookie", cookie);
+  if (accept) headers.set("accept", accept);
+  const response = worker.fetch(new Request(url, { headers }), env);
   return { response, fetch };
 }
 
@@ -63,5 +70,30 @@ describe("changelog", () => {
       expect((await response).status).toBe(200);
       expect(fetch).toHaveBeenCalled();
     }
+  });
+});
+
+describe("the app's pages", () => {
+  const html = "text/html,application/xhtml+xml,*/*;q=0.8";
+
+  it.each(["/you@gmail.com/INBOX/18f3a2", "/all/inbox", "/settings/appearance?target=theme"])(
+    "serves the app at %s, signed in or not",
+    async (path) => {
+      for (const cookie of ["__Secure-better-auth.session_token=session", undefined]) {
+        const { response, fetch } = serve(`https://mail.otterware.app${path}`, cookie, html);
+        expect((await response).status).toBe(200);
+        expect(fetch.mock.calls.at(-1)![0].url).toBe("https://mail.otterware.app/app");
+      }
+    },
+  );
+
+  it("keeps a missing file missing", async () => {
+    const { response, fetch } = serve(
+      "https://mail.otterware.app/assets/gone.js",
+      undefined,
+      "*/*",
+    );
+    expect((await response).status).toBe(404);
+    expect(fetch).toHaveBeenCalledTimes(1);
   });
 });
