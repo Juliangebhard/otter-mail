@@ -113,10 +113,16 @@ export function WindowTitle({ className }: { className?: string }) {
   );
 }
 
-/** Round mark for a mailbox: the account's picture, or its initial. */
-function MailboxMark({ account, className }: { account: GmailAccount | null; className?: string }) {
+/** Round mark for a mailbox: the account's picture, or its initial; layers for All mailboxes. */
+function MailboxMark({
+  account,
+  iconClassName,
+}: {
+  account: GmailAccount | null;
+  iconClassName?: string;
+}) {
   if (!account) {
-    return <LayersIcon className={cn("size-4.5 shrink-0", className)} aria-hidden />;
+    return <LayersIcon className={cn("size-4.5 shrink-0", iconClassName)} aria-hidden />;
   }
   return <AccountPicture account={account} className="size-4.5 text-[9px]" />;
 }
@@ -241,7 +247,7 @@ export function MailboxSwitcher({
           )}
         >
           <span className="flex size-4.5 shrink-0 items-center justify-center">
-            <MailboxMark account={selectedAccount} className="text-sidebar-muted-foreground" />
+            <MailboxMark account={selectedAccount} iconClassName="text-sidebar-muted-foreground" />
           </span>
           {/* A heading, like Codex's "Codex ⌄": the name, then its chevron. */}
           <span className="min-w-0 truncate text-base font-semibold tracking-tight">
@@ -272,7 +278,7 @@ export function MailboxSwitcher({
                 )}
               >
                 <span className="flex size-4.5 shrink-0 items-center justify-center">
-                  <MailboxMark account={option.account} className="text-muted-foreground" />
+                  <MailboxMark account={option.account} iconClassName="text-muted-foreground" />
                 </span>
                 <span className="min-w-0 flex-1 truncate">{option.name}</span>
                 <UnreadPill count={unread[option.id] ?? 0} />
