@@ -11,6 +11,7 @@ import { toast } from "../gmail/toast";
 import { Btn, cn } from "../gmail/ui";
 import { otterApi, useOtterAccount } from "../otter-account";
 import { SettingsGroup, SettingsPageContainer, SettingsRow, SettingsSection } from "./settings-ui";
+import { searchableSetting } from "./settings-search";
 
 /**
  * Settings › Otter account, opened from the user button at the bottom of the
@@ -92,7 +93,7 @@ function DevicesSection() {
   });
 
   return (
-    <SettingsSection title="Devices">
+    <SettingsSection {...searchableSetting("devices")}>
       {devices.isError ? (
         <SettingsRow title="Couldn't load your devices" description={errorText(devices.error)} />
       ) : !devices.data ? (
@@ -146,6 +147,7 @@ function SignedInPane({ state }: { state: OtterAccountState }) {
     <>
       <SettingsGroup>
         <SettingsRow
+          id={searchableSetting("otter-account").id}
           title={
             <span className="flex items-center gap-2.5">
               <OtterAvatar user={user} />
@@ -177,7 +179,7 @@ function SignedInPane({ state }: { state: OtterAccountState }) {
 
       <SettingsSection title="Delete account">
         <SettingsRow
-          title="Delete Otter account"
+          {...searchableSetting("delete-otter-account")}
           description="Removes your account and its list of mailboxes from Otter Mail's servers, and signs out every device. Your mail and the mailboxes on each device stay."
           control={
             <Btn size="sm" variant="destructive" onClick={() => setConfirmDelete(true)}>
@@ -221,6 +223,7 @@ export function OtterAccountPane() {
       ) : (
         <SettingsGroup>
           <SettingsRow
+            id={searchableSetting("otter-account").id}
             title="Sign in to Otter Mail"
             description="Your mailboxes on every device you use, and new mail the moment it arrives. Otter Mail's servers only learn your addresses, never your mail."
             control={<SignInControl />}

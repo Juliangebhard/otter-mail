@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Switch } from "~/components/ui/switch";
 import { toast } from "../gmail/toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../gmail/select";
@@ -16,7 +16,13 @@ import { ViewsPane } from "./views-pane";
 import { ProvidersPane } from "./providers-pane";
 import { TranslationSection } from "./translation-section";
 import { UpdatesSection } from "../updates";
-import { SettingsPageContainer, SettingsRow, SettingsSection } from "./settings-ui";
+import {
+  SettingsPageContainer,
+  SettingsRow,
+  SettingsSearchTargetProvider,
+  SettingsSection,
+} from "./settings-ui";
+import { searchableSetting } from "./settings-search";
 import { features } from "../features";
 import { Btn } from "../gmail/ui";
 import { requestTour, startSetup } from "../onboarding/onboarding";
@@ -28,6 +34,8 @@ export type SettingsRoute = {
   viewId: string | null;
   /** For "new": which mailbox (account id or "__combined__") owns the view. */
   mailbox: string | null;
+  /** A settings-search result's anchor to scroll to, cleared once it's reached. */
+  target?: string;
 };
 
 const NOTIFICATIONS_OPTIONS: { value: NotificationsMode; label: string }[] = [
@@ -214,7 +222,7 @@ function GeneralPane() {
     <SettingsPageContainer title="General">
       <SettingsSection title="Startup & menu bar">
         <SettingsRow
-          title="Launch at login"
+          {...searchableSetting("launch-at-login")}
           description={macAppOnly(
             features.launchAtLogin,
             "Open Otter Mail automatically when you log in to your Mac.",
@@ -229,7 +237,7 @@ function GeneralPane() {
           }
         />
         <SettingsRow
-          title="Show menu-bar icon"
+          {...searchableSetting("menu-bar-icon")}
           description={macAppOnly(
             features.menuBar,
             "An Otter Mail icon in the menu bar with a quick unread inbox view.",
@@ -247,7 +255,7 @@ function GeneralPane() {
 
       <SettingsSection title="Mail">
         <SettingsRow
-          title="Check for new mail"
+          {...searchableSetting("sync-interval")}
           description="Sync runs in the background at this cadence."
           control={
             <RowSelect
@@ -262,7 +270,7 @@ function GeneralPane() {
           }
         />
         <SettingsRow
-          title="Notifications"
+          {...searchableSetting("notifications")}
           description="Notify about new mail found by background sync."
           control={
             <RowSelect
@@ -274,7 +282,7 @@ function GeneralPane() {
           }
         />
         <SettingsRow
-          title="After archive, delete, or move"
+          {...searchableSetting("advance-direction")}
           description="Which message to select next in the list."
           control={
             <RowSelect
@@ -291,7 +299,7 @@ function GeneralPane() {
 
       <SettingsSection title="System">
         <SettingsRow
-          title="Default email app"
+          {...searchableSetting("default-mail-app")}
           description={macAppOnly(
             features.defaultMailApp,
             "Which app opens mailto: links across macOS.",
@@ -311,7 +319,7 @@ function GeneralPane() {
 
       <SettingsSection title="Getting started">
         <SettingsRow
-          title="Tour"
+          {...searchableSetting("tour")}
           description="A minute's walk through the app, on your own mail."
           control={
             <Btn size="sm" onClick={requestTour}>
@@ -320,7 +328,7 @@ function GeneralPane() {
           }
         />
         <SettingsRow
-          title="Setup"
+          {...searchableSetting("setup")}
           description="Mailboxes, look, notifications, your agent and the keys, one step at a time."
           control={
             <Btn size="sm" onClick={() => startSetup()}>
@@ -341,6 +349,24 @@ function GeneralPane() {
 
 /** In-app settings: one pane at a time, chosen from the sidebar nav. */
 export function SettingsPage({
+  route,
+  onNavigate,
+}: {
+  route: SettingsRoute;
+  onNavigate: (route: SettingsRoute) => void;
+}) {
+  const clearTarget = useCallback(
+    () => onNavigate({ ...route, target: undefined }),
+    [onNavigate, route],
+  );
+  return (
+    <SettingsSearchTargetProvider targetId={route.target ?? null} onTargetHandled={clearTarget}>
+      <SettingsPane route={route} onNavigate={onNavigate} />
+    </SettingsSearchTargetProvider>
+  );
+}
+
+function SettingsPane({
   route,
   onNavigate,
 }: {

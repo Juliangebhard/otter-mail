@@ -1,4 +1,14 @@
-import { forwardRef, useEffect, useState, type ComponentProps, type ReactNode } from "react";
+import {
+  createContext,
+  forwardRef,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ComponentProps,
+  type ReactNode,
+} from "react";
 import { Undo2Icon } from "lucide-react";
 import { cn, HintTooltip } from "../gmail/ui";
 
@@ -9,6 +19,80 @@ import { cn, HintTooltip } from "../gmail/ui";
  * from the right.
  */
 
+// ---------------------------------------------------------------------------
+// Search targets (Otter Code's): a settings-search result opens its pane with
+// a target id; the row or section with that id scrolls into view and pulses
+// once it mounts, then the target is cleared.
+// ---------------------------------------------------------------------------
+
+interface SettingsSearchTargetContextValue {
+  readonly targetId: string | null;
+  readonly onTargetHandled: () => void;
+}
+
+const noop = () => undefined;
+const SettingsSearchTargetContext = createContext<SettingsSearchTargetContextValue>({
+  targetId: null,
+  onTargetHandled: noop,
+});
+
+export function SettingsSearchTargetProvider({
+  targetId,
+  onTargetHandled,
+  children,
+}: {
+  targetId: string | null;
+  onTargetHandled: () => void;
+  children: ReactNode;
+}) {
+  const value = useMemo(() => ({ targetId, onTargetHandled }), [onTargetHandled, targetId]);
+  return <SettingsSearchTargetContext value={value}>{children}</SettingsSearchTargetContext>;
+}
+
+function scrollAndFocusSettingsTarget(target: HTMLElement): void {
+  const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  // A section taller than half the window shows from its top, not its middle.
+  target.scrollIntoView({
+    behavior: prefersReducedMotion ? "auto" : "smooth",
+    block: target.offsetHeight > window.innerHeight / 2 ? "start" : "center",
+  });
+  target.focus({ preventScroll: true });
+  target.classList.remove("settings-search-target-pulse");
+  if (prefersReducedMotion) return;
+  void target.offsetWidth;
+  target.classList.add("settings-search-target-pulse");
+  // The class also suppresses the focus outline (the pulse is the destination
+  // indicator), so drop it once the element is no longer the destination.
+  target.addEventListener("blur", () => target.classList.remove("settings-search-target-pulse"), {
+    once: true,
+  });
+}
+
+/** Ref for the element with `id`: scrolls to it when it's the search target. */
+export function useSettingsSearchTarget<T extends HTMLElement>(id: string | undefined) {
+  const { targetId, onTargetHandled } = useContext(SettingsSearchTargetContext);
+  const isSearchTarget = id !== undefined && id === targetId;
+  return useCallback(
+    (target: T | null) => {
+      if (target && isSearchTarget) {
+        scrollAndFocusSettingsTarget(target);
+        onTargetHandled();
+      }
+    },
+    [isSearchTarget, onTargetHandled],
+  );
+}
+
+/** A plain div that's a search target when it has an id. */
+export function SettingsSearchTarget({ children, ...props }: ComponentProps<"div">) {
+  const targetRef = useSettingsSearchTarget<HTMLDivElement>(props.id);
+  return (
+    <div {...props} ref={targetRef} tabIndex={props.id ? -1 : props.tabIndex}>
+      {children}
+    </div>
+  );
+}
+
 /** Shared settings card surface, with separators between rows. */
 export function SettingsGroup({
   variant = "grouped",
@@ -16,9 +100,12 @@ export function SettingsGroup({
   className,
   ...props
 }: ComponentProps<"div"> & { variant?: "grouped" | "plain"; divided?: boolean }) {
+  const targetRef = useSettingsSearchTarget<HTMLDivElement>(props.id);
   return (
     <div
       {...props}
+      ref={targetRef}
+      tabIndex={props.id ? -1 : props.tabIndex}
       data-slot={variant === "grouped" ? "settings-group" : undefined}
       className={cn(
         "relative overflow-visible text-foreground",
@@ -95,8 +182,14 @@ export function SettingsSection({
   variant?: "grouped" | "plain";
   children: ReactNode;
 }) {
+  const targetRef = useSettingsSearchTarget<HTMLElement>(props.id);
   return (
-    <section {...props} className={className}>
+    <section
+      {...props}
+      ref={targetRef}
+      tabIndex={props.id ? -1 : props.tabIndex}
+      className={className}
+    >
       <SettingsSectionHeader
         title={title}
         description={description}
@@ -130,9 +223,12 @@ export function SettingsRow({
   resetAction?: ReactNode;
   children?: ReactNode;
 }) {
+  const targetRef = useSettingsSearchTarget<HTMLDivElement>(props.id);
   return (
     <div
       {...props}
+      ref={targetRef}
+      tabIndex={props.id ? -1 : props.tabIndex}
       data-slot="settings-row"
       className={cn("@container/settings-row px-4", children ? "pt-2.5 pb-1" : "py-2.5", className)}
     >
@@ -194,6 +290,7 @@ export function SettingsPageContainer({
   title,
   description,
   action,
+  searchId,
   className,
   children,
   ...props
@@ -202,15 +299,23 @@ export function SettingsPageContainer({
   description?: ReactNode;
   /** Beside the title, right-aligned with the cards' edge. */
   action?: ReactNode;
+  /** Settings-search anchor for the pane as a whole: its header. */
+  searchId?: string;
 }) {
+  const headerRef = useSettingsSearchTarget<HTMLElement>(searchId);
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto">
+    <div className="min-h-0 flex-1 overflow-y-auto" data-settings-page-scroll="">
       <div
         {...props}
         className={cn("mx-auto w-full max-w-[47rem] space-y-10 px-6 pb-20 pt-14", className)}
       >
         {title ? (
-          <header className="flex items-end justify-between gap-4 px-[17px]">
+          <header
+            id={searchId}
+            ref={headerRef}
+            tabIndex={searchId ? -1 : undefined}
+            className="flex items-end justify-between gap-4 px-[17px] outline-none"
+          >
             <div className="min-w-0">
               <h1
                 data-slot="settings-page-title"

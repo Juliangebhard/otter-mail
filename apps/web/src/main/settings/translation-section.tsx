@@ -13,6 +13,7 @@ import { languageName, TRANSLATION_LANGUAGES, useTranslationSettings } from "../
 import { features } from "../features";
 import { Btn, HintTooltip, IconBtn } from "../gmail/ui";
 import { SettingsRow, SettingsSection } from "./settings-ui";
+import { searchableSetting } from "./settings-search";
 
 /** Languages the user reads (mail in others offers a translation) + auto-translate. */
 export function TranslationSection() {
@@ -37,7 +38,7 @@ export function TranslationSection() {
   return (
     <SettingsSection title="Translation">
       <SettingsRow
-        title="Languages I read"
+        {...searchableSetting("read-languages")}
         description={
           features.translation
             ? "Mail in any other language offers a translation into your starred language. The translator runs on this device, so nothing is sent anywhere."
@@ -104,7 +105,7 @@ export function TranslationSection() {
         </ul>
       </SettingsRow>
       <SettingsRow
-        title="Translate automatically"
+        {...searchableSetting("auto-translate")}
         description="Show mail in other languages already translated, without asking."
         control={
           <Switch

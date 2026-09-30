@@ -52,8 +52,10 @@ import {
   SettingsGroup,
   SettingsPageContainer,
   SettingsRow,
+  SettingsSearchTarget,
   SettingsSectionHeader,
 } from "./settings-ui";
+import { keybindingSearchAnchorId, searchableSetting } from "./settings-search";
 
 /**
  * Settings › Keybindings, after Otter Code's panel: every binding as a row
@@ -361,7 +363,7 @@ const save = (rule: KeybindingRule, replace?: KeybindingRule) =>
 
 // ── Rows ─────────────────────────────────────────────────────────────────────
 
-function KeybindingRow({ row, rows }: { row: Row; rows: Row[] }) {
+function KeybindingRow({ row, rows, searchId }: { row: Row; rows: Row[]; searchId?: string }) {
   const { rule } = row;
   const [keyDraft, setKeyDraft] = useState(rule.key);
   const [whenDraft, setWhenDraft] = useState(rule.when ?? "");
@@ -379,7 +381,11 @@ function KeybindingRow({ row, rows }: { row: Row; rows: Row[] }) {
     void save({ command: rule.command, key: keyDraft, when: whenDraft || undefined }, rule);
 
   return (
-    <div className="group/row flex min-h-14 items-center gap-6 px-[17px] py-2">
+    <SettingsSearchTarget
+      id={searchId}
+      data-slot="settings-row"
+      className="group/row flex min-h-14 items-center gap-6 px-[17px] py-2"
+    >
       <div className="min-w-0 flex-1">
         <div className="flex min-h-5 items-center gap-2 text-sm text-foreground">
           <HintTooltip label={rule.command}>
@@ -448,7 +454,7 @@ function KeybindingRow({ row, rows }: { row: Row; rows: Row[] }) {
           onChange={setKeyDraft}
         />
       </div>
-    </div>
+    </SettingsSearchTarget>
   );
 }
 
@@ -696,6 +702,11 @@ export function KeybindingsPane() {
     </div>
   );
 
+  // Settings search lands on a command's first row.
+  const firstRowIds = new Set(
+    new Map(visible.toReversed().map((row) => [row.rule.command, row.id])).values(),
+  );
+
   // Consecutive rows (sorted by label) share a group: "Message", "Go", …
   const groups: { name: string; rows: Row[] }[] = [];
   for (const row of visible) {
@@ -707,6 +718,7 @@ export function KeybindingsPane() {
 
   return (
     <SettingsPageContainer
+      searchId={searchableSetting("keybindings").id}
       title="Keybindings"
       description="To change a shortcut, click its keys and press the new ones."
       action={header}
@@ -722,7 +734,14 @@ export function KeybindingsPane() {
             <SettingsSectionHeader title={group.name} muted />
             <div className="[&>*+*]:border-t [&>*+*]:border-border/40">
               {group.rows.map((row) => (
-                <KeybindingRow key={row.id} row={row} rows={rows} />
+                <KeybindingRow
+                  key={row.id}
+                  row={row}
+                  rows={rows}
+                  searchId={
+                    firstRowIds.has(row.id) ? keybindingSearchAnchorId(row.rule.command) : undefined
+                  }
+                />
               ))}
             </div>
           </section>
