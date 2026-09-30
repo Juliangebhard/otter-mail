@@ -83,7 +83,7 @@ describe("support handoff", () => {
           searchPath: process.env.PATH ?? "/usr/bin:/bin",
         }),
       );
-      await exec("/bin/zsh", [launcher], {
+      await exec(process.platform === "darwin" ? "/bin/zsh" : "/bin/sh", [launcher], {
         cwd: root,
         env: { ...process.env, OTTER_SUPPORT_TEST_OUTPUT: output },
       });
