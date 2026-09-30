@@ -83,14 +83,14 @@ export function planReconcile(
       // A signed-in Gmail account refreshes its name and picture from Google
       // itself; the relay's copy could be staler, so even an update for its
       // label or color leaves them alone. A null one never blanks ours.
-      const followsProfile = !(here.signedIn && !here.imap);
+      const fromGoogle = here.signedIn && !here.imap;
       if (
         (here.displayName ?? null) !== account.displayName ||
         (here.color ?? null) !== account.color ||
-        (followsProfile && account.name !== null && here.name !== account.name) ||
-        (followsProfile && account.picture !== null && (here.picture ?? null) !== account.picture)
+        (!fromGoogle && account.name !== null && here.name !== account.name) ||
+        (!fromGoogle && account.picture !== null && (here.picture ?? null) !== account.picture)
       ) {
-        plan.update.push(followsProfile ? account : { ...account, name: null, picture: null });
+        plan.update.push(fromGoogle ? { ...account, name: null, picture: null } : account);
       }
       if (here.signedIn && here.imap && account.imap && !sameServers(here.imap, account.imap)) {
         plan.moved.push(account.email);

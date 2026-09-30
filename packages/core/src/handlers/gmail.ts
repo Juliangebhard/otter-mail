@@ -251,6 +251,7 @@ export function registerGmailHandlers(): void {
     }
   });
 
+  // Settings → Accounts opening: signatures, and names and pictures, from Google.
   handle("gmail:refreshSignatures", async () => {
     void refreshSignatures();
     void refreshProfiles();
