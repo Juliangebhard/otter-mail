@@ -78,6 +78,12 @@ xcrun devicectl device install app --device <udid> "apps/ios/.build/Build/Produc
 `-authenticationKeyPath/-authenticationKeyID/-authenticationKeyIssuerID` with an App Store Connect
 API key.)
 
+Unit tests (`OtterMailTests`, Swift Testing) run in the simulator:
+
+```sh
+xcodebuild -project apps/ios/OtterMail.xcodeproj -scheme OtterMail -destination 'platform=iOS Simulator,name=iPhone 17' test
+```
+
 Shipping: the Release iPhone workflow builds and uploads to TestFlight (`pnpm release:ios` does
 the same from a Mac); see `docs/release.md`. The app has its own version, `MARKETING_VERSION` in
 the Xcode project, apart from the Mac app's.

@@ -311,11 +311,12 @@ final class ImapProvider: MailProvider {
         guard saved.uidValidity == status.uidValidity else { return } // The next sync starts it over.
         let older = saved.oldest > 1 ? try await client.search("UID 1:\(saved.oldest - 1) UNDELETED").filter { $0 < saved.oldest } : []
         let page = older.sorted().suffix(Self.page)
-        changes.new += try await messages(Array(page), in: path, validity: status.uidValidity, client)
+        let fetched = try await messages(Array(page), in: path, validity: status.uidValidity, client)
+        changes.new += fetched
         saved.oldest = page.min() ?? saved.oldest
         if state.folders == nil { state.folders = [:] }
         state.folders?[path] = saved
-        state.pages[MailSync.key(folder(path))] = older.count > page.count ? "more" : ""
+        state.paged(MailSync.key(folder(path)), next: older.count > page.count ? "more" : nil, oldest: fetched.map(\.message.date).min())
     }
 
     /** Starts syncing a folder from now, before mail is moved or written there. */

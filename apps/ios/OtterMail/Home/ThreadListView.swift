@@ -22,7 +22,7 @@ struct ThreadListView: View {
 
     var body: some View {
         let searching = !query.trimmingCharacters(in: .whitespaces).isEmpty
-        let threads = searching ? results : store.threads(in: place.folder, scope: place.scope)
+        let threads = searching ? results : listed
 
         List {
             ForEach(threads) { thread in
@@ -35,7 +35,7 @@ struct ThreadListView: View {
                     .frame(maxWidth: .infinity)
                     .listRowSeparator(.hidden)
                     .listRowBackground(Color.clear)
-                    .task(id: "\(place)-\(threads.count)") { await sync.loadMore(place.folder, scope: place.scope) }
+                    .task(id: "\(place)-\(sync.cursor(place.folder, scope: place.scope))") { await sync.loadMore(place.folder, scope: place.scope) }
             }
 
             if threads.isEmpty && !(store.sync?.hasMore(place.folder, scope: place.scope) ?? false) {
@@ -56,6 +56,10 @@ struct ThreadListView: View {
         .background(palette.canvas)
         .contentMargins(.bottom, 24, for: .scrollContent)
         .searchable(text: $query, prompt: "Search")
+        .task(id: place) {
+            // Where a folder's list ends comes from its first page: fetch it now, while the list is at the top.
+            await store.sync?.open(place.folder, scope: place.scope)
+        }
         .task(id: query) {
             guard let sync = store.sync, !query.trimmingCharacters(in: .whitespaces).isEmpty else { return }
             try? await Task.sleep(for: .milliseconds(400))
@@ -95,6 +99,12 @@ struct ThreadListView: View {
             }
         }
         .toolbarTitleDisplayMode(.inline)
+    }
+
+    /** The folder's threads, down to where its pages reached (so the next page adds to the bottom). */
+    private var listed: [MailThread] {
+        let threads = store.threads(in: place.folder, scope: place.scope)
+        return store.sync?.listed(threads, in: place.folder) ?? threads
     }
 
     /** Here first, then what Gmail found. */

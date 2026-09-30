@@ -1,4 +1,5 @@
 import Foundation
+import Observation
 import UserNotifications
 
 /**
@@ -7,9 +8,10 @@ import UserNotifications
  * launch is instant), changes are made there first and then written through
  * the mailbox's provider (Gmail or IMAP), and the provider catches the copy
  * up when a mailbox changed (a relay event, IDLE), on launch and when the
- * app comes back.
+ * app comes back. Observable, so lists follow where their folders' pages got to.
  */
 @MainActor
+@Observable
 final class MailSync {
     private let store: MailStore
     private let google: GoogleAuth
@@ -21,6 +23,8 @@ final class MailSync {
     /** Mailboxes with a provider call under way, and the calls waiting their turn. */
     private var busy: Set<String> = []
     private var waiting: [String: [CheckedContinuation<Void, Never>]] = [:]
+    /** Folder pages being fetched ("email key"), so the same page isn't asked for twice at once. */
+    private var paging: Set<String> = []
 
     init(store: MailStore, google: GoogleAuth) {
         self.store = store
@@ -227,11 +231,34 @@ final class MailSync {
         mailboxes(scope).contains { states[$0]?.pages[Self.key(folder)] != "" }
     }
 
+    /** Where the folder's pages got to in each mailbox of `scope`; a new page changes it. */
+    func cursor(_ folder: Folder, scope: String?) -> String {
+        mailboxes(scope).map { states[$0]?.pages[Self.key(folder)] ?? "" }.joined(separator: " ")
+    }
+
+    /** The folder's threads its list shows: in each mailbox, down to where its pages reached (MailboxState.lists). */
+    func listed(_ threads: [MailThread], in folder: Folder) -> [MailThread] {
+        let key = Self.key(folder)
+        let paged = Set(mailboxes(nil))
+        return threads.filter { !paged.contains($0.mailbox) || states[$0.mailbox]?.lists($0, in: key) != false }
+    }
+
     /** The folder's next page in each mailbox of `scope` (its first, the first time). */
     func loadMore(_ folder: Folder, scope: String?) async {
+        await loadMore(folder, in: mailboxes(scope))
+    }
+
+    /** A page on opening the folder where none yet says where its list ends, before the list gets there (not before a first sync). */
+    func open(_ folder: Folder, scope: String?) async {
         let key = Self.key(folder)
-        for email in mailboxes(scope) where states[email]?.pages[key] != "" {
+        await loadMore(folder, in: mailboxes(scope).filter { states[$0]?.unbounded(key) == true })
+    }
+
+    private func loadMore(_ folder: Folder, in emails: [String]) async {
+        let key = Self.key(folder)
+        for email in emails where states[email]?.pages[key] != "" && paging.insert("\(email) \(key)").inserted {
             _ = try? await run(email) { provider, state, known in try await provider.loadMore(folder, &state, known: known) }
+            paging.remove("\(email) \(key)")
         }
     }
 

@@ -81,6 +81,30 @@ nonisolated struct MailboxState: Codable {
     var folders: [String: ImapFolderState]? = nil
     /** IMAP: where trashed mail came from (its id in Trash → folder path), for Restore. */
     var trashedFrom: [String: String]? = nil
+    /** Folder key → the oldest date its pages reached: its list stops there, so the next page adds to the bottom. */
+    var reached: [String: Date]? = nil
+
+    /** A folder's page came in, back to `oldest`; `next` is the page after it, nil at the end. */
+    mutating func paged(_ key: String, next: String?, oldest: Date?) {
+        pages[key] = next ?? ""
+        guard let oldest else { return }
+        reached = (reached ?? [:]).merging([key: oldest], uniquingKeysWith: min)
+    }
+
+    /**
+     * Whether the folder's list goes down to `thread`. Mail cached from other
+     * folders can be older than the pages loaded here, and a page would land
+     * above it; so until every page is in, the list ends where they reached.
+     */
+    func lists(_ thread: MailThread, in key: String) -> Bool {
+        guard pages[key] != "", let reached = reached?[key] else { return true }
+        return thread.latest.date >= reached
+    }
+
+    /** The folder has more, and no page yet says where its list ends (every cached thread shows). */
+    func unbounded(_ key: String) -> Bool {
+        pages[key] != "" && reached?[key] == nil
+    }
 }
 
 /** Where an IMAP folder's copy got to (RFC 3501, CONDSTORE). */
