@@ -123,7 +123,7 @@
   /* The panel's edge against the frame: the frame's surface a little of the
      way to the text (ChatGPT's lighter rim in dark, a darker one in light),
      so it shows in every theme, whatever its border role is. */
-  --panel-edge: color-mix(in srgb, var(--foreground) 7%, var(--sidebar-surface));
+  --panel-edge: color-mix(in srgb, var(--foreground) 5%, var(--sidebar-surface));
   --code-background: color-mix(in srgb, var(--card) 90%, var(--canvas));
   --code-foreground: var(--foreground);
   /* The composer's glass card (agent chat, reply editor, new message). */
