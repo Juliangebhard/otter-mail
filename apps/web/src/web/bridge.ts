@@ -278,6 +278,7 @@ export const webBridge: DesktopBridge = {
     trafficLights: false,
     menuBar: false,
     launchAtLogin: false,
+    dockBadge: false,
     defaultMailApp: false,
     translation: hasBuiltInTranslator,
     dragOut: false,

@@ -1333,6 +1333,12 @@ export function registerGmailHandlers(): void {
         }
         patch.trayEnabled = p.trayEnabled;
       }
+      if (p?.dockBadgeEnabled !== undefined) {
+        if (typeof p.dockBadgeEnabled !== "boolean") {
+          throw new Error('Invalid parameter: "dockBadgeEnabled" must be a boolean.');
+        }
+        patch.dockBadgeEnabled = p.dockBadgeEnabled;
+      }
       const settings = await updateSettings(patch);
       if (patch.syncIntervalSeconds !== undefined) {
         mailSync.configureAutoSync(settings.syncIntervalSeconds);

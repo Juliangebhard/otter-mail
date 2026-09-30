@@ -367,6 +367,7 @@ export type SyncSettings = {
   notificationsMode: NotificationsMode;
   launchAtLogin: boolean;
   trayEnabled: boolean;
+  dockBadgeEnabled: boolean;
 };
 
 export type TranslationSettings = {
