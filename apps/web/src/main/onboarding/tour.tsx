@@ -57,7 +57,7 @@ const STOPS: TourStop[] = [
   {
     target: "list",
     title: "Triage from the keyboard",
-    body: "Move through the list and act without the mouse. ⌘- or ⇧-click selects several; drag them onto a label to file them.",
+    body: "Gmail's keys, so you already know them: move through the list and act without the mouse. ⌘- or ⇧-click selects several; drag them onto a label to file them.",
     keys: [
       { command: "list.next", label: "Next" },
       { command: "message.archive", label: "Archive" },
@@ -89,7 +89,7 @@ const STOPS: TourStop[] = [
   },
   {
     title: "Everything else is ⌘K away",
-    body: "Mailboxes, views, messages, themes and actions, all from one search. Every shortcut can be rebound in Settings → Keybindings.",
+    body: "Mailboxes, views, messages, themes and actions, all from one search. The keys start out as Gmail's; remap any of them, or add your own, in Settings → Keybindings.",
     keys: [
       { command: "commandPalette.toggle", label: "Command palette" },
       { command: "keybindings.show", label: "All shortcuts" },

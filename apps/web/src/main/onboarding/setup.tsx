@@ -22,6 +22,7 @@ import {
   gmailApi,
   type NotificationsMode,
   type ProviderSnapshot,
+  type ProvidersState,
   type SyncSettings,
 } from "../gmail/api";
 import { ImapAccountDialog, readableError } from "../gmail/add-mailbox";
@@ -52,7 +53,8 @@ import { Btn, cn } from "../gmail/ui";
 import { WindowTitle } from "../gmail/top-bar";
 import { OtterSignInOnboardingLink } from "../settings/otter-account-pane";
 import { SchemeCard, ThemeCard, useColorScheme } from "../settings/appearance-pane";
-import { SettingsGroup, SettingsRow } from "../settings/settings-ui";
+import { SettingsGroup, SettingsRow, TextInput } from "../settings/settings-ui";
+import { HERMES_URL_HINT, useConnectHermes } from "../settings/providers-pane";
 import { setThemeForAppearance, themeColors, useThemeChoice } from "../theme/apply-theme";
 import { features } from "../features";
 import { KEY_DRILL_COUNT, KeyTrainer } from "./key-trainer";
@@ -295,7 +297,7 @@ const PILLARS: { icon: ReactNode; title: string; body: string }[] = [
   {
     icon: <KeyboardIcon />,
     title: "Made for the keyboard",
-    body: "Triage with single keys, undo anything with Z, and reach everything else from ⌘K.",
+    body: "Gmail's shortcuts out of the box, each one yours to remap, and ⌘K for everything else.",
   },
   {
     icon: <MousePointer2Icon />,
@@ -728,6 +730,41 @@ function HabitsStep() {
 // Agent
 // ---------------------------------------------------------------------------
 
+/** Hermes' server URL and key, checked against the server as in Settings → Agents. */
+function HermesConnect({ state, onConnected }: { state: ProvidersState; onConnected: () => void }) {
+  const { baseUrl, setBaseUrl, apiKey, setApiKey, saving, connect } = useConnectHermes(state);
+  return (
+    <form
+      className="flex flex-col gap-2 px-3.5 pb-3.5"
+      onSubmit={(e) => {
+        e.preventDefault();
+        void connect().then((ok) => ok && onConnected());
+      }}
+    >
+      <TextInput
+        autoFocus
+        value={baseUrl}
+        onChange={(e) => setBaseUrl(e.target.value)}
+        placeholder={state.settings.hermes.baseUrl || "https://<host>:8642"}
+        aria-label="Hermes API base URL"
+      />
+      <TextInput
+        type="password"
+        value={apiKey}
+        onChange={(e) => setApiKey(e.target.value)}
+        placeholder="API key (API_SERVER_KEY)"
+        aria-label="Hermes API key"
+      />
+      <p className="text-xs leading-[17px] text-muted-foreground">
+        {HERMES_URL_HINT} The key stays on this device.
+      </p>
+      <Btn type="submit" size="sm" variant="primary" disabled={saving} className="self-end">
+        {saving ? "Connecting…" : "Connect"}
+      </Btn>
+    </form>
+  );
+}
+
 /** A provider that can take a chat here (the Mac's agents are off on the web). */
 const canAnswer = (p: ProviderSnapshot) => isProviderUsable(p) && !p.macAppOnly;
 
@@ -735,6 +772,7 @@ function AgentStep() {
   const query = useAgentProviders();
   const setState = useSetProvidersState();
   const state = query.data;
+  const [hermesOpen, setHermesOpen] = useState(false);
   const pick = (kind: NonNullable<typeof state>["selected"]) => {
     console.log("[Setup:selectAgent]", { kind });
     gmailApi
@@ -760,7 +798,7 @@ function AgentStep() {
         {/* What a chat looks like, in the panel's own style. */}
         <div
           aria-hidden
-          className="flex flex-col gap-3 rounded-xl border border-border/60 bg-card p-4 text-[13px] leading-5"
+          className="flex flex-col gap-3 self-start rounded-xl border border-border/60 bg-card p-4 text-[13px] leading-5"
         >
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <span className="rounded-md bg-accent-surface px-1.5 py-0.5 text-foreground">
@@ -794,42 +832,64 @@ function AgentStep() {
             <div className="flex flex-col gap-2">
               {state.providers.map((p) => {
                 const usable = canAnswer(p);
-                const summary = providerSummary(p);
-                const selected = state.selected === p.kind;
+                // Hermes connects right here; the Mac's CLIs are set up outside the app.
+                const connectable = !usable && p.kind === "hermes" && !p.macAppOnly;
+                const selected = usable && state.selected === p.kind;
+                const open = connectable && hermesOpen;
                 return (
-                  <button
+                  <div
                     key={p.kind}
-                    type="button"
-                    aria-pressed={selected}
-                    disabled={!usable}
-                    onClick={() => pick(p.kind)}
                     className={cn(
-                      "flex cursor-pointer items-start gap-3 rounded-xl border bg-card px-3.5 py-3 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-focus-ring disabled:cursor-default",
-                      selected && usable
+                      "rounded-xl border bg-card transition-colors",
+                      selected
                         ? "border-focus-ring ring-1 ring-focus-ring"
-                        : "border-border/60 enabled:hover:border-input",
+                        : usable || connectable
+                          ? "border-border/60 hover:border-input"
+                          : "border-border/60",
                     )}
                   >
-                    <span className="flex h-5 shrink-0 items-center">
-                      <ProviderIcon kind={p.kind} className="size-4" />
-                    </span>
-                    <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                      <span className="text-sm text-foreground">{p.displayName}</span>
-                      <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                        <span
-                          aria-hidden
-                          className={cn(
-                            "size-1.5 shrink-0 rounded-full",
-                            PROVIDER_STATUS_DOT[p.status],
-                          )}
-                        />
-                        <span className="truncate">{summary.headline}</span>
+                    <button
+                      type="button"
+                      aria-pressed={usable ? selected : undefined}
+                      aria-expanded={connectable ? open : undefined}
+                      disabled={!usable && !connectable}
+                      onClick={() => (connectable ? setHermesOpen(!open) : pick(p.kind))}
+                      className="flex w-full cursor-pointer items-start gap-3 rounded-xl px-3.5 py-3 text-left outline-none focus-visible:ring-2 focus-visible:ring-focus-ring disabled:cursor-default"
+                    >
+                      <span className="flex h-5 shrink-0 items-center">
+                        <ProviderIcon kind={p.kind} className="size-4" />
                       </span>
-                    </span>
-                    {selected && usable ? (
-                      <CheckIcon className="mt-0.5 size-4 shrink-0 text-foreground" />
+                      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                        <span className="text-sm text-foreground">{p.displayName}</span>
+                        <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                          <span
+                            aria-hidden
+                            className={cn(
+                              "size-1.5 shrink-0 rounded-full",
+                              PROVIDER_STATUS_DOT[p.status],
+                            )}
+                          />
+                          <span className="truncate">{providerSummary(p).headline}</span>
+                        </span>
+                      </span>
+                      {selected ? (
+                        <CheckIcon className="mt-0.5 size-4 shrink-0 text-foreground" />
+                      ) : connectable ? (
+                        <span className="mt-0.5 shrink-0 text-[13px] text-foreground">
+                          {open ? "Cancel" : "Connect"}
+                        </span>
+                      ) : null}
+                    </button>
+                    {open ? (
+                      <HermesConnect
+                        state={state}
+                        onConnected={() => {
+                          setHermesOpen(false);
+                          pick("hermes");
+                        }}
+                      />
                     ) : null}
-                  </button>
+                  </div>
                 );
               })}
             </div>
@@ -859,7 +919,8 @@ function KeysStep() {
         title="Learn a few keys"
         description={
           <>
-            Try them on this practice inbox; nothing here touches your mail.{" "}
+            The same keys as Gmail, so your hands already know them. Try them here; nothing touches
+            your mail.{" "}
             <span className="tabular-nums text-foreground">
               {done} of {KEY_DRILL_COUNT}
             </span>
@@ -867,6 +928,10 @@ function KeysStep() {
         }
       />
       <KeyTrainer onProgress={setDone} />
+      <p className="mt-6 flex items-center justify-center gap-2 text-[13px] text-muted-foreground">
+        <ShortcutKeys command="keybindings.show" />
+        lists every shortcut. Remap any of them, or add your own, in Settings → Keybindings.
+      </p>
     </>
   );
 }
