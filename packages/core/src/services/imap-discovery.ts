@@ -1,7 +1,10 @@
 /**
  * Finds an address's IMAP and SMTP servers, the way Thunderbird does: known
  * providers first, then Mozilla's ISPDB, then the domain's own autoconfig
- * file, then its MX records (a custom domain hosted by a provider we know).
+ * file, then its MX records: a custom domain hosted by a provider we know, or
+ * else the mail server itself, when it answers IMAP with a certificate for its
+ * own name (shared hosting like All-Inkl, where imap.<domain> would point at
+ * the same machine but not match its certificate).
  * Null when nothing is found, and for Gmail and Outlook, which don't sign in
  * with a password.
  *
@@ -15,6 +18,7 @@ import type { ImapSettings, MailServer } from "@otter-mail/contracts/mail";
 import { platform } from "../platform.js";
 
 const FETCH_TIMEOUT_MS = 5_000;
+const PROBE_TIMEOUT_MS = 5_000;
 
 type Preset = {
   domains: string[];
@@ -286,7 +290,7 @@ async function autoconfig(domain: string, email: string): Promise<ImapSettings |
 }
 
 /** The domain's MX hosts, most preferred first (Cloudflare's DNS-over-HTTPS, which allows CORS). */
-async function mxHosts(domain: string): Promise<string[]> {
+export async function mxHosts(domain: string): Promise<string[]> {
   const json = await fetchText(
     `https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(domain)}&type=MX`,
     { headers: { accept: "application/dns-json" } },
@@ -315,6 +319,32 @@ function baseDomain(host: string): string {
   return labels.slice(suffix ? -3 : -2).join(".");
 }
 
+/** Whether the host completes a TLS handshake on IMAP's port, its certificate matching its name. */
+export async function servesImap(host: string): Promise<boolean> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const stream = await Promise.race([
+      platform().connect(host, 993, { tls: true }),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error("timed out")), PROBE_TIMEOUT_MS);
+      }),
+    ]);
+    stream.close();
+    return true;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** The mail server itself: IMAP on 993, SMTP on 465, both over TLS. */
+const onServer = (host: string, email: string): ImapSettings => ({
+  username: email,
+  imap: tls(host),
+  smtp: tls(host, 465),
+});
+
 export async function discoverImap(address: string): Promise<ImapSettings | null> {
   const email = address.trim();
   const domain = email.split("@")[1]?.toLowerCase();
@@ -331,5 +361,7 @@ export async function discoverImap(address: string): Promise<ImapSettings | null
   const hoster = PRESETS.find((p) => p.mx?.some((d) => endsWithDomain(mx, d)));
   if (hoster) return fromPreset(hoster, email);
   const base = baseDomain(mx);
-  return base === domain ? null : autoconfig(base, email);
+  const fromBase = base === domain ? null : await autoconfig(base, email);
+  if (fromBase) return fromBase;
+  return (await servesImap(mx)) ? onServer(mx, email) : null;
 }
