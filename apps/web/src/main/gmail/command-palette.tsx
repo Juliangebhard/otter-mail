@@ -120,6 +120,30 @@ function formatResultDate(timestamp: number): string {
     : date.toLocaleDateString([], { month: "short", day: "numeric" });
 }
 
+/** What a match of `matchScore` or better counts as: the text names the item. */
+const STRONG = 2;
+
+/** Words of a text, for matching the start of any of them ("dark" in "Change appearance: Dark"). */
+const words = (text: string) => text.toLowerCase().split(/[^\p{L}\p{N}]+/u);
+
+/**
+ * How well an item matches what's typed: 4 its title starts with it, 3 every
+ * typed word starts a word of the title, 2 the same counting its description
+ * and keywords (synonyms like "upgrade" for Update), 1 the text appears
+ * anywhere, even mid-word; 0 not at all. Everything matches an empty query.
+ */
+function matchScore(item: PaletteItem, needle: string): number {
+  if (!needle) return 1;
+  const title = item.title.toLowerCase();
+  if (title.startsWith(needle)) return 4;
+  const typed = needle.split(/\s+/);
+  const startsAWord = (list: string[]) => typed.every((t) => list.some((w) => w.startsWith(t)));
+  if (startsAWord(words(title))) return 3;
+  const rest = `${item.description ?? ""} ${item.keywords ?? ""}`;
+  if (startsAWord(words(`${title} ${rest}`))) return 2;
+  return `${title} ${rest.toLowerCase()}`.includes(needle) ? 1 : 0;
+}
+
 function Dot({ color }: { color: string }) {
   return (
     <span className="flex size-4 shrink-0 items-center justify-center" aria-hidden>
@@ -198,13 +222,18 @@ export function CommandPalette({
     const sc = (command: KeybindingCommand) => shortcutLabelFor(keybindings, command) ?? undefined;
     const jump = (digit: number) => sc(`mailbox.jump.${digit}` as KeybindingCommand);
     const needle = query.trim().toLowerCase();
-    const matches = (item: PaletteItem) =>
-      !needle ||
-      `${item.title} ${item.description ?? ""} ${item.keywords ?? ""}`
-        .toLowerCase()
-        .includes(needle);
+    // Best first within each group (a stable sort keeps the list's own order on ties).
     const filter = (list: PaletteGroup[]) =>
-      list.map((g) => ({ ...g, items: g.items.filter(matches) })).filter((g) => g.items.length > 0);
+      list
+        .map((g) => ({
+          ...g,
+          items: g.items
+            .map((item) => ({ item, score: matchScore(item, needle) }))
+            .filter((m) => m.score > 0)
+            .sort((a, b) => b.score - a.score)
+            .map((m) => m.item),
+        }))
+        .filter((g) => g.items.length > 0);
 
     if (page === "appearance") {
       const options = [
@@ -385,30 +414,35 @@ export function CommandPalette({
         })
       : [];
 
-    // First option while typing: hand the text to the Search mailbox (Gmail's
-    // own search, every operator), like pressing Enter in Gmail's search bar.
-    const searchGroup = needle
-      ? [
-          {
-            id: "search",
-            label: "Search",
-            items: [
-              {
-                id: "search-mail",
-                icon: <SearchIcon className={ICON} />,
-                title: `Search mail for “${query.trim()}”`,
-                run: () => onSearchMail(query.trim()),
-              },
-            ],
-          },
-        ]
-      : [];
+    const mailGroup = mail.length > 0 ? [{ id: "mail", label: "Mail", items: mail }] : [];
+    if (!needle) return staticGroups;
 
-    return [
-      ...searchGroup,
-      ...staticGroups,
-      ...(mail.length > 0 ? [{ id: "mail", label: "Mail", items: mail }] : []),
-    ];
+    // Handing the text to the Search mailbox (Gmail's own search, every
+    // operator), like pressing Enter in Gmail's search bar.
+    const searchGroup = {
+      id: "search",
+      label: "Search",
+      items: [
+        {
+          id: "search-mail",
+          icon: <SearchIcon className={ICON} />,
+          title: `Search mail for “${query.trim()}”`,
+          run: () => onSearchMail(query.trim()),
+        },
+      ],
+    };
+    // Commands, mailboxes and views the text clearly names come first (Enter
+    // runs the best), then the search, one ↓ away, and the mail it finds.
+    // Text that reads as a search (an operator, an address, a quote) or names
+    // nothing searches first. Mail, arriving later, lands below both, so the
+    // rows above it never move.
+    const best = (g: PaletteGroup) => matchScore(g.items[0]!, needle);
+    const strong = staticGroups.filter((g) => best(g) >= STRONG).sort((a, b) => best(b) - best(a));
+    const weak = staticGroups.filter((g) => best(g) < STRONG);
+    const searchFirst = /[:@"]/.test(needle) || strong.length === 0;
+    return searchFirst
+      ? [searchGroup, ...strong, ...mailGroup, ...weak]
+      : [...strong, searchGroup, ...mailGroup, ...weak];
   }, [
     keybindings,
     page,
