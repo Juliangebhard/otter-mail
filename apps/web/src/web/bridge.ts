@@ -232,7 +232,8 @@ async function invoke<T>(channel: string, params?: unknown): Promise<T> {
   if (channel === "otter:signIn") {
     const result = await backend.invoke<{ redirectTo?: string } | null>(channel, {
       ...(params as object),
-      callbackURL: `${location.origin}/`,
+      // Back to the page it was opened at: a link to a message, say.
+      callbackURL: location.href,
     });
     if (result?.redirectTo) location.assign(result.redirectTo);
     return result as T;

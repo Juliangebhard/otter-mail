@@ -684,6 +684,12 @@ export function AccountsSidebar(props: AccountsSidebarProps) {
   // The page the scroller is at (or heading to), so its own resting doesn't
   // pick a mailbox again, and a switch from elsewhere knows to scroll.
   const shown = useRef(-1);
+  // Whether the user has moved the scroller since it last scrolled itself:
+  // only then does where it rests pick a mailbox.
+  const swiped = useRef(false);
+  const onUserScroll = () => {
+    swiped.current = true;
+  };
 
   // A switch from elsewhere scrolls to its page (at once the first time).
   useLayoutEffect(() => {
@@ -691,6 +697,7 @@ export function AccountsSidebar(props: AccountsSidebarProps) {
     if (!el || index < 0 || shown.current === index) return;
     const first = shown.current < 0;
     shown.current = index;
+    swiped.current = false;
     el.scrollTo({ left: index * el.clientWidth, behavior: first ? "instant" : "smooth" });
   }, [index]);
   // Resizing the sidebar keeps the page in place.
@@ -711,6 +718,11 @@ export function AccountsSidebar(props: AccountsSidebarProps) {
     if (!el || !el.clientWidth) return;
     const at = Math.round(el.scrollLeft / el.clientWidth);
     if (at === shown.current || !mailboxIds[at]) return;
+    // Its own scroll cut short (a layout change re-snaps it): carry on.
+    if (!swiped.current) {
+      el.scrollTo({ left: shown.current * el.clientWidth, behavior: "smooth" });
+      return;
+    }
     shown.current = at;
     onSelectAccount(mailboxIds[at]);
   };
@@ -727,6 +739,10 @@ export function AccountsSidebar(props: AccountsSidebarProps) {
 
       <div
         ref={scroller}
+        onWheel={onUserScroll}
+        onTouchStart={onUserScroll}
+        onPointerDown={onUserScroll}
+        onKeyDown={onUserScroll}
         // Where there's no scrollend (older Safari), a pause in scrolling stands in.
         onScroll={() => {
           window.clearTimeout(settleTimer.current);

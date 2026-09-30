@@ -1,10 +1,13 @@
 import {
+  useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type CSSProperties,
   type PointerEvent as ReactPointerEvent,
 } from "react";
+import { useMatch, useNavigate, useRouter } from "@tanstack/react-router";
 import { EmptyState } from "~/components/ui/empty-state";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast, type ToastId } from "./gmail/toast";
@@ -62,7 +65,7 @@ import {
 import { getAccountColor, getAccountContrastColor } from "./gmail/account-style";
 import { gmailApi, type MailtoTarget } from "./gmail/api";
 import type { QuoteContext } from "./gmail/chat-context";
-import type { GmailMessageSummary } from "./gmail/types";
+import type { GmailAccount, GmailMessageSummary } from "./gmail/types";
 import {
   useMailViews,
   resolveRules,
@@ -92,13 +95,76 @@ import {
 /** Narrowest the reader gets when the chat panel is dragged wider. */
 const READER_MIN_WIDTH = 360;
 
-/** A place the user was at, for the top-bar back/forward buttons. */
-type NavLoc = {
-  accountId: string | null;
-  labelId: string;
+/** A place in the mail, as the route names it (router.tsx). */
+type MailLoc = {
+  /** An account id, or COMBINED_ACCOUNT_ID. */
+  mailbox: string;
+  /** A label or view id, or SEARCH_MAILBOX. */
+  label: string;
+  /** The conversation (or message) open in the reader. */
   messageId: string | null;
-  readerAccountId: string | null;
+  /** The open message's own account, where it isn't `mailbox`. */
+  account: string | null;
+  /** One message picked from the open conversation: the reader shows just that one. */
+  focusId: string | null;
 };
+
+const sameLoc = (a: MailLoc, b: MailLoc | null) =>
+  !!b &&
+  a.mailbox === b.mailbox &&
+  a.label === b.label &&
+  a.messageId === b.messageId &&
+  a.account === b.account &&
+  a.focusId === b.focusId;
+
+/** The place in the mail the route names, if it names one. */
+function useRouteMailLoc(): MailLoc | null {
+  const message = useMatch({ from: "/mail/$mailbox/$label/$messageId", shouldThrow: false });
+  const list = useMatch({ from: "/mail/$mailbox/$label", shouldThrow: false });
+  if (message) {
+    const { mailbox, label, messageId } = message.params;
+    const { account, message: focusId } = message.search;
+    return { mailbox, label, messageId, account: account ?? null, focusId: focusId ?? null };
+  }
+  if (list) {
+    const { mailbox, label } = list.params;
+    return { mailbox, label, messageId: null, account: null, focusId: null };
+  }
+  return null;
+}
+
+const inboxOf = (mailbox: string) => (mailbox === COMBINED_ACCOUNT_ID ? INBOX_VIEW_ID : "INBOX");
+
+/** Where the mail was last time (custom-views' saved location). */
+function savedLoc(): MailLoc {
+  const saved = loadLastLocation();
+  const [mailbox, label] = saved ? [saved.accountId, saved.labelId] : ["", "INBOX"];
+  return { mailbox, label, messageId: null, account: null, focusId: null };
+}
+
+/**
+ * `loc` among the mailboxes there are: one turned off (or "All mailboxes"
+ * off, or one not there at all) gives way to what's first now (Combined when
+ * it's on, else the first account), at its inbox.
+ */
+function placeFor(loc: MailLoc, accounts: GmailAccount[], combined: boolean): MailLoc {
+  const there =
+    loc.mailbox === COMBINED_ACCOUNT_ID ? combined : accounts.some((a) => a.id === loc.mailbox);
+  if (there) return loc;
+  const mailbox = combined ? COMBINED_ACCOUNT_ID : (accounts[0]?.id ?? loc.mailbox);
+  return { mailbox, label: inboxOf(mailbox), messageId: null, account: null, focusId: null };
+}
+
+/** The Settings pane the route names, if it names one. */
+function useRouteSettings(): SettingsRoute | null {
+  const match = useMatch({ from: "/mail/settings/$pane", shouldThrow: false });
+  const pane = match?.params.pane;
+  const { view, mailbox, target } = match?.search ?? {};
+  return useMemo(
+    () => (pane ? { pane, viewId: view ?? null, mailbox: mailbox ?? null, target } : null),
+    [pane, view, mailbox, target],
+  );
+}
 
 /**
  * Drag-resizable pane width persisted to localStorage. `room` (when given)
@@ -216,20 +282,42 @@ export function HomeView() {
 }
 
 function MailHome() {
-  const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
-  const [selectedLabelId, setSelectedLabelId] = useState<string>("INBOX");
-  const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
-  // One message picked from an expanded conversation in the list: the reader
-  // shows just that message. Tied to the row it came from, so it lapses as
-  // soon as the selection moves anywhere else.
-  const [focusedMessage, setFocusedMessage] = useState<{ rowId: string; id: string } | null>(null);
-  const focusedMessageId =
-    focusedMessage && focusedMessage.rowId === selectedMessageId ? focusedMessage.id : null;
-  useEffect(() => {
-    if (focusedMessage && focusedMessage.rowId !== selectedMessageId) setFocusedMessage(null);
-  }, [focusedMessage, selectedMessageId]);
+  // Where the window is comes from the route: a place in the mail, or a
+  // Settings pane over the mail it was opened from (router.tsx).
+  const navigate = useNavigate();
+  const router = useRouter();
+  const routeLoc = useRouteMailLoc();
+  const settingsRoute = useRouteSettings();
+
+  const accountsQuery = useAccounts();
+  const { views, loaded: viewsLoaded } = useMailViews();
+
+  // The mailboxes shown: turned-on accounts, in the user's order (Settings →
+  // Mailboxes, synced with the Otter account).
+  const mailboxes = useMailboxes();
+  const accounts = mailboxes.accounts;
+  const accountIds = accounts.map((a) => a.id);
+  const firstRealAccountId = accounts[0]?.id ?? null;
+  const ready = !accountsQuery.isLoading && accounts.length > 0;
+
+  // The mail under Settings: where it was when Settings opened.
+  const [lastMail, setLastMail] = useState<MailLoc | null>(null);
+  if (routeLoc && !sameLoc(routeLoc, lastMail)) setLastMail(routeLoc);
+  // Where the route names no place in the mail (the index route, or a window
+  // that started in Settings), it's where it was last time. Once the
+  // mailboxes are known, it's always one of theirs (effects below catch the
+  // route up), so nothing shows a place only to leave it at once.
+  const placed = routeLoc ?? lastMail;
+  const mailLoc = ready ? placeFor(placed ?? savedLoc(), accounts, mailboxes.combined) : placed;
+  const initialized = ready && mailLoc !== null;
+  const selectedAccountId = mailLoc?.mailbox ?? null;
+  const selectedLabelId = mailLoc?.label ?? "INBOX";
+  const selectedMessageId = mailLoc?.messageId ?? null;
   // Account that owns the currently-open message (differs per row in combined views).
-  const [readerAccountId, setReaderAccountId] = useState<string | null>(null);
+  const readerAccountId = mailLoc?.account ?? null;
+  // One message picked from an expanded conversation in the list: the reader
+  // shows just that message.
+  const focusedMessageId = mailLoc?.focusId ?? null;
   // Open searches, each a sidebar row: the top Search row (all mail) and one
   // per view it was started from (⌘F there). They keep their query and any
   // unrun text while you visit other mailboxes; × or Escape closes them.
@@ -243,16 +331,36 @@ function MailHome() {
   const [paletteOpen, setPaletteOpen] = useState(false);
   // In-app settings page; null = mail. Opened from the sidebar footer, ⌘,
   // (menu accelerator → backend broadcast), or any window's deep link.
-  const [settingsRoute, setSettingsRoute] = useState<SettingsRoute | null>(null);
-  const settingsRouteRef = useRef(settingsRoute);
-  settingsRouteRef.current = settingsRoute;
+  const openSettings = useCallback(
+    (route: SettingsRoute) => {
+      // Only the scroll target going (it was reached): the same place.
+      const replace =
+        !!settingsRoute &&
+        route.pane === settingsRoute.pane &&
+        route.viewId === settingsRoute.viewId &&
+        route.mailbox === settingsRoute.mailbox;
+      void navigate({
+        to: "/settings/$pane",
+        params: { pane: route.pane },
+        search: {
+          view: route.viewId ?? undefined,
+          mailbox: route.mailbox ?? undefined,
+          target: route.target,
+        },
+        replace,
+      });
+    },
+    [navigate, settingsRoute],
+  );
+  const openSettingsRef = useRef(openSettings);
+  openSettingsRef.current = openSettings;
   useEffect(() => {
     const pull = async () => {
       try {
         const target = await gmailApi.getSettingsTarget();
         if (!target) return;
         console.log("[HomeView:openSettings]", { pane: target.pane });
-        setSettingsRoute({
+        openSettingsRef.current({
           pane: target.pane,
           viewId: target.viewId ?? null,
           mailbox: target.mailbox ?? null,
@@ -276,6 +384,42 @@ function MailHome() {
       }),
     [],
   );
+
+  /** Moves the mail to `to`, from where it is (or was, under Settings). */
+  const go = (to: Partial<MailLoc>, replace = false) => {
+    if (!mailLoc) return;
+    const next = { ...mailLoc, ...to };
+    const params = { mailbox: next.mailbox, label: next.label };
+    if (!next.messageId) {
+      void navigate({ to: "/$mailbox/$label", params, replace });
+      return;
+    }
+    void navigate({
+      to: "/$mailbox/$label/$messageId",
+      params: { ...params, messageId: next.messageId },
+      search: {
+        account: next.account && next.account !== next.mailbox ? next.account : undefined,
+        message: next.focusId ?? undefined,
+      },
+      replace,
+    });
+  };
+  const closeMessage = () => go({ messageId: null });
+  /** Puts the mail right where it is; under Settings, where Back returns to. */
+  const correct = (to: Partial<MailLoc>) => {
+    if (routeLoc) go(to, true);
+    else if (lastMail) setLastMail({ ...lastMail, ...to });
+  };
+
+  // Back to the mail Settings was opened over.
+  const leaveSettings = () => {
+    if (mailLoc) go({});
+    else void navigate({ to: "/" });
+  };
+  const settingsRouteRef = useRef(settingsRoute);
+  settingsRouteRef.current = settingsRoute;
+  const leaveSettingsRef = useRef(leaveSettings);
+  leaveSettingsRef.current = leaveSettings;
   // Escape leaves settings (blurring a focused field first, like a dialog).
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -285,22 +429,11 @@ function MailHome() {
         return;
       }
       e.preventDefault();
-      setSettingsRoute(null);
+      leaveSettingsRef.current();
     };
     window.addEventListener("keydown", down, true);
     return () => window.removeEventListener("keydown", down, true);
   }, []);
-  const [initialized, setInitialized] = useState(false);
-
-  const accountsQuery = useAccounts();
-  const { views } = useMailViews();
-
-  // The mailboxes shown: turned-on accounts, in the user's order (Settings →
-  // Mailboxes, synced with the Otter account).
-  const mailboxes = useMailboxes();
-  const accounts = mailboxes.accounts;
-  const accountIds = accounts.map((a) => a.id);
-  const firstRealAccountId = accounts[0]?.id ?? null;
 
   const isCombined = selectedAccountId === COMBINED_ACCOUNT_ID && mailboxes.combined;
 
@@ -372,7 +505,7 @@ function MailHome() {
   const tourRequested = useTourRequested();
   useEffect(() => {
     if (!tourRequested) return;
-    setSettingsRoute(null);
+    if (settingsRouteRef.current) leaveSettingsRef.current();
     setComposeOpen(false);
     if (!sidebarOpen) toggleSidebar();
   }, [tourRequested]);
@@ -383,10 +516,7 @@ function MailHome() {
   // MessageList fills this each render; reader archive/trash advance through it.
   const advanceRef = useRef<(fromMessageId: string) => boolean>(() => false);
   const handleReaderAdvance = () => {
-    if (!selectedMessageId || !advanceRef.current(selectedMessageId)) {
-      setSelectedMessageId(null);
-      setReaderAccountId(null);
-    }
+    if (!selectedMessageId || !advanceRef.current(selectedMessageId)) closeMessage();
   };
 
   const searchRef = useRef<HTMLInputElement>(null);
@@ -518,9 +648,7 @@ function MailHome() {
   useKeybindingContext("settingsOpen", settingsRoute !== null);
   useKeybindingContext("messageOpen", selectedMessageId !== null);
   const goTo = (combinedViewId: string, labelId: string) => {
-    setSelectedLabelId(isCombined ? combinedViewId : labelId);
-    setSelectedMessageId(null);
-    setReaderAccountId(null);
+    go({ label: isCombined ? combinedViewId : labelId, messageId: null });
   };
   const jumpToMailbox = (digit: number) => {
     const { ids, combined, select } = accountSwitchRef.current;
@@ -535,8 +663,7 @@ function MailHome() {
     "agent.toggle": () => toggleChat(),
     "search.focus": () => searchFromView(),
     "compose.new": () => setComposeOpen(true),
-    "keybindings.show": () =>
-      setSettingsRoute({ pane: "keybindings", viewId: null, mailbox: null }),
+    "keybindings.show": () => openSettings({ pane: "keybindings", viewId: null, mailbox: null }),
     "mail.undo": () => {
       const action = takeUndo();
       if (!action) return false;
@@ -548,45 +675,19 @@ function MailHome() {
     "go.starred": () => goTo(STARRED_VIEW_ID, "STARRED"),
     "go.drafts": () => goTo(DRAFTS_VIEW_ID, "DRAFT"),
     "go.allMail": () => goTo(ALL_MAIL_VIEW_ID, ALL_MAIL_LABEL_ID),
-    "message.close": () => {
-      setSelectedMessageId(null);
-      setReaderAccountId(null);
-    },
+    "message.close": () => closeMessage(),
     ...Object.fromEntries(
       MAILBOX_JUMP_COMMANDS.map((command, i) => [command, () => jumpToMailbox(i + 1)]),
     ),
   });
 
-  // Once accounts are known, restore the last location or apply the default
-  // (Combined when 2+ accounts, else the first account).
+  // A window opened on no place in particular (the index route) goes to the
+  // last one, once accounts are known.
+  const onIndex = !routeLoc && !settingsRoute;
+  const hasMail = mailLoc !== null;
   useEffect(() => {
-    if (initialized || accountsQuery.isLoading || accounts.length === 0) return;
-    const canCombined = mailboxes.combined;
-    const saved = loadLastLocation();
-    let acct: string | null = null;
-    let label = "INBOX";
-    if (saved) {
-      if (saved.accountId === COMBINED_ACCOUNT_ID && canCombined) {
-        acct = COMBINED_ACCOUNT_ID;
-        label = saved.labelId;
-      } else if (accounts.some((a) => a.id === saved.accountId)) {
-        acct = saved.accountId;
-        label = saved.labelId;
-      }
-    }
-    if (!acct) {
-      if (canCombined) {
-        acct = COMBINED_ACCOUNT_ID;
-        label = INBOX_VIEW_ID;
-      } else {
-        acct = firstRealAccountId;
-        label = "INBOX";
-      }
-    }
-    setSelectedAccountId(acct);
-    setSelectedLabelId(label);
-    setInitialized(true);
-  }, [initialized, accountsQuery.isLoading, accounts, firstRealAccountId, mailboxes.combined]);
+    if (onIndex && hasMail) go({}, true);
+  }, [onIndex, hasMail]);
 
   // Persist where the user is so we can reopen here next launch.
   useEffect(() => {
@@ -596,83 +697,40 @@ function MailHome() {
     saveLastLocation({ accountId: selectedAccountId, labelId: selectedLabelId });
   }, [initialized, selectedAccountId, selectedLabelId]);
 
-  // ── Back/forward navigation history (top bar) ────────────────────────────
-  const [nav, setNav] = useState<{ stack: NavLoc[]; idx: number }>({ stack: [], idx: -1 });
-  const navigatingRef = useRef(false);
+  // ⌘[ / ⌘] (the menu accelerators, main.ts "Go"; a DOM keydown never
+  // arrives for them because the webview consumes it) and the mouse's
+  // back/forward buttons move through the window's history. A browser does
+  // all of this itself.
   useEffect(() => {
-    if (!initialized) return;
-    if (navigatingRef.current) {
-      navigatingRef.current = false;
-      return;
-    }
-    const loc: NavLoc = {
-      accountId: selectedAccountId,
-      labelId: selectedLabelId,
-      messageId: selectedMessageId,
-      readerAccountId,
+    const back = () => {
+      // Never back out of the app, to the page before it.
+      if (!router.history.canGoBack()) return;
+      console.log("[HomeView:navBack]");
+      router.history.back();
     };
-    setNav((h) => {
-      const cur = h.stack[h.idx];
-      if (
-        cur &&
-        cur.accountId === loc.accountId &&
-        cur.labelId === loc.labelId &&
-        cur.messageId === loc.messageId
-      ) {
-        return h;
-      }
-      const stack = [...h.stack.slice(Math.max(0, h.idx - 98), h.idx + 1), loc];
-      return { stack, idx: stack.length - 1 };
-    });
-  }, [initialized, selectedAccountId, selectedLabelId, selectedMessageId, readerAccountId]);
-
-  const applyNavLoc = (loc: NavLoc) => {
-    navigatingRef.current = true;
-    setSelectedAccountId(loc.accountId);
-    setSelectedLabelId(loc.labelId);
-    setSelectedMessageId(loc.messageId);
-    setReaderAccountId(loc.readerAccountId);
-  };
-  const goBack = () => {
-    if (nav.idx <= 0) return;
-    console.log("[HomeView:navBack]");
-    applyNavLoc(nav.stack[nav.idx - 1]);
-    setNav({ ...nav, idx: nav.idx - 1 });
-  };
-  const goForward = () => {
-    if (nav.idx >= nav.stack.length - 1) return;
-    console.log("[HomeView:navForward]");
-    applyNavLoc(nav.stack[nav.idx + 1]);
-    setNav({ ...nav, idx: nav.idx + 1 });
-  };
-
-  // ⌘[ / ⌘] and the mouse back/forward buttons drive the same history as the
-  // header arrows. Latest closures via ref so the listeners mount once.
-  const navActionsRef = useRef({ back: goBack, forward: goForward });
-  navActionsRef.current = { back: goBack, forward: goForward };
-  useEffect(() => {
-    // The menu accelerators (main/index.ts "Go") broadcast these; a DOM
-    // keydown never arrives for ⌘[/⌘] because the webview consumes it.
-    const unsubBack = window.desktopBridge.on("nav:back", () => navActionsRef.current.back());
-    const unsubForward = window.desktopBridge.on("nav:forward", () =>
-      navActionsRef.current.forward(),
-    );
+    const forward = () => {
+      console.log("[HomeView:navForward]");
+      router.history.forward();
+    };
+    const unsubBack = window.desktopBridge.on("nav:back", back);
+    const unsubForward = window.desktopBridge.on("nav:forward", forward);
     const mouse = (e: MouseEvent) => {
       if (e.button === 3) {
         e.preventDefault();
-        navActionsRef.current.back();
+        back();
       } else if (e.button === 4) {
         e.preventDefault();
-        navActionsRef.current.forward();
+        forward();
       }
     };
-    window.addEventListener("mouseup", mouse);
+    const handlesMouse = window.desktopBridge.platform !== "web";
+    if (handlesMouse) window.addEventListener("mouseup", mouse);
     return () => {
       unsubBack();
       unsubForward();
-      window.removeEventListener("mouseup", mouse);
+      if (handlesMouse) window.removeEventListener("mouseup", mouse);
     };
-  }, []);
+  }, [router]);
 
   // mailto: links (default mail app): pull the pending target on mount (cold
   // start) and whenever the backend broadcasts one, then open the composer
@@ -692,14 +750,17 @@ function MailHome() {
   }, []);
 
   // A conversation clicked in the menu-bar popover, or a new-mail
-  // notification, opens here, in the reader.
-  const openFromTrayRef = useRef<(accountId: string, messageId: string) => void>(() => {});
+  // notification, opens here, in the reader (once there's mail to open it
+  // in, when it started the app).
+  const [openFromTray, setOpenFromTray] = useState<{ accountId: string; messageId: string } | null>(
+    null,
+  );
   useEffect(() => {
     const pull = async () => {
       const target = await gmailApi.takePendingOpenMessage().catch(() => null);
       if (!target) return;
       console.log("[HomeView:openFromTray]", { messageId: target.messageId });
-      openFromTrayRef.current(target.accountId, target.messageId);
+      setOpenFromTray(target);
     };
     void pull();
     return window.desktopBridge.on("mail:open", () => void pull());
@@ -714,19 +775,15 @@ function MailHome() {
   // If the selected view disappears (deleted, or it has no rules for the
   // active account), fall back to Inbox.
   useEffect(() => {
-    if (selectedLabelId === SEARCH_MAILBOX) return;
+    if (!initialized || !viewsLoaded || selectedLabelId === SEARCH_MAILBOX) return;
     if (isCombined) {
-      if (!views.some((v) => v.id === selectedLabelId)) {
-        setSelectedLabelId(INBOX_VIEW_ID);
-      }
+      if (!views.some((v) => v.id === selectedLabelId)) correct({ label: INBOX_VIEW_ID });
       return;
     }
     const view = views.find((v) => v.id === selectedLabelId);
     if (!view) return; // plain label
-    if (view.mailbox !== effectiveAccountId) {
-      setSelectedLabelId("INBOX");
-    }
-  }, [isCombined, views, selectedLabelId, effectiveAccountId]);
+    if (view.mailbox !== effectiveAccountId) correct({ label: "INBOX" });
+  }, [initialized, viewsLoaded, isCombined, views, selectedLabelId, effectiveAccountId]);
 
   // Local-first: keep the on-disk cache synced in the background. Combined mode
   // refreshes all accounts via its own list handler (sentinel isn't a real account).
@@ -780,10 +837,7 @@ function MailHome() {
   const handleSelectAccount = (accountId: string) => {
     console.log("[HomeView:selectAccount]", { accountId });
     setComposeOpen(false);
-    setSelectedAccountId(accountId);
-    setSelectedLabelId(accountId === COMBINED_ACCOUNT_ID ? INBOX_VIEW_ID : "INBOX");
-    setSelectedMessageId(null);
-    setReaderAccountId(null);
+    go({ mailbox: accountId, label: inboxOf(accountId), messageId: null });
   };
   accountSwitchRef.current = {
     ids: accountIds,
@@ -791,34 +845,25 @@ function MailHome() {
     select: handleSelectAccount,
   };
 
-  // The showing mailbox was turned off (or "All mailboxes" was): move to
-  // what's first now, at its inbox.
-  const showingOff =
-    initialized &&
-    selectedAccountId !== null &&
-    (selectedAccountId === COMBINED_ACCOUNT_ID
-      ? !mailboxes.combined
-      : !accounts.some((a) => a.id === selectedAccountId));
+  // The route's mailbox was turned off (or "All mailboxes" was), or isn't
+  // there: the route catches up with what shows instead.
+  const misplaced = ready && !!routeLoc && routeLoc.mailbox !== mailLoc?.mailbox;
   useEffect(() => {
-    if (!showingOff) return;
-    const next = mailboxes.combined ? COMBINED_ACCOUNT_ID : firstRealAccountId;
-    if (next) handleSelectAccount(next);
-  }, [showingOff]);
+    if (!misplaced) return;
+    setComposeOpen(false);
+    go({}, true);
+  }, [misplaced]);
 
   const handleSelectLabel = (labelId: string) => {
     console.log("[HomeView:selectLabel]", { labelId });
     setComposeOpen(false);
-    setSelectedLabelId(labelId);
-    setSelectedMessageId(null);
-    setReaderAccountId(null);
+    go({ label: labelId, messageId: null });
   };
 
   const handleSelectMessage = (messageId: string, accountId: string, focusId?: string) => {
     console.log("[HomeView:selectMessage]", { messageId, accountId, focusId });
     setComposeOpen(false);
-    setSelectedMessageId(messageId);
-    setReaderAccountId(accountId);
-    setFocusedMessage(focusId ? { rowId: messageId, id: focusId } : null);
+    go({ messageId, account: accountId, focusId: focusId ?? null });
   };
 
   // A send taken back with Undo reopens its draft here (the reader edits drafts).
@@ -864,11 +909,8 @@ function MailHome() {
   const showSearch = (id: string) => {
     if (!searchActive) searchReturnRef.current = selectedLabelId;
     setComposeOpen(false);
-    setSettingsRoute(null);
-    setSelectedLabelId(SEARCH_MAILBOX);
     setActiveSearchId(id);
-    setSelectedMessageId(null);
-    setReaderAccountId(null);
+    go({ label: SEARCH_MAILBOX, messageId: null });
   };
   /** The top Search row (all mail), optionally running `q`. */
   const openSearch = (q?: string) => {
@@ -949,16 +991,15 @@ function MailHome() {
     console.log("[HomeView:closeSearch]", { child: Boolean(tab?.parent) });
     setSearchTabs((tabs) => tabs.filter((t) => t.id !== id));
     if (searchActive && activeSearchId === id) {
-      setSelectedLabelId(tab?.parent ?? searchReturnRef.current);
-      setSelectedMessageId(null);
-      setReaderAccountId(null);
+      go({ label: tab?.parent ?? searchReturnRef.current, messageId: null });
     }
   };
   const handleSearchChange = (q: string) => openSearch(q);
-  // Back/forward into a search that was since closed: the top Search row.
+  // Back/forward (or a reload) into a search that was since closed: the top
+  // Search row. Only on arriving: closing the open search leaves it at once.
   useEffect(() => {
     if (searchActive && !activeSearch) openSearch();
-  });
+  }, [searchActive]);
 
   // Palette mail result: jump to the owning account (Combined stays put) and open.
   const handlePaletteOpenMessage = (message: GmailMessageSummary) => {
@@ -968,31 +1009,29 @@ function MailHome() {
     });
     const owner = message.accountId ?? firstRealAccountId;
     if (!owner) return;
-    if (!isCombined && owner !== effectiveAccountId) {
-      setSelectedAccountId(owner);
-      setSelectedLabelId("INBOX");
-    }
-    setSelectedMessageId(message.id);
-    setReaderAccountId(owner);
+    openMessage(owner, message.id);
   };
 
-  openFromTrayRef.current = (owner, messageId) => {
-    setComposeOpen(false);
-    setSettingsRoute(null);
-    if (!isCombined && owner !== effectiveAccountId) {
-      setSelectedAccountId(owner);
-      setSelectedLabelId("INBOX");
-    }
-    setSelectedMessageId(messageId);
-    setReaderAccountId(owner);
+  /** Opens a message of `owner`'s where it is: Combined stays put, another account's inbox opens. */
+  const openMessage = (owner: string, messageId: string) => {
+    const switching = !isCombined && owner !== effectiveAccountId;
+    go({
+      ...(switching ? { mailbox: owner, label: "INBOX" } : {}),
+      messageId,
+      account: owner,
+      focusId: null,
+    });
   };
+  useEffect(() => {
+    if (!openFromTray || !hasMail) return;
+    setOpenFromTray(null);
+    setComposeOpen(false);
+    openMessage(openFromTray.accountId, openFromTray.messageId);
+  }, [openFromTray, hasMail]);
 
   const handlePaletteGoToView = (viewId: string) => {
     console.log("[HomeView:paletteGoToView]", { viewId });
-    setSelectedAccountId(COMBINED_ACCOUNT_ID);
-    setSelectedLabelId(viewId);
-    setSelectedMessageId(null);
-    setReaderAccountId(null);
+    go({ mailbox: COMBINED_ACCOUNT_ID, label: viewId, messageId: null });
   };
 
   // Manual refresh: spin from the click until every account's sync settles
@@ -1084,18 +1123,18 @@ function MailHome() {
                       <SettingsNav
                         pane={settingsRoute.pane}
                         onSelect={(pane, target) =>
-                          setSettingsRoute({ pane, viewId: null, mailbox: null, target })
+                          openSettings({ pane, viewId: null, mailbox: null, target })
                         }
-                        onBack={() => setSettingsRoute(null)}
+                        onBack={leaveSettings}
                       />
                     </>
                   ) : (
                     <AccountsSidebar
                       onOpenSettings={(pane = "general") =>
-                        setSettingsRoute({ pane, viewId: null, mailbox: null })
+                        openSettings({ pane, viewId: null, mailbox: null })
                       }
                       onEditView={(viewId, mailbox) =>
-                        setSettingsRoute({ pane: "views", viewId, mailbox })
+                        openSettings({ pane: "views", viewId, mailbox })
                       }
                       onSync={syncNow}
                       syncing={globalSync.syncing || manualSyncing}
@@ -1161,10 +1200,7 @@ function MailHome() {
                     selectedMessageId={selectedMessageId}
                     focusedMessageId={focusedMessageId}
                     onSelectMessage={handleSelectMessage}
-                    onDeselect={() => {
-                      setSelectedMessageId(null);
-                      setReaderAccountId(null);
-                    }}
+                    onDeselect={closeMessage}
                     advanceRef={advanceRef}
                     onSelectionChange={setChatSelection}
                     onOpenChat={openChat}
@@ -1201,7 +1237,7 @@ function MailHome() {
               {readerOwnsBand ? null : titleControls}
               <div className="flex min-h-0 flex-1 flex-col">
                 {settingsRoute ? (
-                  <SettingsPage route={settingsRoute} onNavigate={setSettingsRoute} />
+                  <SettingsPage route={settingsRoute} onNavigate={openSettings} />
                 ) : composeOpen && composeAccountId ? (
                   <NewMessageView
                     key={mailtoSeq}
@@ -1219,11 +1255,8 @@ function MailHome() {
                     accountId={readerAccount}
                     messageId={focusedMessageId ?? selectedMessageId}
                     single={focusedMessageId != null}
-                    onShowConversation={() => setFocusedMessage(null)}
-                    onDeselect={() => {
-                      setSelectedMessageId(null);
-                      setReaderAccountId(null);
-                    }}
+                    onShowConversation={() => go({ focusId: null })}
+                    onDeselect={closeMessage}
                     onAdvance={handleReaderAdvance}
                     onOpenChat={openChat}
                     onQuote={(q) => {
@@ -1326,11 +1359,9 @@ function MailHome() {
           onGoToView={handlePaletteGoToView}
           onSelectAccount={handleSelectAccount}
           onCompose={() => setComposeOpen(true)}
-          onOpenSettings={(pane = "general") =>
-            setSettingsRoute({ pane, viewId: null, mailbox: null })
-          }
+          onOpenSettings={(pane = "general") => openSettings({ pane, viewId: null, mailbox: null })}
           onNewView={() =>
-            setSettingsRoute({
+            openSettings({
               pane: "views",
               viewId: "new",
               mailbox: isCombined ? COMBINED_ACCOUNT_ID : effectiveAccountId,

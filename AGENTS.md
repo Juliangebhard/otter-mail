@@ -27,6 +27,9 @@ when a feature lands or goes.
   - `src/updates.ts`: electron-updater against GitHub Releases.
 - `apps/web`: the React renderer, one build for both apps. `index.html` is the main window,
   `tray-popover.html` the menu-bar mini inbox. UI primitives live in `src/components/ui/`.
+  Where the main window is (mailbox, label, conversation, Settings pane) is its route
+  (`src/main/router.tsx`, TanStack Router): in the hash in the Mac app, real paths on the web
+  (`/you@gmail.com/INBOX/<id>`, `/all/inbox`, `/settings/appearance`).
   `src/web/` is the browser shell: core in a Web Worker (SQLite WASM on OPFS) hosted by one
   tab for every open tab (`backend.ts`), and the bridge that stands in for the preload. What only the Mac app has is off in `desktopBridge.features`.
 - `apps/ios`: Otter Mail for iPhone, a native SwiftUI app (iOS 27, Liquid Glass): ChatGPT's
@@ -55,7 +58,8 @@ when a feature lands or goes.
   only links there. A note is marketing, written only when the user asks for one (the
   `write-changelog` skill). Format in `packages/shared/src/changelog.ts`.
 - `site/`: https://mail.otterware.app, a Cloudflare Worker: the landing page, privacy policy and
-  terms, and the web app (`/` shows the app when signed in, `/app` always).
+  terms, and the web app (`/` shows the app when signed in, `/app` always, and so does any
+  other page that isn't a file: the app's own routes).
 - Deploys: Cloudflare Workers Builds deploys `infra/relay` and `site/` on pushes to `main` that
   touch them; GitHub Actions smoke-tests the relay every 6 hours (keyless Google Cloud access).
 
