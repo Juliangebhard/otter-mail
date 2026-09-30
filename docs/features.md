@@ -128,16 +128,17 @@ The Mac app supports Apple Silicon Macs (arm64).
 
 ## Settings & customization
 
-| Feature                                                    | Mac | Web | iPhone                                                                     |
-| ---------------------------------------------------------- | --- | --- | -------------------------------------------------------------------------- |
-| 7 themes, a light and a dark pick; System / Light / Dark   | ✓   | ✓   | ✓                                                                          |
-| Panel animations                                           | ✓   | ✓   | —                                                                          |
-| Keyboard shortcuts, rebindable (incl. move to label)       | ✓   | ✓   | —                                                                          |
-| Command palette (⌘K)                                       | ✓   | ✓   | —                                                                          |
-| Settings search (/ or ⌘F in Settings)                      | ✓   | ✓   | —                                                                          |
-| Changelog (opens the site's, from ⌘K and Settings' ? menu) | ✓   | ✓   | —                                                                          |
-| Custom views (rules across mailboxes)                      | ✓   | ✓   | —                                                                          |
-| Preferences synced through the Otter account               | ✓   | ✓   | ✓ (theme, advance, mailboxes, notifications, languages, agent, signatures) |
+| Feature                                                               | Mac | Web | iPhone                                                                     |
+| --------------------------------------------------------------------- | --- | --- | -------------------------------------------------------------------------- |
+| 7 themes, a light and a dark pick; System / Light / Dark              | ✓   | ✓   | ✓                                                                          |
+| Your own themes (Otter Code's editor): duplicate, edit, import/export | ✓   | ✓   | ✓ (worn and picked; made on the Mac or the web)                            |
+| Panel animations                                                      | ✓   | ✓   | —                                                                          |
+| Keyboard shortcuts, rebindable (incl. move to label)                  | ✓   | ✓   | —                                                                          |
+| Command palette (⌘K)                                                  | ✓   | ✓   | —                                                                          |
+| Settings search (/ or ⌘F in Settings)                                 | ✓   | ✓   | —                                                                          |
+| Changelog (opens the site's, from ⌘K and Settings' ? menu)            | ✓   | ✓   | —                                                                          |
+| Custom views (rules across mailboxes)                                 | ✓   | ✓   | —                                                                          |
+| Preferences synced through the Otter account                          | ✓   | ✓   | ✓ (theme, advance, mailboxes, notifications, languages, agent, signatures) |
 
 ## Support
 

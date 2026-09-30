@@ -167,7 +167,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     id: "themes",
     title: "Themes",
     pane: "appearance",
-    searchTerms: ["colors palette look"],
+    searchTerms: ["colors palette look", "custom create duplicate import export"],
   },
   {
     id: "dock-badge",
