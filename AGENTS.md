@@ -128,3 +128,5 @@ change in the simulator, in light and dark.
   payloads small and never block the renderer on Gmail.
 - The Mac app targets macOS only (Apple Translation, the Dock badge, the menu-bar popover); the
   web app runs in current browsers. Gate Mac-only UI with `features`, never with ad-hoc checks.
+- Each app shows only what works on it. Hide what it doesn't have; don't show it disabled or
+  labeled "Available in the Mac app" (an error explaining why something just failed may say so).

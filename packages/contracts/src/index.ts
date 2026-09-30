@@ -64,6 +64,8 @@ export interface BridgeFeatures {
   openFiles: boolean;
   /** Handing a support report to a locally installed agent in Terminal. */
   externalAgent: boolean;
+  /** Codex and Claude, the command-line agents installed on this computer. */
+  localAgents: boolean;
 }
 
 export interface DesktopBridge {

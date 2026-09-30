@@ -1,9 +1,9 @@
 import SwiftUI
 
 /**
- * Settings › Agents, as on the desktop: Hermes' connection and model
- * (following the Otter account, key included), and the Mac's local agents,
- * listed but off here.
+ * Settings › Agents, as on the desktop: Hermes on or off (off, the agent's
+ * buttons go), and its connection and model (following the Otter account, key
+ * included). The Mac's local agents don't run here, so they aren't shown.
  */
 struct AgentSettings: View {
     @Environment(Session.self) private var session
@@ -17,12 +17,17 @@ struct AgentSettings: View {
         @Bindable var agent = session.agent
         SettingsForm {
             Section {
-                LabeledContent {
-                    Text(statusText).foregroundStyle(statusColor)
-                } label: {
-                    Label("Hermes", systemImage: "cursorarrow")
+                Toggle(isOn: $agent.hermes.enabled) {
+                    Label {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Hermes")
+                            Text(statusText).font(.subheadline).foregroundStyle(statusColor)
+                        }
+                    } icon: {
+                        Image("AgentCursor")
+                    }
                 }
-                if agent.hasKey && !agent.hermes.baseUrl.isEmpty {
+                if agent.isOn && agent.hasKey && !agent.hermes.baseUrl.isEmpty {
                     LabeledContent("Server") {
                         Text(URL(string: agent.hermes.baseUrl)?.host() ?? agent.hermes.baseUrl)
                             .foregroundStyle(palette.muted)
@@ -47,7 +52,7 @@ struct AgentSettings: View {
                         ))
                     }
                     Button("Disconnect", role: .destructive) { agent.disconnect() }
-                } else {
+                } else if agent.isOn {
                     TextField("https://hermes.example:8642", text: $url)
                         .keyboardType(.URL)
                         .textContentType(.URL)
@@ -63,37 +68,19 @@ struct AgentSettings: View {
                     }
                     .disabled(url.isEmpty || key.isEmpty || connecting)
                 }
-            } header: {
-                Text("Hermes")
             } footer: {
                 Text("Your agent server, reached from every device. Chats live on it, so they're the same here, on the Mac and on the web. The key follows your Otter account, sealed.")
-            }
-
-            Section {
-                macOnly("Codex", "chevron.left.forwardslash.chevron.right")
-                macOnly("Claude", "asterisk")
-            } header: {
-                Text("On your Mac")
-            } footer: {
-                Text("Codex and Claude run on your Mac, where their command-line tools are. Use them in the Mac app.")
             }
         }
         .navigationTitle("Agents")
         .toolbarTitleDisplayMode(.inline)
         .onAppear { url = session.agent.hermes.baseUrl }
-        .task { await session.agent.check() }
-    }
-
-    private func macOnly(_ name: String, _ symbol: String) -> some View {
-        LabeledContent {
-            Text("Mac app").foregroundStyle(palette.muted)
-        } label: {
-            Label(name, systemImage: symbol)
-        }
+        .task(id: session.agent.isOn) { await session.agent.check() }
     }
 
     private var statusText: String {
-        switch session.agent.status {
+        guard session.agent.isOn else { return "Off" }
+        return switch session.agent.status {
         case .notConfigured: "Not connected"
         case .checking: "Checking…"
         case .ready: "Connected"

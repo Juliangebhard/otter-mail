@@ -7,6 +7,9 @@ The Mac app supports Apple Silicon Macs (arm64).
 
 ✓ supported · — not supported · a note means partly, or differently
 
+An app shows only what it supports: what it doesn't have isn't listed, switched off, or pointed
+to another app. This page is where they're compared.
+
 ## Getting started
 
 | Feature                                                             | Mac                                | Web | iPhone              |
@@ -158,15 +161,16 @@ optional fix PRs. See [support.md](support.md).
 
 ## Agents
 
-| Feature                                            | Mac                         | Web                        | iPhone       |
-| -------------------------------------------------- | --------------------------- | -------------------------- | ------------ |
-| Providers                                          | Claude, Codex, Hermes       | Hermes (Claude, Codex off) | Hermes       |
-| Chat, models, steer / stop, tool approval, history | ✓                           | ✓                          | ✓            |
-| Chat about a conversation (pointers, not mail)     | ✓ (also selections, quotes) | ✓                          | ✓ (a thread) |
-| Attach images and files to a chat                  | ✓                           | ✓                          | —            |
-| Queued follow-ups                                  | ✓                           | ✓                          | —            |
-| Mail and calendar tools (Claude, Codex)            | ✓ (every mailbox)           | —                          | —            |
-| Theme tools: make, change and wear themes          | ✓                           | —                          | —            |
+| Feature                                            | Mac                         | Web        | iPhone                     |
+| -------------------------------------------------- | --------------------------- | ---------- | -------------------------- |
+| Providers                                          | Claude, Codex, Hermes       | Hermes     | Hermes                     |
+| Chat, models, steer / stop, tool approval, history | ✓                           | ✓          | ✓                          |
+| Turn an agent off                                  | ✓                           | ✓ (Hermes) | ✓ (Hermes; its buttons go) |
+| Chat about a conversation (pointers, not mail)     | ✓ (also selections, quotes) | ✓          | ✓ (a thread)               |
+| Attach images and files to a chat                  | ✓                           | ✓          | —                          |
+| Queued follow-ups                                  | ✓                           | ✓          | —                          |
+| Mail and calendar tools (Claude, Codex)            | ✓ (every mailbox)           | —          | —                          |
+| Theme tools: make, change and wear themes          | ✓                           | —          | —                          |
 
 Claude and Codex get Otter Mail's own tools (an MCP server in the Mac app's backend), so they
 need no mail CLI: search, read and sort mail, download attachments, save drafts and send, in

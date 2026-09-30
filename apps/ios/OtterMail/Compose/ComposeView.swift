@@ -27,7 +27,7 @@ struct ComposeView: View {
                 VStack(alignment: .leading, spacing: 0) {
                     fields
                     TextField("Subject", text: $draft.subject, axis: .vertical)
-                        .font(.system(size: 26, weight: .semibold))
+                        .font(.title2.weight(.semibold))
                         .foregroundStyle(palette.text)
                         .focused($focus, equals: .subject)
                         .padding(.top, 20)

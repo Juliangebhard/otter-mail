@@ -9,7 +9,7 @@ their code.
 - **ChatGPT's frame.** The mail list is the page; a swipe from the left (or a tap on its title)
   slides it aside to show the drawer: a page per mailbox (All first) that you swipe through, as on
   the desktop, each with its folders and labels, then Compose and Settings. Settings is ChatGPT's grouped sheet.
-- **Otter Code's rows.** Who and when, the subject, a line of the latest message; the mailbox's mark
+- **The desktop's rows.** Who and when, the subject, a line of the latest message; the mailbox's dot
   in All mailboxes. Swipe for read, archive and trash; long-press for the rest.
 - **iOS's own bars.** The list's bottom bar (agent, search, compose) and the reader's buttons are
   the system's glass toolbar. Replying starts from a glass field at the bottom, like ChatGPT's
@@ -46,7 +46,7 @@ SMTP servers directly too (`docs/imap.md`); the relay never sees its mail, token
   the same server-side chats, model and key (the `assistant` preferences section, under its old
   name, and the sealed `hermesKey` follow the Otter account). Conversations go to it as pointers, the
   desktop's "context from Otter Mail" block; the agent reads the mail itself. Codex and Claude are
-  local agents on the Mac, listed but off.
+  local agents on the Mac, so the phone doesn't show them.
 - `Mail/`: the model and `MailStore`, which screens render from. `DemoMail.swift` loads the demo.
 - `Home/`, `Reader/`, `Compose/`, `Settings/`: the screens.
 

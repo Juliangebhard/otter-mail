@@ -61,11 +61,6 @@ const ADVANCE_DIRECTION_OPTIONS: { value: AdvanceDirection; label: string }[] = 
   { value: "none", label: "Don't select another message" },
 ];
 
-/** What a setting does, or, where it can't be changed here, that the Mac app has it. */
-function macAppOnly(available: boolean, description: string): string {
-  return available ? description : `${description} Available in the Mac app.`;
-}
-
 // ---------------------------------------------------------------------------
 // General
 // ---------------------------------------------------------------------------
@@ -199,53 +194,50 @@ function GeneralPane() {
 
   return (
     <SettingsPageContainer title="General">
-      <SettingsSection title="Startup, Dock & menu bar">
-        <SettingsRow
-          {...searchableSetting("launch-at-login")}
-          description={macAppOnly(
-            features.launchAtLogin,
-            "Open Otter Mail automatically when you log in to your Mac.",
-          )}
-          control={
-            <Switch
-              id="launchAtLogin"
-              checked={features.launchAtLogin && launchAtLogin}
-              disabled={!features.launchAtLogin}
-              onCheckedChange={(checked) => void handleLaunchAtLoginChange(checked)}
+      {/* What only the Mac app has isn't shown elsewhere. */}
+      {features.launchAtLogin || features.menuBar || features.dockBadge ? (
+        <SettingsSection title="Startup, Dock & menu bar">
+          {features.launchAtLogin ? (
+            <SettingsRow
+              {...searchableSetting("launch-at-login")}
+              description="Open Otter Mail automatically when you log in to your Mac."
+              control={
+                <Switch
+                  id="launchAtLogin"
+                  checked={launchAtLogin}
+                  onCheckedChange={(checked) => void handleLaunchAtLoginChange(checked)}
+                />
+              }
             />
-          }
-        />
-        <SettingsRow
-          {...searchableSetting("menu-bar-icon")}
-          description={macAppOnly(
-            features.menuBar,
-            "An Otter Mail icon in the menu bar with a quick unread inbox view.",
-          )}
-          control={
-            <Switch
-              id="trayEnabled"
-              checked={features.menuBar && trayEnabled}
-              disabled={!features.menuBar}
-              onCheckedChange={(checked) => void handleTrayEnabledChange(checked)}
+          ) : null}
+          {features.menuBar ? (
+            <SettingsRow
+              {...searchableSetting("menu-bar-icon")}
+              description="An Otter Mail icon in the menu bar with a quick unread inbox view."
+              control={
+                <Switch
+                  id="trayEnabled"
+                  checked={trayEnabled}
+                  onCheckedChange={(checked) => void handleTrayEnabledChange(checked)}
+                />
+              }
             />
-          }
-        />
-        <SettingsRow
-          {...searchableSetting("dock-badge")}
-          description={macAppOnly(
-            features.dockBadge,
-            "A badge with the number of unread messages in your inboxes.",
-          )}
-          control={
-            <Switch
-              id="dockBadgeEnabled"
-              checked={features.dockBadge && dockBadge}
-              disabled={!features.dockBadge}
-              onCheckedChange={(checked) => void handleDockBadgeChange(checked)}
+          ) : null}
+          {features.dockBadge ? (
+            <SettingsRow
+              {...searchableSetting("dock-badge")}
+              description="A badge with the number of unread messages in your inboxes."
+              control={
+                <Switch
+                  id="dockBadgeEnabled"
+                  checked={dockBadge}
+                  onCheckedChange={(checked) => void handleDockBadgeChange(checked)}
+                />
+              }
             />
-          }
-        />
-      </SettingsSection>
+          ) : null}
+        </SettingsSection>
+      ) : null}
 
       <SettingsSection title="Mail">
         <SettingsRow
@@ -291,25 +283,22 @@ function GeneralPane() {
 
       <TranslationSection />
 
-      <SettingsSection title="System">
-        <SettingsRow
-          {...searchableSetting("default-mail-app")}
-          description={macAppOnly(
-            features.defaultMailApp,
-            "Which app opens mailto: links across macOS.",
-          )}
-          control={
-            <RowSelect
-              value={defaultMailBundleId ?? undefined}
-              onValueChange={(v) => void handleDefaultMailChange(v)}
-              options={mailApps.map((app) => ({ value: app.bundleId, label: app.name }))}
-              ariaLabel="Default email app"
-              placeholder={features.defaultMailApp ? undefined : "—"}
-              disabled={!features.defaultMailApp}
-            />
-          }
-        />
-      </SettingsSection>
+      {features.defaultMailApp ? (
+        <SettingsSection title="System">
+          <SettingsRow
+            {...searchableSetting("default-mail-app")}
+            description="Which app opens mailto: links across macOS."
+            control={
+              <RowSelect
+                value={defaultMailBundleId ?? undefined}
+                onValueChange={(v) => void handleDefaultMailChange(v)}
+                options={mailApps.map((app) => ({ value: app.bundleId, label: app.name }))}
+                ariaLabel="Default email app"
+              />
+            }
+          />
+        </SettingsSection>
+      ) : null}
 
       <SettingsSection title="Getting started">
         <SettingsRow

@@ -156,8 +156,6 @@ export type ProviderSnapshot = {
   model: string | null;
   /** Chats persist on the provider and can be listed/resumed. */
   sessions: boolean;
-  /** A local agent the web app can't run: listed, off, pointing to the Mac app. */
-  macAppOnly?: boolean;
 };
 /** T3 Code's runtime modes: how much an agent may do without asking. */
 export type RuntimeMode = "approval-required" | "auto-accept-edits" | "full-access";

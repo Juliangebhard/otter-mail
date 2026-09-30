@@ -110,11 +110,11 @@ struct MessageView: View {
 
     private var header: some View {
         HStack(alignment: .top, spacing: 12) {
-            SenderAvatar(person: message.from, size: 38)
+            SenderAvatar(person: message.from, size: 34)
             VStack(alignment: .leading, spacing: 2) {
                 HStack(alignment: .firstTextBaseline) {
                     Text(message.from.isAddress(mailbox.email) ? "Me" : message.from.label)
-                        .font(.body.weight(.semibold))
+                        .font(.subheadline.weight(.semibold))
                         .foregroundStyle(palette.text)
                         .lineLimit(1)
                     if message.draft {
@@ -124,8 +124,9 @@ struct MessageView: View {
                     }
                     Spacer()
                     Text(RelativeTime.short(message.date))
-                        .font(.subheadline)
+                        .font(.footnote)
                         .foregroundStyle(palette.muted)
+                        .monospacedDigit()
                 }
                 Text(open ? recipients : message.snippet)
                     .font(.subheadline)
@@ -186,9 +187,9 @@ struct AttachmentChip: View {
 
 private extension Text {
     func bodyText(_ palette: Palette) -> some View {
-        font(.body)
+        font(.callout)
             .foregroundStyle(palette.text)
-            .lineSpacing(3)
+            .lineSpacing(4)
             .textSelection(.enabled)
             .frame(maxWidth: .infinity, alignment: .leading)
     }

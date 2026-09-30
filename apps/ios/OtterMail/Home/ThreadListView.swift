@@ -2,11 +2,12 @@ import SwiftUI
 
 /**
  * A folder's threads, laid out like Otter Code's task list: who, what, and a
- * line of it. The bottom bar is iOS's own: the agent, search and
- * compose (the sidebar is a swipe from the left, or a tap on the title).
+ * line of it. The bottom bar is iOS's own: the agent (when it's on), search
+ * and compose (the sidebar is a swipe from the left, or a tap on the title).
  */
 struct ThreadListView: View {
     @Environment(MailStore.self) private var store
+    @Environment(Session.self) private var session
     @Environment(\.palette) private var palette
 
     let place: Place
@@ -88,10 +89,12 @@ struct ThreadListView: View {
                     Button("Settings", systemImage: "gearshape", action: onSettings)
                 }
             }
-            ToolbarItem(placement: .bottomBar) {
-                Button("Agent", systemImage: "cursorarrow", action: onAgent)
+            if session.agent.isOn {
+                ToolbarItem(placement: .bottomBar) {
+                    Button(action: onAgent) { Label("Agent", image: "AgentCursor") }
+                }
+                ToolbarSpacer(.fixed, placement: .bottomBar)
             }
-            ToolbarSpacer(.fixed, placement: .bottomBar)
             DefaultToolbarItem(kind: .search, placement: .bottomBar)
             ToolbarSpacer(.fixed, placement: .bottomBar)
             ToolbarItem(placement: .bottomBar) {
@@ -131,14 +134,9 @@ struct ThreadListView: View {
                     .navigationLinkIndicatorVisibility(.hidden)
             }
         }
-        .listRowBackground(
-            // The theme's divider (the system's separators don't take its color in light mode).
-            palette.canvas.overlay(alignment: .bottom) {
-                palette.border.frame(height: 1).padding(.horizontal, 20)
-            }
-        )
+        .listRowBackground(palette.canvas)
         .listRowSeparator(.hidden)
-        .listRowInsets(EdgeInsets(top: 12, leading: 20, bottom: 12, trailing: 20))
+        .listRowInsets(EdgeInsets(top: 9, leading: 20, bottom: 9, trailing: 20))
         .swipeActions(edge: .leading) {
             Button(thread.unread ? "Read" : "Unread", systemImage: thread.unread ? "envelope.open" : "envelope.badge") {
                 store.setRead(thread.unread, thread.id)
@@ -169,8 +167,8 @@ struct ThreadListView: View {
         let scope: String
 
         var body: some View {
-            Text("\(Text(title).foregroundStyle(palette.text)) \(Text(scope).foregroundStyle(palette.muted))")
-                .font(.system(size: 28, weight: .regular))
+            Text("\(Text(title).fontWeight(.semibold).foregroundStyle(palette.text)) \(Text(scope).foregroundStyle(palette.muted))")
+                .font(.title3)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
                 .fixedSize()

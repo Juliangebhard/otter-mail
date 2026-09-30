@@ -24,9 +24,9 @@ struct SidebarView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("Otter Mail")
-                .font(.system(size: 26, weight: .semibold))
-                .foregroundStyle(palette.sidebarText)
+            // The desktop's wordmark: "Mail" quieter.
+            Text("\(Text("Otter").foregroundStyle(palette.sidebarText)) \(Text("Mail").foregroundStyle(palette.sidebarMuted))")
+                .font(.title3.weight(.semibold))
                 .padding(.horizontal, 24)
                 .padding(.top, 8)
                 .padding(.bottom, 14)
@@ -88,7 +88,7 @@ struct SidebarView: View {
         } label: {
             HStack(spacing: 6) {
                 if let mailbox {
-                    MailboxMark(mailbox: mailbox, size: 18)
+                    MailboxMark(mailbox: mailbox, size: 16)
                     Text(mailbox.displayName)
                 } else {
                     Image(systemName: "square.stack")
@@ -98,9 +98,8 @@ struct SidebarView: View {
             .font(.subheadline.weight(.medium))
             .foregroundStyle(selected ? palette.sidebarText : palette.sidebarMuted)
             .padding(.horizontal, 12)
-            .frame(height: 36)
+            .frame(height: 32)
             .background(selected ? palette.sidebarSelected : .clear, in: .capsule)
-            .overlay(Capsule().strokeBorder(palette.sidebarSelected, lineWidth: 1))
         }
         .buttonStyle(.plain)
         .id(key)
@@ -124,11 +123,11 @@ struct SidebarView: View {
                 let labels = scope.flatMap(store.mailbox)?.labels ?? []
                 if !labels.isEmpty {
                     Text("Labels")
-                        .font(.headline)
-                        .foregroundStyle(palette.sidebarText)
+                        .font(.footnote)
+                        .foregroundStyle(palette.sidebarMuted)
                         .padding(.horizontal, 12)
-                        .padding(.top, 22)
-                        .padding(.bottom, 6)
+                        .padding(.top, 20)
+                        .padding(.bottom, 4)
                     ForEach(labels) { label in
                         row(.label(id: label.id, name: label.name), scope: scope, color: label.color, indent: label.depth)
                     }
@@ -158,27 +157,28 @@ struct SidebarView: View {
         return Button {
             onSelect(Place(scope: scope, folder: folder))
         } label: {
-            HStack(spacing: 14) {
+            HStack(spacing: 12) {
+                // Icons stay quiet, as on the desktop, until their row is picked.
                 Image(systemName: folder.symbol)
-                    .font(.system(size: 19))
-                    .foregroundStyle(color.map(Color.init(hex:)) ?? palette.sidebarText)
-                    .frame(width: 26)
+                    .font(.system(size: 16))
+                    .foregroundStyle(color.map(Color.init(hex:)) ?? (selected ? palette.sidebarText : palette.sidebarMuted))
+                    .frame(width: 22)
                 Text(folder.title)
-                    .font(.system(size: 18))
+                    .font(.callout)
                     .foregroundStyle(palette.sidebarText)
                     .lineLimit(1)
                 Spacer()
                 if count > 0 {
                     Text("\(count)")
-                        .font(.subheadline)
+                        .font(.footnote)
                         .foregroundStyle(palette.sidebarMuted)
                         .monospacedDigit()
                 }
             }
-            .padding(.leading, 12 + CGFloat(indent) * 22)
+            .padding(.leading, 12 + CGFloat(indent) * 20)
             .padding(.trailing, 12)
-            .frame(height: 50)
-            .background(selected ? palette.sidebarSelected : .clear, in: .rect(cornerRadius: 16))
+            .frame(height: 44)
+            .background(selected ? palette.sidebarSelected : .clear, in: .rect(cornerRadius: 12))
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
@@ -188,18 +188,19 @@ struct SidebarView: View {
         HStack {
             Button(action: onCompose) {
                 Label("Compose", systemImage: "square.and.pencil")
-                    .font(.system(size: 18, weight: .semibold))
-                    .padding(.horizontal, 10)
-                    .frame(height: 40)
+                    .font(.callout.weight(.medium))
+                    .foregroundStyle(palette.sidebarText)
+                    .padding(.horizontal, 18)
+                    .frame(height: 44)
+                    .contentShape(.capsule)
             }
-            .buttonStyle(.glassProminent)
-            .tint(palette.sidebarText)
-            .foregroundStyle(palette.sidebar)
+            .buttonStyle(.plain)
+            .glassEffect(.regular.interactive(), in: .capsule)
             Spacer()
             Button("Settings", systemImage: "gearshape", action: onSettings)
                 .labelStyle(.iconOnly)
-                .font(.system(size: 20))
-                .frame(width: 52, height: 52)
+                .font(.system(size: 17))
+                .frame(width: 44, height: 44)
                 .foregroundStyle(palette.sidebarText)
                 .glassEffect(.regular.interactive(), in: .circle)
         }

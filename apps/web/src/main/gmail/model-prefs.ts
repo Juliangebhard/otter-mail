@@ -1,7 +1,7 @@
 /**
  * Per-model client preferences, as T3 Code keeps them: favorites (pinned in
  * the picker) and models hidden from the picker. Keys are `kind:slug`;
- * stored on this Mac and shared live between Settings and the composer.
+ * stored on this device and shared live between Settings and the composer.
  */
 
 import { setSyncedPreference, type SyncedKey } from "../synced-preferences";

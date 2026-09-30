@@ -30,6 +30,9 @@ export function TranslationSection() {
     }
   };
 
+  // Nothing to translate with here (a browser without a translator): not shown.
+  if (!features.translation) return null;
+
   const setLanguages = (languages: string[]) => void save({ readLanguages: languages });
   const addable = TRANSLATION_LANGUAGES.filter((code) => !readLanguages.includes(code)).sort(
     (a, b) => languageName(a).localeCompare(languageName(b)),
@@ -39,14 +42,10 @@ export function TranslationSection() {
     <SettingsSection title="Translation">
       <SettingsRow
         {...searchableSetting("read-languages")}
-        description={
-          features.translation
-            ? "Mail in any other language offers a translation into your starred language. The translator runs on this device, so nothing is sent anywhere."
-            : "Mail in any other language offers a translation into your starred language. Available in Chrome and in the Mac app, which translate on the device."
-        }
+        description="Mail in any other language offers a translation into your starred language. The translator runs on this device, so nothing is sent anywhere."
         control={
           <DropdownMenu>
-            <DropdownMenuTrigger asChild disabled={!features.translation}>
+            <DropdownMenuTrigger asChild>
               <Btn size="sm" variant="outline">
                 <PlusIcon className="size-3.5" />
                 Add language
@@ -110,8 +109,7 @@ export function TranslationSection() {
         control={
           <Switch
             id="autoTranslate"
-            checked={features.translation && autoTranslate}
-            disabled={!features.translation}
+            checked={autoTranslate}
             onCheckedChange={(checked) => void save({ autoTranslate: checked })}
           />
         }
