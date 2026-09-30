@@ -50,9 +50,15 @@ final class Agent {
         var output: String?
     }
 
+    /** An agent asking before it does something: Hermes running a command. */
     struct Approval: Equatable {
         var id: String
-        var command: String?
+        /** "Allow Hermes to run this command?" */
+        var question: String
+        /** Exactly what will happen, shown verbatim. */
+        var detail: String?
+        /** A command, shown as code. */
+        var isCommand = false
         var reason: String?
         var choices: [String]
     }
@@ -253,12 +259,17 @@ final class Agent {
         case .tool(let name): updateLast { $0.tools.append(Tool(name: name)) }
         case .toolResult(let output): updateLast { t in if !t.tools.isEmpty { t.tools[t.tools.count - 1].output = output } }
         case .approval(let id, let command, let reason, let choices):
-            updateLast { $0.approval = Approval(id: id, command: command, reason: reason, choices: choices) }
+            updateLast {
+                $0.approval = Approval(id: id, question: "Allow Hermes to run this command?", detail: command, isCommand: true, reason: reason, choices: choices)
+            }
         case .completed(let steer):
             if let steer { turns.append(Turn(role: .user, text: steer, error: "Hermes finished before this; send it again.")) }
         case .failed(let message): updateLast { $0.error = message }
         }
     }
+
+    /** What the running turn is waiting on, shown in the composer's place. */
+    var pendingApproval: Approval? { turns.last { $0.role == .agent }?.approval }
 
     private func updateLast(_ change: (inout Turn) -> Void) {
         guard let i = turns.lastIndex(where: { $0.role == .agent }) else { return }
