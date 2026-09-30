@@ -28,7 +28,7 @@ async function refreshProfile(account: GmailAccount): Promise<boolean> {
   const newPicture = picture && picture !== account.picture ? picture : undefined;
   if (!newName && !newPicture) return false;
   const updated = await updateAccount(account.id, { name: newName, picture: newPicture });
-  void accountEdited(updated);
+  void accountEdited(updated, ["name", "picture"]);
   return true;
 }
 

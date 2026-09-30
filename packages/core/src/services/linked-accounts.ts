@@ -207,10 +207,19 @@ export async function accountRemoved(email: string): Promise<void> {
   }
 }
 
-/** After editing an account's profile (name, picture, label, color) here. */
-export async function accountEdited(account: GmailAccount): Promise<void> {
+/**
+ * After editing an account here: its label and color, or the name and picture
+ * read from Google (google-profile.ts). Only `fields` go: this device's copy
+ * of the others may be older than the relay's.
+ */
+export async function accountEdited(
+  account: GmailAccount,
+  fields: (keyof ReturnType<typeof profile>)[],
+): Promise<void> {
   if (!getOtterUser() || !readSnapshot().has(key(account.email))) return;
-  await relayRequest("PUT", accountRoute(account.email), profile(account)).catch((err: unknown) => {
+  const all = profile(account);
+  const edited = Object.fromEntries(fields.map((field) => [field, all[field]]));
+  await relayRequest("PUT", accountRoute(account.email), edited).catch((err: unknown) => {
     logger.info("linked-accounts", `Couldn't update ${account.email}: ${String(err)}`);
   });
 }
