@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { UpdateState } from "@otter-mail/contracts";
+import { changelogUrl } from "@otter-mail/shared/changelog";
 
 import { ArrowDownCircleIcon, SparklesIcon, XIcon } from "lucide-react";
 
@@ -163,6 +164,14 @@ export function UpdateCard() {
                   ? "It will try again later."
                   : `${percent}%`}
           </p>
+          {/* This build doesn't carry the new version's note yet: the site does. */}
+          <button
+            type="button"
+            onClick={() => void window.desktopBridge.openExternal(changelogUrl(version))}
+            className="cursor-pointer text-2xs text-foreground/80 underline-offset-2 outline-none hover:text-foreground hover:underline focus-visible:underline"
+          >
+            What's new →
+          </button>
         </div>
         {state.status === "downloaded" ? (
           <button

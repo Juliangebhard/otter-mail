@@ -11,6 +11,8 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260901.0",
+    "@otter-mail/shared": "workspace:*",
+    "marked": "^18.0.14",
     "typescript": "catalog:",
     "wrangler": "^4.141.0"
   }

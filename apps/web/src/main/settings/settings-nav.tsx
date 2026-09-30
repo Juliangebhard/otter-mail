@@ -9,6 +9,7 @@ import {
   MailIcon,
   MailCheckIcon,
   MousePointer2Icon,
+  SparklesIcon,
 } from "lucide-react";
 import { gmailApi, type SettingsPane } from "../gmail/api";
 import { HintTooltip, cn } from "../gmail/ui";
@@ -28,6 +29,7 @@ export const SETTINGS_SECTIONS: ReadonlyArray<SettingsSection> = [
   { id: "accounts", label: "Mailboxes", icon: MailIcon },
   { id: "views", label: "Views", icon: LayersIcon },
   { id: "agents", label: "Agents", icon: MousePointer2Icon },
+  { id: "changelog", label: "What's new", icon: SparklesIcon },
 ];
 
 export function settingsSectionLabel(pane: SettingsPane): string {

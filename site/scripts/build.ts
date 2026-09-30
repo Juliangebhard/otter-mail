@@ -1,9 +1,11 @@
-// Assembles the site in dist/: the landing pages (public/) and the web app
-// (apps/web's build, its page as app.html). Run by `pnpm build` (and deploy).
+// Assembles the site in dist/: the landing pages (public/), the changelog
+// (changelog/ at the repository root) and the web app (apps/web's build, its
+// page as app.html). Run by `pnpm build` (and deploy).
 
 import { execFileSync } from "node:child_process";
 import * as NodeFS from "node:fs";
 import * as NodePath from "node:path";
+import { writeChangelog } from "./changelog.ts";
 
 const site = NodePath.resolve(import.meta.dirname, "..");
 const web = NodePath.resolve(site, "../apps/web/dist");
@@ -15,4 +17,9 @@ NodeFS.rmSync(dist, { recursive: true, force: true });
 NodeFS.cpSync(NodePath.join(site, "public"), dist, { recursive: true });
 NodeFS.cpSync(NodePath.join(web, "assets"), NodePath.join(dist, "assets"), { recursive: true });
 NodeFS.copyFileSync(NodePath.join(web, "index.html"), NodePath.join(dist, "app.html"));
+// Released notes only: the version main last released (the Release workflow records it).
+const released = JSON.parse(
+  NodeFS.readFileSync(NodePath.resolve(site, "../apps/desktop/package.json"), "utf8"),
+) as { version: string };
+writeChangelog(dist, released.version);
 console.log("Site assembled in site/dist.");
