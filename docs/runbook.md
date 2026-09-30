@@ -27,14 +27,15 @@ the Google and GitHub settings that go with these URLs. D1 migrations run before
 
 ## Mac app
 
-1. If the release is worth announcing (your call; fixes usually aren't), land its note on
-   `main` first: `changelog/<version>.md` (the `write-changelog` skill).
-2. Actions → **Release** → Run workflow → `patch`, `minor` or `major` (or
+1. Actions → **Release** → Run workflow → `patch`, `minor` or `major` (or
    `gh workflow run release.yml -f bump=minor`).
-3. It builds arm64 (Apple Silicon), signs with the Developer ID, notarizes, publishes a GitHub Release
+2. It builds arm64 (Apple Silicon), signs with the Developer ID, notarizes, publishes a GitHub Release
    and bumps the version on `main`.
-4. Installed apps update themselves ("Restart to update" in the sidebar), then offer the newest
-   note since their last.
+3. Installed apps update themselves ("Restart to update" in the sidebar).
+
+A changelog note is not part of a release. When you want one, it can land on `main` before or
+after (`changelog/<version>.md`, the `write-changelog` skill); the site shows it once that version
+is out.
 
 - **Check:** the run is green and its log says "macOS signing and notarization enabled." (not
   "Building UNSIGNED").

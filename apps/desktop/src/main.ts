@@ -7,7 +7,7 @@ import * as path from "node:path";
 import type { NativeThemeInfo, ThemeSource } from "@otter-mail/contracts";
 import type { AppSettings } from "@otter-mail/core";
 
-import { invokeBackend, startBackend, stopBackend } from "./backend-host.js";
+import { invokeBackend, setDockBadgeEnabled, startBackend, stopBackend } from "./backend-host.js";
 import { registerHandlers } from "./handlers/index.js";
 import { requestSupportReport } from "./handlers/support.js";
 import { broadcast } from "./ipc.js";
@@ -333,6 +333,7 @@ void app.whenReady().then(async () => {
   if (startupSettings.trayEnabled) {
     void createTray();
   }
+  setDockBadgeEnabled(startupSettings.dockBadgeEnabled);
 
   try {
     await createMainWindow();

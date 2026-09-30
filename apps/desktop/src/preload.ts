@@ -28,6 +28,7 @@ const bridge: DesktopBridge = {
     trafficLights: true,
     menuBar: true,
     launchAtLogin: true,
+    dockBadge: true,
     defaultMailApp: true,
     translation: true,
     dragOut: true,

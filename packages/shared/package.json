@@ -2,7 +2,7 @@
   "name": "@otter-mail/shared",
   "version": "0.1.0",
   "private": true,
-  "description": "What every app shows the same, the iPhone app included: the color themes and the demo mailbox; and the changelog's format, for the app and the site.",
+  "description": "What every app shows the same, the iPhone app included: the color themes and the demo mailbox; and the changelog's format, for the site.",
   "type": "module",
   "exports": {
     "./themes": "./src/theme-palettes.ts",

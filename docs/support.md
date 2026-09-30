@@ -1,7 +1,8 @@
 # Sending feedback
 
 Open **Send feedback** from the mailbox menu, the command palette, or
-Settings → General → Support. On the Mac it is also in the Help menu.
+Settings → General → Support or the ? Help menu beside Back. On the Mac it is
+also in the native Help menu.
 
 Choose **Bug report** or **Feature request**, and select the affected platform:
 Mac, web, or iPhone. It defaults to the app you are using. GitHub's bug template

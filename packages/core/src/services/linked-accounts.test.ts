@@ -1,15 +1,39 @@
 import { describe, expect, it, vi } from "vite-plus/test";
+import type { ImapSettings } from "@otter-mail/contracts";
 import type { RelayAccount } from "@otter-mail/contracts/relay";
 
 vi.mock("electron", () => ({ app: {}, safeStorage: {}, shell: {}, BrowserWindow: {} }));
 
-const { accountFromRelay, linkRequest, planReconcile } = await import("./linked-accounts.ts");
+// Signed in to an Otter account that links a@x.com, with the relay's requests kept.
+const relayRequests = vi.hoisted((): unknown[][] => []);
+vi.mock("./otter-account.ts", () => ({
+  getOtterUser: () => ({ id: "u" }),
+  relayRequest: async (...args: unknown[]) => {
+    relayRequests.push(args);
+    return null;
+  },
+  RelayError: class extends Error {},
+}));
+vi.mock("./mail-store.ts", () => ({ getKv: () => '["a@x.com"]', setKv: () => {} }));
+
+const { accountEdited, accountFromRelay, linkRequest, planReconcile } =
+  await import("./linked-accounts.ts");
 
 const local = (
   email: string,
-  extra: { signedIn?: boolean; displayName?: string; color?: string } = {},
+  extra: {
+    signedIn?: boolean;
+    displayName?: string;
+    color?: string;
+    name?: string;
+    picture?: string;
+    imap?: ImapSettings;
+  } = {},
 ) => ({
   email,
+  name: extra.name ?? "A",
+  picture: extra.picture,
+  imap: extra.imap,
   signedIn: extra.signedIn ?? true,
   displayName: extra.displayName,
   color: extra.color,
@@ -32,6 +56,50 @@ describe("planReconcile", () => {
   it("does nothing when both sides agree", () => {
     const plan = planReconcile([local("a@x.com")], [remote("a@x.com")], new Set(["a@x.com"]));
     expect(plan).toEqual(none);
+  });
+
+  it("a signed-out Gmail account follows the relay's name and picture", () => {
+    const here = local("a@x.com", { signedIn: false, picture: "old" });
+    const there = remote("a@x.com", { name: "A", picture: "new" });
+    expect(planReconcile([here], [there], new Set(["a@x.com"]))).toEqual({
+      ...none,
+      update: [there],
+    });
+  });
+
+  it("a signed-in Gmail account keeps its own name and picture", () => {
+    const there = remote("a@x.com", { name: "Other", picture: "new" });
+    const plan = planReconcile(
+      [local("a@x.com", { picture: "old" })],
+      [there],
+      new Set(["a@x.com"]),
+    );
+    expect(plan).toEqual(none);
+  });
+
+  it("a signed-in Gmail account recolored elsewhere still keeps its own picture", () => {
+    const there = remote("a@x.com", { name: "Other", picture: "new", color: "#f00" });
+    const plan = planReconcile(
+      [local("a@x.com", { picture: "old" })],
+      [there],
+      new Set(["a@x.com"]),
+    );
+    expect(plan).toEqual({ ...none, update: [{ ...there, name: null, picture: null }] });
+  });
+
+  it("a relay row without a picture never blanks the local one", () => {
+    const here = local("a@x.com", { signedIn: false, picture: "mine" });
+    expect(planReconcile([here], [remote("a@x.com")], new Set(["a@x.com"]))).toEqual(none);
+  });
+
+  it("an IMAP account follows the relay's picture", () => {
+    const settings = { imap: { host: "i" }, smtp: { host: "s" } } as ImapSettings;
+    const there = remote("a@x.com", { provider: "imap", imap: settings, picture: "new" });
+    const here = local("a@x.com", { imap: settings, picture: "old" });
+    expect(planReconcile([here], [there], new Set(["a@x.com"]))).toEqual({
+      ...none,
+      update: [there],
+    });
   });
 
   it("first sign-in merges: links what's here, adds what's there", () => {
@@ -173,5 +241,34 @@ describe("IMAP mailboxes", () => {
     );
     expect(body).toMatchObject({ idToken: "token-for-a@gmail.com", name: "A" });
     expect(body).not.toHaveProperty("provider");
+  });
+});
+
+describe("accountEdited", () => {
+  const account = {
+    id: "a@x.com",
+    email: "a@x.com",
+    name: "Ada",
+    picture: "https://example.com/a.png",
+    displayName: "Work",
+    color: "#f00",
+  };
+
+  it("a new label or color sends just those, never this device's name and picture", async () => {
+    relayRequests.length = 0;
+    await accountEdited(account, ["displayName", "color"]);
+    expect(relayRequests).toEqual([
+      [
+        "PUT",
+        "/v1/accounts/a%40x.com?providers=gmail,imap",
+        { displayName: "Work", color: "#f00" },
+      ],
+    ]);
+  });
+
+  it("Google's name and picture go without the label and color", async () => {
+    relayRequests.length = 0;
+    await accountEdited(account, ["name", "picture"]);
+    expect(relayRequests[0]?.[2]).toEqual({ name: "Ada", picture: "https://example.com/a.png" });
   });
 });

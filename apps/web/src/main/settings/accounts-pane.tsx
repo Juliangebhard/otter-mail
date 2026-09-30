@@ -200,7 +200,9 @@ function AccountAvatar({
   return (
     <span className="relative shrink-0">
       <Avatar size={size}>
-        {account.picture ? <AvatarImage src={account.picture} alt={displayName} /> : null}
+        {account.picture ? (
+          <AvatarImage src={account.picture} alt={displayName} referrerPolicy="no-referrer" />
+        ) : null}
         <AvatarFallback>{(displayName[0] ?? "?").toUpperCase()}</AvatarFallback>
       </Avatar>
       <span

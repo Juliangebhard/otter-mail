@@ -50,6 +50,8 @@ export interface BridgeFeatures {
   /** The menu-bar icon and mini inbox. */
   menuBar: boolean;
   launchAtLogin: boolean;
+  /** The unread count on the Dock icon. */
+  dockBadge: boolean;
   /** Being the Mac's default mail app (mailto: links). */
   defaultMailApp: boolean;
   /** Apple's on-device translation. */

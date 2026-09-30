@@ -211,7 +211,8 @@ function carryOut(effect: MainEffect): void {
       return;
     }
     case "unread":
-      app.dock?.setBadge(effect.count > 0 ? String(effect.count) : "");
+      unreadCount = effect.count;
+      showDockBadge();
       setTrayUnread(effect.count);
       return;
     case "settings":
@@ -223,8 +224,24 @@ function carryOut(effect: MainEffect): void {
   }
 }
 
+let unreadCount = 0;
+let dockBadgeEnabled = true;
+
+function showDockBadge(): void {
+  app.dock?.setBadge(dockBadgeEnabled && unreadCount > 0 ? String(unreadCount) : "");
+}
+
+/** Shows or hides the Dock badge, keeping the count for when it comes back. */
+export function setDockBadgeEnabled(enabled: boolean): void {
+  dockBadgeEnabled = enabled;
+  showDockBadge();
+}
+
 /** The settings main carries out itself. */
 function applySettings(settings: AppSettings, patch: Partial<AppSettings>): void {
+  if (patch.dockBadgeEnabled !== undefined) {
+    setDockBadgeEnabled(settings.dockBadgeEnabled);
+  }
   if (patch.launchAtLogin !== undefined) {
     app.setLoginItemSettings({ openAtLogin: settings.launchAtLogin });
   }

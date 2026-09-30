@@ -6,9 +6,9 @@ their code.
 
 ## Design
 
-- **ChatGPT's frame.** The mail list is the page; a swipe from the left slides it aside to
-  show the drawer: a page per mailbox (All first) that you swipe through, as on the desktop, each
-  with its folders and labels, then Compose and Settings. Settings is ChatGPT's grouped sheet.
+- **ChatGPT's frame.** The mail list is the page; a swipe from the left (or a tap on its title)
+  slides it aside to show the drawer: a page per mailbox (All first) that you swipe through, as on
+  the desktop, each with its folders and labels, then Compose and Settings. Settings is ChatGPT's grouped sheet.
 - **Otter Code's rows.** Who and when, the subject, a line of the latest message; the mailbox's mark
   in All mailboxes. Swipe for read, archive and trash; long-press for the rest.
 - **iOS's own bars.** The list's bottom bar (agent, search, compose) and the reader's buttons are
@@ -77,6 +77,12 @@ xcrun devicectl device install app --device <udid> "apps/ios/.build/Build/Produc
 (`xcrun devicectl list devices` gives the UDID. Without an Apple account signed in to Xcode, add
 `-authenticationKeyPath/-authenticationKeyID/-authenticationKeyIssuerID` with an App Store Connect
 API key.)
+
+Unit tests (`OtterMailTests`, Swift Testing) run in the simulator:
+
+```sh
+xcodebuild -project apps/ios/OtterMail.xcodeproj -scheme OtterMail -destination 'platform=iOS Simulator,name=iPhone 17' test
+```
 
 Shipping: the Release iPhone workflow builds and uploads to TestFlight (`pnpm release:ios` does
 the same from a Mac); see `docs/release.md`. The app has its own version, `MARKETING_VERSION` in

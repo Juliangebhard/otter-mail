@@ -35,8 +35,9 @@ final class GmailProvider: MailProvider {
             // First sync: where Gmail is now, then the inbox's first page.
             state.historyID = try await api.historyID()
             let (ids, next) = try await api.threadIDs(label: "INBOX")
-            delta.threads += try await api.threads(ids)
-            state.pages[MailSync.key(.inbox)] = next ?? ""
+            let page = try await api.threads(ids)
+            delta.threads += page
+            state.paged(MailSync.key(.inbox), next: next, oldest: page.map(\.latest.date).min())
             state.draftIDs = try await api.draftIDs()
         }
         return delta
@@ -47,7 +48,10 @@ final class GmailProvider: MailProvider {
         let (ids, next) = try await api.threadIDs(label: Self.label(folder), pageToken: state.pages[key])
         let have = Set(known.map(\.id))
         let threads = try await api.threads(ids.filter { !have.contains($0) })
-        state.pages[key] = next ?? ""
+        // How far back the page goes counts the threads already here too.
+        let listed = Set(ids)
+        let page = threads + known.filter { listed.contains($0.id) }
+        state.paged(key, next: next, oldest: page.map(\.latest.date).min())
         return MailDelta(threads: threads)
     }
 

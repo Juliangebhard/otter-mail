@@ -24,6 +24,7 @@ The Mac app supports Apple Silicon Macs (arm64).
 | Several mailboxes: on/off, reorder          | ✓                  | ✓                                   | ✓                       |
 | Combined mailbox (all accounts)             | ✓                  | ✓                                   | ✓ ("All")               |
 | Rename and color a mailbox (synced)         | ✓                  | ✓                                   | ✓                       |
+| Google profile picture per mailbox          | ✓ (kept current)   | ✓ (kept current)                    | —                       |
 | Remove a mailbox (unlinks it everywhere)    | ✓                  | ✓                                   | ✓                       |
 | Mailbox linked elsewhere shows "signed out" | ✓                  | ✓                                   | ✓                       |
 | Demo mailbox                                | —                  | `pnpm dev:demo` only                | TestFlight / Xcode only |
@@ -127,15 +128,15 @@ The Mac app supports Apple Silicon Macs (arm64).
 
 ## Settings & customization
 
-| Feature                                                  | Mac | Web | iPhone                                                                     |
-| -------------------------------------------------------- | --- | --- | -------------------------------------------------------------------------- |
-| 7 themes, a light and a dark pick; System / Light / Dark | ✓   | ✓   | ✓                                                                          |
-| Panel animations                                         | ✓   | ✓   | —                                                                          |
-| Keyboard shortcuts, rebindable (incl. move to label)     | ✓   | ✓   | —                                                                          |
-| Command palette (⌘K)                                     | ✓   | ✓   | —                                                                          |
-| What's new (the changelog; offered once after an update) | ✓   | ✓   | —                                                                          |
-| Custom views (rules across mailboxes)                    | ✓   | ✓   | —                                                                          |
-| Preferences synced through the Otter account             | ✓   | ✓   | ✓ (theme, advance, mailboxes, notifications, languages, agent, signatures) |
+| Feature                                                    | Mac | Web | iPhone                                                                     |
+| ---------------------------------------------------------- | --- | --- | -------------------------------------------------------------------------- |
+| 7 themes, a light and a dark pick; System / Light / Dark   | ✓   | ✓   | ✓                                                                          |
+| Panel animations                                           | ✓   | ✓   | —                                                                          |
+| Keyboard shortcuts, rebindable (incl. move to label)       | ✓   | ✓   | —                                                                          |
+| Command palette (⌘K)                                       | ✓   | ✓   | —                                                                          |
+| Changelog (opens the site's, from ⌘K and Settings' ? menu) | ✓   | ✓   | —                                                                          |
+| Custom views (rules across mailboxes)                      | ✓   | ✓   | —                                                                          |
+| Preferences synced through the Otter account               | ✓   | ✓   | ✓ (theme, advance, mailboxes, notifications, languages, agent, signatures) |
 
 ## Support
 
@@ -175,7 +176,7 @@ that changes a mailbox asks first unless the chat has full access; drafts don't 
 ## Mac-only
 
 - Menu-bar icon and mini inbox (open, archive, trash, compose, sync).
-- Dock badge; launch at login; default mail app (mailto: links).
+- Dock badge (can be turned off in Settings → Appearance); launch at login; default mail app (mailto: links).
 - Drag attachments out to Finder.
 - Menus: Sync Now, Back / Forward (⌘[ ⌘]).
 - Auto-update from GitHub Releases ("Restart to update"), or all at once from ⌘K ("Update Otter

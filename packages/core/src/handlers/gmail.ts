@@ -47,6 +47,7 @@ import { getSenderAvatar } from "../services/avatar-store.js";
 import { updateDockBadge } from "../services/notifier.js";
 import { getSettings, updateSettings, type AppSettings } from "../services/settings-store.js";
 import { preferenceChanged } from "../services/preferences.js";
+import { refreshProfiles } from "../services/google-profile.js";
 import { refreshSignatures, saveSignature } from "../services/signatures.js";
 import * as viewsStore from "../services/views-store.js";
 import { ALL_MAIL_LABEL_ID } from "../types.js";
@@ -250,8 +251,10 @@ export function registerGmailHandlers(): void {
     }
   });
 
+  // Settings → Accounts opening: signatures, and names and pictures, from Google.
   handle("gmail:refreshSignatures", async () => {
     void refreshSignatures();
+    void refreshProfiles();
   });
 
   handle("gmail:cancelAddAccount", async () => {
@@ -287,7 +290,9 @@ export function registerGmailHandlers(): void {
       let updated = await storeUpdateAccount(accountId, { displayName, color });
       if (signature !== undefined) updated = await saveSignature(updated, signature);
       broadcast("gmail:accounts-changed");
-      if (displayName !== undefined || color !== undefined) void accountEdited(updated);
+      if (displayName !== undefined || color !== undefined) {
+        void accountEdited(updated, ["displayName", "color"]);
+      }
       updateDockBadge();
       return updated;
     } catch (err) {
@@ -1332,6 +1337,12 @@ export function registerGmailHandlers(): void {
           throw new Error('Invalid parameter: "trayEnabled" must be a boolean.');
         }
         patch.trayEnabled = p.trayEnabled;
+      }
+      if (p?.dockBadgeEnabled !== undefined) {
+        if (typeof p.dockBadgeEnabled !== "boolean") {
+          throw new Error('Invalid parameter: "dockBadgeEnabled" must be a boolean.');
+        }
+        patch.dockBadgeEnabled = p.dockBadgeEnabled;
       }
       const settings = await updateSettings(patch);
       if (patch.syncIntervalSeconds !== undefined) {

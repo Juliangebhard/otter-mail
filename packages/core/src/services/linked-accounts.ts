@@ -31,7 +31,10 @@ import { getOtterUser, relayRequest, RelayError } from "./otter-account.js";
 import { syncedSignature } from "./preferences.js";
 import type { GmailAccount } from "../types.js";
 
-export type LocalAccount = Pick<GmailAccount, "email" | "displayName" | "color" | "imap"> & {
+export type LocalAccount = Pick<
+  GmailAccount,
+  "email" | "name" | "picture" | "displayName" | "color" | "imap"
+> & {
   signedIn: boolean;
 };
 
@@ -44,7 +47,7 @@ export type ReconcilePlan = {
   add: RelayAccount[];
   /** Unlinked on another device: remove them here. */
   remove: string[];
-  /** Linked on both, with a profile edited elsewhere. */
+  /** Linked on both, with a profile (name, picture, label, color) edited elsewhere. */
   update: RelayAccount[];
   /**
    * IMAP mailboxes signed in here whose servers the relay lists differently.
@@ -77,11 +80,17 @@ export function planReconcile(
       if (snapshot.has(key(account.email))) plan.unlink.push(account.email);
       else plan.add.push(account);
     } else {
+      // A signed-in Gmail account refreshes its name and picture from Google
+      // itself; the relay's copy could be staler, so even an update for its
+      // label or color leaves them alone. A null one never blanks ours.
+      const fromGoogle = here.signedIn && !here.imap;
       if (
         (here.displayName ?? null) !== account.displayName ||
-        (here.color ?? null) !== account.color
+        (here.color ?? null) !== account.color ||
+        (!fromGoogle && account.name !== null && here.name !== account.name) ||
+        (!fromGoogle && account.picture !== null && (here.picture ?? null) !== account.picture)
       ) {
-        plan.update.push(account);
+        plan.update.push(fromGoogle ? { ...account, name: null, picture: null } : account);
       }
       if (here.signedIn && here.imap && account.imap && !sameServers(here.imap, account.imap)) {
         plan.moved.push(account.email);
@@ -198,10 +207,19 @@ export async function accountRemoved(email: string): Promise<void> {
   }
 }
 
-/** After editing an account's name or color here. */
-export async function accountEdited(account: GmailAccount): Promise<void> {
+/**
+ * After editing an account here: its label and color, or the name and picture
+ * read from Google (google-profile.ts). Only `fields` go: this device's copy
+ * of the others may be older than the relay's.
+ */
+export async function accountEdited(
+  account: GmailAccount,
+  fields: (keyof ReturnType<typeof profile>)[],
+): Promise<void> {
   if (!getOtterUser() || !readSnapshot().has(key(account.email))) return;
-  await relayRequest("PUT", accountRoute(account.email), profile(account)).catch((err: unknown) => {
+  const all = profile(account);
+  const edited = Object.fromEntries(fields.map((field) => [field, all[field]]));
+  await relayRequest("PUT", accountRoute(account.email), edited).catch((err: unknown) => {
     logger.info("linked-accounts", `Couldn't update ${account.email}: ${String(err)}`);
   });
 }
@@ -255,6 +273,8 @@ export async function reconcileAccounts(
   }
   for (const account of plan.update) {
     await accountStore.updateAccount(byKey.get(key(account.email))!.id, {
+      name: account.name ?? undefined,
+      picture: account.picture ?? undefined,
       displayName: account.displayName ?? "",
       color: account.color ?? "",
     });

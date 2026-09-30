@@ -367,6 +367,7 @@ export type SyncSettings = {
   notificationsMode: NotificationsMode;
   launchAtLogin: boolean;
   trayEnabled: boolean;
+  dockBadgeEnabled: boolean;
 };
 
 export type TranslationSettings = {
@@ -391,7 +392,6 @@ export type SettingsPane =
   | "accounts"
   | "views"
   | "agents"
-  | "changelog"
   /** The Otter account page, opened from the user button at the bottom of the nav. */
   | "otter";
 export type SettingsTarget = {
