@@ -83,14 +83,6 @@ jobs:
           else args+=(--bump "${BUMP:-patch}"); fi
           node scripts/resolve-release-version.ts "${args[@]}"
 
-      - name: Changelog note
-        env:
-          VERSION: ${{ steps.meta.outputs.version }}
-        run: |
-          if [[ ! -f "changelog/$VERSION.md" ]]; then
-            echo "::notice title=No changelog note::No changelog/$VERSION.md: this release isn't announced (fine when that's the plan)."
-          fi
-
   build_mac:
     name: Build macOS (Apple Silicon)
     needs: [preflight]
