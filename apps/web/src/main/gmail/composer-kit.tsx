@@ -370,7 +370,7 @@ export function ComposerFooter({
         type="button"
         onClick={onSend}
         disabled={!canSend}
-        className="inline-flex h-8 cursor-pointer items-center gap-2 rounded-full bg-primary px-4 text-sm font-medium text-primary-foreground outline-none transition-[background-color,scale,opacity] hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-1 focus-visible:ring-offset-canvas active:scale-[0.97] disabled:pointer-events-none disabled:opacity-30"
+        className="inline-flex h-8 cursor-pointer items-center gap-2 rounded-full bg-primary px-4 text-sm font-medium text-primary-foreground outline-none transition-[background-color,opacity] hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-1 focus-visible:ring-offset-canvas disabled:pointer-events-none disabled:opacity-30"
       >
         Send
         <ShortcutText command="composer.send" className="text-[13px] font-normal opacity-60" />

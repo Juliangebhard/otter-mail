@@ -1,8 +1,24 @@
 import type { ReactNode } from "react";
 import { DropdownMenu as RadixMenu } from "radix-ui";
+import { useRouter, type RouterHistory } from "@tanstack/react-router";
+import { useSyncExternalStore } from "react";
 import {
+  ArchiveXIcon,
+  BookmarkIcon,
   ChevronDownIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  ClockIcon,
+  FileIcon,
+  InboxIcon,
   LayersIcon,
+  MailIcon,
+  MailsIcon,
+  SendIcon,
+  Settings2Icon,
+  StarIcon,
+  TagIcon,
+  Trash2Icon,
   PanelLeftCloseIcon,
   PanelLeftIcon,
   PanelRightIcon,
@@ -12,10 +28,19 @@ import { COMBINED_ACCOUNT_ID } from "./custom-views";
 import { getAccountDisplayName } from "./account-style";
 import { AccountPicture } from "./account-picture";
 import { useAllAccountLabels } from "./hooks";
-import { DropdownMenuSeparator } from "./menu";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "./menu";
+import { useRecentlyViewed, type RecentIcon } from "../recently-viewed";
 import type { GmailAccount } from "./types";
 import type { KeybindingCommand } from "../keybindings/commands";
 import { shortcutLabelFor, useKeybindingsState } from "../keybindings/store";
+import { features } from "../features";
 import { useMailboxArrangement } from "../mailboxes";
 
 /**
@@ -24,6 +49,123 @@ import { useMailboxArrangement } from "../mailboxes";
  * title (traffic lights, sidebar toggle, wordmark), the mailbox breadcrumb,
  * and the right-hand controls.
  */
+
+/**
+ * Where history can go: the router gives each entry its index, and a push
+ * drops everything ahead of it. Tracked from the first HistoryControls on,
+ * which mount with the window.
+ */
+let trackedHistory: RouterHistory | null = null;
+let furthestIndex = 0;
+
+function trackHistory(history: RouterHistory): void {
+  if (trackedHistory === history) return;
+  trackedHistory = history;
+  furthestIndex = history.location.state.__TSR_index;
+  history.subscribe(({ location, action }) => {
+    const index = location.state.__TSR_index;
+    furthestIndex = action.type === "PUSH" ? index : Math.max(furthestIndex, index);
+  });
+}
+
+const RECENT_ICONS: Record<RecentIcon, typeof InboxIcon> = {
+  inbox: InboxIcon,
+  starred: StarIcon,
+  sent: SendIcon,
+  drafts: FileIcon,
+  important: BookmarkIcon,
+  allmail: MailsIcon,
+  junk: ArchiveXIcon,
+  trash: Trash2Icon,
+  custom: LayersIcon,
+  label: TagIcon,
+  conversation: MailIcon,
+  settings: Settings2Icon,
+};
+
+/** The clock: where you've been lately (recently-viewed.ts), to go back to in one click. */
+function RecentlyViewedMenu() {
+  const { navigate } = useRouter();
+  const places = useRecentlyViewed();
+  return (
+    <DropdownMenu>
+      <HintTooltip label="Recently viewed">
+        <DropdownMenuTrigger asChild>
+          <IconBtn label="Recently viewed" className="no-drag pointer-events-auto">
+            <ClockIcon className="size-4" />
+          </IconBtn>
+        </DropdownMenuTrigger>
+      </HintTooltip>
+      <DropdownMenuContent align="start" className="w-[26rem]">
+        <DropdownMenuLabel>Recently viewed</DropdownMenuLabel>
+        {places.length === 0 ? (
+          <p className="px-2.5 pb-2 pt-1 text-sm text-muted-foreground">
+            Conversations and mailboxes you open show up here.
+          </p>
+        ) : (
+          places.map((place) => {
+            const Icon = RECENT_ICONS[place.icon] ?? MailIcon;
+            return (
+              <DropdownMenuItem
+                key={place.href}
+                onSelect={() => void navigate({ href: place.href })}
+              >
+                <span className="flex min-w-0 items-center gap-3">
+                  <span className="w-28 shrink-0 truncate text-muted-foreground">
+                    {place.context}
+                  </span>
+                  <Icon className="size-4 shrink-0 text-muted-foreground" />
+                  <span className="min-w-0 truncate">{place.title}</span>
+                </span>
+              </DropdownMenuItem>
+            );
+          })
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+/**
+ * Recently viewed, back and forward through the mailboxes, conversations and
+ * Settings pages you've been to (Linear's), in the Mac app, where no browser
+ * offers them: after the pinned toggle with the sidebar hidden, at the end
+ * of the sidebar's title band when it shows.
+ */
+export function HistoryControls({ className }: { className?: string }) {
+  const { history } = useRouter();
+  trackHistory(history);
+  const where = useSyncExternalStore(history.subscribe, () => {
+    const index = history.location.state.__TSR_index;
+    return `${index > 0 ? "back" : ""} ${index < furthestIndex ? "forward" : ""}`;
+  });
+  if (!features.historyButtons) return null;
+  return (
+    <div className={cn("flex items-center gap-1", className)}>
+      <RecentlyViewedMenu />
+      <HintTooltip label="Back">
+        <IconBtn
+          label="Back"
+          className="no-drag pointer-events-auto"
+          disabled={!where.includes("back")}
+          onClick={() => history.back()}
+        >
+          <ChevronLeftIcon className="size-4" />
+        </IconBtn>
+      </HintTooltip>
+      <HintTooltip label="Forward">
+        <IconBtn
+          label="Forward"
+          className="no-drag pointer-events-auto"
+          disabled={!where.includes("forward")}
+          onClick={() => history.forward()}
+        >
+          <ChevronRightIcon className="size-4" />
+        </IconBtn>
+      </HintTooltip>
+    </div>
+  );
+}
 
 /**
  * The sidebar toggle, pinned at one window position (Otter Code's
@@ -38,7 +180,7 @@ export function SidebarControl({
   onToggleSidebar: () => void;
 }) {
   return (
-    <div className="pointer-events-none fixed left-(--workspace-controls-left) top-0 z-40 flex h-(--workspace-topbar-height) items-center">
+    <div className="pointer-events-none fixed left-(--workspace-controls-left) top-0 z-40 flex h-(--workspace-topbar-height) items-center gap-1">
       <HintTooltip label={sidebarOpen ? "Hide sidebar" : "Show sidebar"} shortcut="sidebar.toggle">
         <IconBtn
           label="Toggle sidebar"
@@ -52,6 +194,7 @@ export function SidebarControl({
           )}
         </IconBtn>
       </HintTooltip>
+      {sidebarOpen ? null : <HistoryControls />}
     </div>
   );
 }
@@ -87,16 +230,27 @@ export function PanelControlSlot() {
   return <span aria-hidden className="w-(--workspace-titlebar-control-size) shrink-0" />;
 }
 
-/** Room left at the start of the leftmost band (sidebar hidden): traffic lights + toggle. */
+/** Room left at the start of the leftmost band (sidebar hidden): traffic lights, toggle, arrows. */
 export function TitlebarInset() {
   // The band's own px-4 already covers 1rem of it.
   return (
-    <span aria-hidden className="w-[calc(var(--workspace-titlebar-content-left)-1rem)] shrink-0" />
+    <span
+      aria-hidden
+      className={cn(
+        "shrink-0",
+        features.historyButtons
+          ? "w-[calc(var(--workspace-titlebar-content-left)+var(--workspace-history-controls-width)-1rem)]"
+          : "w-[calc(var(--workspace-titlebar-content-left)-1rem)]",
+      )}
+    />
   );
 }
 
-/** The sidebar's title band: room for the traffic lights and pinned toggle, then the wordmark. */
-export function WindowTitle({ className }: { className?: string }) {
+/**
+ * The sidebar's title band: room for the traffic lights and pinned toggle,
+ * then the wordmark, and back/forward at its end (`history`).
+ */
+export function WindowTitle({ className, history }: { className?: string; history?: boolean }) {
   return (
     <div
       className={cn(
@@ -109,6 +263,7 @@ export function WindowTitle({ className }: { className?: string }) {
         <span className="text-foreground">Otter</span>
         <span className="truncate text-muted-foreground">Mail</span>
       </span>
+      {history ? <HistoryControls className="-me-1.5 ml-auto" /> : null}
     </div>
   );
 }

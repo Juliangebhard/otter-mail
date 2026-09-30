@@ -26,13 +26,16 @@
   --sidebar-content-inset: 0.5rem;
   --sidebar-control-gap: 0.5rem;
   --sidebar-row-content-inset: 0.625rem;
-  --workspace-topbar-height: 52px;
+  /* Thin chrome, like Linear's: the traffic lights sit centered in it (main-window.ts). */
+  --workspace-topbar-height: 42px;
   /* Otter Code's titlebar anchors: the sidebar and agent toggles sit at
      these window positions whatever the panes do; headers leave room. */
-  --workspace-controls-left: 84px;
+  --workspace-controls-left: 82px;
   --workspace-controls-right: 1rem;
   --workspace-titlebar-control-size: 1.75rem;
   --workspace-titlebar-control-gap: 0.5rem;
+  /* Recently viewed, back and forward after the pinned toggle, sidebar hidden (the Mac app's HistoryControls). */
+  --workspace-history-controls-width: calc(3 * var(--workspace-titlebar-control-size));
   --workspace-titlebar-content-left: calc(
     var(--workspace-controls-left) + var(--workspace-titlebar-control-size) +
       var(--workspace-titlebar-control-gap)

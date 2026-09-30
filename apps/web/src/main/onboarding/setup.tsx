@@ -52,7 +52,13 @@ import type { GmailAccount } from "../gmail/types";
 import { Btn, cn } from "../gmail/ui";
 import { WindowTitle } from "../gmail/top-bar";
 import { OtterSignInOnboardingLink } from "../settings/otter-account-pane";
-import { SchemeCard, ThemeCard, useColorScheme } from "../settings/appearance-pane";
+import {
+  FontSizeRow,
+  ReadingWidthRow,
+  SchemeCard,
+  ThemeCard,
+  useColorScheme,
+} from "../settings/appearance-pane";
 import { SettingsGroup, SettingsRow, TextInput } from "../settings/settings-ui";
 import { HERMES_URL_HINT, useConnectHermes } from "../settings/providers-pane";
 import {
@@ -504,7 +510,7 @@ function LookStep() {
     <>
       <StepHeader
         title="Make it yours"
-        description="Everything changes as you click. Pick a theme for both, or just its light or dark half."
+        description="Everything changes as you click. Pick a theme for both, or just its light or dark half, then the text size and how wide mail reads."
       />
       <div className="grid grid-cols-3 gap-3">
         {(["system", "light", "dark"] as const).map((s) => (
@@ -530,6 +536,10 @@ function LookStep() {
           />
         ))}
       </div>
+      <SettingsGroup className="mt-6">
+        <FontSizeRow />
+        <ReadingWidthRow />
+      </SettingsGroup>
     </>
   );
 }

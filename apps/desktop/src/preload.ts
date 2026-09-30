@@ -26,6 +26,7 @@ const bridge: DesktopBridge = {
   platform: process.platform,
   features: {
     trafficLights: true,
+    historyButtons: true,
     menuBar: true,
     launchAtLogin: true,
     dockBadge: true,

@@ -23,7 +23,7 @@ export function RootView() {
       {/* Draggable top bar - fallback for when no toolbar is present (with
           one, it stops dragging: Electron ignores z-order for drag regions,
           so it would otherwise swallow clicks in the views' own top bars). */}
-      <div className="drag-region fixed top-0 left-0 right-0 h-13" />
+      <div className="drag-region fixed top-0 left-0 right-0 h-(--workspace-topbar-height)" />
       {/* relative: paints above the fixed fallback strip, which otherwise
           swallows clicks on the app's own top bar (the strip still wins via
           z-50 when no [data-toolbar] is mounted). */}

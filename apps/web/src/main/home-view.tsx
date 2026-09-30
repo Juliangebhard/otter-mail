@@ -81,6 +81,7 @@ import {
 import { ALL_MAIL_LABEL_ID } from "./gmail/label-names";
 import { useMonochromeTheme } from "./theme/apply-theme";
 import { useMailboxes } from "./mailboxes";
+import { useRecordRecentlyViewed } from "./recently-viewed";
 import { SetupFlow } from "./onboarding/setup";
 import { Tour } from "./onboarding/tour";
 import {
@@ -1067,6 +1068,17 @@ function MailHome() {
 
   const composeAccountId = isCombined ? firstRealAccountId : effectiveAccountId;
   const readerAccount = readerAccountId ?? (isCombined ? firstRealAccountId : effectiveAccountId);
+  useRecordRecentlyViewed({
+    ready: initialized,
+    href: router.state.location.href,
+    settingsPane: settingsRoute?.pane ?? null,
+    mailbox: selectedAccountId,
+    label: selectedLabelId,
+    messageId: selectedMessageId,
+    readerAccount,
+    accounts,
+    views,
+  });
   const hasListTarget = isCombined || effectiveAccountId != null;
 
   // Full-height columns: each pane owns its slice of the title band (on the
@@ -1119,7 +1131,7 @@ function MailHome() {
                 >
                   {settingsRoute ? (
                     <>
-                      <WindowTitle />
+                      <WindowTitle history />
                       <SettingsNav
                         pane={settingsRoute.pane}
                         onSelect={(pane, target) =>
