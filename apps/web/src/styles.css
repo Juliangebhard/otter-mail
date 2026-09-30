@@ -45,6 +45,15 @@
   --glass-blur: 12px;
   --glass-opacity: 80%;
   --glass-saturation: 1.14;
+  /* Contrast (Settings › Appearance; interface-settings.ts sets the first
+     three): text fades toward its surface below 100% and goes toward
+     black (white in dark) above it; borders fade, then take on text color. */
+  --appearance-contrast-base: 100%;
+  --appearance-contrast-boost: 0%;
+  --appearance-contrast-border-boost: 0%;
+  --appearance-contrast-target: black;
+  /* How wide the reader's thread grows (Settings › Appearance, Reading width). */
+  --reading-width: none;
 
   --canvas: #fcfcfc; /* zinc-25 */
   --app-chrome-background: var(--canvas);
@@ -114,6 +123,7 @@ html[data-platform="web"] {
   --app-scrollbar-thumb-hover: rgb(255 255 255 / 12%);
   --glass-blur: 16px;
   --glass-saturation: 1.08;
+  --appearance-contrast-target: white;
 
   --canvas: #0a0a0a; /* neutral-950 */
   --surface-raised: color-mix(in srgb, var(--canvas) 97%, #ffffff);
@@ -192,6 +202,108 @@ html[data-platform="web"] {
   --sidebar-line: var(--border);
 }
 
+/* Contrast (Otter Code's): the text and border roles the utilities paint,
+   derived from the raw ones above (or a theme's). Surfaces keep their color.
+   The sidebar declares them again so they come from its own palette. */
+:root,
+[data-app-sidebar] {
+  --contrast-foreground: color-mix(
+    in oklab,
+    color-mix(in oklab, var(--foreground) var(--appearance-contrast-base), var(--canvas)),
+    var(--appearance-contrast-target) var(--appearance-contrast-boost)
+  );
+  --contrast-muted-foreground: color-mix(
+    in oklab,
+    color-mix(in oklab, var(--muted-foreground) var(--appearance-contrast-base), var(--canvas)),
+    var(--appearance-contrast-target) var(--appearance-contrast-boost)
+  );
+  --contrast-placeholder: color-mix(
+    in oklab,
+    color-mix(in oklab, var(--placeholder) var(--appearance-contrast-base), var(--canvas)),
+    var(--appearance-contrast-target) var(--appearance-contrast-boost)
+  );
+  --contrast-secondary-label: color-mix(
+    in oklab,
+    color-mix(in oklab, var(--secondary-label) var(--appearance-contrast-base), var(--canvas)),
+    var(--appearance-contrast-target) var(--appearance-contrast-boost)
+  );
+  --contrast-icon-muted: color-mix(
+    in oklab,
+    color-mix(in oklab, var(--icon-muted) var(--appearance-contrast-base), var(--canvas)),
+    var(--appearance-contrast-target) var(--appearance-contrast-boost)
+  );
+  --contrast-card-foreground: color-mix(
+    in oklab,
+    color-mix(in oklab, var(--card-foreground) var(--appearance-contrast-base), var(--card)),
+    var(--appearance-contrast-target) var(--appearance-contrast-boost)
+  );
+  --contrast-popover-foreground: color-mix(
+    in oklab,
+    color-mix(in oklab, var(--popover-foreground) var(--appearance-contrast-base), var(--popover)),
+    var(--appearance-contrast-target) var(--appearance-contrast-boost)
+  );
+  --contrast-secondary-foreground: color-mix(
+    in oklab,
+    color-mix(
+      in oklab,
+      var(--secondary-foreground) var(--appearance-contrast-base),
+      var(--secondary)
+    ),
+    var(--appearance-contrast-target) var(--appearance-contrast-boost)
+  );
+  --contrast-accent-surface-foreground: color-mix(
+    in oklab,
+    color-mix(
+      in oklab,
+      var(--accent-surface-foreground) var(--appearance-contrast-base),
+      var(--accent-surface)
+    ),
+    var(--appearance-contrast-target) var(--appearance-contrast-boost)
+  );
+  --contrast-message-foreground: color-mix(
+    in oklab,
+    color-mix(
+      in oklab,
+      var(--message-foreground) var(--appearance-contrast-base),
+      var(--message-surface)
+    ),
+    var(--appearance-contrast-target) var(--appearance-contrast-boost)
+  );
+  --contrast-sidebar-foreground: color-mix(
+    in oklab,
+    color-mix(
+      in oklab,
+      var(--sidebar-foreground) var(--appearance-contrast-base),
+      var(--sidebar-surface)
+    ),
+    var(--appearance-contrast-target) var(--appearance-contrast-boost)
+  );
+  --contrast-sidebar-muted-foreground: color-mix(
+    in oklab,
+    color-mix(
+      in oklab,
+      var(--sidebar-muted-foreground) var(--appearance-contrast-base),
+      var(--sidebar-surface)
+    ),
+    var(--appearance-contrast-target) var(--appearance-contrast-boost)
+  );
+  --contrast-border: color-mix(
+    in srgb,
+    color-mix(in srgb, var(--border) var(--appearance-contrast-base), transparent),
+    var(--foreground) var(--appearance-contrast-border-boost)
+  );
+  --contrast-input: color-mix(
+    in srgb,
+    color-mix(in srgb, var(--input) var(--appearance-contrast-base), transparent),
+    var(--foreground) var(--appearance-contrast-border-boost)
+  );
+  --contrast-sidebar-line: color-mix(
+    in srgb,
+    color-mix(in srgb, var(--sidebar-line) var(--appearance-contrast-base), transparent),
+    var(--sidebar-foreground) var(--appearance-contrast-border-boost)
+  );
+}
+
 @theme {
   --font-sans:
     -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter Variable", "Segoe UI", system-ui,
@@ -215,27 +327,27 @@ html[data-platform="web"] {
 
   --color-canvas: var(--canvas);
   --color-background: var(--canvas);
-  --color-foreground: var(--foreground);
-  --color-foreground-40: color-mix(in srgb, var(--foreground) 40%, transparent);
+  --color-foreground: var(--contrast-foreground);
+  --color-foreground-40: color-mix(in srgb, var(--contrast-foreground) 40%, transparent);
   --color-accent: var(--accent);
   --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
+  --color-card-foreground: var(--contrast-card-foreground);
   --color-popover: var(--popover);
-  --color-popover-foreground: var(--popover-foreground);
+  --color-popover-foreground: var(--contrast-popover-foreground);
   --color-surface-raised: var(--surface-raised);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
   --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary-foreground: var(--contrast-secondary-foreground);
   --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-placeholder: var(--placeholder);
-  --color-secondary-label: var(--secondary-label);
-  --color-icon-muted: var(--icon-muted);
+  --color-muted-foreground: var(--contrast-muted-foreground);
+  --color-placeholder: var(--contrast-placeholder);
+  --color-secondary-label: var(--contrast-secondary-label);
+  --color-icon-muted: var(--contrast-icon-muted);
   --color-accent-surface: var(--accent-surface);
-  --color-accent-surface-foreground: var(--accent-surface-foreground);
+  --color-accent-surface-foreground: var(--contrast-accent-surface-foreground);
   --color-message: var(--message-surface);
-  --color-message-foreground: var(--message-foreground);
+  --color-message-foreground: var(--contrast-message-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
   --color-error: var(--error);
@@ -248,19 +360,19 @@ html[data-platform="web"] {
   --color-warning: var(--warning);
   --color-warning-foreground: var(--warning-foreground);
   --color-warning-surface: var(--warning-surface);
-  --color-border: var(--border);
-  --color-input: var(--input);
+  --color-border: var(--contrast-border);
+  --color-input: var(--contrast-input);
   --color-focus-ring: var(--ring);
   --color-code: var(--code-background);
   --color-code-foreground: var(--code-foreground);
   --color-sidebar-surface: var(--sidebar-surface);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar-muted-foreground: var(--sidebar-muted-foreground);
+  --color-sidebar-foreground: var(--contrast-sidebar-foreground);
+  --color-sidebar-muted-foreground: var(--contrast-sidebar-muted-foreground);
   --color-sidebar-control-surface: var(--sidebar-control-surface);
   --color-sidebar-row-hover: var(--sidebar-row-hover);
   --color-sidebar-row-active: var(--sidebar-row-active);
   --color-sidebar-row-selected: var(--sidebar-row-selected);
-  --color-sidebar-line: var(--sidebar-line);
+  --color-sidebar-line: var(--contrast-sidebar-line);
 
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);

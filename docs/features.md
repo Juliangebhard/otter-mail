@@ -133,6 +133,7 @@ The Mac app supports Apple Silicon Macs (arm64).
 | 7 themes, a light and a dark pick; System / Light / Dark              | ✓   | ✓   | ✓                                                                          |
 | Your own themes (Otter Code's editor): duplicate, edit, import/export | ✓   | ✓   | ✓ (worn and picked; made on the Mac or the web)                            |
 | Panel animations                                                      | ✓   | ✓   | —                                                                          |
+| Contrast, glass opacity, font size, reading width                     | ✓   | ✓   | —                                                                          |
 | Keyboard shortcuts, rebindable (incl. move to label)                  | ✓   | ✓   | —                                                                          |
 | Command palette (⌘K)                                                  | ✓   | ✓   | —                                                                          |
 | Settings search (/ or ⌘F in Settings)                                 | ✓   | ✓   | —                                                                          |
@@ -181,7 +182,7 @@ also make a theme or change one of the user's own, and wear a theme; a built-in 
 ## Mac-only
 
 - Menu-bar icon and mini inbox (open, archive, trash, compose, sync).
-- Dock badge (can be turned off in Settings → Appearance); launch at login; default mail app (mailto: links).
+- Dock badge (off by default; Settings → General); launch at login; default mail app (mailto: links).
 - Drag attachments out to Finder.
 - Menus: Sync Now, Back / Forward (⌘[ ⌘]).
 - Auto-update from GitHub Releases ("Restart to update"), or all at once from ⌘K ("Update Otter

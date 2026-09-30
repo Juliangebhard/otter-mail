@@ -4,7 +4,7 @@
  * roles with light and dark variants. The web app maps the roles onto its CSS
  * variables (apps/web's apply-theme.ts); the iPhone app reads them from
  * Themes.json (scripts/export-ios-resources.ts). The standard palette is
- * "Otter Code".
+ * "T3 Code".
  */
 
 export type ThemeAppearance = "light" | "dark";
@@ -1007,7 +1007,7 @@ export function getThemeColorsForAppearance(
 /** The stock palette ("otter", styles.css in the web app) as a definition. */
 export const OTTER_THEME: ThemeDefinition = {
   id: "otter",
-  label: "Otter Code",
+  label: "T3 Code",
   appearance: "light",
   colors: OTTER_LIGHT_THEME_COLORS,
   variants: { light: OTTER_LIGHT_THEME_COLORS, dark: OTTER_DARK_THEME_COLORS },

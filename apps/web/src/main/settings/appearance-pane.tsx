@@ -1,21 +1,23 @@
 import { setSyncedPreference } from "../synced-preferences";
-import { Switch } from "~/components/ui/switch";
-import { features } from "../features";
-import { gmailApi } from "../gmail/api";
 import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { toast } from "../gmail/toast";
 import type { NativeThemeInfo } from "@otter-mail/contracts";
 import {
   CopyIcon,
-  MoonIcon,
+  EllipsisIcon,
   PaintbrushIcon,
   PenLineIcon,
   PlusIcon,
-  SunIcon,
   Trash2Icon,
   UploadIcon,
 } from "lucide-react";
 import { cn, HintTooltip } from "../gmail/ui";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "../gmail/menu";
 import {
   appearance,
   INITIAL_THEME_ID,
@@ -46,8 +48,21 @@ import {
 } from "../panel-animations";
 import { PanelAnimationsPreview } from "./panel-animations-preview";
 import {
+  CONTRAST,
+  GLASS_OPACITY,
+  DEFAULT_READING_WIDTH,
+  INTERFACE_FONT_SIZE,
+  READING_WIDTHS,
+  setInterfaceSetting,
+  setReadingWidth,
+  useInterfaceSetting,
+  useReadingWidth,
+  type InterfaceSetting,
+  type ReadingWidth,
+} from "../theme/interface-settings";
+import {
+  RowSelect,
   SettingResetButton,
-  SettingsGroup,
   SettingsPageContainer,
   SettingsRow,
   SettingsSection,
@@ -65,7 +80,7 @@ function MiniWindow({ colors }: { colors: ThemeColors }) {
   const line = (width: string, extra?: CSSProperties) => (
     <span
       className="block h-1.5 rounded-full"
-      style={{ width, backgroundColor: colors.textMuted, opacity: 0.35, ...extra }}
+      style={{ width, backgroundColor: colors.textMuted, opacity: 0.6, ...extra }}
     />
   );
   return (
@@ -81,7 +96,7 @@ function MiniWindow({ colors }: { colors: ThemeColors }) {
           className="block h-2 rounded-full"
           style={{
             backgroundColor: colors.sidebarRowSelected,
-            border: `1px solid ${colors.border}`,
+            border: `1px solid ${colors.input}`,
           }}
         />
         {line("80%")}
@@ -99,7 +114,7 @@ function MiniWindow({ colors }: { colors: ThemeColors }) {
         {line("48%")}
         <span
           className="absolute inset-x-3 bottom-2.5 flex h-4 items-center justify-end rounded-full px-1"
-          style={{ backgroundColor: colors.surfaceRaised, border: `1px solid ${colors.border}` }}
+          style={{ backgroundColor: colors.surfaceRaised, border: `1px solid ${colors.input}` }}
         >
           <span
             className="block size-2.5 rounded-full"
@@ -124,25 +139,29 @@ export function SchemeCard({
   light: ThemeColors;
   dark: ThemeColors;
   onSelect: () => void;
-  /** Just the little window, named by a tooltip (Settings' row, as ChatGPT has it). */
+  /** A short window over its name, as tall as the theme cards below it (Settings). */
   compact?: boolean;
 }) {
   const label = scheme === "system" ? "System" : scheme === "light" ? "Light" : "Dark";
-  const card = (
+  return (
     <button
       type="button"
       aria-pressed={selected}
-      aria-label={compact ? label : undefined}
       onClick={onSelect}
       className={cn(
         "flex cursor-pointer flex-col items-center gap-2 rounded-xl border bg-card p-2 pb-2.5 text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-focus-ring",
-        compact && "w-24 rounded-lg p-1",
+        compact && "items-stretch gap-1.5 p-1.5 pb-2",
         selected
           ? "border-focus-ring text-foreground ring-1 ring-focus-ring"
           : "border-border/60 text-muted-foreground hover:border-input hover:text-foreground",
       )}
     >
-      <span className="relative block aspect-[16/10] w-full overflow-hidden rounded-lg border border-border/60">
+      <span
+        className={cn(
+          "relative block w-full overflow-hidden rounded-lg border border-border/60",
+          compact ? "h-16" : "aspect-[16/10]",
+        )}
+      >
         {scheme === "system" ? (
           <>
             <span className="absolute inset-0">
@@ -156,54 +175,37 @@ export function SchemeCard({
           <MiniWindow colors={scheme === "light" ? light : dark} />
         )}
       </span>
-      {compact ? null : <span className={selected ? "font-medium" : undefined}>{label}</span>}
+      <span
+        className={cn(
+          compact && "flex min-h-6 items-center px-2.5",
+          selected && !compact && "font-medium",
+        )}
+      >
+        {label}
+      </span>
     </button>
   );
-  return compact ? <HintTooltip label={label}>{card}</HintTooltip> : card;
 }
 
 // ---------------------------------------------------------------------------
-// Theme orbs (ported from Otter Code's ThemePreviewCircles).
+// Theme cards: the theme's own light and dark windows, side by side.
 // ---------------------------------------------------------------------------
 
-const ORB_SPEC = {
-  light: {
-    baseTarget: "#ffffff",
-    accent: { center: "72% 22%", middleOffset: 28, middleOpacity: 72, endOffset: 58 },
-    action: { center: "18% 82%", startOpacity: 45, endOffset: 55 },
-  },
-  dark: {
-    baseTarget: "#09090b",
-    accent: { center: "28% 78%", middleOffset: 28, middleOpacity: 62, endOffset: 58 },
-    action: { center: "82% 18%", startOpacity: 45, endOffset: 55 },
-  },
-} as const;
-
-function orbStyle(colors: ThemeColors, mode: ThemeAppearance): CSSProperties {
-  const spec = ORB_SPEC[mode];
-  return {
-    backgroundColor: `color-mix(in oklab, ${colors.canvas} 80%, ${spec.baseTarget})`,
-    backgroundImage: [
-      `radial-gradient(circle at ${spec.accent.center} in oklab, ${colors.accent} 0%, color-mix(in oklab, ${colors.accent} ${spec.accent.middleOpacity}%, transparent) ${spec.accent.middleOffset}%, transparent ${spec.accent.endOffset}%)`,
-      `radial-gradient(circle at ${spec.action.center} in oklab, color-mix(in oklab, ${colors.messageAction} ${spec.action.startOpacity}%, transparent) 0%, transparent ${spec.action.endOffset}%)`,
-    ].join(", "),
-    filter: "blur(3px)",
-    transform: "scale(1.1)",
-  };
-}
-
-function ThemeOrb({
+/** One side of a theme card's window: click it to wear the theme there alone. */
+function ThemeHalf({
   theme,
   mode,
+  side,
   picked,
   onPick,
 }: {
   theme: ThemeDefinition;
   mode: ThemeAppearance;
+  /** Which part of the window shows: light is its left, dark its right (as System's tile). */
+  side: "start" | "end" | "full";
   picked: boolean;
   onPick: () => void;
 }) {
-  const colors = themeColors(theme.id, mode);
   return (
     <HintTooltip label={mode === "light" ? "Use for light mode" : "Use for dark mode"}>
       <button
@@ -215,37 +217,29 @@ function ThemeOrb({
           onPick();
         }}
         className={cn(
-          "relative flex size-[60px] shrink-0 cursor-pointer items-center justify-center rounded-full p-1 outline-none transition-transform focus-visible:ring-2 focus-visible:ring-focus-ring",
-          !picked && "hover:scale-105",
+          "group/half relative min-w-0 flex-1 cursor-pointer overflow-hidden outline-none focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-focus-ring",
+          side !== "end" && "rounded-s-[7px]",
+          side !== "start" && "rounded-e-[7px]",
         )}
       >
         <span
-          aria-hidden
-          className="relative block size-12 overflow-hidden rounded-full border-2 border-canvas"
-          style={{
-            boxShadow:
-              mode === "dark"
-                ? "inset 0 0 0 1px rgb(255 255 255 / 0.14), 0 1px 2px rgb(0 0 0 / 0.18)"
-                : "inset 0 0 0 1px rgb(0 0 0 / 0.10), 0 1px 2px rgb(0 0 0 / 0.08)",
-          }}
+          className={cn(
+            "absolute inset-y-0 block",
+            side === "full" ? "inset-x-0" : "w-[200%]",
+            side === "end" && "right-0",
+          )}
         >
-          <span className="absolute inset-0 rounded-full" style={orbStyle(colors, mode)} />
+          <MiniWindow colors={themeColors(theme.id, mode)} />
         </span>
-        {picked ? (
-          <>
-            <span
-              aria-hidden
-              className="pointer-events-none absolute inset-0 rounded-full"
-              style={{ boxShadow: "inset 0 0 0 2px var(--ring)" }}
-            />
-            <span
-              aria-hidden
-              className="pointer-events-none absolute bottom-0.5 right-0.5 flex size-5 items-center justify-center rounded-full border border-border/70 bg-canvas text-foreground shadow-sm"
-            >
-              {mode === "light" ? <SunIcon className="size-3" /> : <MoonIcon className="size-3" />}
-            </span>
-          </>
-        ) : null}
+        <span
+          aria-hidden
+          className={cn(
+            "pointer-events-none absolute inset-0 rounded-[inherit] transition-shadow",
+            picked
+              ? "shadow-[inset_0_0_0_2px_var(--ring)]"
+              : "group-hover/half:shadow-[inset_0_0_0_2px_color-mix(in_srgb,var(--ring)_45%,transparent)]",
+          )}
+        />
       </button>
     </HintTooltip>
   );
@@ -260,7 +254,7 @@ export function ThemeCard({
   theme: ThemeDefinition;
   pickedModes: ThemeAppearance[];
   onPick: (modes: ThemeAppearance[]) => void;
-  /** Buttons by the label (Otter Code's Duplicate, Edit, Export, Remove). */
+  /** Buttons by the label, shown on hover (Otter Code's Duplicate, Edit, Export, Remove). */
   actions?: ReactNode;
 }) {
   const active = pickedModes.length > 0;
@@ -285,26 +279,27 @@ export function ThemeCard({
         }
       }}
       className={cn(
-        "flex cursor-pointer flex-col gap-1.5 rounded-xl border bg-card pb-2.5 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-focus-ring",
+        "group/theme flex cursor-pointer flex-col gap-1.5 rounded-xl border bg-card p-1.5 pb-2 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-focus-ring",
         active ? "border-foreground/25" : "border-border/60 hover:border-input",
       )}
     >
-      <div className="flex min-h-14 items-center justify-center gap-2 px-3 pt-2">
+      <span className="flex h-16 overflow-hidden rounded-lg border border-border/60">
         {modes.map((mode) => (
-          <ThemeOrb
+          <ThemeHalf
             key={mode}
             theme={theme}
             mode={mode}
+            side={modes.length === 1 ? "full" : mode === "light" ? "start" : "end"}
             picked={pickedModes.includes(mode)}
             onPick={() => onPick([mode])}
           />
         ))}
-      </div>
-      <div className="flex min-h-6 items-center gap-2 px-4">
+      </span>
+      <div className="flex min-h-6 items-center gap-2 px-2.5">
         <span className="min-w-0 flex-1 truncate text-sm text-foreground">{theme.label}</span>
         {actions ? (
           <span
-            className="-me-2 flex shrink-0 items-center gap-0.5"
+            className="-me-1.5 flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-focus-within/theme:opacity-100 group-hover/theme:opacity-100 has-[[data-state=open]]:opacity-100"
             onClick={(e) => e.stopPropagation()}
             onKeyDown={(e) => e.stopPropagation()}
           >
@@ -349,12 +344,23 @@ function ThemeAction({
   );
 }
 
+/** Themes four to a row (seven built-ins leave a short row, not a lone card). */
+function ThemeGrid({ children }: { children: ReactNode }) {
+  return (
+    <div className="@container">
+      <div className="grid grid-cols-2 gap-2 @min-[28rem]:grid-cols-3 @min-[40rem]:grid-cols-4">
+        {children}
+      </div>
+    </div>
+  );
+}
+
 /** The built-in or your own themes, under a small heading. */
 function ThemeGroup({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div className="space-y-2">
       <h4 className="px-[17px] text-xs text-muted-foreground">{title}</h4>
-      <div className="grid grid-cols-2 gap-2 md:grid-cols-3">{children}</div>
+      <ThemeGrid>{children}</ThemeGrid>
     </div>
   );
 }
@@ -389,6 +395,14 @@ function ThemeLibrary() {
     for (const mode of getThemeModes(theme)) setThemeForAppearance(mode, theme.id);
   };
 
+  const duplicate = (theme: ThemeDefinition) =>
+    openThemeEditor({
+      editingThemeId: null,
+      seedThemeId: theme.id,
+      seedName: `${theme.label} copy`,
+      initialAppearance: appearance(),
+    });
+
   // Built-ins are never changed: duplicating one is how you make it yours.
   const card = (theme: ThemeDefinition, custom: boolean) => (
     <ThemeCard
@@ -399,27 +413,18 @@ function ThemeLibrary() {
         for (const mode of modes) setThemeForAppearance(mode, theme.id);
       }}
       actions={
-        <>
-          <ThemeAction
-            label={`Duplicate ${theme.label}`}
-            tooltip="Duplicate theme"
-            onClick={() =>
-              openThemeEditor({
-                editingThemeId: null,
-                seedThemeId: theme.id,
-                seedName: `${theme.label} copy`,
-                initialAppearance: appearance(),
-              })
-            }
-          >
-            <CopyIcon />
-          </ThemeAction>
-          {custom ? (
-            <>
-              <ThemeAction
-                label={`Edit ${theme.label}`}
-                tooltip="Edit theme"
-                onClick={() =>
+        // One button a card: your own themes' actions sit behind it.
+        custom ? (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button aria-label={`More for ${theme.label}`} size="icon-xs" variant="ghost">
+                <EllipsisIcon />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                icon={<PenLineIcon />}
+                onSelect={() =>
                   openThemeEditor({
                     editingThemeId: theme.id,
                     seedThemeId: null,
@@ -428,26 +433,35 @@ function ThemeLibrary() {
                   })
                 }
               >
-                <PenLineIcon />
-              </ThemeAction>
-              <ThemeAction
-                label={`Export ${theme.label}`}
-                tooltip="Export theme file"
-                onClick={() => downloadThemeFile(`${theme.id}.json`, serializeThemeFile(theme))}
+                Edit
+              </DropdownMenuItem>
+              <DropdownMenuItem icon={<CopyIcon />} onSelect={() => duplicate(theme)}>
+                Duplicate
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                icon={<UploadIcon />}
+                onSelect={() => downloadThemeFile(`${theme.id}.json`, serializeThemeFile(theme))}
               >
-                <UploadIcon />
-              </ThemeAction>
-              <ThemeAction
-                label={`Remove ${theme.label}`}
-                tooltip="Remove theme"
-                destructive
-                onClick={() => setRemoving(theme)}
+                Export theme file
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                icon={<Trash2Icon />}
+                color="red"
+                onSelect={() => setRemoving(theme)}
               >
-                <Trash2Icon />
-              </ThemeAction>
-            </>
-          ) : null}
-        </>
+                Remove
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : (
+          <ThemeAction
+            label={`Duplicate ${theme.label}`}
+            tooltip="Duplicate theme"
+            onClick={() => duplicate(theme)}
+          >
+            <CopyIcon />
+          </ThemeAction>
+        )
       }
     />
   );
@@ -484,18 +498,15 @@ function ThemeLibrary() {
       }
     >
       <TooltipProvider>
-        <div className="space-y-4">
-          <ThemeGroup title="Built-in">{builtIn.map((theme) => card(theme, false))}</ThemeGroup>
-          <ThemeGroup title="Custom">
-            {custom.length > 0 ? (
-              custom.map((theme) => card(theme, true))
-            ) : (
-              <p className="col-span-full rounded-xl border border-dashed border-border/70 px-4 py-6 text-center text-sm text-muted-foreground">
-                No themes of your own yet.
-              </p>
-            )}
-          </ThemeGroup>
-        </div>
+        {/* Headings only once there are themes of your own to tell apart. */}
+        {custom.length > 0 ? (
+          <div className="space-y-4">
+            <ThemeGroup title="Built-in">{builtIn.map((theme) => card(theme, false))}</ThemeGroup>
+            <ThemeGroup title="Yours">{custom.map((theme) => card(theme, true))}</ThemeGroup>
+          </div>
+        ) : (
+          <ThemeGrid>{builtIn.map((theme) => card(theme, false))}</ThemeGrid>
+        )}
       </TooltipProvider>
       <ThemeImportDialog
         open={isImportOpen}
@@ -546,6 +557,108 @@ function ThemeLibrary() {
 }
 
 // ---------------------------------------------------------------------------
+// Sliders (Otter Code's settings sliders)
+// ---------------------------------------------------------------------------
+
+/** A range input with its value beside it. */
+function SettingSlider({
+  id,
+  label,
+  value,
+  valueLabel,
+  min,
+  max,
+  step,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  value: number;
+  valueLabel: string;
+  min: number;
+  max: number;
+  step: number;
+  onChange: (value: number) => void;
+}) {
+  const ratio = (value - min) / (max - min);
+  const style = {
+    "--settings-slider-progress": `${ratio * 100}%`,
+    "--settings-slider-fill-offset": `${0.5 - ratio}rem`,
+  } as CSSProperties;
+  return (
+    <div className="flex w-full items-center gap-3">
+      <output
+        className="min-w-16 rounded-lg bg-muted px-2 py-1 text-center font-mono text-xs tabular-nums text-foreground"
+        htmlFor={id}
+      >
+        {valueLabel}
+      </output>
+      <input
+        aria-label={label}
+        className="settings-slider min-w-0 flex-1"
+        id={id}
+        max={max}
+        min={min}
+        onChange={(event) => onChange(Number(event.currentTarget.value))}
+        step={step}
+        style={style}
+        type="range"
+        value={value}
+      />
+    </div>
+  );
+}
+
+/** Contrast or glass opacity: a percentage slider, reset beside the title. */
+function PercentSettingRow({
+  setting,
+  searchId,
+  label,
+  description,
+}: {
+  setting: InterfaceSetting;
+  searchId: "contrast" | "glass-opacity";
+  label: string;
+  description: string;
+}) {
+  const value = useInterfaceSetting(setting);
+  return (
+    <SettingsRow
+      {...searchableSetting(searchId)}
+      description={description}
+      control={
+        // As wide as Panel animations' slider, so the three line up.
+        <div className="w-full sm:w-52">
+          <SettingSlider
+            id={`${searchId}-slider`}
+            label={label}
+            value={value}
+            valueLabel={`${value}%`}
+            min={setting.min}
+            max={setting.max}
+            step={setting.step}
+            onChange={(next) => setInterfaceSetting(setting, next)}
+          />
+        </div>
+      }
+      resetAction={
+        value !== setting.defaultValue ? (
+          <SettingResetButton
+            label={label.toLowerCase()}
+            onClick={() => setInterfaceSetting(setting, setting.defaultValue)}
+          />
+        ) : null
+      }
+    />
+  );
+}
+
+const FONT_SIZE_OPTIONS = Array.from(
+  { length: INTERFACE_FONT_SIZE.max - INTERFACE_FONT_SIZE.min + 1 },
+  (_, i) => String(INTERFACE_FONT_SIZE.min + i),
+).map((size) => ({ value: size, label: `${size} px` }));
+
+// ---------------------------------------------------------------------------
 // Pane
 // ---------------------------------------------------------------------------
 
@@ -578,86 +691,96 @@ export function useColorScheme(): [ColorScheme, (next: ColorScheme) => Promise<v
   return [scheme, setScheme];
 }
 
-/** Whether the Dock icon shows the unread count (Mac app), on by default. */
-function useDockBadge(): [boolean, (next: boolean) => Promise<void>] {
-  const [enabled, setEnabled] = useState(true);
-  useEffect(() => {
-    if (!features.dockBadge) return;
-    gmailApi
-      .getSyncSettings()
-      .then((settings) => setEnabled(settings.dockBadgeEnabled))
-      .catch((error) => toast.error(`Failed to load Dock badge setting: ${error}`));
-  }, []);
-  const set = async (next: boolean) => {
-    setEnabled(next);
-    console.log("[Settings:setDockBadgeEnabled]", { checked: next });
-    try {
-      await gmailApi.setSyncSettings({ dockBadgeEnabled: next });
-    } catch (error) {
-      setEnabled(!next);
-      toast.error(`Failed to change Dock badge: ${error}`);
-    }
-  };
-  return [enabled, set];
-}
-
 export function AppearancePane() {
   const choice = useThemeChoice();
   const [scheme, setScheme] = useColorScheme();
-  const [dockBadge, setDockBadge] = useDockBadge();
 
   const panelAnimationDurationMs = usePanelAnimationDurationMs();
-  const panelAnimationDurationRatio =
-    (panelAnimationDurationMs - MIN_PANEL_ANIMATION_DURATION_MS) /
-    (MAX_PANEL_ANIMATION_DURATION_MS - MIN_PANEL_ANIMATION_DURATION_MS);
-  const panelAnimationDurationSliderStyle = {
-    "--settings-slider-progress": `${panelAnimationDurationRatio * 100}%`,
-    "--settings-slider-fill-offset": `${0.5 - panelAnimationDurationRatio}rem`,
-  } as CSSProperties;
+  const fontSize = useInterfaceSetting(INTERFACE_FONT_SIZE);
+  const readingWidth = useReadingWidth();
 
   const light = themeColors(choice.light, "light");
   const dark = themeColors(choice.dark, "dark");
 
   return (
     <SettingsPageContainer title="Appearance">
-      <SettingsGroup>
+      {/* The scheme and the themes it wears, together (Otter Code's). */}
+      <div className="space-y-6">
+        <SettingsSection {...searchableSetting("color-scheme")} variant="plain">
+          <div className="grid grid-cols-3 gap-2">
+            {(["system", "light", "dark"] as const).map((s) => (
+              <SchemeCard
+                key={s}
+                compact
+                scheme={s}
+                selected={scheme === s}
+                light={light}
+                dark={dark}
+                onSelect={() => void setScheme(s)}
+              />
+            ))}
+          </div>
+        </SettingsSection>
+
+        <ThemeLibrary />
+      </div>
+
+      <SettingsSection title="Interface">
+        <PercentSettingRow
+          setting={CONTRAST}
+          searchId="contrast"
+          label="Contrast"
+          description="Adjust the contrast of text and borders across the app."
+        />
+        <PercentSettingRow
+          setting={GLASS_OPACITY}
+          searchId="glass-opacity"
+          label="Glass opacity"
+          description="Higher values make menus, popovers and dialogs more solid."
+        />
         <SettingsRow
-          {...searchableSetting("color-scheme")}
+          {...searchableSetting("font-size")}
+          description="Text and controls across the app, messages included."
           control={
-            <div className="flex gap-2">
-              {(["system", "light", "dark"] as const).map((s) => (
-                <SchemeCard
-                  key={s}
-                  compact
-                  scheme={s}
-                  selected={scheme === s}
-                  light={light}
-                  dark={dark}
-                  onSelect={() => void setScheme(s)}
-                />
-              ))}
-            </div>
+            <RowSelect
+              ariaLabel="Font size"
+              value={String(fontSize)}
+              onValueChange={(size) => setInterfaceSetting(INTERFACE_FONT_SIZE, Number(size))}
+              options={FONT_SIZE_OPTIONS}
+            />
+          }
+          resetAction={
+            fontSize !== INTERFACE_FONT_SIZE.defaultValue ? (
+              <SettingResetButton
+                label="font size"
+                onClick={() =>
+                  setInterfaceSetting(INTERFACE_FONT_SIZE, INTERFACE_FONT_SIZE.defaultValue)
+                }
+              />
+            ) : null
           }
         />
-      </SettingsGroup>
-
-      <ThemeLibrary />
-
-      <SettingsSection title="Dock">
         <SettingsRow
-          {...searchableSetting("dock-badge")}
-          description={
-            features.dockBadge
-              ? "A badge with the number of unread messages in your inboxes."
-              : "A badge with the number of unread messages in your inboxes. Available in the Mac app."
-          }
+          {...searchableSetting("reading-width")}
+          description="How wide emails and threads can grow on large screens."
           control={
-            <Switch
-              id="dockBadgeEnabled"
-              checked={features.dockBadge && dockBadge}
-              disabled={!features.dockBadge}
-              onCheckedChange={(checked) => void setDockBadge(checked)}
+            <RowSelect
+              ariaLabel="Reading width"
+              value={readingWidth}
+              onValueChange={(width) => setReadingWidth(width as ReadingWidth)}
+              options={Object.entries(READING_WIDTHS).map(([value, { label }]) => ({
+                value,
+                label,
+              }))}
             />
+          }
+          resetAction={
+            readingWidth !== DEFAULT_READING_WIDTH ? (
+              <SettingResetButton
+                label="reading width"
+                onClick={() => setReadingWidth(DEFAULT_READING_WIDTH)}
+              />
+            ) : null
           }
         />
       </SettingsSection>
@@ -669,28 +792,16 @@ export function AppearancePane() {
           control={
             <div className="grid w-full grid-cols-[5rem_minmax(0,1fr)] items-center gap-3 sm:w-auto sm:grid-cols-[7rem_13rem] sm:gap-4">
               <PanelAnimationsPreview durationMs={panelAnimationDurationMs} />
-              <div className="flex w-full items-center gap-3">
-                <output
-                  className="min-w-16 rounded-lg bg-muted px-2 py-1 text-center font-mono text-xs tabular-nums text-foreground"
-                  htmlFor="panel-animation-duration"
-                >
-                  {panelAnimationDurationMs} ms
-                </output>
-                <input
-                  aria-label="Panel animation duration"
-                  className="settings-slider min-w-0 flex-1"
-                  id="panel-animation-duration"
-                  max={MAX_PANEL_ANIMATION_DURATION_MS}
-                  min={MIN_PANEL_ANIMATION_DURATION_MS}
-                  onChange={(event) =>
-                    setPanelAnimationDurationMs(Number(event.currentTarget.value))
-                  }
-                  step={25}
-                  style={panelAnimationDurationSliderStyle}
-                  type="range"
-                  value={panelAnimationDurationMs}
-                />
-              </div>
+              <SettingSlider
+                id="panel-animation-duration"
+                label="Panel animation duration"
+                value={panelAnimationDurationMs}
+                valueLabel={`${panelAnimationDurationMs} ms`}
+                min={MIN_PANEL_ANIMATION_DURATION_MS}
+                max={MAX_PANEL_ANIMATION_DURATION_MS}
+                step={25}
+                onChange={setPanelAnimationDurationMs}
+              />
             </div>
           }
           resetAction={

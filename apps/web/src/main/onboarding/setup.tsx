@@ -504,7 +504,7 @@ function LookStep() {
     <>
       <StepHeader
         title="Make it yours"
-        description="Everything changes as you click. Pick a theme for both, or an orb for light or dark alone."
+        description="Everything changes as you click. Pick a theme for both, or just its light or dark half."
       />
       <div className="grid grid-cols-3 gap-3">
         {(["system", "light", "dark"] as const).map((s) => (
