@@ -32,6 +32,7 @@ import {
   SendIcon,
   SettingsIcon,
   SignpostIcon,
+  SparklesIcon,
   SquarePenIcon,
   StarIcon,
   SunIcon,
@@ -46,6 +47,7 @@ import { COMBINED_ACCOUNT_ID } from "./custom-views";
 import { APP_THEMES } from "@otter-mail/shared/themes";
 import { previewTheme, setThemeForAppearance, useThemeChoice } from "../theme/apply-theme";
 import type { GmailAccount, GmailMessageSummary, MailView } from "./types";
+import type { SettingsPane } from "./api";
 import type { KeybindingCommand } from "../keybindings/commands";
 import { shortcutLabelFor, useKeybindingsState } from "../keybindings/store";
 import { requestTour, startSetup } from "../onboarding/onboarding";
@@ -72,7 +74,7 @@ type CommandPaletteProps = {
   onGoToView: (viewId: string) => void;
   onSelectAccount: (accountId: string) => void;
   onCompose: () => void;
-  onOpenSettings: () => void;
+  onOpenSettings: (pane?: SettingsPane) => void;
   onNewView: () => void;
   onToggleChat: () => void;
   onToggleSidebar: () => void;
@@ -319,7 +321,14 @@ export function CommandPalette({
         icon: <SettingsIcon className={ICON} />,
         title: "Settings",
         shortcut: "⌘,",
-        run: onOpenSettings,
+        run: () => onOpenSettings(),
+      },
+      {
+        id: "whats-new",
+        icon: <SparklesIcon className={ICON} />,
+        title: "What's new",
+        keywords: "changelog release notes new version",
+        run: () => onOpenSettings("changelog"),
       },
       ...(update && update.status !== "disabled"
         ? [

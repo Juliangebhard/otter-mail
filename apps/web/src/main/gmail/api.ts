@@ -391,6 +391,7 @@ export type SettingsPane =
   | "accounts"
   | "views"
   | "agents"
+  | "changelog"
   /** The Otter account page, opened from the user button at the bottom of the nav. */
   | "otter";
 export type SettingsTarget = {

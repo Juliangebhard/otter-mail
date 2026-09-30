@@ -133,6 +133,7 @@ The Mac app supports Apple Silicon Macs (arm64).
 | Panel animations                                         | ✓   | ✓   | —                                                                          |
 | Keyboard shortcuts, rebindable (incl. move to label)     | ✓   | ✓   | —                                                                          |
 | Command palette (⌘K)                                     | ✓   | ✓   | —                                                                          |
+| What's new (the changelog; offered once after an update) | ✓   | ✓   | —                                                                          |
 | Custom views (rules across mailboxes)                    | ✓   | ✓   | —                                                                          |
 | Preferences synced through the Otter account             | ✓   | ✓   | ✓ (theme, advance, mailboxes, notifications, languages, agent, signatures) |
 

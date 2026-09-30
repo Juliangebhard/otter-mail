@@ -50,6 +50,9 @@ when a feature lands or goes.
 - `scripts/`: dev runner, desktop packaging (`build-desktop-artifact.ts`), release helpers.
 - `assets/`: app icons like T3 Code's: `prod/` for releases, `dev/` for the blueprint variant that
   unpackaged runs wear. `pnpm icons:export` regenerates the dev icon and both `.icns` files.
+- `changelog/`: one note per Mac and web release (`<version>.md`, images in `images/`), shown on
+  the site at /changelog and in the app under Settings → What's new. Format in
+  `packages/shared/src/changelog.ts`; style in the `write-changelog` skill.
 - `site/`: https://mail.otterware.app, a Cloudflare Worker: the landing page, privacy policy and
   terms, and the web app (`/` shows the app when signed in, `/app` always).
 - Deploys: Cloudflare Workers Builds deploys `infra/relay` and `site/` on pushes to `main` that
@@ -92,8 +95,10 @@ it; the web app needs it (the relay keeps its Gmail sign-ins alive).
 Stable only (no nightlies). The Mac app (and web) and the iPhone app release separately, each with
 its own version:
 
-- Mac: run the Release workflow from `main` with a patch/minor/major bump, or push a `vX.Y.Z` tag.
-  Installed apps download updates on their own and offer "Restart to update" in the sidebar.
+- Mac: write the release's note first, `changelog/<version>.md` (the `write-changelog` skill),
+  then run the Release workflow from `main` with a patch/minor/major bump, or push a `vX.Y.Z`
+  tag. Installed apps download updates on their own and offer "Restart to update" in the sidebar;
+  after it, a toast links to the note (Settings → What's new, and /changelog on the site).
 - iPhone: run the Release iPhone workflow from `main` when `apps/ios` (or what it bundles from
   `packages/shared`) has changed. It uploads to TestFlight and tags `ios-vX.Y.Z`.
 

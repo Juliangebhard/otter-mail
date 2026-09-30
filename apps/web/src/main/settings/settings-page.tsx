@@ -14,6 +14,7 @@ import { AccountsPane } from "./accounts-pane";
 import { OtterAccountPane } from "./otter-account-pane";
 import { ViewsPane } from "./views-pane";
 import { ProvidersPane } from "./providers-pane";
+import { ChangelogPane } from "./changelog-pane";
 import { TranslationSection } from "./translation-section";
 import { UpdatesSection } from "../updates";
 import { SettingsPageContainer, SettingsRow, SettingsSection } from "./settings-ui";
@@ -352,6 +353,7 @@ export function SettingsPage({
   if (route.pane === "accounts") return <AccountsPane />;
   if (route.pane === "otter") return <OtterAccountPane />;
   if (route.pane === "agents") return <ProvidersPane />;
+  if (route.pane === "changelog") return <ChangelogPane />;
   if (route.pane === "views") {
     return (
       <ViewsPane

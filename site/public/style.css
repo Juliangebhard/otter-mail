@@ -80,6 +80,81 @@ footer a:hover {
   font-size: 0.9rem;
 }
 
+/* The changelog: an index of releases, and a page per release (after conductor.build's). */
+.changelog .version {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  margin-right: 0.3em;
+}
+.releases {
+  list-style: none;
+  padding: 0;
+  margin: 2.5rem 0 0;
+  border-top: 1px solid var(--line);
+}
+.releases li {
+  margin: 0;
+  border-bottom: 1px solid var(--line);
+}
+.releases a {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.9rem 0;
+  text-decoration: none;
+}
+.releases a:hover .name {
+  text-decoration: underline;
+  text-decoration-color: var(--line);
+}
+.releases time,
+.changelog .back {
+  color: var(--muted);
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+.changelog .back {
+  text-decoration: none;
+}
+.changelog article > p:first-child {
+  color: var(--fg);
+  font-size: 1.1rem;
+}
+.changelog figure {
+  margin: 2rem 0;
+}
+.changelog figure img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.changelog figcaption {
+  margin-top: 0.6rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+  text-align: center;
+}
+.changelog code {
+  font-size: 0.9em;
+}
+.pager {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 3.5rem;
+  font-size: 0.9rem;
+}
+.pager a {
+  color: var(--soft);
+  text-decoration: none;
+}
+.pager a:hover {
+  color: var(--fg);
+}
+
 .button {
   display: inline-block;
   padding: 0.7rem 1.4rem;
