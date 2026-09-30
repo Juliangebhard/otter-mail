@@ -29,8 +29,6 @@ import {
   ShieldCheckIcon,
   Trash2Icon,
   XIcon,
-  CircleIcon,
-  CircleDotIcon,
   CircleChevronDownIcon,
   PaperclipIcon,
 } from "lucide-react";
@@ -651,6 +649,34 @@ function ThreadMessageRow({
 }
 
 /** "260 messages, 7 unread" — omits the unread clause when nothing is unread. */
+/**
+ * The unread filter's icon (Apple Mail's): a ring round three narrowing
+ * lines, filled with the lines cut out while showing unread only.
+ */
+function UnreadFilterIcon({ on, className }: { on: boolean; className?: string }) {
+  return on ? (
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden className={className}>
+      <path
+        fillRule="evenodd"
+        d="M12 1a11 11 0 1 1 0 22 11 11 0 0 1 0-22ZM7.5 8a1 1 0 0 0 0 2h9a1 1 0 0 0 0-2h-9Zm2 3.5a1 1 0 0 0 0 2h5a1 1 0 0 0 0-2h-5ZM11 15a1 1 0 0 0 0 2h2a1 1 0 0 0 0-2h-2Z"
+      />
+    </svg>
+  ) : (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      aria-hidden
+      className={className}
+    >
+      <circle cx="12" cy="12" r="10" />
+      <path d="M7.5 9h9M9.5 12.5h5M11 16h2" />
+    </svg>
+  );
+}
+
 function formatMailboxSummary(total: number, unread: number): string {
   const messages = `${total.toLocaleString()} message${total === 1 ? "" : "s"}`;
   return unread > 0 ? `${messages} · ${unread.toLocaleString()} unread` : messages;
@@ -1501,18 +1527,15 @@ export function MessageList({
           </IconBtn>
         </HintTooltip>
         <HintTooltip label={unreadOnly ? "Show all messages" : "Show unread only"}>
-          {/* The rows' unread dot: an empty ring, or dotted when showing unread only. */}
           <IconBtn
             label={unreadOnly ? "Show all messages" : "Show unread only"}
             aria-pressed={unreadOnly}
-            active={unreadOnly}
             onClick={() => setMailboxMode(unreadOnly ? "all" : "unread")}
           >
-            {unreadOnly ? (
-              <CircleDotIcon className="size-4 text-primary" />
-            ) : (
-              <CircleIcon className="size-4" />
-            )}
+            <UnreadFilterIcon
+              on={unreadOnly}
+              className={cn("size-4", unreadOnly && "text-primary")}
+            />
           </IconBtn>
         </HintTooltip>
       </div>
