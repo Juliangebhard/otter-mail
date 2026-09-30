@@ -35,6 +35,7 @@ import {
   XIcon,
   Trash2Icon,
   SettingsIcon,
+  MessageSquareIcon,
   PlusIcon,
   ChevronDownIcon,
   LayersIcon,
@@ -75,6 +76,7 @@ import { useOtterAccount } from "../otter-account";
 import { useMailboxes } from "../mailboxes";
 import { OtterAvatar } from "../settings/otter-account-pane";
 import type { SettingsPane } from "./api";
+import { requestProblemReport } from "../support/report-problem";
 import { UpdateCard } from "../updates";
 import { AddMailboxMenu } from "./add-mailbox";
 import { useCapabilities } from "./capabilities";
@@ -239,6 +241,9 @@ function AccountMenuItems({
       )}
       <DropdownMenuItem icon={<SettingsIcon />} accelerator="⌘," onSelect={() => onOpenSettings()}>
         Settings
+      </DropdownMenuItem>
+      <DropdownMenuItem icon={<MessageSquareIcon />} onSelect={requestProblemReport}>
+        Send feedback
       </DropdownMenuItem>
       {otter?.realtime === "live" ? null : (
         <DropdownMenuItem

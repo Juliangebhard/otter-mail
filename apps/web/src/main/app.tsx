@@ -4,6 +4,7 @@ import { RouterProvider } from "@tanstack/react-router";
 import { router, queryClient } from "./router";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { ToastProvider } from "./gmail/toast";
+import { ReportProblemDialog } from "./support/report-problem";
 
 declare const __APP_DISPLAY_NAME__: string | undefined;
 
@@ -22,6 +23,7 @@ root.render(
     <QueryClientProvider client={queryClient}>
       <ToastProvider>
         <RouterProvider router={router} />
+        <ReportProblemDialog />
       </ToastProvider>
     </QueryClientProvider>
   </React.StrictMode>,

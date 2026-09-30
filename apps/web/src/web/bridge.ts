@@ -283,6 +283,7 @@ export const webBridge: DesktopBridge = {
     translation: hasBuiltInTranslator,
     dragOut: false,
     openFiles: false,
+    externalAgent: false,
   },
   invoke,
   on(channel, listener) {

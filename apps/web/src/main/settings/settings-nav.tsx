@@ -10,6 +10,7 @@ import {
   Settings2Icon,
   MailIcon,
   MailCheckIcon,
+  MessageSquareIcon,
   MousePointer2Icon,
   ScrollTextIcon,
 } from "lucide-react";
@@ -23,6 +24,7 @@ import {
 } from "../gmail/menu";
 import { HintTooltip, IconBtn, cn } from "../gmail/ui";
 import { features } from "../features";
+import { requestProblemReport } from "../support/report-problem";
 
 type SettingsSection = {
   id: SettingsPane;
@@ -103,7 +105,7 @@ export function SettingsNav({
   );
 }
 
-/** The ? beside Back (Conductor's): links out, for now just the changelog on the site. */
+/** The ? beside Back: feedback and the changelog. */
 function HelpMenu() {
   return (
     <DropdownMenu>
@@ -115,6 +117,9 @@ function HelpMenu() {
         </DropdownMenuTrigger>
       </HintTooltip>
       <DropdownMenuContent side="top">
+        <DropdownMenuItem icon={<MessageSquareIcon />} onSelect={requestProblemReport}>
+          Send feedback
+        </DropdownMenuItem>
         <DropdownMenuItem
           icon={<ScrollTextIcon />}
           onSelect={() => void window.desktopBridge.openExternal(changelogUrl())}

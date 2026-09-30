@@ -60,6 +60,8 @@ export interface BridgeFeatures {
   dragOut: boolean;
   /** Opening an attachment in its default app (Preview, Pages, …). */
   openFiles: boolean;
+  /** Handing a support report to a locally installed agent in Terminal. */
+  externalAgent: boolean;
 }
 
 export interface DesktopBridge {
