@@ -1,4 +1,7 @@
 import { setSyncedPreference } from "../synced-preferences";
+import { Switch } from "~/components/ui/switch";
+import { features } from "../features";
+import { gmailApi } from "../gmail/api";
 import { useEffect, useState, type CSSProperties } from "react";
 import { toast } from "../gmail/toast";
 import type { NativeThemeInfo } from "@otter-mail/contracts";
@@ -293,9 +296,33 @@ export function useColorScheme(): [ColorScheme, (next: ColorScheme) => Promise<v
   return [scheme, setScheme];
 }
 
+/** Whether the Dock icon shows the unread count (Mac app), on by default. */
+function useDockBadge(): [boolean, (next: boolean) => Promise<void>] {
+  const [enabled, setEnabled] = useState(true);
+  useEffect(() => {
+    if (!features.dockBadge) return;
+    gmailApi
+      .getSyncSettings()
+      .then((settings) => setEnabled(settings.dockBadgeEnabled))
+      .catch((error) => toast.error(`Failed to load Dock badge setting: ${error}`));
+  }, []);
+  const set = async (next: boolean) => {
+    setEnabled(next);
+    console.log("[Settings:setDockBadgeEnabled]", { checked: next });
+    try {
+      await gmailApi.setSyncSettings({ dockBadgeEnabled: next });
+    } catch (error) {
+      setEnabled(!next);
+      toast.error(`Failed to change Dock badge: ${error}`);
+    }
+  };
+  return [enabled, set];
+}
+
 export function AppearancePane() {
   const choice = useThemeChoice();
   const [scheme, setScheme] = useColorScheme();
+  const [dockBadge, setDockBadge] = useDockBadge();
 
   const panelAnimationDurationMs = usePanelAnimationDurationMs();
   const panelAnimationDurationRatio =
@@ -343,6 +370,25 @@ export function AppearancePane() {
             />
           ))}
         </div>
+      </SettingsSection>
+
+      <SettingsSection title="Dock">
+        <SettingsRow
+          title="Show unread count on Dock icon"
+          description={
+            features.dockBadge
+              ? "A badge with the number of unread messages in your inboxes."
+              : "A badge with the number of unread messages in your inboxes. Available in the Mac app."
+          }
+          control={
+            <Switch
+              id="dockBadgeEnabled"
+              checked={features.dockBadge && dockBadge}
+              disabled={!features.dockBadge}
+              onCheckedChange={(checked) => void setDockBadge(checked)}
+            />
+          }
+        />
       </SettingsSection>
 
       <SettingsSection title="Motion">

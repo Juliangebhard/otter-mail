@@ -18,6 +18,8 @@ export type AppSettings = {
   launchAtLogin: boolean;
   /** Show the menu-bar icon and mini-inbox popover (opt-in). */
   trayEnabled: boolean;
+  /** Show the unread count on the Dock icon (Mac app). */
+  dockBadgeEnabled: boolean;
   /** Languages the user reads (BCP-47 codes, first = where translations go).
       Empty until set: the renderer then falls back to the system languages. */
   readLanguages: string[];
@@ -30,6 +32,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   notificationsMode: "inbox",
   launchAtLogin: false,
   trayEnabled: false,
+  dockBadgeEnabled: true,
   readLanguages: [],
   autoTranslate: false,
 };

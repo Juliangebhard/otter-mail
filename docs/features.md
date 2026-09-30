@@ -163,7 +163,7 @@ that changes a mailbox asks first unless the chat has full access; drafts don't 
 ## Mac-only
 
 - Menu-bar icon and mini inbox (open, archive, trash, compose, sync).
-- Dock badge; launch at login; default mail app (mailto: links).
+- Dock badge (can be turned off in Settings → Appearance); launch at login; default mail app (mailto: links).
 - Drag attachments out to Finder.
 - Menus: Sync Now, Back / Forward (⌘[ ⌘]).
 - Auto-update from GitHub Releases ("Restart to update"), or all at once from ⌘K ("Update Otter
