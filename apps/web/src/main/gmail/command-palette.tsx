@@ -10,6 +10,7 @@ import {
 import { createPortal } from "react-dom";
 import {
   ArchiveXIcon,
+  MessageSquareIcon,
   ArrowDownCircleIcon,
   ArrowDownIcon,
   ArrowUpIcon,
@@ -53,6 +54,7 @@ import type { KeybindingCommand } from "../keybindings/commands";
 import { shortcutLabelFor, useKeybindingsState } from "../keybindings/store";
 import { requestTour, startSetup } from "../onboarding/onboarding";
 import { updateNow, useUpdateState } from "../updates";
+import { requestProblemReport } from "../support/report-problem";
 
 /**
  * Command palette (⌘K), modeled on Otter Code's: a frosted card anchored near
@@ -323,6 +325,13 @@ export function CommandPalette({
         title: "Settings",
         shortcut: "⌘,",
         run: () => onOpenSettings(),
+      },
+      {
+        id: "report-problem",
+        icon: <MessageSquareIcon className={ICON} />,
+        title: "Send feedback",
+        keywords: "feedback feature request bug issue support diagnostics github",
+        run: requestProblemReport,
       },
       {
         id: "changelog",

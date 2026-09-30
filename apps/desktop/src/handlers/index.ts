@@ -14,6 +14,7 @@ import { takePendingOpenMessage } from "../services/open-message-target.js";
 import { focusMainWindow } from "../windows/main-window.js";
 import { setSettingsTarget, takeSettingsTarget } from "../windows/settings-window.js";
 import { registerTrayPopoverHandlers } from "./tray-popover.js";
+import { registerSupportHandlers } from "./support.js";
 
 export function registerHandlers(): void {
   // Settings live in the main window. Any window can deep-link into a pane
@@ -112,6 +113,7 @@ export function registerHandlers(): void {
   });
 
   registerTrayPopoverHandlers();
+  registerSupportHandlers();
 
   logger.info("handlers", "✓ IPC handlers registered");
 }

@@ -18,6 +18,7 @@ import {
   Settings2Icon,
   MailIcon,
   MailCheckIcon,
+  MessageSquareIcon,
   MousePointer2Icon,
   ScrollTextIcon,
   SearchIcon,
@@ -39,6 +40,7 @@ import {
   SETTINGS_SECTION_LABELS,
   type SettingsSearchItem,
 } from "./settings-search";
+import { requestProblemReport } from "../support/report-problem";
 
 const SETTINGS_SECTION_ICONS: Readonly<
   Record<SettingsPane, ComponentType<{ className?: string }>>
@@ -263,7 +265,7 @@ export function SettingsNav({
   );
 }
 
-/** The ? beside Back (Conductor's): links out, for now just the changelog on the site. */
+/** The ? beside Back: feedback and the changelog. */
 function HelpMenu() {
   return (
     <DropdownMenu>
@@ -275,6 +277,9 @@ function HelpMenu() {
         </DropdownMenuTrigger>
       </HintTooltip>
       <DropdownMenuContent side="top">
+        <DropdownMenuItem icon={<MessageSquareIcon />} onSelect={requestProblemReport}>
+          Send feedback
+        </DropdownMenuItem>
         <DropdownMenuItem
           icon={<ScrollTextIcon />}
           onSelect={() => void window.desktopBridge.openExternal(changelogUrl())}

@@ -121,6 +121,7 @@ export async function webPlatform(page: Page): Promise<Platform> {
     : import.meta.env.VITE_RELAY_URL || "https://relay.mail.otterware.app";
   const platform: Platform = {
     kind: "web",
+    supportDiagnostics: async () => ({ environment: navigator.userAgent }),
     appVersion: __APP_VERSION__,
     log: (level, scope, message, data) =>
       console[level === "debug" ? "log" : level](`[${scope}] ${message}`, data ?? ""),

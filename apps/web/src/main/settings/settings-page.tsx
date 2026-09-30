@@ -26,6 +26,7 @@ import { searchableSetting } from "./settings-search";
 import { features } from "../features";
 import { Btn } from "../gmail/ui";
 import { requestTour, startSetup } from "../onboarding/onboarding";
+import { requestProblemReport } from "../support/report-problem";
 
 /** Where the settings page is. */
 export type SettingsRoute = {
@@ -339,6 +340,17 @@ function GeneralPane() {
       </SettingsSection>
 
       <UpdatesSection />
+      <SettingsSection title="Support">
+        <SettingsRow
+          {...searchableSetting("send-feedback")}
+          description="Report a bug or suggest a feature, with optional agent investigation."
+          control={
+            <Btn size="sm" onClick={requestProblemReport}>
+              Send feedback
+            </Btn>
+          }
+        />
+      </SettingsSection>
     </SettingsPageContainer>
   );
 }

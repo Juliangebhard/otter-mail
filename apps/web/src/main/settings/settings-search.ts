@@ -131,6 +131,12 @@ export const SETTINGS_SEARCH_ITEMS = [
     pane: "general",
     searchTerms: ["version check restart to update release about"],
   },
+  {
+    id: "send-feedback",
+    title: "Send feedback",
+    pane: "general",
+    searchTerms: ["support report bug problem suggest feature help"],
+  },
   // Account
   {
     id: "otter-account",

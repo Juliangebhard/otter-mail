@@ -8,6 +8,7 @@
 
 import type { ChatProvider } from "./services/agent/types.js";
 import type { GmailAccount } from "./types.js";
+import type { SupportError } from "@otter-mail/shared/support";
 
 export type SqlValue = string | number | bigint | null | Uint8Array;
 
@@ -93,6 +94,8 @@ export interface AsyncContext<T> {
 export interface Platform {
   kind: "desktop" | "web";
   appVersion: string;
+  /** Environment and classified errors only; no raw mail or credentials. */
+  supportDiagnostics?(): Promise<{ environment: string; errors?: SupportError[] }>;
   log(
     level: "debug" | "info" | "warn" | "error",
     scope: string,
