@@ -163,11 +163,14 @@ optional fix PRs. See [support.md](support.md).
 | Attach images and files to a chat                  | ✓                           | ✓                          | —            |
 | Queued follow-ups                                  | ✓                           | ✓                          | —            |
 | Mail and calendar tools (Claude, Codex)            | ✓ (every mailbox)           | —                          | —            |
+| Theme tools: make, change and wear themes          | ✓                           | —                          | —            |
 
 Claude and Codex get Otter Mail's own tools (an MCP server in the Mac app's backend), so they
 need no mail CLI: search, read and sort mail, download attachments, save drafts and send, in
 any mailbox (Gmail or IMAP), and list, add, change and answer events in Google Calendar. A tool
-that changes a mailbox asks first unless the chat has full access; drafts don't ask.
+that changes a mailbox asks first unless the chat has full access; drafts don't ask. They can
+also make a theme or change one of the user's own, and wear a theme; a built-in never changes
+(changing one makes a copy, worn in its place).
 
 ## Translation
 
