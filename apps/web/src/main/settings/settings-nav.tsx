@@ -1,6 +1,7 @@
 import { useEffect, useState, type ComponentType } from "react";
 import {
   ArrowLeftIcon,
+  ArrowUpRightIcon,
   CircleHelpIcon,
   CircleUserRoundIcon,
   KeyboardIcon,
@@ -10,9 +11,16 @@ import {
   MailIcon,
   MailCheckIcon,
   MousePointer2Icon,
+  ScrollTextIcon,
 } from "lucide-react";
 import { changelogUrl } from "@otter-mail/shared/changelog";
 import { gmailApi, type SettingsPane } from "../gmail/api";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "../gmail/menu";
 import { HintTooltip, IconBtn, cn } from "../gmail/ui";
 import { features } from "../features";
 
@@ -88,18 +96,34 @@ export function SettingsNav({
             <ArrowLeftIcon />
             <span className="truncate">Back</span>
           </button>
-          {/* What's new: the changelog, on the site. */}
-          <HintTooltip label="What's new">
-            <IconBtn
-              label="What's new"
-              onClick={() => void window.desktopBridge.openExternal(changelogUrl())}
-            >
-              <CircleHelpIcon className="size-4" />
-            </IconBtn>
-          </HintTooltip>
+          <HelpMenu />
         </div>
       </div>
     </>
+  );
+}
+
+/** The ? beside Back (Conductor's): links out, for now just the changelog on the site. */
+function HelpMenu() {
+  return (
+    <DropdownMenu>
+      <HintTooltip label="Help">
+        <DropdownMenuTrigger asChild>
+          <IconBtn label="Help">
+            <CircleHelpIcon className="size-4" />
+          </IconBtn>
+        </DropdownMenuTrigger>
+      </HintTooltip>
+      <DropdownMenuContent side="top">
+        <DropdownMenuItem
+          icon={<ScrollTextIcon />}
+          onSelect={() => void window.desktopBridge.openExternal(changelogUrl())}
+        >
+          Changelog
+          <ArrowUpRightIcon className="ms-1 inline size-3.5 align-[-2px]" />
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 

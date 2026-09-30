@@ -172,7 +172,7 @@ export function UpdateCard() {
               onClick={() => void window.desktopBridge.openExternal(changelogUrl())}
               className="cursor-pointer text-2xs text-foreground/80 underline-offset-2 outline-none hover:text-foreground hover:underline focus-visible:underline"
             >
-              What's new →
+              Changelog →
             </button>
           ) : null}
         </div>

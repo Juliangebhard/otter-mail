@@ -8,8 +8,8 @@ description: Write an Otter Mail changelog note (changelog/<version>.md) in the 
 The changelog is how Otter Mail announces itself: marketing and brand as much
 as a record. Notes live in `changelog/<version>.md` at the repository root.
 The site shows them at https://mail.otterware.app/changelog (an index, and a
-page per release); the app only links there ("What's new" in ⌘K, at the
-bottom of Settings, and on the update card). The format lives in `packages/shared/src/changelog.ts`.
+page per release); the app only links there ("Changelog" in ⌘K, in the ?
+menu at the bottom of Settings, and on the update card). The format lives in `packages/shared/src/changelog.ts`.
 
 The iPhone app releases on its own (TestFlight) and isn't in this changelog.
 
