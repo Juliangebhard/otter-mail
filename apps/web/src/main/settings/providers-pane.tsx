@@ -397,6 +397,47 @@ function EditorHeader({
   );
 }
 
+/** Where Hermes' URL comes from, for the field's description. */
+export const HERMES_URL_HINT =
+  window.desktopBridge.platform === "web"
+    ? `Hermes' built-in API server (port 8642), over HTTPS. Allow ${location.origin} in its API_SERVER_CORS_ORIGINS.`
+    : "Hermes' built-in API server (port 8642), reached over Tailscale.";
+
+/**
+ * Connecting Hermes (Settings and the setup): the URL and key as typed, and
+ * `connect`, which checks them against the server, then saves them. Resolves
+ * true once connected.
+ */
+export function useConnectHermes(state: ProvidersState) {
+  const setState = useSetProvidersState();
+  const [baseUrl, setBaseUrl] = useState("");
+  const [apiKey, setApiKey] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const connect = async (): Promise<boolean> => {
+    const url = baseUrl.trim() || state.settings.hermes.baseUrl;
+    if (!url || !apiKey.trim()) {
+      toast.error("API base URL and key are both required");
+      return false;
+    }
+    setSaving(true);
+    console.log("[Settings:connectHermes]");
+    try {
+      setState(await gmailApi.connectHermes({ baseUrl: url, apiKey: apiKey.trim() }));
+      setBaseUrl("");
+      setApiKey("");
+      toast.success("Hermes connected");
+      return true;
+    } catch (error) {
+      toast.error(`Could not connect: ${error instanceof Error ? error.message : String(error)}`);
+      return false;
+    } finally {
+      setSaving(false);
+    }
+  };
+  return { baseUrl, setBaseUrl, apiKey, setApiKey, saving, connect };
+}
+
 function HermesEditor({
   state,
   provider,
@@ -406,42 +447,15 @@ function HermesEditor({
   provider: ProviderSnapshot;
   update: (patch: AgentSettingsPatch) => void;
 }) {
-  const setState = useSetProvidersState();
-  const [baseUrl, setBaseUrl] = useState("");
-  const [apiKey, setApiKey] = useState("");
-  const [saving, setSaving] = useState(false);
+  const { baseUrl, setBaseUrl, apiKey, setApiKey, saving, connect } = useConnectHermes(state);
   const connected = Boolean(state.settings.hermes.baseUrl && state.settings.hermesHasKey);
-
-  const connect = async () => {
-    const url = baseUrl.trim() || state.settings.hermes.baseUrl;
-    if (!url || !apiKey.trim()) {
-      toast.error("API base URL and key are both required");
-      return;
-    }
-    setSaving(true);
-    console.log("[Settings:connectHermes]");
-    try {
-      setState(await gmailApi.connectHermes({ baseUrl: url, apiKey: apiKey.trim() }));
-      setBaseUrl("");
-      setApiKey("");
-      toast.success("Hermes connected");
-    } catch (error) {
-      toast.error(`Could not connect: ${error instanceof Error ? error.message : String(error)}`);
-    } finally {
-      setSaving(false);
-    }
-  };
 
   return (
     <>
       <SettingsSection title="Connection">
         <SettingsRow
           title="Base URL"
-          description={
-            window.desktopBridge.platform === "web"
-              ? `Hermes' built-in API server (port 8642), over HTTPS. Allow ${location.origin} in its API_SERVER_CORS_ORIGINS.`
-              : "Hermes' built-in API server (port 8642), reached over Tailscale."
-          }
+          description={HERMES_URL_HINT}
           control={
             <TextInput
               value={baseUrl}

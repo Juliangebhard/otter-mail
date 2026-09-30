@@ -7,6 +7,13 @@ The Mac app supports Apple Silicon Macs (arm64).
 
 ✓ supported · — not supported · a note means partly, or differently
 
+## Getting started
+
+| Feature                                                             | Mac                                | Web | iPhone              |
+| ------------------------------------------------------------------- | ---------------------------------- | --- | ------------------- |
+| Setup: a mailbox, the look, notifications, the agent, keys practice | ✓ (plus login, menu bar, mail app) | ✓   | welcome screen only |
+| Tour of the app on your own mail (⌘K, Settings → General)           | ✓                                  | ✓   | —                   |
+
 ## Mailboxes & accounts
 
 | Feature                                     | Mac                | Web                                 | iPhone                  |

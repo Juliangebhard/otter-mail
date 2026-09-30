@@ -390,6 +390,8 @@ function MessageRow({
           <button
             ref={rowRef}
             type="button"
+            data-message-row=""
+            data-draft={isDraft || undefined}
             onClick={onRowClick}
             draggable
             onDragStart={onDragStart}

@@ -18,6 +18,8 @@ import { TranslationSection } from "./translation-section";
 import { UpdatesSection } from "../updates";
 import { SettingsPageContainer, SettingsRow, SettingsSection } from "./settings-ui";
 import { features } from "../features";
+import { Btn } from "../gmail/ui";
+import { requestTour, startSetup } from "../onboarding/onboarding";
 
 /** Where the settings page is. */
 export type SettingsRoute = {
@@ -303,6 +305,27 @@ function GeneralPane() {
               placeholder={features.defaultMailApp ? undefined : "—"}
               disabled={!features.defaultMailApp}
             />
+          }
+        />
+      </SettingsSection>
+
+      <SettingsSection title="Getting started">
+        <SettingsRow
+          title="Tour"
+          description="A minute's walk through the app, on your own mail."
+          control={
+            <Btn size="sm" onClick={requestTour}>
+              Take the tour
+            </Btn>
+          }
+        />
+        <SettingsRow
+          title="Setup"
+          description="Mailboxes, look, notifications, your agent and the keys, one step at a time."
+          control={
+            <Btn size="sm" onClick={() => startSetup()}>
+              Run setup again
+            </Btn>
           }
         />
       </SettingsSection>
