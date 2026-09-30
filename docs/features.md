@@ -24,7 +24,7 @@ The Mac app supports Apple Silicon Macs (arm64).
 | Several mailboxes: on/off, reorder          | ✓                  | ✓                                   | ✓                       |
 | Combined mailbox (all accounts)             | ✓                  | ✓                                   | ✓ ("All")               |
 | Rename and color a mailbox (synced)         | ✓                  | ✓                                   | ✓                       |
-| Google profile picture per mailbox          | ✓ (kept current)   | ✓ (kept current)                    | Settings only           |
+| Google profile picture per mailbox          | ✓ (kept current)   | ✓ (kept current)                    | —                       |
 | Remove a mailbox (unlinks it everywhere)    | ✓                  | ✓                                   | ✓                       |
 | Mailbox linked elsewhere shows "signed out" | ✓                  | ✓                                   | ✓                       |
 | Demo mailbox                                | —                  | `pnpm dev:demo` only                | TestFlight / Xcode only |
