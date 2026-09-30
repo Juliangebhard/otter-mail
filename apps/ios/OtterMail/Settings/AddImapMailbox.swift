@@ -117,7 +117,8 @@ struct AddImapMailbox: View {
             try await session.addImapMailbox(email, settings: settings, password: password)
             dismiss()
         } catch {
-            self.error = error.localizedDescription
+            let hint = await MailDiscovery.certificateHint(error, email: email, tried: [settings.imap.host, settings.smtp.host])
+            self.error = hint ?? error.localizedDescription
             showsServers = true
         }
     }

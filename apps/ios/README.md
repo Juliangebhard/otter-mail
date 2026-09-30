@@ -39,7 +39,7 @@ SMTP servers directly too (`docs/imap.md`); the relay never sees its mail, token
   IDLE on the inbox while the app is open. Its IMAP and SMTP clients run over Network.framework
   with the system's TLS (`MailSocket.swift`; STARTTLS goes through `URLSessionStreamTask`, which
   can start TLS mid-connection). `MailDiscovery.swift` finds the servers for an address (known
-  providers, then Thunderbird's autoconfig). The password stays in the Keychain; the settings
+  providers, then Thunderbird's autoconfig, then the domain's MX host). The password stays in the Keychain; the settings
   follow the Otter account. Debug builds trust any certificate from localhost, to test against
   GreenMail or Dovecot in Docker.
 - `Agent/`: the agent, as on the desktop. Hermes (`Hermes.swift`) runs anywhere, so it runs here:

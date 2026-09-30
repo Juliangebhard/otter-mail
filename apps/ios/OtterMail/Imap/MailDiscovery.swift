@@ -1,9 +1,12 @@
 import Foundation
+import Network
 
 /**
  * Where an address's mail servers are: the providers people use most, then
  * Thunderbird's autoconfig database, then the domain's own autoconfig file,
- * and last a guess (imap.<domain>, smtp.<domain>) to check by hand.
+ * then its MX host (Thunderbird's entry for the MX's domain, or the MX itself
+ * if it takes TLS on 993 under its own name), and last a guess
+ * (imap.<domain>, smtp.<domain>) to check by hand.
  */
 nonisolated enum MailDiscovery {
     struct Found {
@@ -37,6 +40,23 @@ nonisolated enum MailDiscovery {
             guard let url = URL(string: url), let settings = await autoconfig(url, email: email) else { continue }
             return Found(settings: settings, note: index == 0 ? "Found in Thunderbird's list of mail providers." : "Found in \(domain)'s own settings.")
         }
+        if let mx = await mxHost(domain) {
+            let base = baseDomain(mx)
+            if base != domain, let url = URL(string: "https://autoconfig.thunderbird.net/v1.1/\(base)"),
+               let settings = await autoconfig(url, email: email) {
+                return Found(settings: settings, note: "Found in Thunderbird's list of mail providers, for \(base).")
+            }
+            if await takesTLS(mx) {
+                return Found(
+                    settings: ImapSettings(
+                        username: email,
+                        imap: MailServer(host: mx, port: 993, security: .tls),
+                        smtp: MailServer(host: mx, port: 465, security: .tls)
+                    ),
+                    note: "Your domain's mail server, from its MX record."
+                )
+            }
+        }
         return Found(
             settings: ImapSettings(
                 username: email,
@@ -45,6 +65,89 @@ nonisolated enum MailDiscovery {
             ),
             note: "Guessed from the address; check them under Server settings."
         )
+    }
+
+    /**
+     * For a certificate that doesn't match the server tried: the domain's own
+     * mail server, when it's another host and its certificate is good.
+     */
+    static func certificateHint(_ error: Error, email: String, tried hosts: [String]) async -> String? {
+        let certificate = switch error {
+        case NWError.tls: true
+        case let error as URLError:
+            [.serverCertificateUntrusted, .serverCertificateHasUnknownRoot, .serverCertificateHasBadDate, .secureConnectionFailed].contains(error.code)
+        default: false
+        }
+        let domain = email.split(separator: "@").last.map { $0.lowercased() } ?? ""
+        guard
+            certificate,
+            let mx = await mxHost(domain),
+            let host = hosts.first(where: { $0.lowercased() != mx }),
+            await takesTLS(mx)
+        else { return nil }
+        return "Its certificate doesn't match \(host). Your domain's mail server is \(mx): use that as the server name."
+    }
+
+    // ── MX ───────────────────────────────────────────────────────────────────
+
+    /** The domain's most preferred MX host (Cloudflare's DNS-over-HTTPS), unless it's Google's or Microsoft's. */
+    private static func mxHost(_ domain: String) async -> String? {
+        guard let url = URL(string: "https://cloudflare-dns.com/dns-query?name=\(domain)&type=MX") else { return nil }
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 8
+        request.setValue("application/dns-json", forHTTPHeaderField: "accept")
+        struct Answers: Decodable {
+            struct Answer: Decodable { let type: Int; let data: String }
+            let Answer: [Answer]?
+        }
+        guard
+            let (data, _) = try? await URLSession.shared.data(for: request),
+            let answers = try? JSONDecoder().decode(Answers.self, from: data).Answer
+        else { return nil }
+        let records: [(preference: Int, host: String)] = answers.compactMap { answer in
+            let parts = answer.data.split(separator: " ")
+            guard answer.type == 15, parts.count == 2, let preference = Int(parts[0]) else { return nil }
+            return (preference, parts[1].lowercased().trimmingCharacters(in: CharacterSet(charactersIn: ".")))
+        }
+        guard let host = records.min(by: { $0.preference < $1.preference })?.host, !host.isEmpty else { return nil }
+        let notImap = ["google.com", "googlemail.com", "outlook.com"]
+        return notImap.contains { host == $0 || host.hasSuffix(".\($0)") } ? nil : host
+    }
+
+    /** mx1.mail.example.co.uk → example.co.uk, roughly. */
+    private static func baseDomain(_ host: String) -> String {
+        let labels = host.split(separator: ".")
+        let suffixes: Set<Substring> = ["co", "com", "net", "org", "ac", "gov", "edu", "ne", "or"]
+        let suffix = labels.count > 2 && labels[labels.count - 1].count == 2 && suffixes.contains(labels[labels.count - 2])
+        return labels.suffix(suffix ? 3 : 2).joined(separator: ".")
+    }
+
+    /** Whether the host completes a TLS handshake on 993 with a certificate for its own name (within 5 seconds). */
+    private static func takesTLS(_ host: String) async -> Bool {
+        let tcp = NWProtocolTCP.Options()
+        tcp.connectionTimeout = 5
+        let connection = NWConnection(host: NWEndpoint.Host(host), port: .imaps, using: NWParameters(tls: .init(), tcp: tcp))
+        let queue = DispatchQueue(label: "dev.otterware.mail.discovery")
+        return await withCheckedContinuation { continuation in
+            // Everything runs on `queue`, so this needs no lock.
+            final class Once: @unchecked Sendable { var done = false }
+            let once = Once()
+            let finish = { @Sendable (ok: Bool) in
+                guard !once.done else { return }
+                once.done = true
+                connection.cancel()
+                continuation.resume(returning: ok)
+            }
+            connection.stateUpdateHandler = { state in
+                switch state {
+                case .ready: finish(true)
+                case .waiting, .failed, .cancelled: finish(false)
+                default: break
+                }
+            }
+            connection.start(queue: queue)
+            queue.asyncAfter(deadline: .now() + 5) { finish(false) }
+        }
     }
 
     // ── Known providers ──────────────────────────────────────────────────────
