@@ -9,7 +9,8 @@ import {
 } from "lucide-react";
 import { IconBtn, HintTooltip, UnreadPill, cn, restoreFocusForKeyboardOnly } from "./ui";
 import { COMBINED_ACCOUNT_ID } from "./custom-views";
-import { getAccountColor, getAccountDisplayName } from "./account-style";
+import { getAccountDisplayName } from "./account-style";
+import { AccountPicture } from "./account-picture";
 import { useAllAccountLabels } from "./hooks";
 import { DropdownMenuSeparator } from "./menu";
 import type { GmailAccount } from "./types";
@@ -112,23 +113,12 @@ export function WindowTitle({ className }: { className?: string }) {
   );
 }
 
-/** Small square mark for a mailbox, like a project favicon in the breadcrumb. */
+/** Round mark for a mailbox: the account's picture, or its initial. */
 function MailboxMark({ account, className }: { account: GmailAccount | null; className?: string }) {
   if (!account) {
-    return <LayersIcon className={cn("size-4 shrink-0", className)} aria-hidden />;
+    return <LayersIcon className={cn("size-4.5 shrink-0", className)} aria-hidden />;
   }
-  return (
-    <span
-      className={cn(
-        "flex size-4 shrink-0 items-center justify-center rounded-[4px] text-[9px] font-bold leading-none text-white",
-        className,
-      )}
-      style={{ background: getAccountColor(account) }}
-      aria-hidden
-    >
-      {(getAccountDisplayName(account)[0] ?? "?").toUpperCase()}
-    </span>
-  );
+  return <AccountPicture account={account} className="size-4.5 text-[9px]" />;
 }
 
 type MailboxOption = { id: string; account: GmailAccount | null; name: string; shortcut: string };
@@ -250,7 +240,7 @@ export function MailboxSwitcher({
             className,
           )}
         >
-          <span className="flex size-4 shrink-0 items-center justify-center">
+          <span className="flex size-4.5 shrink-0 items-center justify-center">
             <MailboxMark account={selectedAccount} className="text-sidebar-muted-foreground" />
           </span>
           {/* A heading, like Codex's "Codex ⌄": the name, then its chevron. */}
@@ -281,7 +271,7 @@ export function MailboxSwitcher({
                   selected && "bg-foreground/[0.08]",
                 )}
               >
-                <span className="flex size-4 shrink-0 items-center justify-center">
+                <span className="flex size-4.5 shrink-0 items-center justify-center">
                   <MailboxMark account={option.account} className="text-muted-foreground" />
                 </span>
                 <span className="min-w-0 flex-1 truncate">{option.name}</span>
