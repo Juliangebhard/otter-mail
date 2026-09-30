@@ -44,3 +44,24 @@ describe("site domain migration", () => {
     },
   );
 });
+
+describe("changelog", () => {
+  it.each(["/changelog/0.5.17/", "/changelog/0.5.17"])(
+    "sends a release's old page %s to its note on the one page",
+    async (path) => {
+      const { response, fetch } = serve(`https://mail.otterware.app${path}`);
+      const result = await response;
+      expect(result.status).toBe(301);
+      expect(result.headers.get("location")).toBe("https://mail.otterware.app/changelog/#0.5.17");
+      expect(fetch).not.toHaveBeenCalled();
+    },
+  );
+
+  it("serves the changelog and its images", async () => {
+    for (const path of ["/changelog/", "/changelog/images/0.5.17-settings-search.webp"]) {
+      const { response, fetch } = serve(`https://mail.otterware.app${path}`);
+      expect((await response).status).toBe(200);
+      expect(fetch).toHaveBeenCalled();
+    }
+  });
+});

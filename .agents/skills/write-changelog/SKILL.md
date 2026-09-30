@@ -7,8 +7,9 @@ description: Write an Otter Mail changelog note (changelog/<version>.md) in the 
 
 The changelog is how Otter Mail announces itself: marketing and brand as much
 as a record. Notes live in `changelog/<version>.md` at the repository root.
-The site shows them at https://mail.otterware.app/changelog (an index, and a
-page per release); the app only links there ("Changelog" in ⌘K, in the ?
+The site shows them at https://mail.otterware.app/changelog, all on one page,
+newest first, with the versions down the side (each note's anchor is its
+version: /changelog/#0.5.17); the app only links there ("Changelog" in ⌘K, in the ?
 menu at the bottom of Settings, and on the update card). The format lives in `packages/shared/src/changelog.ts`.
 
 The iPhone app releases on its own (TestFlight) and isn't in this changelog.
@@ -106,7 +107,7 @@ Type what you want and Enter does it: commands you name come first, and mail sea
 
 ## Check it
 
-- Site: `pnpm --filter @otter-mail/site build`, then open
-  `site/dist/changelog/index.html` and the release's page.
+- Site: `pnpm --filter @otter-mail/site build`, then serve `site/dist` (e.g.
+  `python3 -m http.server --directory site/dist`) and open `/changelog/`.
 - `pnpm --filter @otter-mail/site test`: every note parses and every image it
   shows exists.

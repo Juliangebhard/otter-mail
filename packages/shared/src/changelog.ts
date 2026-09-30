@@ -73,6 +73,6 @@ export function changelogImageName(src: string): string | null {
   return match ? match[1]! : null;
 }
 
-/** The site's changelog, or one release's page there. */
+/** The site's changelog, or one release's note there. */
 export const changelogUrl = (version?: string | null) =>
-  `https://mail.otterware.app/changelog/${version ? `${version}/` : ""}`;
+  `https://mail.otterware.app/changelog/${version ? `#${version}` : ""}`;
