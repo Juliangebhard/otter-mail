@@ -118,7 +118,7 @@
         ]
       },
       {
-        "subject": "Invitation: Garden planning @ Mon, Oct 5, 9:00 AM UTC (demo@otter.example)",
+        "subject": "Invitation: Garden planning @ Sun, Oct 4, 9:00 AM UTC (demo@otter.example)",
         "labels": ["INBOX", "Projects/Garden", "CATEGORY_PERSONAL"],
         "messages": [
           {
@@ -128,7 +128,7 @@
             },
             "hoursAgo": 20,
             "unread": true,
-            "text": "Jonas Müller has invited you to an event.\n\nGarden planning\nWhen: Mon, Oct 5, 9:00 AM UTC\nWhere: Community garden, plot 12\n\nLet's decide what goes in the raised beds before the frost. Bring seed catalogues!",
+            "text": "Jonas Müller has invited you to an event.\n\nGarden planning\nWhen: Sun, Oct 4, 9:00 AM UTC\nWhere: Community garden, plot 12\n\nLet's decide what goes in the raised beds before the frost. Bring seed catalogues!",
             "attachments": [
               {
                 "filename": "invite.ics",
@@ -733,7 +733,7 @@
         ]
       },
       {
-        "subject": "Invitation: Design review @ Sat, Oct 3, 2:00 PM UTC (sam@acme.example)",
+        "subject": "Invitation: Design review @ Fri, Oct 2, 2:00 PM UTC (sam@acme.example)",
         "labels": ["INBOX", "IMPORTANT"],
         "messages": [
           {
@@ -743,7 +743,7 @@
             },
             "hoursAgo": 9,
             "unread": true,
-            "text": "Priya Natarajan has invited you to an event.\n\nDesign review: new reader layout\nWhen: Sat, Oct 3, 2:00 PM UTC\nWhere: Room Rhine / video call",
+            "text": "Priya Natarajan has invited you to an event.\n\nDesign review: new reader layout\nWhen: Fri, Oct 2, 2:00 PM UTC\nWhere: Room Rhine / video call",
             "attachments": [
               {
                 "filename": "invite.ics",
