@@ -6,9 +6,9 @@ their code.
 
 ## Design
 
-- **ChatGPT's frame.** The mail list is the page; a swipe from the left slides it aside to
-  show the drawer: a page per mailbox (All first) that you swipe through, as on the desktop, each
-  with its folders and labels, then Compose and Settings. Settings is ChatGPT's grouped sheet.
+- **ChatGPT's frame.** The mail list is the page; a swipe from the left (or a tap on its title)
+  slides it aside to show the drawer: a page per mailbox (All first) that you swipe through, as on
+  the desktop, each with its folders and labels, then Compose and Settings. Settings is ChatGPT's grouped sheet.
 - **Otter Code's rows.** Who and when, the subject, a line of the latest message; the mailbox's mark
   in All mailboxes. Swipe for read, archive and trash; long-press for the rest.
 - **iOS's own bars.** The list's bottom bar (agent, search, compose) and the reader's buttons are
