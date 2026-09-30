@@ -56,6 +56,7 @@ import { SettingsGroup, SettingsRow } from "../settings/settings-ui";
 import { setThemeForAppearance, themeColors, useThemeChoice } from "../theme/apply-theme";
 import { features } from "../features";
 import { KEY_DRILL_COUNT, KeyTrainer } from "./key-trainer";
+import { MailField } from "./mail-field";
 import { ShortcutKeys } from "./keycap";
 import {
   finishSetup,
@@ -121,7 +122,8 @@ export function SetupFlow() {
       <div className="flex shrink-0">
         <WindowTitle className="flex-1" />
       </div>
-      <div className="mx-1 mb-1 flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border/70 bg-canvas">
+      <div className="relative isolate mx-1 mb-1 flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border/70 bg-canvas">
+        <MailField />
         <header className="grid shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-4 px-5 pt-4">
           <span />
           {framed ? <Progress step={step} /> : <span />}
