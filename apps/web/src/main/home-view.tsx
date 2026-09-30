@@ -78,7 +78,6 @@ import {
 import { ALL_MAIL_LABEL_ID } from "./gmail/label-names";
 import { useMonochromeTheme } from "./theme/apply-theme";
 import { useMailboxes } from "./mailboxes";
-import { offerWhatsNew } from "./changelog";
 import { SetupFlow } from "./onboarding/setup";
 import { Tour } from "./onboarding/tour";
 import {
@@ -369,10 +368,6 @@ function MailHome() {
     markSetUp();
     offerTour();
   }, [accountsQuery.isLoading, accounts.length]);
-  // Just updated: say so once, with the way to What's new.
-  useEffect(() => {
-    void offerWhatsNew(() => setSettingsRoute({ pane: "changelog", viewId: null, mailbox: null }));
-  }, []);
   // The tour walks the mail view: out of Settings and the composer, with the sidebar showing.
   const tourRequested = useTourRequested();
   useEffect(() => {

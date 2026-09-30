@@ -1,6 +1,6 @@
 ---
 name: write-changelog
-description: Write Otter Mail's changelog note for a Mac and web release (changelog/<version>.md), in the house style after conductor.build/changelog - a few-word title, a one-line lead, a screenshot or two, short bullets. The changelog is marketing, so whether a release gets a note is the user's call; ask before a release, never assume. Use before running the Release workflow, or when asked for release notes or a changelog entry.
+description: Write an Otter Mail changelog note (changelog/<version>.md) in the house style after conductor.build/changelog - a few-word title, a one-line lead, a screenshot or two, short bullets. Use only when the user asks for a note, release notes or a changelog entry. The changelog is marketing, not part of releasing - never write, draft, suggest or ask about a note on your own, not even when running a release.
 ---
 
 # Write a changelog note
@@ -8,17 +8,18 @@ description: Write Otter Mail's changelog note for a Mac and web release (change
 The changelog is how Otter Mail announces itself: marketing and brand as much
 as a record. Notes live in `changelog/<version>.md` at the repository root.
 The site shows them at https://mail.otterware.app/changelog (an index, and a
-page per release) and the app in Settings → What's new; after an update the
-app offers the newest note since the one you last saw. The format lives in
-`packages/shared/src/changelog.ts`.
+page per release); the app only links there ("Changelog" in ⌘K, in the ?
+menu at the bottom of Settings, and on the update card). The format lives in `packages/shared/src/changelog.ts`.
 
 The iPhone app releases on its own (TestFlight) and isn't in this changelog.
 
 ## Whether to write one
 
-The user decides, release by release; there's no rule. Before running a
-release, say what's in it and ask whether it's worth announcing, with a draft
-when it might be. Never add a note unasked.
+Only when the user asks for one. A release never needs a note and nothing
+checks for one, so most releases have none. Don't write, draft or suggest a
+note on your own, and don't ask about one when releasing.
+
+If the user asks whether something deserves a note:
 
 - Usually worth it: something new people would notice, want to try, or show
   someone. Those tend to be `minor` bumps (0.6.0), with a screenshot.
@@ -30,13 +31,14 @@ when it might be. Never add a note unasked.
 
 ## When
 
-Write it before running the Release workflow, in the pull request that lands
-the work or in one of its own. The file is named for the version it ships in:
-the latest `vX.Y.Z` tag bumped the way the release will bump it.
+Whenever the user asks: before the release or after it, in a pull request of
+its own. The file is named for the version it ships (or shipped) in; for one
+not out yet, the latest `vX.Y.Z` tag bumped the way the release will bump it.
 `gh release list --limit 1` shows the latest.
 
-A note for a version not released yet stays hidden: the site and the app show
-only versions up to their own. So it's safe on `main` ahead of the release.
+A note for a version not released yet stays hidden: the site shows only the
+versions up to the one `main` last released. So it's safe on `main` ahead of
+the release. A push to `main` that changes `changelog/` redeploys the site.
 
 ## The file
 
@@ -94,13 +96,11 @@ Type what you want and Enter does it: commands you name come first, and mail sea
   when the feature is about appearance.
 - Crop to the feature when the whole window isn't the point.
 - Save as WebP (quality about 80) under `changelog/images/`, named
-  `<version>-<slug>.webp`, around 100 KB or less. They ship inside the app.
+  `<version>-<slug>.webp`, around 100 KB or less.
 
 ## Check it
 
 - Site: `pnpm --filter @otter-mail/site build`, then open
   `site/dist/changelog/index.html` and the release's page.
-- App: Settings → What's new (a dev build shows notes up to its own version,
-  the one in `apps/desktop/package.json`).
 - `pnpm --filter @otter-mail/site test`: every note parses and every image it
   shows exists.

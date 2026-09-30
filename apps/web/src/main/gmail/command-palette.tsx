@@ -28,11 +28,11 @@ import {
   MousePointer2Icon,
   PlusIcon,
   RotateCwIcon,
+  ScrollTextIcon,
   SearchIcon,
   SendIcon,
   SettingsIcon,
   SignpostIcon,
-  SparklesIcon,
   SquarePenIcon,
   StarIcon,
   SunIcon,
@@ -44,6 +44,7 @@ import { getAccountColor, getAccountDisplayName } from "./account-style";
 import { senderLabel } from "./address";
 import { cn } from "./ui";
 import { COMBINED_ACCOUNT_ID } from "./custom-views";
+import { changelogUrl } from "@otter-mail/shared/changelog";
 import { APP_THEMES } from "@otter-mail/shared/themes";
 import { previewTheme, setThemeForAppearance, useThemeChoice } from "../theme/apply-theme";
 import type { GmailAccount, GmailMessageSummary, MailView } from "./types";
@@ -324,11 +325,11 @@ export function CommandPalette({
         run: () => onOpenSettings(),
       },
       {
-        id: "whats-new",
-        icon: <SparklesIcon className={ICON} />,
-        title: "What's new",
-        keywords: "changelog release notes new version",
-        run: () => onOpenSettings("changelog"),
+        id: "changelog",
+        icon: <ScrollTextIcon className={ICON} />,
+        title: "Changelog",
+        keywords: "what's new release notes new version",
+        run: () => void window.desktopBridge.openExternal(changelogUrl()),
       },
       ...(update && update.status !== "disabled"
         ? [

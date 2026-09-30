@@ -128,15 +128,15 @@ The Mac app supports Apple Silicon Macs (arm64).
 
 ## Settings & customization
 
-| Feature                                                  | Mac | Web | iPhone                                                                     |
-| -------------------------------------------------------- | --- | --- | -------------------------------------------------------------------------- |
-| 7 themes, a light and a dark pick; System / Light / Dark | ✓   | ✓   | ✓                                                                          |
-| Panel animations                                         | ✓   | ✓   | —                                                                          |
-| Keyboard shortcuts, rebindable (incl. move to label)     | ✓   | ✓   | —                                                                          |
-| Command palette (⌘K)                                     | ✓   | ✓   | —                                                                          |
-| What's new (the changelog; offered once after an update) | ✓   | ✓   | —                                                                          |
-| Custom views (rules across mailboxes)                    | ✓   | ✓   | —                                                                          |
-| Preferences synced through the Otter account             | ✓   | ✓   | ✓ (theme, advance, mailboxes, notifications, languages, agent, signatures) |
+| Feature                                                    | Mac | Web | iPhone                                                                     |
+| ---------------------------------------------------------- | --- | --- | -------------------------------------------------------------------------- |
+| 7 themes, a light and a dark pick; System / Light / Dark   | ✓   | ✓   | ✓                                                                          |
+| Panel animations                                           | ✓   | ✓   | —                                                                          |
+| Keyboard shortcuts, rebindable (incl. move to label)       | ✓   | ✓   | —                                                                          |
+| Command palette (⌘K)                                       | ✓   | ✓   | —                                                                          |
+| Changelog (opens the site's, from ⌘K and Settings' ? menu) | ✓   | ✓   | —                                                                          |
+| Custom views (rules across mailboxes)                      | ✓   | ✓   | —                                                                          |
+| Preferences synced through the Otter account               | ✓   | ✓   | ✓ (theme, advance, mailboxes, notifications, languages, agent, signatures) |
 
 ## Agents
 

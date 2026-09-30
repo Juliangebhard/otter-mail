@@ -1,9 +1,10 @@
 /**
- * The changelog: one short note per Mac and web release, `changelog/<version>.md`
- * at the repository root (images beside it in `changelog/images/`). The site
- * shows it at /changelog, the app in Settings → What's new. Notes are written
- * before the release they describe, so each reader shows only the versions up
- * to its own. How to write one: the write-changelog skill (.agents/skills).
+ * The changelog: short notes on Mac and web releases, `changelog/<version>.md`
+ * at the repository root (images beside it in `changelog/images/`), on the
+ * site at /changelog; the app only links there. A note is marketing, written
+ * when the user asks for one, before or after its release: the site shows the
+ * versions up to the one main last released. How to write one: the
+ * write-changelog skill (.agents/skills).
  */
 
 export type ChangelogEntry = {
@@ -37,7 +38,7 @@ export function parseChangelogEntry(version: string, text: string): ChangelogEnt
 }
 
 /** Semver order of X.Y.Z versions: negative when `a` is older. */
-export function compareVersions(a: string, b: string): number {
+function compareVersions(a: string, b: string): number {
   const pa = a.split(".").map(Number);
   const pb = b.split(".").map(Number);
   for (let i = 0; i < 3; i++) {

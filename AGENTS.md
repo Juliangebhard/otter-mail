@@ -50,9 +50,9 @@ when a feature lands or goes.
 - `scripts/`: dev runner, desktop packaging (`build-desktop-artifact.ts`), release helpers.
 - `assets/`: app icons like T3 Code's: `prod/` for releases, `dev/` for the blueprint variant that
   unpackaged runs wear. `pnpm icons:export` regenerates the dev icon and both `.icns` files.
-- `changelog/`: one note per Mac and web release (`<version>.md`, images in `images/`), shown on
-  the site at /changelog and in the app under Settings → What's new. Format in
-  `packages/shared/src/changelog.ts`; style in the `write-changelog` skill.
+- `changelog/`: notes on Mac and web releases (`<version>.md`, images in `images/`), shown on
+  the site at /changelog; the app only links there. A note is marketing, written only when the
+  user asks for one (the `write-changelog` skill). Format in `packages/shared/src/changelog.ts`.
 - `site/`: https://mail.otterware.app, a Cloudflare Worker: the landing page, privacy policy and
   terms, and the web app (`/` shows the app when signed in, `/app` always).
 - Deploys: Cloudflare Workers Builds deploys `infra/relay` and `site/` on pushes to `main` that
@@ -97,8 +97,7 @@ its own version:
 
 - Mac: run the Release workflow from `main` with a patch/minor/major bump, or push a `vX.Y.Z`
   tag. Installed apps download updates on their own and offer "Restart to update" in the sidebar.
-  Whether a release is announced in the changelog is the user's call: ask before releasing, and
-  write `changelog/<version>.md` first when it is (the `write-changelog` skill).
+  A release never needs a changelog note: don't write one, or ask about one, unless the user asks.
 - iPhone: run the Release iPhone workflow from `main` when `apps/ios` (or what it bundles from
   `packages/shared`) has changed. It uploads to TestFlight and tags `ios-vX.Y.Z`.
 
