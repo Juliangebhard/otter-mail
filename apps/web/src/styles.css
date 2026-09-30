@@ -34,8 +34,8 @@
   --workspace-controls-right: 1rem;
   --workspace-titlebar-control-size: 1.75rem;
   --workspace-titlebar-control-gap: 0.5rem;
-  /* Recently viewed, back and forward after the pinned toggle, sidebar hidden
-     (the Mac app's HistoryControls): three buttons, each after a 0.25rem gap. */
+  /* Recently viewed, back and forward after the pinned toggle (the Mac app's
+     HistoryControls): three buttons, each after a 0.25rem gap. */
   --workspace-history-controls-width: calc(3 * (var(--workspace-titlebar-control-size) + 0.25rem));
   --workspace-titlebar-content-left: calc(
     var(--workspace-controls-left) + var(--workspace-titlebar-control-size) +

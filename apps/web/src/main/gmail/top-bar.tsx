@@ -125,10 +125,9 @@ function RecentlyViewedMenu() {
 /**
  * Recently viewed, back and forward through the mailboxes, conversations and
  * Settings pages you've been to (Linear's), in the Mac app, where no browser
- * offers them: after the pinned toggle with the sidebar hidden, at the end
- * of the sidebar's title band when it shows.
+ * offers them: after the pinned sidebar toggle.
  */
-export function HistoryControls({ className }: { className?: string }) {
+export function HistoryControls() {
   const { history } = useRouter();
   trackHistory(history);
   const where = useSyncExternalStore(history.subscribe, () => {
@@ -137,7 +136,7 @@ export function HistoryControls({ className }: { className?: string }) {
   });
   if (!features.historyButtons) return null;
   return (
-    <div className={cn("flex items-center gap-1", className)}>
+    <div className="flex items-center gap-1">
       <RecentlyViewedMenu />
       <HintTooltip label="Back">
         <IconBtn
@@ -208,9 +207,10 @@ export function PaneIcon({
 }
 
 /**
- * The sidebar toggle, pinned at one window position (Otter Code's
- * SidebarControl): right of the traffic lights, whether the sidebar is open
- * or not. The bands under it leave room (`WindowTitle`, `TitlebarInset`).
+ * The sidebar toggle and back/forward, pinned at one window position (Otter
+ * Code's SidebarControl, ChatGPT's): right of the traffic lights, whether the
+ * sidebar is open or not, so nothing moves when it opens or closes. The
+ * bands under them leave room (`SidebarTitle`, `TitlebarInset`).
  */
 export function SidebarControl({
   sidebarOpen,
@@ -230,7 +230,7 @@ export function SidebarControl({
           <PaneIcon side="left" open={sidebarOpen} className="size-4" />
         </IconBtn>
       </HintTooltip>
-      {sidebarOpen ? null : <HistoryControls />}
+      <HistoryControls />
     </div>
   );
 }
@@ -303,15 +303,11 @@ export function WindowTitle({ className }: { className?: string }) {
 }
 
 /**
- * The sidebar's title band in the main window: the traffic lights and the
- * pinned toggle over its start, back/forward at its end.
+ * The sidebar's title band in the main window: the traffic lights, the
+ * pinned toggle and back/forward sit over it.
  */
 export function SidebarTitle() {
-  return (
-    <div className="drag-region flex h-(--workspace-topbar-height) shrink-0 items-center justify-end pr-3">
-      <HistoryControls className="-me-1.5" />
-    </div>
-  );
+  return <div className="drag-region h-(--workspace-topbar-height) shrink-0" />;
 }
 
 /** Round mark for a mailbox: the account's picture, or its initial; layers for All mailboxes. */

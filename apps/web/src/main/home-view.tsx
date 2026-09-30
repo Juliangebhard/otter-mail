@@ -1162,8 +1162,8 @@ function MailHome() {
                   style={{ width: sidebarOpen ? sidebarPane.width : 0 }}
                   className={cn(
                     PANE_FRAME,
-                    // Anchored right, so the sidebar slides out to the left.
-                    "justify-end",
+                    // Anchored left: the sidebar stays put while the columns
+                    // after it slide over it, and back out.
                     sidebarOpen && "[[data-panel-animations=true]_&]:starting:w-0!",
                     !sidebarOpen && "pointer-events-none",
                   )}
