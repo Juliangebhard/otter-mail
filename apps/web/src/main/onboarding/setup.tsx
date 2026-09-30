@@ -94,6 +94,8 @@ const isStep = (value: string | null): value is Step => STEPS.includes(value as 
 export function SetupFlow() {
   const accountsQuery = useAccounts();
   const accounts = accountsQuery.data ?? [];
+  // Run again with mail already here, the setup changes only what's clicked.
+  const [firstRun] = useState(() => accounts.length === 0);
   // Asked now, so the agent step opens with its list rather than growing into it.
   useAgentProviders();
   const [step, setStep] = useState<Step>(() => {
@@ -150,7 +152,7 @@ export function SetupFlow() {
               {step === "mailbox" ? <MailboxStep accounts={accounts} /> : null}
               {step === "look" ? <LookStep /> : null}
               {step === "habits" ? <HabitsStep /> : null}
-              {step === "agent" ? <AgentStep /> : null}
+              {step === "agent" ? <AgentStep firstRun={firstRun} /> : null}
               {step === "keys" ? <KeysStep /> : null}
               {step === "done" ? <DoneStep /> : null}
             </div>
@@ -768,7 +770,7 @@ function HermesConnect({ state, onConnected }: { state: ProvidersState; onConnec
 /** A provider that can take a chat here (the Mac's agents are off on the web). */
 const canAnswer = (p: ProviderSnapshot) => isProviderUsable(p) && !p.macAppOnly;
 
-function AgentStep() {
+function AgentStep({ firstRun }: { firstRun: boolean }) {
   const query = useAgentProviders();
   const setState = useSetProvidersState();
   const state = query.data;
@@ -779,9 +781,10 @@ function AgentStep() {
       .updateAgentSettings({ selected: kind })
       .then(setState, (error: unknown) => toast.error(`Could not save: ${String(error)}`));
   };
-  // The saved choice can't answer (Hermes isn't connected, say) but another
-  // can: that one, once every check is in.
+  // First run: the default (Hermes) can't answer yet but another can, so
+  // that one, once every check is in. Run again, a choice stays as it was.
   useEffect(() => {
+    if (!firstRun) return;
     if (!state || state.providers.some((p) => p.checkedAt === null && !p.macAppOnly)) return;
     const current = state.providers.find((p) => p.kind === state.selected);
     const ready = state.providers.find(canAnswer);

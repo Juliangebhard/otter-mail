@@ -159,19 +159,21 @@ export function UpdateCard() {
             {state.status === "downloaded"
               ? "Restart to finish updating."
               : manualUrl
-                ? "This build can't update itself. Install it by hand."
+                ? "Install this version by hand."
                 : failed
                   ? "It will try again later."
                   : `${percent}%`}
           </p>
           {/* This build doesn't carry the new version's note yet: the site does. */}
-          <button
-            type="button"
-            onClick={() => void window.desktopBridge.openExternal(changelogUrl(version))}
-            className="cursor-pointer text-2xs text-foreground/80 underline-offset-2 outline-none hover:text-foreground hover:underline focus-visible:underline"
-          >
-            What's new →
-          </button>
+          {state.status === "downloading" || state.status === "downloaded" ? (
+            <button
+              type="button"
+              onClick={() => void window.desktopBridge.openExternal(changelogUrl(version))}
+              className="cursor-pointer text-2xs text-foreground/80 underline-offset-2 outline-none hover:text-foreground hover:underline focus-visible:underline"
+            >
+              What's new →
+            </button>
+          ) : null}
         </div>
         {state.status === "downloaded" ? (
           <button
@@ -185,7 +187,7 @@ export function UpdateCard() {
         ) : null}
       </div>
       {state.status === "downloading" ? (
-        <div className="mt-2 h-1 overflow-hidden rounded-full bg-muted">
+        <div className="mt-2 h-1 overflow-hidden rounded-full bg-foreground/10">
           <div
             className="h-full rounded-full bg-primary transition-[width] duration-300"
             style={{ width: `${percent}%` }}

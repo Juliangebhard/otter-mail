@@ -392,6 +392,7 @@ function MessageRow({
             type="button"
             data-message-row=""
             data-draft={isDraft || undefined}
+            data-unread={unread || undefined}
             onClick={onRowClick}
             draggable
             onDragStart={onDragStart}
