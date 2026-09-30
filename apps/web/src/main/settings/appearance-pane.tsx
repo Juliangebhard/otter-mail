@@ -342,6 +342,16 @@ function ThemeAction({
   );
 }
 
+/** The built-in or your own themes, under a small heading. */
+function ThemeGroup({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div className="space-y-2">
+      <h4 className="px-[17px] text-xs text-muted-foreground">{title}</h4>
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3">{children}</div>
+    </div>
+  );
+}
+
 // Otter Code's (ThemeSettings.tsx).
 function downloadThemeFile(filename: string, contents: string): void {
   const url = URL.createObjectURL(new Blob([contents], { type: "application/json" }));
@@ -372,10 +382,75 @@ function ThemeLibrary() {
     for (const mode of getThemeModes(theme)) setThemeForAppearance(mode, theme.id);
   };
 
+  // Built-ins are never changed: duplicating one is how you make it yours.
+  const card = (theme: ThemeDefinition, custom: boolean) => (
+    <ThemeCard
+      key={theme.id}
+      theme={theme}
+      pickedModes={(["light", "dark"] as const).filter((m) => choice[m] === theme.id)}
+      onPick={(modes) => {
+        for (const mode of modes) setThemeForAppearance(mode, theme.id);
+      }}
+      actions={
+        <>
+          <ThemeAction
+            label={`Duplicate ${theme.label}`}
+            tooltip="Duplicate theme"
+            onClick={() =>
+              openThemeEditor({
+                editingThemeId: null,
+                seedThemeId: theme.id,
+                seedName: `${theme.label} copy`,
+                initialAppearance: appearance(),
+              })
+            }
+          >
+            <CopyIcon />
+          </ThemeAction>
+          {custom ? (
+            <>
+              <ThemeAction
+                label={`Edit ${theme.label}`}
+                tooltip="Edit theme"
+                onClick={() =>
+                  openThemeEditor({
+                    editingThemeId: theme.id,
+                    seedThemeId: null,
+                    seedName: null,
+                    initialAppearance: appearance(),
+                  })
+                }
+              >
+                <PenLineIcon />
+              </ThemeAction>
+              <ThemeAction
+                label={`Export ${theme.label}`}
+                tooltip="Export theme file"
+                onClick={() => downloadThemeFile(`${theme.id}.json`, serializeThemeFile(theme))}
+              >
+                <UploadIcon />
+              </ThemeAction>
+              <ThemeAction
+                label={`Remove ${theme.label}`}
+                tooltip="Remove theme"
+                destructive
+                onClick={() => setRemoving(theme)}
+              >
+                <Trash2Icon />
+              </ThemeAction>
+            </>
+          ) : null}
+        </>
+      }
+    />
+  );
+  const builtIn = themes.filter((theme) => APP_THEMES.includes(theme));
+  const custom = themes.filter((theme) => !APP_THEMES.includes(theme));
+
   return (
     <SettingsSection
       {...searchableSetting("themes")}
-      description="Click a theme to use it everywhere, or a single orb to use it for light or dark mode only. Duplicate one to make it your own."
+      description="Duplicate a built-in theme to make it your own."
       variant="plain"
       headerAction={
         <div className="flex items-center gap-2">
@@ -403,73 +478,17 @@ function ThemeLibrary() {
       }
     >
       <TooltipProvider>
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-          {themes.map((theme) => {
-            const custom = !APP_THEMES.includes(theme);
-            return (
-              <ThemeCard
-                key={theme.id}
-                theme={theme}
-                pickedModes={(["light", "dark"] as const).filter((m) => choice[m] === theme.id)}
-                onPick={(modes) => {
-                  for (const mode of modes) setThemeForAppearance(mode, theme.id);
-                }}
-                actions={
-                  <>
-                    <ThemeAction
-                      label={`Duplicate ${theme.label}`}
-                      tooltip="Duplicate theme"
-                      onClick={() =>
-                        openThemeEditor({
-                          editingThemeId: null,
-                          seedThemeId: theme.id,
-                          seedName: `${theme.label} copy`,
-                          initialAppearance: appearance(),
-                        })
-                      }
-                    >
-                      <CopyIcon />
-                    </ThemeAction>
-                    {custom ? (
-                      <>
-                        <ThemeAction
-                          label={`Edit ${theme.label}`}
-                          tooltip="Edit theme"
-                          onClick={() =>
-                            openThemeEditor({
-                              editingThemeId: theme.id,
-                              seedThemeId: null,
-                              seedName: null,
-                              initialAppearance: appearance(),
-                            })
-                          }
-                        >
-                          <PenLineIcon />
-                        </ThemeAction>
-                        <ThemeAction
-                          label={`Export ${theme.label}`}
-                          tooltip="Export theme file"
-                          onClick={() =>
-                            downloadThemeFile(`${theme.id}.json`, serializeThemeFile(theme))
-                          }
-                        >
-                          <UploadIcon />
-                        </ThemeAction>
-                        <ThemeAction
-                          label={`Remove ${theme.label}`}
-                          tooltip="Remove theme"
-                          destructive
-                          onClick={() => setRemoving(theme)}
-                        >
-                          <Trash2Icon />
-                        </ThemeAction>
-                      </>
-                    ) : null}
-                  </>
-                }
-              />
-            );
-          })}
+        <div className="space-y-4">
+          <ThemeGroup title="Built-in">{builtIn.map((theme) => card(theme, false))}</ThemeGroup>
+          <ThemeGroup title="Custom">
+            {custom.length > 0 ? (
+              custom.map((theme) => card(theme, true))
+            ) : (
+              <p className="col-span-full rounded-xl border border-dashed border-border/70 px-4 py-6 text-center text-sm text-muted-foreground">
+                No themes of your own yet.
+              </p>
+            )}
+          </ThemeGroup>
         </div>
       </TooltipProvider>
       <ThemeImportDialog
