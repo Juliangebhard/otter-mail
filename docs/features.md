@@ -164,7 +164,8 @@ that changes a mailbox asks first unless the chat has full access; drafts don't 
 - Dock badge; launch at login; default mail app (mailto: links).
 - Drag attachments out to Finder.
 - Menus: Sync Now, Back / Forward (⌘[ ⌘]).
-- Auto-update from GitHub Releases ("Restart to update"). The web app is always current; the
+- Auto-update from GitHub Releases ("Restart to update"), or all at once from ⌘K ("Update Otter
+  Mail": check, download, restart). The web app is always current; the
   iPhone app updates through TestFlight.
 
 ## Otter account & devices
