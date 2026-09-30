@@ -88,7 +88,7 @@ jobs:
           VERSION: ${{ steps.meta.outputs.version }}
         run: |
           if [[ ! -f "changelog/$VERSION.md" ]]; then
-            echo "::warning title=No changelog note::changelog/$VERSION.md is missing, so the app and the site have nothing to show for it (the write-changelog skill)."
+            echo "::notice title=No changelog note::No changelog/$VERSION.md: this release isn't announced (fine when that's the plan)."
           fi
 
   build_mac:

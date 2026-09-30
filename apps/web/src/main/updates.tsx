@@ -164,11 +164,12 @@ export function UpdateCard() {
                   ? "It will try again later."
                   : `${percent}%`}
           </p>
-          {/* This build doesn't carry the new version's note yet: the site does. */}
+          {/* The site's changelog: this build doesn't carry newer notes, and not every
+              release has one, so the index rather than the version's page. */}
           {state.status === "downloading" || state.status === "downloaded" ? (
             <button
               type="button"
-              onClick={() => void window.desktopBridge.openExternal(changelogUrl(version))}
+              onClick={() => void window.desktopBridge.openExternal(changelogUrl())}
               className="cursor-pointer text-2xs text-foreground/80 underline-offset-2 outline-none hover:text-foreground hover:underline focus-visible:underline"
             >
               What's new →

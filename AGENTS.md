@@ -95,10 +95,10 @@ it; the web app needs it (the relay keeps its Gmail sign-ins alive).
 Stable only (no nightlies). The Mac app (and web) and the iPhone app release separately, each with
 its own version:
 
-- Mac: write the release's note first, `changelog/<version>.md` (the `write-changelog` skill),
-  then run the Release workflow from `main` with a patch/minor/major bump, or push a `vX.Y.Z`
-  tag. Installed apps download updates on their own and offer "Restart to update" in the sidebar;
-  after it, a toast links to the note (Settings → What's new, and /changelog on the site).
+- Mac: run the Release workflow from `main` with a patch/minor/major bump, or push a `vX.Y.Z`
+  tag. Installed apps download updates on their own and offer "Restart to update" in the sidebar.
+  Whether a release is announced in the changelog is the user's call: ask before releasing, and
+  write `changelog/<version>.md` first when it is (the `write-changelog` skill).
 - iPhone: run the Release iPhone workflow from `main` when `apps/ios` (or what it bundles from
   `packages/shared`) has changed. It uploads to TestFlight and tags `ios-vX.Y.Z`.
 
