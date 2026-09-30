@@ -40,6 +40,12 @@ A note for a version not released yet stays hidden: the site shows only the
 versions up to the one `main` last released. So it's safe on `main` ahead of
 the release. A push to `main` that changes `changelog/` redeploys the site.
 
+The note is also the GitHub Release's: the Release workflow puts it above
+GitHub's generated notes, and when it lands after the release, the Changelog
+notes workflow (`.github/workflows/changelog-notes.yml`) updates that release.
+Both use `scripts/changelog-release-notes.ts`, so write it once, in
+`changelog/`, and never by hand in the GitHub Release.
+
 ## The file
 
 ```markdown

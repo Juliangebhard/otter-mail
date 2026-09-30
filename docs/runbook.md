@@ -35,7 +35,8 @@ the Google and GitHub settings that go with these URLs. D1 migrations run before
 
 A changelog note is not part of a release. When you want one, it can land on `main` before or
 after (`changelog/<version>.md`, the `write-changelog` skill); the site shows it once that version
-is out.
+is out, and the GitHub Release carries it too, above the generated notes (the Release workflow adds
+it, or the Changelog notes workflow once it lands after the release).
 
 - **Check:** the run is green and its log says "macOS signing and notarization enabled." (not
   "Building UNSIGNED").

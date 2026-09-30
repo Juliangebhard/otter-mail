@@ -51,8 +51,9 @@ when a feature lands or goes.
 - `assets/`: app icons like T3 Code's: `prod/` for releases, `dev/` for the blueprint variant that
   unpackaged runs wear. `pnpm icons:export` regenerates the dev icon and both `.icns` files.
 - `changelog/`: notes on Mac and web releases (`<version>.md`, images in `images/`), shown on
-  the site at /changelog; the app only links there. A note is marketing, written only when the
-  user asks for one (the `write-changelog` skill). Format in `packages/shared/src/changelog.ts`.
+  the site at /changelog and on the version's GitHub Release (workflows copy it there); the app
+  only links there. A note is marketing, written only when the user asks for one (the
+  `write-changelog` skill). Format in `packages/shared/src/changelog.ts`.
 - `site/`: https://mail.otterware.app, a Cloudflare Worker: the landing page, privacy policy and
   terms, and the web app (`/` shows the app when signed in, `/app` always).
 - Deploys: Cloudflare Workers Builds deploys `infra/relay` and `site/` on pushes to `main` that

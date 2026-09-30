@@ -1,7 +1,8 @@
 /**
  * The changelog: short notes on Mac and web releases, `changelog/<version>.md`
  * at the repository root (images beside it in `changelog/images/`), on the
- * site at /changelog; the app only links there. A note is marketing, written
+ * site at /changelog and on the version's GitHub Release
+ * (scripts/changelog-release-notes.ts); the app only links there. A note is marketing, written
  * when the user asks for one, before or after its release: the site shows the
  * versions up to the one main last released. How to write one: the
  * write-changelog skill (.agents/skills).
