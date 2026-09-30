@@ -7,6 +7,7 @@ import {
   OTTER_THEME,
   getThemeColorsForAppearance,
   type ThemeAppearance,
+  type ThemeColorRole,
   type ThemeColors,
   type ThemeDefinition,
 } from "@otter-mail/shared/themes";
@@ -77,57 +78,70 @@ function softenColor(color: string, over: string, keep: number): string {
   return `color-mix(in oklab, ${color} ${keep}%, ${over})`;
 }
 
-/** Theme role → the app's CSS variables (mirrors Otter Code's index.css mapping). */
+/**
+ * Theme role → the app's CSS variables it paints (mirrors Otter Code's
+ * index.css mapping). A softened variable is blended toward another role,
+ * keeping that percentage, unless the theme is `exact`. Roles missing here
+ * (the toolbar, terminal and update ones, `accent`) have nothing to paint in Mail.
+ */
+const VARIABLES: ReadonlyArray<
+  readonly [variable: string, role: ThemeColorRole, soften?: readonly [ThemeColorRole, number]]
+> = [
+  ["--canvas", "canvas"],
+  ["--app-chrome-background", "chrome"],
+  ["--foreground", "text"],
+  ["--card", "surface", ["canvas", 60]],
+  ["--card-foreground", "text"],
+  ["--popover", "surfaceOverlay"],
+  ["--popover-foreground", "text"],
+  ["--surface-raised", "surfaceRaised", ["canvas", 45]],
+  ["--chat-composer-surface", "surfaceRaised", ["canvas", 45]],
+  ["--primary", "messageAction"],
+  ["--primary-foreground", "messageActionForeground"],
+  ["--secondary", "secondary", ["canvas", 55]],
+  ["--secondary-foreground", "secondaryForeground"],
+  ["--muted", "muted", ["canvas", 55]],
+  ["--muted-foreground", "mutedForeground"],
+  ["--placeholder", "placeholder"],
+  ["--secondary-label", "secondaryLabel"],
+  ["--icon-muted", "iconMuted"],
+  ["--accent-surface", "accentSurface", ["canvas", 45]],
+  ["--accent-surface-foreground", "accentSurfaceForeground"],
+  ["--message-surface", "messageSurface", ["canvas", 70]],
+  ["--message-foreground", "messageForeground"],
+  ["--error", "error"],
+  ["--error-foreground", "errorForeground"],
+  ["--error-surface", "errorSurface"],
+  ["--destructive", "error"],
+  ["--destructive-foreground", "errorForeground"],
+  ["--warning", "warning"],
+  ["--warning-foreground", "warningForeground"],
+  ["--warning-surface", "warningSurface"],
+  ["--border", "border", ["canvas", 35]],
+  ["--input", "input", ["canvas", 50]],
+  ["--ring", "focus"],
+  ["--sidebar-surface", "sidebar"],
+  ["--sidebar-foreground", "sidebarForeground"],
+  ["--sidebar-muted-foreground", "sidebarMutedForeground"],
+  ["--sidebar-control-surface", "sidebarControlSurface", ["sidebar", 50]],
+  ["--sidebar-row-hover", "sidebarRowHover", ["sidebar", 45]],
+  ["--sidebar-row-active", "sidebarRowActive", ["sidebar", 50]],
+  ["--sidebar-row-selected", "sidebarRowSelected", ["sidebar", 50]],
+  ["--sidebar-line", "sidebarBorder", ["sidebar", 30]],
+  ["--code-background", "codeBackground", ["canvas", 60]],
+  ["--code-foreground", "codeForeground"],
+];
+
 function cssVariables(c: ThemeColors, exact: boolean): string {
-  const soften = exact ? (color: string) => color : softenColor;
-  const vars: Record<string, string> = {
-    "--canvas": c.canvas,
-    "--app-chrome-background": c.chrome,
-    "--foreground": c.text,
-    "--card": soften(c.surface, c.canvas, 60),
-    "--card-foreground": c.text,
-    "--popover": c.surfaceOverlay,
-    "--popover-foreground": c.text,
-    "--surface-raised": soften(c.surfaceRaised, c.canvas, 45),
-    "--chat-composer-surface": soften(c.surfaceRaised, c.canvas, 45),
-    "--primary": c.messageAction,
-    "--primary-foreground": c.messageActionForeground,
-    "--secondary": soften(c.secondary, c.canvas, 55),
-    "--secondary-foreground": c.secondaryForeground,
-    "--muted": soften(c.muted, c.canvas, 55),
-    "--muted-foreground": c.mutedForeground,
-    "--placeholder": c.placeholder,
-    "--secondary-label": c.secondaryLabel,
-    "--icon-muted": c.iconMuted,
-    "--accent-surface": soften(c.accentSurface, c.canvas, 45),
-    "--accent-surface-foreground": c.accentSurfaceForeground,
-    "--message-surface": soften(c.messageSurface, c.canvas, 70),
-    "--message-foreground": c.messageForeground,
-    "--error": c.error,
-    "--error-foreground": c.errorForeground,
-    "--error-surface": c.errorSurface,
-    "--destructive": c.error,
-    "--destructive-foreground": c.errorForeground,
-    "--warning": c.warning,
-    "--warning-foreground": c.warningForeground,
-    "--warning-surface": c.warningSurface,
-    "--border": soften(c.border, c.canvas, 35),
-    "--input": soften(c.input, c.canvas, 50),
-    "--ring": c.focus,
-    "--sidebar-surface": c.sidebar,
-    "--sidebar-foreground": c.sidebarForeground,
-    "--sidebar-muted-foreground": c.sidebarMutedForeground,
-    "--sidebar-control-surface": soften(c.sidebarControlSurface, c.sidebar, 50),
-    "--sidebar-row-hover": soften(c.sidebarRowHover, c.sidebar, 45),
-    "--sidebar-row-active": soften(c.sidebarRowActive, c.sidebar, 50),
-    "--sidebar-row-selected": soften(c.sidebarRowSelected, c.sidebar, 50),
-    "--sidebar-line": soften(c.sidebarBorder, c.sidebar, 30),
-    "--code-background": soften(c.codeBackground, c.canvas, 60),
-    "--code-foreground": c.codeForeground,
-  };
-  return Object.entries(vars)
-    .map(([k, v]) => `  ${k}: ${v};`)
-    .join("\n");
+  return VARIABLES.map(([variable, role, soften]) => {
+    const value = soften && !exact ? softenColor(c[role], c[soften[0]], soften[1]) : c[role];
+    return `  ${variable}: ${value};`;
+  }).join("\n");
+}
+
+/** The CSS variables a role paints (the theme editor's spotlight probes them). */
+export function themeRoleVariables(role: ThemeColorRole): ReadonlyArray<string> {
+  return VARIABLES.filter(([, r]) => r === role).map(([variable]) => variable);
 }
 
 const STYLE_ID = "otter-app-theme";

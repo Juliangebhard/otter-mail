@@ -2,8 +2,8 @@
  * Ported from Otter Code (github.com/otterware-app/otter-code) at a944cac52:
  * apps/web/src/components/settings/ThemeEditorPanel.tsx. Kept as close to
  * upstream as possible so its changes can be mirrored by diffing; departures
- * are marked "Mail:". Mail leaves out Inspect (themeInspector.ts): picking a
- * color from the app, and spotlighting where a color is used.
+ * are marked "Mail:". Mail leaves out Inspect (picking a color from the app);
+ * selecting a color still spotlights where it's used (themeInspector.ts).
  */
 import { ChevronDownIcon, ChevronUpIcon, PaintbrushIcon, PlusIcon, XIcon } from "lucide-react";
 import {
@@ -14,6 +14,7 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import {
+  THEME_COLOR_ROLES,
   THEME_FILE_VERSION,
   createVividThemeColors,
   getCustomThemes,
@@ -39,6 +40,11 @@ import { Switch } from "~/components/ui/switch";
 import { Toggle, ToggleGroup } from "~/components/ui/toggle-group";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "~/components/ui/tooltip";
 import { getThemeRoleLabel, ThemeColorField } from "./ThemeColorPicker";
+import {
+  clearThemeInspectorHighlights,
+  highlightThemeRoleUsage,
+  refreshThemeInspectorSpotlight,
+} from "./themeInspector";
 // Mail: the draft is painted by Mail's own theme code.
 import { applyThemeColorPreview } from "../../theme/apply-theme";
 
@@ -125,7 +131,8 @@ const THEME_EDITOR_ROLE_GROUPS: ReadonlyArray<{
       },
       {
         id: "accent",
-        label: "Accent",
+        // Mail: the accent itself isn't painted in Mail; its focus ring is.
+        label: "Focus ring",
         role: "accent",
         roles: [
           "accent",
@@ -179,18 +186,7 @@ const THEME_EDITOR_ROLE_GROUPS: ReadonlyArray<{
         role: "sidebarRowSelected",
         roles: ["sidebarRowHover", "sidebarRowActive", "sidebarRowSelected"],
       },
-      {
-        id: "terminal-background",
-        label: "Terminal background",
-        role: "terminalBackground",
-        roles: [
-          "terminalBackground",
-          "terminalForeground",
-          "terminalSelection",
-          "terminalScrollbar",
-          "terminalScrollbarHover",
-        ],
-      },
+      // Mail: no terminal, so no Terminal background.
     ],
   },
   {
@@ -304,6 +300,7 @@ export function ThemeEditorPanel({
   const [isMinimized, setIsMinimized] = useState(false);
   const [roleQuery, setRoleQuery] = useState("");
   const [selectedRole, setSelectedRole] = useState<ThemeColorRole | null>(null);
+  const [usageCount, setUsageCount] = useState<number | null>(null);
   // Null parks the panel at its default corner; a value is a dragged spot,
   // kept clamped so the header can always be grabbed again.
   const [position, setPosition] = useState<{ x: number; y: number } | null>(null);
@@ -397,6 +394,7 @@ export function ThemeEditorPanel({
       setShouldRegenerateGuidedColors(sourceTheme !== null && sourceTheme.managed !== true);
       setColorsByAppearance(nextColors);
       setSelectedRole(null);
+      setUsageCount(null);
       setError(null);
       setIsDraftSeeded(true);
     }
@@ -513,6 +511,82 @@ export function ThemeEditorPanel({
   const toggleThemeRole = useCallback((role: ThemeColorRole) => {
     setSelectedRole((current) => (current === role ? null : role));
   }, []);
+
+  const selectedHighlightRoles = selectedRole
+    ? isAdvanced
+      ? (getThemeEditorColorFamily(selectedRole)?.roles ?? [selectedRole])
+      : THEME_EDITOR_SIMPLE_ROLES.includes(selectedRole)
+        ? THEME_COLOR_ROLES.filter(
+            (role) =>
+              colorsByAppearance[activeAppearance][role].trim().toLowerCase() ===
+              colorsByAppearance[activeAppearance][selectedRole].trim().toLowerCase(),
+          )
+        : [selectedRole]
+    : [];
+  const selectedHighlightRolesKey = selectedHighlightRoles.join(",");
+
+  useEffect(() => {
+    clearThemeInspectorHighlights();
+    if (!open || selectedRole === null) {
+      setUsageCount(null);
+      return;
+    }
+    const highlightedRoles = selectedHighlightRolesKey.split(",") as Array<ThemeColorRole>;
+    const refreshHighlights = () => setUsageCount(highlightThemeRoleUsage(highlightedRoles));
+    refreshHighlights();
+    // A refresh snapshots computed styles for the whole tree twice, so it is
+    // throttled rather than run per frame: a streaming reply or a virtualized
+    // list mutates the DOM continuously and would otherwise stall the main
+    // thread for as long as the inspector is open.
+    const MIN_REFRESH_INTERVAL_MS = 500;
+    let refreshFrame: number | null = null;
+    let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+    let lastRefreshAt = performance.now();
+    const scheduleRefresh = () => {
+      if (refreshFrame !== null || refreshTimer !== null) return;
+      const wait = Math.max(0, MIN_REFRESH_INTERVAL_MS - (performance.now() - lastRefreshAt));
+      const run = () => {
+        refreshFrame = null;
+        refreshTimer = null;
+        lastRefreshAt = performance.now();
+        refreshHighlights();
+      };
+      if (wait === 0) refreshFrame = requestAnimationFrame(run);
+      else refreshTimer = setTimeout(run, wait);
+    };
+    const observer = new MutationObserver((mutations) => {
+      if (
+        mutations.every(
+          (mutation) =>
+            mutation.target instanceof Element &&
+            (mutation.target.closest("#theme-inspector-spotlight") ||
+              mutation.target.closest("[data-theme-editor-panel]")),
+        )
+      ) {
+        return;
+      }
+      scheduleRefresh();
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+    let spotlightFrame: number | null = null;
+    const scheduleSpotlightRefresh = () => {
+      spotlightFrame ??= requestAnimationFrame(() => {
+        spotlightFrame = null;
+        refreshThemeInspectorSpotlight();
+      });
+    };
+    window.addEventListener("resize", scheduleSpotlightRefresh);
+    window.addEventListener("scroll", scheduleSpotlightRefresh, true);
+    return () => {
+      observer.disconnect();
+      if (refreshFrame !== null) cancelAnimationFrame(refreshFrame);
+      if (refreshTimer !== null) clearTimeout(refreshTimer);
+      if (spotlightFrame !== null) cancelAnimationFrame(spotlightFrame);
+      window.removeEventListener("resize", scheduleSpotlightRefresh);
+      window.removeEventListener("scroll", scheduleSpotlightRefresh, true);
+      clearThemeInspectorHighlights();
+    };
+  }, [open, selectedHighlightRolesKey, selectedRole]);
 
   const handleAdvancedChange = useCallback(
     (checked: boolean) => {
@@ -962,10 +1036,7 @@ export function ThemeEditorPanel({
           {isMinimized ? null : (
             <p className="truncate text-xs text-muted-foreground">
               {selectedRole
-                ? isAdvanced
-                  ? (getThemeEditorColorFamily(selectedRole)?.label ??
-                    getThemeRoleLabel(selectedRole))
-                  : getThemeRoleLabel(selectedRole)
+                ? `${isAdvanced ? (getThemeEditorColorFamily(selectedRole)?.label ?? getThemeRoleLabel(selectedRole)) : getThemeRoleLabel(selectedRole)} · ${usageCount ?? 0} ${usageCount === 1 ? "use" : "uses"}`
                 : "Select a color below"}
             </p>
           )}
