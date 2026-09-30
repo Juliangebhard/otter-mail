@@ -47,6 +47,7 @@ import { getSenderAvatar } from "../services/avatar-store.js";
 import { updateDockBadge } from "../services/notifier.js";
 import { getSettings, updateSettings, type AppSettings } from "../services/settings-store.js";
 import { preferenceChanged } from "../services/preferences.js";
+import { refreshProfiles } from "../services/google-profile.js";
 import { refreshSignatures, saveSignature } from "../services/signatures.js";
 import * as viewsStore from "../services/views-store.js";
 import { ALL_MAIL_LABEL_ID } from "../types.js";
@@ -252,6 +253,7 @@ export function registerGmailHandlers(): void {
 
   handle("gmail:refreshSignatures", async () => {
     void refreshSignatures();
+    void refreshProfiles();
   });
 
   handle("gmail:cancelAddAccount", async () => {
