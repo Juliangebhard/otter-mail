@@ -1304,10 +1304,13 @@ function MailHome() {
             agentOpen: chatOpen,
             setAgentOpen: (open) => (open ? openChat() : closeChat()),
             openMessage: () => {
-              if (!selectedMessageId)
-                document
-                  .querySelector<HTMLElement>("[data-message-row]:not([data-draft])")
-                  ?.click();
+              if (selectedMessageId) return;
+              // A read one where there is one: opening marks a conversation read.
+              const row =
+                document.querySelector<HTMLElement>(
+                  "[data-message-row]:not([data-draft]):not([data-unread])",
+                ) ?? document.querySelector<HTMLElement>("[data-message-row]:not([data-draft])");
+              row?.click();
             },
           }}
           onClose={endTour}
