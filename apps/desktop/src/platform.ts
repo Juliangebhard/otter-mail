@@ -22,6 +22,7 @@ import { connectMailSocket } from "./services/mail-socket.js";
 import { claudeProvider } from "./services/agent/claude.js";
 import { codexProvider } from "./services/agent/codex.js";
 import { appleTranslator } from "./services/translator.js";
+import { desktopSupportDiagnostics } from "./services/support-diagnostics.js";
 
 const home = () => appInfo().stateDir;
 
@@ -68,6 +69,7 @@ export function desktopPlatform(): Platform {
   let database: SqlDatabase | null = null;
   return {
     kind: "desktop",
+    supportDiagnostics: desktopSupportDiagnostics,
     appVersion: appInfo().version,
     log: (level, scope, message, data) => logger[level](scope, message, data),
 

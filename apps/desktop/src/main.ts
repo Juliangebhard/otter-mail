@@ -9,6 +9,7 @@ import type { AppSettings } from "@otter-mail/core";
 
 import { invokeBackend, startBackend, stopBackend } from "./backend-host.js";
 import { registerHandlers } from "./handlers/index.js";
+import { requestSupportReport } from "./handlers/support.js";
 import { broadcast } from "./ipc.js";
 import { logger, logToFile } from "./logger.js";
 import { configureAppPaths } from "./paths.js";
@@ -272,6 +273,18 @@ function setupApplicationMenu(): void {
       ],
     },
     { role: "windowMenu" },
+    {
+      role: "help",
+      submenu: [
+        {
+          label: "Send Feedback…",
+          click: () => {
+            requestSupportReport();
+            void focusMainWindow().then(() => broadcast("support:open"));
+          },
+        },
+      ],
+    },
   ]);
   Menu.setApplicationMenu(menu);
 }

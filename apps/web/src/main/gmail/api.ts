@@ -408,6 +408,8 @@ export type AddImapAccountParams = {
 };
 
 export const gmailApi = {
+  saveSupportReport: (contents: string, filename?: "Otter Mail diagnostics.json") =>
+    task<boolean>("support:saveReport", { contents, filename }),
   listAccounts: (): Promise<GmailAccount[]> => ipc("gmail:listAccounts"),
 
   /** Browser sign-in; `email` signs an existing account back in. */

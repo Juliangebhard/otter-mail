@@ -11,6 +11,7 @@ import { registerImapAccountHandlers } from "./handlers/imap-accounts.js";
 import { registerOtterAccountHandlers } from "./handlers/otter-account.js";
 import { registerSearchHandlers } from "./handlers/search.js";
 import { registerTranslationHandlers } from "./handlers/translation.js";
+import { registerSupportHandlers } from "./handlers/support.js";
 import { broadcast, handle } from "./ipc.js";
 import { setPlatform, type Platform } from "./platform.js";
 import { pruneAttachmentCache } from "./services/attachment-cache.js";
@@ -40,6 +41,7 @@ export async function startCore(platform: Platform): Promise<void> {
   registerOtterAccountHandlers();
   registerTranslationHandlers();
   registerAgentHandlers();
+  registerSupportHandlers();
   handle("keybindings:read", async () => readKeybindings());
   handle("preferences:getUi", async () => getUiPreferences());
   handle("preferences:setUi", async (params: unknown) => {

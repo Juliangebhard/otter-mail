@@ -137,6 +137,19 @@ The Mac app supports Apple Silicon Macs (arm64).
 | Custom views (rules across mailboxes)                    | ✓   | ✓   | —                                                                          |
 | Preferences synced through the Otter account             | ✓   | ✓   | ✓ (theme, advance, mailboxes, notifications, languages, agent, signatures) |
 
+## Support
+
+| Feature                                                                      | Mac | Web | iPhone |
+| ---------------------------------------------------------------------------- | --- | --- | ------ |
+| Bug or feature feedback, platform selection, and GitHub issue review         | ✓   | ✓   | —      |
+| Anonymous diagnostics and export for a coding agent                          | ✓   | ✓   | —      |
+| Open a support investigation in an installed Claude / Codex terminal session | ✓   | —   | —      |
+| Return local-agent drafts and findings to the report preview                 | ✓   | —   | —      |
+| Download diagnostics as a file and import an agent's Markdown draft          | ✓   | ✓   | —      |
+
+The support playbook covers diagnosis, duplicate detection, issue review, and
+optional fix PRs. See [support.md](support.md).
+
 ## Agents
 
 | Feature                                            | Mac                         | Web                        | iPhone       |
