@@ -207,4 +207,36 @@ describe("discoverImap", () => {
     setKind("web");
     expect((await discoverImap("me@jane.dev"))?.imap.host).toBe("imap.gmx.net");
   });
+
+  it("uses the mail server itself when it answers IMAP with its own certificate", async () => {
+    // All-Inkl: imap.<domain> reaches the same machine, but its certificate is *.kasserver.com.
+    stubFetch({
+      "https://cloudflare-dns.com/dns-query?name=ternes.info": JSON.stringify({
+        Answer: [{ type: 15, data: "10 w020d192.kasserver.com." }],
+      }),
+    });
+    const probed: string[] = [];
+    setPlatform({
+      kind: "web",
+      connect: async (host: string) => {
+        probed.push(host);
+        if (host !== "w020d192.kasserver.com") throw new Error("certificate isn't trusted");
+        return { close() {} };
+      },
+    } as unknown as Platform);
+    expect(await discoverImap("sebastian@ternes.info")).toEqual({
+      username: "sebastian@ternes.info",
+      imap: { host: "w020d192.kasserver.com", port: 993, security: "tls" },
+      smtp: { host: "w020d192.kasserver.com", port: 465, security: "tls" },
+    });
+    expect(probed).toEqual(["w020d192.kasserver.com"]);
+
+    // A mail server that doesn't answer IMAP is no answer.
+    stubFetch({
+      "https://cloudflare-dns.com/dns-query?name=spam.dev": JSON.stringify({
+        Answer: [{ type: 15, data: "10 mx.filter.example." }],
+      }),
+    });
+    expect(await discoverImap("me@spam.dev")).toBeNull();
+  });
 });

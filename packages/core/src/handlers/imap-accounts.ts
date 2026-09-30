@@ -10,7 +10,7 @@ import { IMAP_CAPABILITIES, type ImapSettings, type MailServer } from "@otter-ma
 import { broadcast, handle } from "../ipc.js";
 import { MailProtocolError, connectImap, connectSmtp } from "../protocols/index.js";
 import * as accountStore from "../services/account-store.js";
-import { discoverImap, appPasswordUrl } from "../services/imap-discovery.js";
+import { appPasswordUrl, discoverImap, mxHosts, servesImap } from "../services/imap-discovery.js";
 import { setImapPassword } from "../services/imap-passwords.js";
 import { accountAdded } from "../services/linked-accounts.js";
 import * as mailSync from "../services/mail-sync.js";
@@ -38,14 +38,34 @@ function describe(err: unknown, server: MailServer, settings: ImapSettings): str
   return `${server.host} (port ${server.port}): ${message}`;
 }
 
+/**
+ * A certificate for another name usually means the host points at a shared
+ * server (imap.<domain> on a hosting provider): name the domain's own mail
+ * server, when it answers IMAP with a certificate of its own.
+ */
+async function certificateHint(message: string, host: string, email: string): Promise<string> {
+  if (!/certificate/i.test(message)) return message;
+  const domain = email.split("@")[1]?.toLowerCase();
+  const [mx] = domain ? await mxHosts(domain) : [];
+  if (!mx || mx === host || !(await servesImap(mx))) return message;
+  return `${message}. Your domain's mail server is ${mx}: use that as the server name, for incoming and outgoing mail.`;
+}
+
 /** Logs in to the IMAP server, then the SMTP server; throws a readable Error when either fails. */
-export async function verifyLogin(settings: ImapSettings, password: string): Promise<void> {
+export async function verifyLogin(
+  settings: ImapSettings,
+  password: string,
+  email?: string,
+): Promise<void> {
   const auth = { user: settings.username, pass: password };
   try {
     const imap = await connectImap({ ...settings.imap, auth, timeoutMs: VERIFY_TIMEOUT_MS });
     await imap.logout();
   } catch (err) {
-    throw new Error(describe(err, settings.imap, settings), { cause: err });
+    const message = describe(err, settings.imap, settings);
+    throw new Error(email ? await certificateHint(message, settings.imap.host, email) : message, {
+      cause: err,
+    });
   }
   try {
     const smtp = await connectSmtp({ ...settings.smtp, auth, timeoutMs: VERIFY_TIMEOUT_MS });
@@ -102,7 +122,7 @@ export async function addImapAccount(params: unknown): Promise<GmailAccount> {
   const existing = await accountStore.getAccount(id);
   if (existing && existing.provider !== "imap") throw new Error(`${email} is already added.`);
 
-  await verifyLogin(imap, password);
+  await verifyLogin(imap, password, email);
   await setImapPassword(id, password);
   const name = typeof p.name === "string" && p.name.trim() ? p.name.trim() : email;
   const account: GmailAccount = {
@@ -132,7 +152,7 @@ export async function signInImap(params: unknown): Promise<void> {
   if (!account?.imap || account.provider !== "imap") {
     throw new Error(`${accountId} isn't an IMAP mailbox.`);
   }
-  await verifyLogin(account.imap, password);
+  await verifyLogin(account.imap, password, account.email);
   await setImapPassword(account.id, password);
   await accountAdded(account);
   mailSync.syncAccount(account.id, { force: true });
