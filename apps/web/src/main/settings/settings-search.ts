@@ -78,6 +78,12 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: ["tray status bar unread inbox popover"],
   },
   {
+    id: "dock-badge",
+    title: "Show unread count on Dock icon",
+    pane: "general",
+    searchTerms: ["badge number unread"],
+  },
+  {
     id: "sync-interval",
     title: "Check for new mail",
     pane: "general",
@@ -170,10 +176,28 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: ["colors palette look", "custom create duplicate import export"],
   },
   {
-    id: "dock-badge",
-    title: "Show unread count on Dock icon",
+    id: "contrast",
+    title: "Contrast",
     pane: "appearance",
-    searchTerms: ["badge number unread"],
+    searchTerms: ["text borders legibility accessibility"],
+  },
+  {
+    id: "glass-opacity",
+    title: "Glass opacity",
+    pane: "appearance",
+    searchTerms: ["transparency blur translucent menus dialogs solid"],
+  },
+  {
+    id: "font-size",
+    title: "Font size",
+    pane: "appearance",
+    searchTerms: ["text size bigger smaller zoom scale typography accessibility"],
+  },
+  {
+    id: "reading-width",
+    title: "Reading width",
+    pane: "appearance",
+    searchTerms: ["email thread message reader wide narrow full column space"],
   },
   {
     id: "panel-animations",

@@ -11,6 +11,7 @@ import {
 } from "react";
 import { Undo2Icon } from "lucide-react";
 import { cn, HintTooltip } from "../gmail/ui";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../gmail/select";
 
 /*
  * Settings layout (after ChatGPT's): one centered column. The page title, page
@@ -260,6 +261,41 @@ export function SettingsRow({
       </div>
       {children}
     </div>
+  );
+}
+
+/** Compact select in the control slot of a row. */
+export function RowSelect({
+  value,
+  onValueChange,
+  options,
+  placeholder,
+  ariaLabel,
+  className,
+  disabled,
+}: {
+  value: string | undefined;
+  onValueChange: (value: string) => void;
+  options: { value: string; label: string }[];
+  placeholder?: string;
+  ariaLabel: string;
+  className?: string;
+  disabled?: boolean;
+}) {
+  return (
+    // "" keeps the Select controlled (showing the placeholder) while the value loads.
+    <Select value={value ?? ""} onValueChange={onValueChange} disabled={disabled}>
+      <SelectTrigger variant="pill" aria-label={ariaLabel} className={className}>
+        <SelectValue placeholder={placeholder ?? "Loading…"} />
+      </SelectTrigger>
+      <SelectContent>
+        {options.map((option) => (
+          <SelectItem key={option.value} value={option.value}>
+            {option.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }
 

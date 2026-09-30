@@ -2,16 +2,20 @@ import { Outlet } from "@tanstack/react-router";
 import * as React from "react";
 import { startSyncedPreferences } from "./synced-preferences";
 import { applyAppTheme, startAppTheme } from "./theme/apply-theme";
+import { applyInterfaceSettings, startInterfaceSettings } from "./theme/interface-settings";
 import { UpdateNotifier } from "./updates";
 import { ThemeEditorHost } from "./settings/theme/ThemeEditorHost";
 
 // Color theme (Settings → Appearance) for the current appearance, applied
 // before first paint. It also owns the `dark` class on <html>.
 applyAppTheme();
+// Contrast, glass and the font size, also before first paint.
+applyInterfaceSettings();
 
 export function RootView() {
   // Re-theme live on appearance switches and theme picks from any window.
   React.useEffect(() => startAppTheme(), []);
+  React.useEffect(() => startInterfaceSettings(), []);
   React.useEffect(() => startSyncedPreferences(), []);
 
   return (

@@ -46,6 +46,7 @@ import {
   useIsForeignMessage,
   useMessageTranslation,
 } from "./translate-banner";
+import { INTERFACE_FONT_SIZE, useInterfaceSetting } from "../theme/interface-settings";
 import { useTranslationSettings } from "./translation";
 import { InviteCard, requestRsvp, rsvpFromGoogleLink } from "./invite-card";
 import type { RsvpResponse } from "./api";
@@ -203,14 +204,14 @@ export function dayKey(timestamp: number): string {
  * document to light rendering and sane typography; email-supplied CSS comes
  * after it and still wins.
  */
-const MESSAGE_BODY_PRELUDE = `<style>
+const messageBodyPrelude = (fontSize: number) => `<style>
 :root { color-scheme: light; }
 body {
   margin: 10px;
   background: #ffffff;
   color: #1f1f1f;
   font-family: -apple-system, system-ui, Helvetica, Arial, sans-serif;
-  font-size: 15px;
+  font-size: ${fontSize}px;
   line-height: 1.45;
   word-break: break-word;
 }
@@ -224,14 +225,14 @@ blockquote { border-left: 3px solid #d6d6d6; padding-left: 12px; margin: 4px 0; 
  * that paint their own background keep their original look (see
  * `adaptForDarkCanvas`). Email-supplied CSS still comes after and wins.
  */
-const MESSAGE_BODY_PRELUDE_DARK = `<style>
+const messageBodyPreludeDark = (fontSize: number) => `<style>
 :root { color-scheme: dark; }
 html, body { background: transparent; }
 body {
   margin: 0;
   color: #e6e6e6;
   font-family: -apple-system, system-ui, Helvetica, Arial, sans-serif;
-  font-size: 15px;
+  font-size: ${fontSize}px;
   line-height: 1.45;
   word-break: break-word;
 }
@@ -587,6 +588,8 @@ function HtmlBody({
   const inviteRef = useRef(inviteMessageId);
   inviteRef.current = inviteMessageId;
   const dark = useDarkAppearance();
+  // 15px at the default interface font size, and scaled with it.
+  const bodyFontSize = (15 * useInterfaceSetting(INTERFACE_FONT_SIZE)) / 16;
   // Light: white card, email's own dark-mode CSS disabled, white-on-white
   // rescued. Dark: transparent canvas, email's dark CSS honored, dark-on-dark
   // rescued, islands with their own background untouched.
@@ -794,18 +797,19 @@ function HtmlBody({
       ro?.disconnect();
       iframe.removeEventListener("load", onLoad);
     };
-    // adaptColors only varies with `dark`, which is a dependency.
-  }, [html, dark]);
+    // adaptColors only varies with `dark`, which is a dependency; a new font
+    // size remounts the frame (its key), which is wired again.
+  }, [html, dark, bodyFontSize]);
 
   // Marketing/HTML mail is designed for a white canvas — give it a light card
   // inside the dark conversation, like an unfurled preview card.
   return (
     <div>
       <iframe
-        key={dark ? "dark" : "light"}
+        key={`${dark ? "dark" : "light"}-${bodyFontSize}`}
         ref={frameRef}
         sandbox="allow-same-origin"
-        srcDoc={(dark ? MESSAGE_BODY_PRELUDE_DARK : MESSAGE_BODY_PRELUDE) + html}
+        srcDoc={(dark ? messageBodyPreludeDark : messageBodyPrelude)(bodyFontSize) + html}
         // Matching the embedder's scheme keeps a dark frame transparent
         // instead of getting an opaque canvas painted behind it.
         style={{ colorScheme: dark ? "dark" : "light" }}
@@ -1876,7 +1880,7 @@ function InlineComposer({
 
   return (
     <div
-      className="relative mx-auto w-full max-w-3xl shrink-0 px-5 pb-4 pt-1"
+      className="relative mx-auto w-full max-w-(--reading-width) shrink-0 px-5 pb-4 pt-1"
       data-inline-compose=""
       {...dropProps}
     >
@@ -2179,7 +2183,7 @@ export function MessageReader({
   if (messageQuery.isLoading || threadQuery.isLoading) {
     return (
       <ReaderShell trailing={titleTrailing}>
-        <div className="mx-auto flex w-full max-w-3xl flex-col gap-3 px-6 py-5">
+        <div className="mx-auto flex w-full max-w-(--reading-width) flex-col gap-3 px-6 py-5">
           <div className="h-5 w-64 animate-skeleton rounded-full bg-secondary" />
           <div className="h-4 w-48 animate-skeleton rounded-full bg-accent-surface" />
           <div className="h-4 w-40 animate-skeleton rounded-full bg-accent-surface" />
@@ -2743,13 +2747,13 @@ export function MessageReader({
 
         {/* Narrow reader: the subject + labels as a wrapping heading. */}
         {compactTitle ? (
-          <div className="mx-auto flex w-full max-w-3xl shrink-0 flex-wrap items-center gap-x-2 gap-y-1.5 px-6 pb-2 pt-3">
+          <div className="mx-auto flex w-full max-w-(--reading-width) shrink-0 flex-wrap items-center gap-x-2 gap-y-1.5 px-6 pb-2 pt-3">
             {renderTitle(true)}
           </div>
         ) : null}
 
         {single && threadMessages.length > 1 ? (
-          <div className="mx-auto flex w-full max-w-3xl shrink-0 items-center gap-2 px-6 py-1.5">
+          <div className="mx-auto flex w-full max-w-(--reading-width) shrink-0 items-center gap-2 px-6 py-1.5">
             <span className="text-sm text-muted-foreground">
               One message of {threadMessages.length} in this conversation
             </span>
@@ -2765,7 +2769,7 @@ export function MessageReader({
         ) : null}
 
         {isTrashed ? (
-          <div className="mx-auto w-full max-w-3xl shrink-0 px-5 pt-3">
+          <div className="mx-auto w-full max-w-(--reading-width) shrink-0 px-5 pt-3">
             <div className="flex items-center gap-2 rounded-2xl border border-warning/32 bg-warning-surface py-2 pl-4 pr-2">
               <Trash2Icon className="size-4 shrink-0 text-warning-foreground" />
               <span className="text-sm text-warning-foreground">
@@ -2801,7 +2805,7 @@ export function MessageReader({
           )}
           onMouseUp={onParentMouseUp}
         >
-          <div className="mx-auto w-full max-w-3xl">
+          <div className="mx-auto w-full max-w-(--reading-width)">
             {(() => {
               // Day dividers, expanded messages, and runs of collapsed messages
               // (one grouped card per run; long runs fold to "N more").

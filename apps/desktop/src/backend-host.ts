@@ -225,7 +225,7 @@ function carryOut(effect: MainEffect): void {
 }
 
 let unreadCount = 0;
-let dockBadgeEnabled = true;
+let dockBadgeEnabled = false;
 
 function showDockBadge(): void {
   app.dock?.setBadge(dockBadgeEnabled && unreadCount > 0 ? String(unreadCount) : "");

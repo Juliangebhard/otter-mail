@@ -15,12 +15,14 @@ import { HintTooltip, IconBtn, buttonClass, cn } from "../main/gmail/ui";
 import { MailboxSwitcher } from "../main/gmail/top-bar";
 import { COMBINED_ACCOUNT_ID } from "../main/gmail/custom-views";
 import { applyAppTheme, startAppTheme } from "../main/theme/apply-theme";
+import { applyInterfaceSettings, startInterfaceSettings } from "../main/theme/interface-settings";
 import { gmailApi } from "../main/gmail/api";
 import { trayApi } from "./api";
 import type { GmailMessageSummary } from "../main/gmail/types";
 
-// Color theme (Settings → Appearance), applied before first paint.
+// Color theme and contrast, glass, font size (Settings → Appearance), before first paint.
 applyAppTheme();
+applyInterfaceSettings();
 
 function formatRelativeDate(timestamp: number): string {
   const date = new Date(timestamp);
@@ -155,6 +157,7 @@ export function TrayPopoverView() {
 
   // Re-theme on appearance switches and on theme picks from any window.
   useEffect(() => startAppTheme(), []);
+  useEffect(() => startInterfaceSettings(), []);
 
   // Reopening the popover re-activates its window, and WebKit restores focus
   // to the last-clicked control drawn as keyboard focus (a ring around the

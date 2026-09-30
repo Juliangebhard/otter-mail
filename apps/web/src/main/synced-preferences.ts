@@ -16,6 +16,10 @@ const SYNCED_KEYS = [
   "otter:themes:v1",
   "otter:theme:light",
   "otter:theme:dark",
+  "otter:contrast",
+  "otter:glass-opacity",
+  "otter:interface-font-size",
+  "otter:reading-width",
   "gmail:panel-animation-duration",
   "gmail:advance-direction",
   // The agent's, under their old names: other devices sync these keys.

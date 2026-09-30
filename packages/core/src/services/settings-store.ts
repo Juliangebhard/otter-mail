@@ -32,7 +32,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   notificationsMode: "inbox",
   launchAtLogin: false,
   trayEnabled: false,
-  dockBadgeEnabled: true,
+  dockBadgeEnabled: false,
   readLanguages: [],
   autoTranslate: false,
 };

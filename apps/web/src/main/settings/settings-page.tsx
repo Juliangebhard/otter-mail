@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Switch } from "~/components/ui/switch";
 import { toast } from "../gmail/toast";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../gmail/select";
 import { gmailApi, type MailApp, type NotificationsMode, type SettingsPane } from "../gmail/api";
 import {
   getAdvanceDirection,
@@ -17,6 +16,7 @@ import { ProvidersPane } from "./providers-pane";
 import { TranslationSection } from "./translation-section";
 import { UpdatesSection } from "../updates";
 import {
+  RowSelect,
   SettingsPageContainer,
   SettingsRow,
   SettingsSearchTargetProvider,
@@ -66,41 +66,6 @@ function macAppOnly(available: boolean, description: string): string {
   return available ? description : `${description} Available in the Mac app.`;
 }
 
-/** Compact select in the control slot of a row. */
-function RowSelect({
-  value,
-  onValueChange,
-  options,
-  placeholder,
-  ariaLabel,
-  className,
-  disabled,
-}: {
-  value: string | undefined;
-  onValueChange: (value: string) => void;
-  options: { value: string; label: string }[];
-  placeholder?: string;
-  ariaLabel: string;
-  className?: string;
-  disabled?: boolean;
-}) {
-  return (
-    // "" keeps the Select controlled (showing the placeholder) while the value loads.
-    <Select value={value ?? ""} onValueChange={onValueChange} disabled={disabled}>
-      <SelectTrigger variant="pill" aria-label={ariaLabel} className={className}>
-        <SelectValue placeholder={placeholder ?? "Loading…"} />
-      </SelectTrigger>
-      <SelectContent>
-        {options.map((option) => (
-          <SelectItem key={option.value} value={option.value}>
-            {option.label}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  );
-}
-
 // ---------------------------------------------------------------------------
 // General
 // ---------------------------------------------------------------------------
@@ -113,6 +78,7 @@ function GeneralPane() {
   );
   const [launchAtLogin, setLaunchAtLogin] = useState(false);
   const [trayEnabled, setTrayEnabled] = useState(true);
+  const [dockBadge, setDockBadge] = useState(false);
   const [mailApps, setMailApps] = useState<MailApp[]>([]);
   const [defaultMailBundleId, setDefaultMailBundleId] = useState<string | null>(null);
 
@@ -124,6 +90,7 @@ function GeneralPane() {
       setNotificationsMode(settings.notificationsMode);
       setLaunchAtLogin(settings.launchAtLogin);
       setTrayEnabled(settings.trayEnabled);
+      setDockBadge(settings.dockBadgeEnabled);
     } catch (error) {
       toast.error(`Failed to load sync settings: ${error}`);
     }
@@ -206,6 +173,17 @@ function GeneralPane() {
     }
   };
 
+  const handleDockBadgeChange = async (checked: boolean) => {
+    setDockBadge(checked);
+    console.log("[Settings:setDockBadgeEnabled]", { checked });
+    try {
+      await gmailApi.setSyncSettings({ dockBadgeEnabled: checked });
+    } catch (error) {
+      toast.error(`Failed to change Dock badge: ${error}`);
+      void loadSyncSettings();
+    }
+  };
+
   const handleDefaultMailChange = async (bundleId: string) => {
     setDefaultMailBundleId(bundleId);
     console.log("[Settings:setDefaultMailApp]", { bundleId });
@@ -221,7 +199,7 @@ function GeneralPane() {
 
   return (
     <SettingsPageContainer title="General">
-      <SettingsSection title="Startup & menu bar">
+      <SettingsSection title="Startup, Dock & menu bar">
         <SettingsRow
           {...searchableSetting("launch-at-login")}
           description={macAppOnly(
@@ -249,6 +227,21 @@ function GeneralPane() {
               checked={features.menuBar && trayEnabled}
               disabled={!features.menuBar}
               onCheckedChange={(checked) => void handleTrayEnabledChange(checked)}
+            />
+          }
+        />
+        <SettingsRow
+          {...searchableSetting("dock-badge")}
+          description={macAppOnly(
+            features.dockBadge,
+            "A badge with the number of unread messages in your inboxes.",
+          )}
+          control={
+            <Switch
+              id="dockBadgeEnabled"
+              checked={features.dockBadge && dockBadge}
+              disabled={!features.dockBadge}
+              onCheckedChange={(checked) => void handleDockBadgeChange(checked)}
             />
           }
         />
