@@ -47,15 +47,17 @@ export function useChangelog(): { entries: ChangelogEntry[]; current: string | n
 const SEEN_KEY = "otter:changelog:seen";
 
 /**
- * Once after an update: a toast naming the new version, with What's new. A
- * first launch only notes the version (the setup and the tour cover it).
+ * Once after an update that brought an announced release: a toast naming the
+ * version, with What's new. A first launch only notes the version (the setup
+ * and the tour cover it).
  */
 export async function offerWhatsNew(open: () => void): Promise<void> {
   const current = (await window.desktopBridge.updates.getState()).currentVersion;
   const seen = localStorage.getItem(SEEN_KEY);
   localStorage.setItem(SEEN_KEY, current);
   if (!seen || compareVersions(current, seen) <= 0) return;
-  const entry = ENTRIES.find((e) => e.version === current);
+  // The newest release announced since the last one seen: not every release has a note.
+  const entry = releasedEntries(ENTRIES, current).find((e) => compareVersions(e.version, seen) > 0);
   if (!entry) return;
   console.log("[Changelog:offer]", { from: seen, to: current });
   toast.info(`Updated to Otter Mail ${current}`, {
