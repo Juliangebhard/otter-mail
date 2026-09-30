@@ -1,9 +1,10 @@
+import type { ProviderKind } from "./api";
 import type { GmailMessageSummary } from "./types";
 
 /**
- * Pointer-sized mail context for the agent chat. The agent has gog
- * access to the same mailboxes, so ids are enough — no mail content leaves
- * the app.
+ * Pointer-sized mail context for the agent chat. The agent can read the same
+ * mailboxes (Claude and Codex through Otter Mail's tools, Hermes with gog on
+ * its server), so ids are enough — no mail content leaves the app.
  */
 export type AgentContext = {
   /** Owning account email per conversation (falls back to account id). */
@@ -61,7 +62,11 @@ export function contextFromQuote(q: QuoteContext): AgentContext {
 }
 
 /** Question + pointer block sent with a chat turn. */
-export function buildHandoffText(question: string, context: AgentContext): string {
+export function buildHandoffText(
+  question: string,
+  context: AgentContext,
+  provider: ProviderKind,
+): string {
   const lines: string[] = [question.trim(), "", "— context from Otter Mail —"];
   for (const c of context.conversations) {
     if (c.quote) {
@@ -74,6 +79,10 @@ export function buildHandoffText(question: string, context: AgentContext): strin
       );
     }
   }
-  lines.push("Fetch full content with gog if needed.");
+  lines.push(
+    provider === "hermes"
+      ? "Fetch full content with gog if needed."
+      : "Read them with the otter-mail tools (get_thread) if needed.",
+  );
   return lines.join("\n");
 }

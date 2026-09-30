@@ -152,12 +152,28 @@ export type ProviderSettings = {
 /** Settings as the renderer sees them: Hermes' API key never leaves the backend. */
 export type ProviderSettingsView = ProviderSettings & { hermesHasKey: boolean };
 
+/**
+ * One step an agent took, described the same way whichever agent took it
+ * (steps.ts), like Otter Code's canonical tool items: the chat shows
+ * `title`, groups a `source`'s steps, and opens to `detail` and the output.
+ */
+export type ToolStep = {
+  kind: "command" | "read" | "edit" | "search" | "web" | "skill" | "tool";
+  /** What it did, in words: "Search mail", "Read Chris Google Accounts skill", "Ran git status". */
+  title: string;
+  /** Its input: the command, the path, the arguments as JSON. */
+  detail?: string;
+  /** The integration (MCP server) it came from: "Otter Mail", "Linear". */
+  source?: string;
+};
+
 /** Canonical stream events, one contract for every provider. */
 export type ChatEvent =
   | { requestId: string; type: "session"; sessionId: string }
   | { requestId: string; type: "delta"; text: string }
-  | { requestId: string; type: "tool"; name: string }
-  | { requestId: string; type: "toolResult"; output: string }
+  /** `id` pairs a step with its result. */
+  | { requestId: string; type: "tool"; id?: string; step: ToolStep }
+  | { requestId: string; type: "toolResult"; id?: string; output: string }
   | { requestId: string; type: "approval"; approval: ApprovalRequest }
   | { requestId: string; type: "approvalResolved"; approvalId: string }
   /** A steer the agent didn't get to before finishing: send it as the next message. */
@@ -191,7 +207,7 @@ export type ChatSessionMessage = {
   role: "user" | "assistant" | "tool" | "system";
   text: string;
   toolName?: string;
-  toolCalls?: string[];
+  toolCalls?: ToolStep[];
 };
 
 /** A file attached to a turn, staged in the app's assistant-attachments folder. */

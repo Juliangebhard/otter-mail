@@ -35,7 +35,9 @@ import { logger } from "../../logger.js";
 import fs from "node:fs/promises";
 import { attachmentPath, attachmentsDir, agentWorkspace, withAttachmentPaths } from "./local.js";
 import { AGENT_INSTRUCTIONS } from "./instructions.js";
+import { MCP_SERVER_NAME, toolAccess, type ToolAccess } from "./mcp-server.js";
 import { ensureShellPath } from "./shell-path.js";
+import { TOOL_OUTPUT_CHARS, claudeStep } from "@otter-mail/core";
 import type {
   ApprovalDecision,
   ApprovalRequest,
@@ -56,7 +58,6 @@ const CLAUDE_IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/gif", "ima
 const VERSION_TIMEOUT_MS = 10_000;
 /** Idle chats release their Claude process after this long. */
 const SESSION_IDLE_MS = 15 * 60_000;
-const TOOL_OUTPUT_PREVIEW_CHARS = 400;
 
 function expandHome(p: string): string {
   return p.startsWith("~/") ? path.join(os.homedir(), p.slice(2)) : p;
@@ -128,6 +129,9 @@ const APPROVAL_TITLES: Record<ApprovalRequest["kind"], string> = {
   permission: "Permission approval",
   tool: "Tool approval",
 };
+
+/** Otter Mail's own tools, as Claude names them. */
+const OTTER_TOOL_PREFIX = `mcp__${MCP_SERVER_NAME}__`;
 
 /** `Bash: gog gmail …`, a file path, or the tool name + JSON input (≤400 chars). */
 function summarizeTool(name: string, input: Record<string, unknown>): string {
@@ -226,6 +230,10 @@ type Session = {
   model: string;
   idleTimer: ReturnType<typeof setTimeout> | null;
   closed: boolean;
+  /** Otter Mail's tools, on this chat's token. */
+  tools: ToolAccess;
+  /** Tool uses the chat doesn't show (Claude's own bookkeeping), so their results aren't shown either. */
+  hiddenTools: Set<string>;
 };
 
 const sessions = new Map<string, Session>();
@@ -237,6 +245,7 @@ function closeSession(session: Session, reason: "cancelled" | "unreachable" = "c
   session.closed = true;
   if (session.idleTimer) clearTimeout(session.idleTimer);
   sessions.delete(session.sessionId);
+  session.tools.revoke();
   const turn = session.turn;
   if (turn) {
     for (const pending of turn.approvals.values()) pending.resolve("cancel");
@@ -310,16 +319,15 @@ function handleMessage(session: Session, message: SDKMessage): void {
       const content = (message.message as { content?: unknown[] }).content ?? [];
       for (const block of content as {
         type?: string;
+        id?: string;
         name?: string;
         input?: Record<string, unknown>;
         text?: string;
       }[]) {
         if (block.type === "tool_use" && block.name) {
-          emit({
-            requestId,
-            type: "tool",
-            name: summarizeTool(block.name, block.input ?? {}),
-          });
+          const step = claudeStep(block.name, block.input ?? {});
+          if (step) emit({ requestId, type: "tool", id: block.id, step });
+          else if (block.id) session.hiddenTools.add(block.id);
         } else if (block.type === "text" && block.text && !turn.streamedText) {
           // Backfill text the stream didn't deliver.
           turn.streamedText = true;
@@ -334,14 +342,17 @@ function handleMessage(session: Session, message: SDKMessage): void {
       if (!Array.isArray(content)) break;
       for (const block of content as {
         type?: string;
+        tool_use_id?: string;
         content?: unknown;
         is_error?: boolean;
       }[]) {
         if (block.type !== "tool_result") continue;
-        const text = resultText(block.content).slice(0, TOOL_OUTPUT_PREVIEW_CHARS);
+        if (block.tool_use_id && session.hiddenTools.delete(block.tool_use_id)) continue;
+        const text = resultText(block.content).slice(0, TOOL_OUTPUT_CHARS);
         emit({
           requestId,
           type: "toolResult",
+          id: block.tool_use_id,
           output: text || (block.is_error ? "(failed)" : "(done)"),
         });
       }
@@ -417,6 +428,7 @@ async function openSession(
   const prompts = new PromptQueue();
   const mode = settings.runtimeMode;
   const session = {} as Session;
+  const tools = await toolAccess({ mode: () => session.mode, turn: () => session.turn });
 
   const canUseTool: CanUseTool = async (toolName, input, options): Promise<PermissionResult> => {
     const turn = session.turn;
@@ -475,8 +487,19 @@ async function openSession(
     ...(pm === "bypassPermissions" ? { allowDangerouslySkipPermissions: true } : {}),
     ...(sessionId ? { resume: sessionId } : { sessionId: id }),
     includePartialMessages: true,
-    // Attached documents live outside the workspace.
+    // Attached documents (and downloaded mail attachments) live outside the workspace.
     additionalDirectories: [await attachmentsDir()],
+    mcpServers: {
+      // In the prompt from the start, rather than found through ToolSearch.
+      [MCP_SERVER_NAME]: {
+        type: "http",
+        url: tools.url,
+        headers: tools.headers,
+        alwaysLoad: true,
+      },
+    },
+    // The tools ask the user themselves before changing a mailbox.
+    allowedTools: [`${OTTER_TOOL_PREFIX}*`],
     canUseTool,
     stderr: (line: string) => {
       if (/error|auth|login|keychain|credential/i.test(line))
@@ -494,6 +517,8 @@ async function openSession(
     model: settings.model,
     idleTimer: null,
     closed: false,
+    tools,
+    hiddenTools: new Set(),
   } satisfies Session);
   sessions.set(id, session);
 
@@ -850,6 +875,7 @@ export const claudeProvider: ChatProvider = {
       dir: await agentWorkspace(),
     });
     const out: ChatSessionMessage[] = [];
+    const hidden = new Set<string>();
     for (const m of messages) {
       if (m.parent_tool_use_id) continue;
       const content = (m.message as { content?: unknown })?.content;
@@ -861,6 +887,8 @@ export const claudeProvider: ChatProvider = {
             : [];
       for (const block of blocks as {
         type?: string;
+        id?: string;
+        tool_use_id?: string;
         text?: string;
         name?: string;
         input?: Record<string, unknown>;
@@ -868,19 +896,16 @@ export const claudeProvider: ChatProvider = {
       }[]) {
         if (m.type === "user" && block.type === "text" && block.text)
           out.push({ role: "user", text: block.text });
-        else if (m.type === "user" && block.type === "tool_result")
-          out.push({
-            role: "tool",
-            text: resultText(block.content).slice(0, TOOL_OUTPUT_PREVIEW_CHARS),
-          });
-        else if (m.type === "assistant" && block.type === "text" && block.text)
+        else if (m.type === "user" && block.type === "tool_result") {
+          if (block.tool_use_id && hidden.has(block.tool_use_id)) continue;
+          out.push({ role: "tool", text: resultText(block.content).slice(0, TOOL_OUTPUT_CHARS) });
+        } else if (m.type === "assistant" && block.type === "text" && block.text)
           out.push({ role: "assistant", text: block.text });
-        else if (m.type === "assistant" && block.type === "tool_use" && block.name)
-          out.push({
-            role: "assistant",
-            text: "",
-            toolCalls: [summarizeTool(block.name, block.input ?? {})],
-          });
+        else if (m.type === "assistant" && block.type === "tool_use" && block.name) {
+          const step = claudeStep(block.name, block.input ?? {});
+          if (step) out.push({ role: "assistant", text: "", toolCalls: [step] });
+          else if (block.id) hidden.add(block.id);
+        }
       }
     }
     return out;

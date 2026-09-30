@@ -218,11 +218,21 @@ export type AgentSettingsPatch = {
   claude?: Partial<ProviderSettingsView["claude"]>;
 };
 
+/** One step an agent took, the same for every agent (core's steps.ts). */
+export type ToolStep = {
+  kind: "command" | "read" | "edit" | "search" | "web" | "skill" | "tool";
+  title: string;
+  /** Its input: the command, the path, the arguments as JSON. */
+  detail?: string;
+  /** The integration it came from: "Otter Mail". */
+  source?: string;
+};
+
 export type ChatEvent =
   | { requestId: string; type: "session"; sessionId: string }
   | { requestId: string; type: "delta"; text: string }
-  | { requestId: string; type: "tool"; name: string }
-  | { requestId: string; type: "toolResult"; output: string }
+  | { requestId: string; type: "tool"; id?: string; step: ToolStep }
+  | { requestId: string; type: "toolResult"; id?: string; output: string }
   | { requestId: string; type: "approval"; approval: ApprovalRequest }
   | { requestId: string; type: "approvalResolved"; approvalId: string }
   | { requestId: string; type: "steerReturned"; text: string }
@@ -258,7 +268,7 @@ export type ChatSessionMessage = {
   role: "user" | "assistant" | "tool" | "system";
   text: string;
   toolName?: string;
-  toolCalls?: string[];
+  toolCalls?: ToolStep[];
 };
 
 export type ModifyMessageParams = {

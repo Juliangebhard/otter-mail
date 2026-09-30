@@ -68,6 +68,44 @@ export type DraftSave = Omit<OutgoingMail, "inReplyTo" | "references"> & { draft
 
 export type RsvpResponse = "accepted" | "declined" | "tentative";
 
+/** An event in a mailbox's calendar, the same whatever calendar it is. */
+export type CalendarEvent = {
+  id: string;
+  title: string;
+  /** ISO: a date-time with its offset, or a date for all-day events. */
+  start: string;
+  /** For all-day events, the day after the last one. */
+  end: string;
+  allDay: boolean;
+  location: string | null;
+  description: string | null;
+  status: "confirmed" | "tentative" | "cancelled";
+  organizer: string | null;
+  attendees: { email: string; name?: string; response: RsvpResponse | "needsAction" }[];
+  /** Your answer, when you're invited. */
+  response: RsvpResponse | "needsAction" | null;
+  /** The video call's link. */
+  meetingLink: string | null;
+  htmlLink: string | null;
+  recurring: boolean;
+};
+
+/** What a new event is, or what changes in one (then every field is optional). */
+export type EventInput = {
+  title?: string;
+  start?: string;
+  end?: string;
+  allDay?: boolean;
+  /** IANA time zone for the times; default: this device's. */
+  timeZone?: string;
+  location?: string;
+  description?: string;
+  /** Every attendee's address (replaces the list). */
+  attendees?: string[];
+  /** Adds a video call (Google Meet). */
+  videoCall?: boolean;
+};
+
 export type ErrorKind = "rateLimit" | "network" | "notFound";
 
 export interface MailProvider {
@@ -206,8 +244,9 @@ export interface MailProvider {
   };
 
   /**
-   * Invitations answered in the account's calendar (`capabilities.calendar`).
-   * Both throw NoCalendarAccess when the sign-in may not use it.
+   * The account's calendar (`capabilities.calendar`): invitations answered in
+   * place, and its events for the agents' tools. Every call throws
+   * NoCalendarAccess when the sign-in may not use it. `notify` tells attendees.
    */
   calendar?: {
     /** The invitation's event: your answer and a link to it; null when it isn't there. */
@@ -217,5 +256,24 @@ export interface MailProvider {
     ): Promise<{ response: RsvpResponse | "needsAction"; htmlLink: string | null } | null>;
     /** Answers it (the organizer is notified); false when the event isn't there. */
     respond(accountId: string, uid: string, response: RsvpResponse): Promise<boolean>;
+    /** Events overlapping `from`–`to` (ISO), soonest first; recurring ones as occurrences. */
+    listEvents(
+      accountId: string,
+      range: { from: string; to: string; query?: string; limit: number },
+    ): Promise<CalendarEvent[]>;
+    getEvent(accountId: string, eventId: string): Promise<CalendarEvent>;
+    createEvent(accountId: string, input: EventInput, notify: boolean): Promise<CalendarEvent>;
+    updateEvent(
+      accountId: string,
+      eventId: string,
+      patch: EventInput,
+      notify: boolean,
+    ): Promise<CalendarEvent>;
+    deleteEvent(accountId: string, eventId: string, notify: boolean): Promise<void>;
+    respondToEvent(
+      accountId: string,
+      eventId: string,
+      response: RsvpResponse,
+    ): Promise<CalendarEvent>;
   };
 }

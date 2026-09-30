@@ -12,6 +12,7 @@ import { utf8Decode } from "../../bytes.js";
 import { logger } from "../../logger.js";
 import { dataUrl, readAttachment } from "./attachments.js";
 import { getHermesKey } from "./settings.js";
+import { hermesStep, TOOL_OUTPUT_CHARS } from "./steps.js";
 import type {
   ApprovalDecision,
   ChatAttachment,
@@ -26,7 +27,6 @@ import type {
 } from "./types.js";
 
 const IDLE_TIMEOUT_MS = 180_000;
-const TOOL_OUTPUT_PREVIEW_CHARS = 400;
 const PROBE_TIMEOUT_MS = 4_000;
 
 /** `https://host:8642/v1` → OpenAI-compatible base; the Sessions API hangs off the root. */
@@ -296,7 +296,9 @@ type RawMessage = {
   role?: string;
   content?: unknown;
   tool_name?: string | null;
-  tool_calls?: { function?: { name?: string }; name?: string }[] | null;
+  tool_calls?:
+    | { function?: { name?: string; arguments?: string }; name?: string; arguments?: string }[]
+    | null;
 };
 
 /** Text of a stored message: plain string or multimodal parts. */
@@ -476,12 +478,12 @@ async function streamSessionTurn(ctx: TurnContext & { sessionId: string }): Prom
           emit({
             requestId,
             type: "tool",
-            name: String(payload.tool_name ?? payload.tool ?? "tool"),
+            step: hermesStep(String(payload.tool_name ?? payload.tool ?? "tool"), payload.preview),
           });
           break;
         case "tool.completed":
         case "tool.failed": {
-          const preview = String(payload.preview ?? "").slice(0, TOOL_OUTPUT_PREVIEW_CHARS);
+          const preview = String(payload.preview ?? "").slice(0, TOOL_OUTPUT_CHARS);
           emit({
             requestId,
             type: "toolResult",
@@ -609,17 +611,18 @@ async function streamResponsesTurn(
           | {
               type?: string;
               name?: string;
+              arguments?: string;
               output?: { text?: string }[] | string;
             }
           | undefined;
         if (item?.type === "function_call") {
-          emit({ requestId, type: "tool", name: item.name ?? "tool" });
+          emit({ requestId, type: "tool", step: hermesStep(item.name ?? "tool", item.arguments) });
         } else if (item?.type === "function_call_output") {
           const text = (
             typeof item.output === "string"
               ? item.output
               : (item.output ?? []).map((part) => part?.text ?? "").join("")
-          ).slice(0, TOOL_OUTPUT_PREVIEW_CHARS);
+          ).slice(0, TOOL_OUTPUT_CHARS);
           emit({ requestId, type: "toolResult", output: text });
         }
       } else if (type === "response.failed") {
@@ -919,8 +922,13 @@ export const hermesProvider: ChatProvider = {
       const role =
         m.role === "user" || m.role === "assistant" || m.role === "tool" ? m.role : "system";
       const toolCalls = (m.tool_calls ?? [])
-        .map((call) => call.function?.name ?? call.name ?? "")
-        .filter((name) => name.length > 0);
+        .filter((call) => call.function?.name ?? call.name)
+        .map((call) =>
+          hermesStep(
+            call.function?.name ?? call.name ?? "",
+            call.function?.arguments ?? call.arguments,
+          ),
+        );
       return {
         role,
         text: contentText(m.content),
