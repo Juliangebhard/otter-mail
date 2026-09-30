@@ -39,7 +39,7 @@ import {
   type Skill,
 } from "./api";
 import { ProviderModelPicker, RuntimeModePicker, TraitsPicker } from "./model-picker";
-import { ApprovalBanner } from "./approval-banner";
+import { ApprovalCard } from "./approval-card";
 import {
   ProviderIcon,
   isProviderUsable,
@@ -1920,219 +1920,228 @@ export function AgentChatPanel({
                 onMove={moveQueued}
               />
               {pendingApproval && streamingActive ? (
-                <ApprovalBanner
+                <ApprovalCard
+                  key={pendingApproval.approval.id}
+                  agent={providerName}
                   approval={pendingApproval.approval}
                   pendingCount={activeApprovals.length}
                   responding={respondingApproval === pendingApproval.approval.id}
                   onRespond={(decision) => respondApproval(pendingApproval.approval.id, decision)}
                   onCancel={stop}
                 />
-              ) : null}
-              <div className={cn("relative", COMPOSER_SURFACE)}>
-                <ComposerAttachments items={files.items} onRemove={files.remove}>
-                  {/* The mail this message is about; click to leave it out. */}
-                  {context ? (
-                    <AttachmentChip
-                      name={
-                        quote
-                          ? `“${quote.text}”`
-                          : context.conversations.length > 1
-                            ? `${context.conversations.length} conversations`
-                            : context.conversations[0].subject || "(no subject)"
-                      }
-                      detail={
-                        quote
-                          ? "Quote"
-                          : context.conversations.length > 1
-                            ? context.conversations
-                                .slice(0, 3)
-                                .map((c) => c.subject || "(no subject)")
-                                .join(" · ")
-                            : context.conversations[0].from
-                      }
-                      title={attach ? "Attached to this message" : "Not attached"}
-                      tile={<ContextKindIcon kind={attachKind} />}
-                      off={!attach}
-                      onClick={() => setAttach((a) => !a)}
-                    />
+              ) : (
+                <div className={cn("relative", COMPOSER_SURFACE)}>
+                  <ComposerAttachments items={files.items} onRemove={files.remove}>
+                    {/* The mail this message is about; click to leave it out. */}
+                    {context ? (
+                      <AttachmentChip
+                        name={
+                          quote
+                            ? `“${quote.text}”`
+                            : context.conversations.length > 1
+                              ? `${context.conversations.length} conversations`
+                              : context.conversations[0].subject || "(no subject)"
+                        }
+                        detail={
+                          quote
+                            ? "Quote"
+                            : context.conversations.length > 1
+                              ? context.conversations
+                                  .slice(0, 3)
+                                  .map((c) => c.subject || "(no subject)")
+                                  .join(" · ")
+                              : context.conversations[0].from
+                        }
+                        title={attach ? "Attached to this message" : "Not attached"}
+                        tile={<ContextKindIcon kind={attachKind} />}
+                        off={!attach}
+                        onClick={() => setAttach((a) => !a)}
+                      />
+                    ) : null}
+                  </ComposerAttachments>
+                  {activeSkill ? (
+                    <div className="px-4 pt-3">
+                      <SkillBadge name={activeSkill.name} onRemove={() => setActiveSkill(null)} />
+                    </div>
                   ) : null}
-                </ComposerAttachments>
-                {activeSkill ? (
-                  <div className="px-4 pt-3">
-                    <SkillBadge name={activeSkill.name} onRemove={() => setActiveSkill(null)} />
-                  </div>
-                ) : null}
-                <textarea
-                  ref={inputRef}
-                  value={draft}
-                  onChange={(e) => handleDraftChange(e.target.value)}
-                  onPaste={(e) => {
-                    const pasted = filesFromPaste(e.clipboardData);
-                    if (pasted.length === 0) return;
-                    e.preventDefault();
-                    void files.add(pasted);
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Backspace" && draft === "" && activeSkill && !slashOpen) {
+                  <textarea
+                    ref={inputRef}
+                    value={draft}
+                    onChange={(e) => handleDraftChange(e.target.value)}
+                    onPaste={(e) => {
+                      const pasted = filesFromPaste(e.clipboardData);
+                      if (pasted.length === 0) return;
                       e.preventDefault();
-                      setActiveSkill(null);
-                      return;
-                    }
-                    if (slashOpen) {
-                      if (e.key === "ArrowDown") {
-                        e.preventDefault();
-                        setSlashIndex((i) => Math.min(slashSkills.length - 1, i + 1));
-                        return;
-                      }
-                      if (e.key === "ArrowUp") {
-                        e.preventDefault();
-                        setSlashIndex((i) => Math.max(0, i - 1));
-                        return;
-                      }
-                      if (e.key === "Enter" || e.key === "Tab") {
-                        e.preventDefault();
-                        pickSkill(slashSkills[slashIndex]);
-                        return;
-                      }
-                      if (e.key === "Escape") {
-                        e.preventDefault();
-                        setSlashDismissed(true);
-                        return;
-                      }
-                    }
-                    if (e.key === "Escape" && editing) {
-                      e.preventDefault();
-                      cancelQueuedEdit();
-                      return;
-                    }
-                    if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-                      e.preventDefault();
-                      send(e.metaKey || e.ctrlKey);
-                    }
-                  }}
-                  placeholder="Ask anything, / for skills"
-                  aria-label={`Message ${providerName}`}
-                  rows={2}
-                  className="w-full resize-none bg-transparent px-4.5 pb-1 pt-4 text-sm leading-relaxed text-foreground outline-none placeholder:text-placeholder"
-                />
-                <div className="flex min-w-0 items-center gap-1 px-3 pb-3">
-                  <HintTooltip label="Attach files">
-                    <IconBtn
-                      label="Attach files"
-                      className="-ms-0.5 size-8 rounded-full"
-                      onPointerDown={(e) => e.preventDefault()}
-                      onClick={() => filePickerRef.current?.click()}
-                    >
-                      <PlusIcon className="size-4.5" />
-                    </IconBtn>
-                  </HintTooltip>
-                  <input
-                    ref={filePickerRef}
-                    type="file"
-                    multiple
-                    className="hidden"
-                    onChange={(e) => {
-                      const picked = Array.from(e.currentTarget.files ?? []);
-                      e.currentTarget.value = "";
-                      void files.add(picked);
-                      focusComposer();
+                      void files.add(pasted);
                     }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Backspace" && draft === "" && activeSkill && !slashOpen) {
+                        e.preventDefault();
+                        setActiveSkill(null);
+                        return;
+                      }
+                      if (slashOpen) {
+                        if (e.key === "ArrowDown") {
+                          e.preventDefault();
+                          setSlashIndex((i) => Math.min(slashSkills.length - 1, i + 1));
+                          return;
+                        }
+                        if (e.key === "ArrowUp") {
+                          e.preventDefault();
+                          setSlashIndex((i) => Math.max(0, i - 1));
+                          return;
+                        }
+                        if (e.key === "Enter" || e.key === "Tab") {
+                          e.preventDefault();
+                          pickSkill(slashSkills[slashIndex]);
+                          return;
+                        }
+                        if (e.key === "Escape") {
+                          e.preventDefault();
+                          setSlashDismissed(true);
+                          return;
+                        }
+                      }
+                      if (e.key === "Escape" && editing) {
+                        e.preventDefault();
+                        cancelQueuedEdit();
+                        return;
+                      }
+                      if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+                        e.preventDefault();
+                        send(e.metaKey || e.ctrlKey);
+                      }
+                    }}
+                    placeholder="Ask anything, / for skills"
+                    aria-label={`Message ${providerName}`}
+                    rows={2}
+                    className="w-full resize-none bg-transparent px-4.5 pb-1 pt-4 text-sm leading-relaxed text-foreground outline-none placeholder:text-placeholder"
                   />
-                  <div className="flex min-w-0 shrink items-center gap-0.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                    {runtimeMode ? (
-                      <RuntimeModePicker
-                        returnFocus={focusComposer}
-                        value={runtimeMode}
-                        onChange={(mode) => {
-                          updateSettings({
-                            [providerKind]: { runtimeMode: mode },
-                          });
-                        }}
-                      />
-                    ) : null}
-                  </div>
-                  {/* Codex's "Model Effort ⌄": the model reads as plain text,
-                      the traits follow it muted and carry the chevron, and
-                      one pill wraps both, as a single control. */}
-                  <div className="ms-auto flex min-w-0 shrink items-center rounded-full transition-colors hover:bg-accent-surface has-[[data-state=open]]:bg-accent-surface">
-                    <ProviderModelPicker
-                      providers={providersState?.providers ?? []}
-                      activeKind={providerKind}
-                      lockedKind={active && active.turns.length > 0 ? active.provider : null}
-                      onPick={pickModel}
-                      returnFocus={focusComposer}
-                      chevron={traitOptions.length === 0}
-                      className={cn(
-                        "hover:bg-transparent data-[state=open]:bg-transparent",
-                        traitOptions.length > 0 && "pe-1",
-                      )}
+                  <div className="flex min-w-0 items-center gap-1 px-3 pb-3">
+                    <HintTooltip label="Attach files">
+                      <IconBtn
+                        label="Attach files"
+                        className="-ms-0.5 size-8 rounded-full"
+                        onPointerDown={(e) => e.preventDefault()}
+                        onClick={() => filePickerRef.current?.click()}
+                      >
+                        <PlusIcon className="size-4.5" />
+                      </IconBtn>
+                    </HintTooltip>
+                    <input
+                      ref={filePickerRef}
+                      type="file"
+                      multiple
+                      className="hidden"
+                      onChange={(e) => {
+                        const picked = Array.from(e.currentTarget.files ?? []);
+                        e.currentTarget.value = "";
+                        void files.add(picked);
+                        focusComposer();
+                      }}
                     />
-                    {traitOptions.length > 0 ? (
-                      <TraitsPicker
+                    <div className="flex min-w-0 shrink items-center gap-0.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                      {runtimeMode ? (
+                        <RuntimeModePicker
+                          returnFocus={focusComposer}
+                          value={runtimeMode}
+                          onChange={(mode) => {
+                            updateSettings({
+                              [providerKind]: { runtimeMode: mode },
+                            });
+                          }}
+                        />
+                      ) : null}
+                    </div>
+                    {/* Codex's "Model Effort ⌄": the model reads as plain text,
+                        the traits follow it muted and carry the chevron, and
+                        one pill wraps both, as a single control. */}
+                    <div className="ms-auto flex min-w-0 shrink items-center rounded-full transition-colors hover:bg-accent-surface has-[[data-state=open]]:bg-accent-surface">
+                      <ProviderModelPicker
+                        providers={providersState?.providers ?? []}
+                        activeKind={providerKind}
+                        lockedKind={active && active.turns.length > 0 ? active.provider : null}
+                        onPick={pickModel}
                         returnFocus={focusComposer}
-                        options={traitOptions}
-                        values={traitValues}
-                        className="shrink-0 ps-1 hover:bg-transparent data-[state=open]:bg-transparent"
-                        onChange={(id, value) => {
-                          updateSettings({ [providerKind]: { [id]: value } });
-                        }}
+                        chevron={traitOptions.length === 0}
+                        className={cn(
+                          "hover:bg-transparent data-[state=open]:bg-transparent",
+                          traitOptions.length > 0 && "pe-1",
+                        )}
                       />
-                    ) : null}
-                  </div>
-                  <div className="flex shrink-0 items-center">
-                    {/* Running + empty composer → Stop; with a draft the button
-                        queues or steers it (Otter Code's primary actions). */}
-                    {busy && !hasDraft && !editing ? (
-                      <HintTooltip label="Interrupt">
-                        <button
-                          type="button"
-                          onClick={stop}
-                          aria-label="Stop generation"
-                          className="flex size-8 cursor-pointer items-center justify-center rounded-full bg-destructive/90 text-white shadow-xs shadow-destructive/24 inset-shadow-2xs inset-shadow-white/16 transition-all duration-150 hover:scale-105 hover:bg-destructive active:shadow-none active:inset-shadow-black/8"
-                        >
-                          <svg
-                            width="12"
-                            height="12"
-                            viewBox="0 0 12 12"
-                            fill="currentColor"
-                            aria-hidden
+                      {traitOptions.length > 0 ? (
+                        <TraitsPicker
+                          returnFocus={focusComposer}
+                          options={traitOptions}
+                          values={traitValues}
+                          className="shrink-0 ps-1 hover:bg-transparent data-[state=open]:bg-transparent"
+                          onChange={(id, value) => {
+                            updateSettings({ [providerKind]: { [id]: value } });
+                          }}
+                        />
+                      ) : null}
+                    </div>
+                    <div className="flex shrink-0 items-center">
+                      {/* Running + empty composer → Stop; with a draft the button
+                          queues or steers it (Otter Code's primary actions). */}
+                      {busy && !hasDraft && !editing ? (
+                        <HintTooltip label="Interrupt">
+                          <button
+                            type="button"
+                            onClick={stop}
+                            aria-label="Stop generation"
+                            className="flex size-8 cursor-pointer items-center justify-center rounded-full bg-destructive/90 text-white shadow-xs shadow-destructive/24 inset-shadow-2xs inset-shadow-white/16 transition-all duration-150 hover:scale-105 hover:bg-destructive active:shadow-none active:inset-shadow-black/8"
                           >
-                            <rect x="2" y="2" width="8" height="8" rx="1.5" />
-                          </svg>
-                        </button>
-                      </HintTooltip>
-                    ) : (
-                      <HintTooltip label={submitTooltip}>
-                        <button
-                          type="button"
-                          onClick={(e) => send(e.metaKey || e.ctrlKey)}
-                          disabled={!hasDraft}
-                          aria-label={submitLabel}
-                          className="relative isolate flex size-8 items-center justify-center overflow-hidden rounded-full bg-primary text-primary-foreground shadow-xs transition-all duration-150 enabled:cursor-pointer enabled:shadow-primary/24 enabled:inset-shadow-2xs enabled:inset-shadow-white/16 hover:scale-105 hover:bg-primary/90 active:shadow-none active:inset-shadow-black/8 disabled:pointer-events-none disabled:opacity-30 disabled:shadow-none"
-                        >
-                          {editing ? (
-                            <CheckIcon className="size-4" aria-hidden />
-                          ) : submitMode === "queue" ? (
-                            <ListPlusIcon className="size-4" aria-hidden />
-                          ) : submitMode === "steer" ? (
-                            <CornerUpRightIcon className="size-4" aria-hidden />
-                          ) : (
-                            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
-                              <path
-                                d="M7 11.5V2.5M7 2.5L3 6.5M7 2.5L11 6.5"
-                                stroke="currentColor"
-                                strokeWidth="1.8"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                              />
+                            <svg
+                              width="12"
+                              height="12"
+                              viewBox="0 0 12 12"
+                              fill="currentColor"
+                              aria-hidden
+                            >
+                              <rect x="2" y="2" width="8" height="8" rx="1.5" />
                             </svg>
-                          )}
-                        </button>
-                      </HintTooltip>
-                    )}
+                          </button>
+                        </HintTooltip>
+                      ) : (
+                        <HintTooltip label={submitTooltip}>
+                          <button
+                            type="button"
+                            onClick={(e) => send(e.metaKey || e.ctrlKey)}
+                            disabled={!hasDraft}
+                            aria-label={submitLabel}
+                            className="relative isolate flex size-8 items-center justify-center overflow-hidden rounded-full bg-primary text-primary-foreground shadow-xs transition-all duration-150 enabled:cursor-pointer enabled:shadow-primary/24 enabled:inset-shadow-2xs enabled:inset-shadow-white/16 hover:scale-105 hover:bg-primary/90 active:shadow-none active:inset-shadow-black/8 disabled:pointer-events-none disabled:opacity-30 disabled:shadow-none"
+                          >
+                            {editing ? (
+                              <CheckIcon className="size-4" aria-hidden />
+                            ) : submitMode === "queue" ? (
+                              <ListPlusIcon className="size-4" aria-hidden />
+                            ) : submitMode === "steer" ? (
+                              <CornerUpRightIcon className="size-4" aria-hidden />
+                            ) : (
+                              <svg
+                                width="14"
+                                height="14"
+                                viewBox="0 0 14 14"
+                                fill="none"
+                                aria-hidden
+                              >
+                                <path
+                                  d="M7 11.5V2.5M7 2.5L3 6.5M7 2.5L11 6.5"
+                                  stroke="currentColor"
+                                  strokeWidth="1.8"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                />
+                              </svg>
+                            )}
+                          </button>
+                        </HintTooltip>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
         </MessageScroller.Provider>

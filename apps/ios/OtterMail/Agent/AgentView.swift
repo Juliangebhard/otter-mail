@@ -98,7 +98,13 @@ struct AgentView: View {
             .onChange(of: agent.turns.last?.text) {
                 if let last = agent.turns.last { reader.scrollTo(last.id, anchor: .bottom) }
             }
-            .safeAreaBar(edge: .bottom) { composer }
+            .safeAreaBar(edge: .bottom) {
+                if let approval = agent.pendingApproval {
+                    ApprovalCard(approval: approval)
+                } else {
+                    composer
+                }
+            }
         }
     }
 
@@ -305,9 +311,6 @@ private struct TurnView: View {
                         .textSelection(.enabled)
                         .tint(palette.focus)
                 }
-                if let approval = turn.approval {
-                    ApprovalCard(approval: approval)
-                }
                 if let error = turn.error {
                     Label(error, systemImage: "exclamationmark.triangle")
                         .font(.footnote)
@@ -324,41 +327,70 @@ private struct TurnView: View {
     }
 }
 
-/** An agent asking before it runs something. */
+/**
+ * An agent asking before it acts, ChatGPT's way (the desktop's approval-card):
+ * in the composer's place, "Allow Hermes to …?", exactly what will happen, and
+ * Deny or Allow once; allowing it for the rest of the chat is behind "…".
+ */
 private struct ApprovalCard: View {
     @Environment(Session.self) private var session
     @Environment(\.palette) private var palette
     let approval: Agent.Approval
 
-    private static let labels = ["once": "Allow once", "session": "Allow for this chat", "always": "Always allow", "deny": "Deny"]
+    private static let more = ["session": "Allow for this chat", "always": "Always allow"]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Label("Hermes wants to run a command", systemImage: "terminal")
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(palette.text)
-            if let command = approval.command {
-                Text(command)
-                    .font(.footnote.monospaced())
+        let agent = session.agent
+        VStack(alignment: .leading, spacing: 12) {
+            Label("Permissions", systemImage: "hand.raised")
+                .font(.caption)
+                .foregroundStyle(palette.muted)
+            VStack(alignment: .leading, spacing: 6) {
+                Text(approval.question)
                     .foregroundStyle(palette.text)
-                    .padding(10)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(palette.canvas, in: .rect(cornerRadius: 10))
-            }
-            if let reason = approval.reason {
-                Text(reason).font(.footnote).foregroundStyle(palette.muted)
-            }
-            HStack {
-                ForEach(approval.choices, id: \.self) { choice in
-                    Button(Self.labels[choice] ?? choice) { session.agent.answer(approval, choice) }
-                        .font(.footnote.weight(.medium))
-                        .buttonStyle(.bordered)
-                        .tint(choice == "deny" ? palette.error : palette.text)
+                if let detail = approval.detail, approval.isCommand {
+                    Text(detail)
+                        .font(.footnote.monospaced())
+                        .foregroundStyle(palette.text)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(palette.canvas, in: .rect(cornerRadius: 10))
+                }
+                if let note = [approval.reason, approval.isCommand ? nil : approval.detail].compactMap(\.self).first {
+                    Text(note).font(.footnote).foregroundStyle(palette.muted)
                 }
             }
+            HStack(spacing: 8) {
+                Spacer()
+                let extra = approval.choices.filter { Self.more[$0] != nil }
+                if !extra.isEmpty {
+                    Menu {
+                        ForEach(extra, id: \.self) { choice in
+                            Button(Self.more[choice]!) { agent.answer(approval, choice) }
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis").frame(width: 34, height: 34)
+                    }
+                    .foregroundStyle(palette.muted)
+                }
+                Button("Deny") { agent.answer(approval, "deny") }
+                    .buttonStyle(.bordered)
+                    .keyboardShortcut(.cancelAction)
+                Button("Allow once") { agent.answer(approval, "once") }
+                    .buttonStyle(.borderedProminent)
+                    .tint(palette.action)
+                    .foregroundStyle(palette.actionText)
+                    .keyboardShortcut(.defaultAction)
+            }
+            .buttonBorderShape(.capsule)
+            .tint(palette.text)
+            .font(.subheadline.weight(.medium))
         }
-        .padding(14)
-        .background(palette.card, in: .rect(cornerRadius: 18))
+        .padding(16)
+        .glassEffect(.regular, in: .rect(cornerRadius: 26))
+        .padding(.horizontal, 16)
+        .padding(.bottom, 6)
     }
 }
 
