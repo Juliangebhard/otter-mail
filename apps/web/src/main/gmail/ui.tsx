@@ -117,7 +117,8 @@ const TOOLTIP_GAP = 6;
 const VIEWPORT_MARGIN = 6;
 let lastTooltipClosedAt = 0;
 
-type TooltipPlacement = { top: number; left: number; side: "top" | "bottom" };
+type TooltipSide = "top" | "bottom" | "right";
+type TooltipPlacement = { top: number; left: number; side: TooltipSide };
 
 /** Hover/focus hint for a control. Wraps its child without adding layout. */
 export function HintTooltip({
@@ -131,7 +132,8 @@ export function HintTooltip({
   hint?: string;
   /** Shows this command's live keybinding as the hint. */
   shortcut?: KeybindingCommand;
-  side?: "top" | "bottom";
+  /** "right" for a control in the rail down the window's edge. */
+  side?: TooltipSide;
   children: ReactNode;
 }) {
   const liveHint = useShortcutLabel(shortcut);
@@ -169,6 +171,15 @@ export function HintTooltip({
     const popup = popupRef.current;
     if (!anchor || !popup) return;
     const { width, height } = popup.getBoundingClientRect();
+    if (side === "right") {
+      const middle = anchor.top + anchor.height / 2 - height / 2;
+      const top = Math.min(
+        Math.max(VIEWPORT_MARGIN, middle),
+        window.innerHeight - height - VIEWPORT_MARGIN,
+      );
+      setPlacement({ top, left: anchor.right + TOOLTIP_GAP, side });
+      return;
+    }
     const fitsTop = anchor.top - TOOLTIP_GAP - height >= VIEWPORT_MARGIN;
     const fitsBottom = anchor.bottom + TOOLTIP_GAP + height <= window.innerHeight - VIEWPORT_MARGIN;
     const resolved =
@@ -245,7 +256,11 @@ export function HintTooltip({
               }
               className={cn(
                 "tooltip-in pointer-events-none fixed z-[140] flex max-w-80 items-center gap-1.5 whitespace-nowrap rounded-lg border border-border/60 bg-popover px-2 py-1 text-xs leading-snug text-popover-foreground shadow-lg/10",
-                placement?.side === "bottom" ? "origin-top" : "origin-bottom",
+                placement?.side === "bottom"
+                  ? "origin-top"
+                  : placement?.side === "right"
+                    ? "origin-left"
+                    : "origin-bottom",
               )}
             >
               <span>{label}</span>

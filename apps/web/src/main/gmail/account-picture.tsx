@@ -2,7 +2,10 @@ import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { getAccountColor, getAccountDisplayName } from "./account-style";
 import type { GmailAccount } from "./types";
 
-/** The account's Google profile picture, round; its colored initial until it loads, or without one. */
+/**
+ * The account's Google profile picture, round unless `className` shapes it;
+ * its colored initial until it loads, or without one.
+ */
 export function AccountPicture({
   account,
   className,
@@ -16,7 +19,7 @@ export function AccountPicture({
         <AvatarImage src={account.picture} alt="" referrerPolicy="no-referrer" />
       ) : null}
       <AvatarFallback
-        className="font-bold leading-none text-white"
+        className="rounded-[inherit] font-bold leading-none text-white"
         style={{ background: getAccountColor(account) }}
       >
         {(getAccountDisplayName(account)[0] ?? "?").toUpperCase()}

@@ -13,6 +13,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast, type ToastId } from "./gmail/toast";
 import { setDraftOpener } from "./gmail/undo-send";
 import { AccountsSidebar } from "./gmail/accounts-sidebar";
+import { MailboxRail } from "./gmail/mailbox-rail";
 import { MessageList } from "./gmail/message-list";
 import { MessageReader } from "./gmail/message-reader";
 import { NewMessageView } from "./gmail/new-message-view";
@@ -26,7 +27,7 @@ import {
   TitleControls,
   TitleTrailing,
   TitlebarInset,
-  WindowTitle,
+  SidebarTitle,
 } from "./gmail/top-bar";
 import { SettingsPage, type SettingsRoute } from "./settings/settings-page";
 import { SettingsNav } from "./settings/settings-nav";
@@ -80,6 +81,7 @@ import {
 } from "./gmail/custom-views";
 import { ALL_MAIL_LABEL_ID } from "./gmail/label-names";
 import { useMonochromeTheme } from "./theme/apply-theme";
+import { features } from "./features";
 import { useMailboxes } from "./mailboxes";
 import { useRecordRecentlyViewed } from "./recently-viewed";
 import { SetupFlow } from "./onboarding/setup";
@@ -95,6 +97,8 @@ import {
 
 /** Narrowest the reader gets when the chat panel is dragged wider. */
 const READER_MIN_WIDTH = 360;
+/** The mailbox rail's width (styles.css's --workspace-rail-width). */
+const RAIL_WIDTH = 52;
 
 /** A place in the mail, as the route names it (router.tsx). */
 type MailLoc = {
@@ -248,15 +252,16 @@ function PaneResizer({ onPointerDown }: { onPointerDown: (e: ReactPointerEvent) 
 }
 
 /**
- * Codex-style window chrome: the window wears the sidebar's surface (and
- * grain), so the sidebar and the title band read as one frame, and the
- * content columns share one inset panel (canvas) that starts under the title
- * band, with a rounded top-left corner and a faint top/left edge. The panes
- * themselves are transparent: their title bands sit on the frame, their
- * bodies on the panel.
+ * ChatGPT-style window chrome: the window wears the sidebar's surface (and
+ * grain), so the rail and the title band read as one frame, and the columns
+ * after the rail share one inset panel (canvas) that starts under the title
+ * band, with rounded corners and a faint edge. The panes themselves are
+ * transparent: their title bands sit on the frame, their bodies on the panel.
  */
 const PANE = "min-h-0 overflow-hidden";
-const PANE_SIDEBAR = `${PANE} text-sidebar-foreground`;
+/** The sidebar's body sits in the panel, between the frame's tone and the
+    canvas, with a faint full-height divider before the list. */
+const PANE_SIDEBAR = `${PANE} relative text-sidebar-foreground before:pointer-events-none before:absolute before:bottom-px before:left-px before:right-0 before:top-[calc(var(--workspace-topbar-height)+1px)] before:-z-10 before:rounded-l-[calc(var(--radius-xl)-1px)] before:bg-(--sidebar-panel-surface) after:pointer-events-none after:absolute after:bottom-0 after:right-0 after:top-0 after:w-px after:bg-border/70`;
 /** Faint full-height dividers, through the title band (ChatGPT): on the
     list's right, the chat's left. */
 const PANE_LIST = `${PANE} relative after:pointer-events-none after:absolute after:bottom-0 after:right-0 after:top-0 after:w-px after:bg-border/70`;
@@ -452,12 +457,22 @@ function MailHome() {
     900,
     -1,
     () =>
-      window.innerWidth - (sidebarOpen ? sidebarPane.width : 0) - listPane.width - READER_MIN_WIDTH,
+      window.innerWidth -
+      RAIL_WIDTH -
+      (sidebarOpen ? sidebarPane.width : 0) -
+      listPane.width -
+      READER_MIN_WIDTH,
   );
   const [chatOpen, setChatOpen] = useState(() => localStorage.getItem("gmail:chat-open") === "1");
-  const [sidebarOpen, setSidebarOpen] = useState(
+  // Mail and Settings are separate spaces: each keeps its sidebar open or
+  // closed on its own, and the toggle acts on the one showing.
+  const [mailSidebarOpen, setMailSidebarOpen] = useState(
     () => localStorage.getItem("gmail:sidebar-open") !== "0",
   );
+  const [settingsSidebarOpen, setSettingsSidebarOpen] = useState(
+    () => localStorage.getItem("gmail:settings-sidebar-open") !== "0",
+  );
+  const sidebarOpen = settingsRoute ? settingsSidebarOpen : mailSidebarOpen;
   // Entering or leaving Settings swaps panes in place rather than animating them.
   const { active: panelAnimationsActive, durationMs: panelAnimationDurationMs } =
     usePanelAnimationSettings(settingsRoute ? "settings" : "mail");
@@ -473,8 +488,11 @@ function MailHome() {
     panelAnimationDurationMs,
   );
   const toggleSidebar = () => {
-    setSidebarOpen((open) => {
-      localStorage.setItem("gmail:sidebar-open", open ? "0" : "1");
+    const [key, setOpen] = settingsRoute
+      ? ["gmail:settings-sidebar-open", setSettingsSidebarOpen]
+      : ["gmail:sidebar-open", setMailSidebarOpen];
+    setOpen((open) => {
+      localStorage.setItem(key, open ? "0" : "1");
       return !open;
     });
   };
@@ -508,7 +526,8 @@ function MailHome() {
     if (!tourRequested) return;
     if (settingsRouteRef.current) leaveSettingsRef.current();
     setComposeOpen(false);
-    if (!sidebarOpen) toggleSidebar();
+    localStorage.setItem("gmail:sidebar-open", "1");
+    setMailSidebarOpen(true);
   }, [tourRequested]);
 
   // A highlighted excerpt handed from the reader to the chat panel (one-shot).
@@ -1088,9 +1107,9 @@ function MailHome() {
   const readerOwnsBand =
     !settingsRoute && !(composeOpen && composeAccountId) && !!readerAccount && !!selectedMessageId;
   const titleTrailing = <TitleTrailing showPanelToggle={!chatOpen && !settingsRoute} />;
-  // With the sidebar hidden and no list pane, this band is the leftmost one: it
-  // needs the traffic-light clearance and the toggle to bring the sidebar (and
-  // Settings' Back button) back.
+  // With the sidebar hidden and no list pane, this band is the first after the
+  // rail: it needs the traffic-light clearance and the toggle to bring the
+  // sidebar (and Settings' Back button) back.
   const mainIsLeftmost = !sidebarOpen && !(hasListTarget && !settingsRoute);
   const titleControls = (
     <TitleControls
@@ -1105,95 +1124,103 @@ function MailHome() {
   return (
     <>
       <div
-        className="surface-grain flex h-full bg-sidebar-surface text-foreground"
+        className={cn(
+          "surface-grain flex h-full text-foreground",
+          // The Mac window is frosted glass (main-window.ts's vibrancy): the
+          // frame lets it through, more so as Glass opacity goes down.
+          features.trafficLights ? "bg-sidebar-surface/(--frame-opacity)" : "bg-sidebar-surface",
+        )}
         data-panel-animations={panelAnimationsActive ? "true" : "false"}
         style={{ "--panel-animation-duration": `${panelAnimationDurationMs}ms` } as CSSProperties}
       >
         <div className="contents">
-          {sidebarPresent ? (
-            <>
-              <div
-                ref={sidebarPane.frameRef}
-                style={{ width: sidebarOpen ? sidebarPane.width : 0 }}
-                className={cn(
-                  PANE_FRAME,
-                  // Anchored right, so the sidebar slides out to the left.
-                  "justify-end",
-                  sidebarOpen && "[[data-panel-animations=true]_&]:starting:w-0!",
-                  !sidebarOpen && "pointer-events-none",
-                )}
-              >
-                <div
-                  ref={sidebarPane.paneRef}
-                  style={{ width: sidebarPane.width }}
-                  className={`${PANE_SIDEBAR} flex shrink-0 flex-col`}
-                  data-app-sidebar=""
-                >
-                  {settingsRoute ? (
-                    <>
-                      <WindowTitle history />
-                      <SettingsNav
-                        pane={settingsRoute.pane}
-                        onSelect={(pane, target) =>
-                          openSettings({ pane, viewId: null, mailbox: null, target })
-                        }
-                        onBack={leaveSettings}
-                      />
-                    </>
-                  ) : (
-                    <AccountsSidebar
-                      onOpenSettings={(pane = "general") =>
-                        openSettings({ pane, viewId: null, mailbox: null })
-                      }
-                      onEditView={(viewId, mailbox) =>
-                        openSettings({ pane: "views", viewId, mailbox })
-                      }
-                      onSync={syncNow}
-                      syncing={globalSync.syncing || manualSyncing}
-                      selectedAccountId={effectiveAccountId}
-                      onSelectAccount={handleSelectAccount}
-                      selectedLabelId={selectedLabelId}
-                      onSelectLabel={handleSelectLabel}
-                      views={views}
-                      onCompose={() => setComposeOpen(true)}
-                      searchSelected={activeSearch?.id === topSearchId}
-                      searchPending={Boolean(
-                        searchTabs.find((t) => t.id === topSearchId)?.draft.trim(),
-                      )}
-                      searches={searchTabs
-                        .filter((t) => t.mailbox === searchMailbox && t.parent)
-                        .map((t) => ({
-                          id: t.id,
-                          parent: t.parent!,
-                          title: searchTitle(t),
-                          selected: activeSearch?.id === t.id,
-                        }))}
-                      onSelectSearch={(id) => {
-                        showSearch(id);
-                        focusSearchEnd();
-                      }}
-                      onCloseSearch={closeSearch}
-                      onOpenSearch={() => openSearch()}
-                    />
-                  )}
-                </div>
-              </div>
-              {sidebarOpen ? <PaneResizer onPointerDown={sidebarPane.start} /> : null}
-            </>
-          ) : null}
+          {/* The mailboxes and the app's menu (ChatGPT's rail): they stay when
+              the sidebar hides. */}
+          <MailboxRail
+            accounts={accounts}
+            selectedAccountId={effectiveAccountId}
+            onSelectAccount={handleSelectAccount}
+            settingsOpen={settingsRoute !== null}
+            onOpenSettings={(pane = "general") =>
+              openSettings({ pane, viewId: null, mailbox: null })
+            }
+            onSync={syncNow}
+            syncing={globalSync.syncing || manualSyncing}
+          />
           {/* A thin margin of frame on every free side (ChatGPT), so the panel
               floats with all four corners rounded. */}
-          <div
-            className={cn("relative isolate flex min-w-0 flex-1 pb-1 pr-1", !sidebarOpen && "pl-1")}
-          >
+          <div className="relative isolate flex min-w-0 flex-1 pb-1 pr-1">
             {/* The inset content panel, behind the panes and under their title bands. */}
             <div
               aria-hidden
-              className={cn(
-                "pointer-events-none absolute bottom-1 right-1 top-(--workspace-topbar-height) -z-10 rounded-xl border border-border/70 bg-canvas",
-                sidebarOpen ? "left-0" : "left-1",
-              )}
+              className="pointer-events-none absolute bottom-1 left-0 right-1 top-(--workspace-topbar-height) -z-10 rounded-xl border border-(--panel-edge) bg-canvas"
             />
+            {sidebarPresent ? (
+              <>
+                <div
+                  ref={sidebarPane.frameRef}
+                  style={{ width: sidebarOpen ? sidebarPane.width : 0 }}
+                  className={cn(
+                    PANE_FRAME,
+                    // Anchored left: the sidebar stays put while the columns
+                    // after it slide over it, and back out.
+                    sidebarOpen && "[[data-panel-animations=true]_&]:starting:w-0!",
+                    !sidebarOpen && "pointer-events-none",
+                  )}
+                >
+                  <div
+                    ref={sidebarPane.paneRef}
+                    style={{ width: sidebarPane.width }}
+                    className={`${PANE_SIDEBAR} flex shrink-0 flex-col`}
+                    data-app-sidebar=""
+                  >
+                    {settingsRoute ? (
+                      <>
+                        <SidebarTitle />
+                        <SettingsNav
+                          pane={settingsRoute.pane}
+                          onSelect={(pane, target) =>
+                            openSettings({ pane, viewId: null, mailbox: null, target })
+                          }
+                          onBack={leaveSettings}
+                        />
+                      </>
+                    ) : (
+                      <AccountsSidebar
+                        onEditView={(viewId, mailbox) =>
+                          openSettings({ pane: "views", viewId, mailbox })
+                        }
+                        selectedAccountId={effectiveAccountId}
+                        onSelectAccount={handleSelectAccount}
+                        selectedLabelId={selectedLabelId}
+                        onSelectLabel={handleSelectLabel}
+                        views={views}
+                        onCompose={() => setComposeOpen(true)}
+                        searchSelected={activeSearch?.id === topSearchId}
+                        searchPending={Boolean(
+                          searchTabs.find((t) => t.id === topSearchId)?.draft.trim(),
+                        )}
+                        searches={searchTabs
+                          .filter((t) => t.mailbox === searchMailbox && t.parent)
+                          .map((t) => ({
+                            id: t.id,
+                            parent: t.parent!,
+                            title: searchTitle(t),
+                            selected: activeSearch?.id === t.id,
+                          }))}
+                        onSelectSearch={(id) => {
+                          showSearch(id);
+                          focusSearchEnd();
+                        }}
+                        onCloseSearch={closeSearch}
+                        onOpenSearch={() => openSearch()}
+                      />
+                    )}
+                  </div>
+                </div>
+                {sidebarOpen ? <PaneResizer onPointerDown={sidebarPane.start} /> : null}
+              </>
+            ) : null}
             {hasListTarget && !settingsRoute ? (
               <>
                 <div

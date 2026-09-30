@@ -19,9 +19,6 @@ import {
   StarIcon,
   TagIcon,
   Trash2Icon,
-  PanelLeftCloseIcon,
-  PanelLeftIcon,
-  PanelRightIcon,
 } from "lucide-react";
 import { IconBtn, HintTooltip, UnreadPill, cn, restoreFocusForKeyboardOnly } from "./ui";
 import { COMBINED_ACCOUNT_ID } from "./custom-views";
@@ -33,7 +30,6 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "./menu";
 import { useRecentlyViewed, type RecentIcon } from "../recently-viewed";
@@ -129,10 +125,9 @@ function RecentlyViewedMenu() {
 /**
  * Recently viewed, back and forward through the mailboxes, conversations and
  * Settings pages you've been to (Linear's), in the Mac app, where no browser
- * offers them: after the pinned toggle with the sidebar hidden, at the end
- * of the sidebar's title band when it shows.
+ * offers them: after the pinned sidebar toggle.
  */
-export function HistoryControls({ className }: { className?: string }) {
+export function HistoryControls() {
   const { history } = useRouter();
   trackHistory(history);
   const where = useSyncExternalStore(history.subscribe, () => {
@@ -141,7 +136,7 @@ export function HistoryControls({ className }: { className?: string }) {
   });
   if (!features.historyButtons) return null;
   return (
-    <div className={cn("flex items-center gap-1", className)}>
+    <div className="flex items-center gap-1">
       <RecentlyViewedMenu />
       <HintTooltip label="Back">
         <IconBtn
@@ -168,9 +163,54 @@ export function HistoryControls({ className }: { className?: string }) {
 }
 
 /**
- * The sidebar toggle, pinned at one window position (Otter Code's
- * SidebarControl): right of the traffic lights, whether the sidebar is open
- * or not. The bands under it leave room (`WindowTitle`, `TitlebarInset`).
+ * The sidebar and agent panel toggles' icon: ChatGPT's and Linear's soft
+ * frame, in Lucide's strokes so it sits with the rest. The pane is filled
+ * while it's open, a thin bar while it's closed.
+ */
+export function PaneIcon({
+  side,
+  open,
+  className,
+}: {
+  side: "left" | "right";
+  open: boolean;
+  className?: string;
+}) {
+  const x = side === "left" ? 8 : 16;
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+      className={className}
+    >
+      <rect x="3" y="4" width="18" height="16" rx="4" />
+      {open ? (
+        <rect
+          x={x - 1.5}
+          y="7.5"
+          width="3"
+          height="9"
+          rx="1"
+          fill="currentColor"
+          strokeWidth="1.5"
+        />
+      ) : (
+        <path d={`M${x} 8v8`} strokeWidth="1.5" />
+      )}
+    </svg>
+  );
+}
+
+/**
+ * The sidebar toggle and back/forward, pinned at one window position (Otter
+ * Code's SidebarControl, ChatGPT's): right of the traffic lights, whether the
+ * sidebar is open or not, so nothing moves when it opens or closes. The
+ * bands under them leave room (`SidebarTitle`, `TitlebarInset`).
  */
 export function SidebarControl({
   sidebarOpen,
@@ -187,14 +227,10 @@ export function SidebarControl({
           className="no-drag pointer-events-auto"
           onClick={onToggleSidebar}
         >
-          {sidebarOpen ? (
-            <PanelLeftCloseIcon className="size-4" />
-          ) : (
-            <PanelLeftIcon className="size-4" />
-          )}
+          <PaneIcon side="left" open={sidebarOpen} className="size-4" />
         </IconBtn>
       </HintTooltip>
-      {sidebarOpen ? null : <HistoryControls />}
+      <HistoryControls />
     </div>
   );
 }
@@ -214,11 +250,10 @@ export function PanelControl({ open, onToggle }: { open: boolean; onToggle: () =
       >
         <IconBtn
           label="Toggle agent panel"
-          active={open}
           className="no-drag pointer-events-auto"
           onClick={onToggle}
         >
-          <PanelRightIcon className="size-4" />
+          <PaneIcon side="right" open={open} className="size-4" />
         </IconBtn>
       </HintTooltip>
     </div>
@@ -230,27 +265,27 @@ export function PanelControlSlot() {
   return <span aria-hidden className="w-(--workspace-titlebar-control-size) shrink-0" />;
 }
 
-/** Room left at the start of the leftmost band (sidebar hidden): traffic lights, toggle, arrows. */
+/**
+ * Room left at the start of the band next to the rail (sidebar hidden) for
+ * what sits over it: traffic lights, toggle, arrows.
+ */
 export function TitlebarInset() {
-  // The band's own px-4 already covers 1rem of it.
+  // The band's own px-4 already covers 1rem of it, and the rail its width.
   return (
     <span
       aria-hidden
       className={cn(
         "shrink-0",
         features.historyButtons
-          ? "w-[calc(var(--workspace-titlebar-content-left)+var(--workspace-history-controls-width)-1rem)]"
-          : "w-[calc(var(--workspace-titlebar-content-left)-1rem)]",
+          ? "w-[max(0px,calc(var(--workspace-titlebar-content-left)+var(--workspace-history-controls-width)-1rem-var(--workspace-rail-width)))]"
+          : "w-[max(0px,calc(var(--workspace-titlebar-content-left)-1rem-var(--workspace-rail-width)))]",
       )}
     />
   );
 }
 
-/**
- * The sidebar's title band: room for the traffic lights and pinned toggle,
- * then the wordmark, and back/forward at its end (`history`).
- */
-export function WindowTitle({ className, history }: { className?: string; history?: boolean }) {
+/** The setup's title band: room for the traffic lights, then the wordmark. */
+export function WindowTitle({ className }: { className?: string }) {
   return (
     <div
       className={cn(
@@ -263,9 +298,16 @@ export function WindowTitle({ className, history }: { className?: string; histor
         <span className="text-foreground">Otter</span>
         <span className="truncate text-muted-foreground">Mail</span>
       </span>
-      {history ? <HistoryControls className="-me-1.5 ml-auto" /> : null}
     </div>
   );
+}
+
+/**
+ * The sidebar's title band in the main window: the traffic lights, the
+ * pinned toggle and back/forward sit over it.
+ */
+export function SidebarTitle() {
+  return <div className="drag-region h-(--workspace-topbar-height) shrink-0" />;
 }
 
 /** Round mark for a mailbox: the account's picture, or its initial; layers for All mailboxes. */
@@ -304,7 +346,7 @@ export function useMailboxOptions(accounts: GmailAccount[]): MailboxOption[] {
 }
 
 /** Unread in each mailbox's Inbox (as its sidebar shows it), and their sum for All mailboxes. */
-function useInboxUnread(accounts: GmailAccount[]): Record<string, number> {
+export function useInboxUnread(accounts: GmailAccount[]): Record<string, number> {
   const counts = Object.fromEntries(
     useAllAccountLabels(accounts.map((a) => a.id)).map(({ accountId, labels }) => [
       accountId,
@@ -315,69 +357,17 @@ function useInboxUnread(accounts: GmailAccount[]): Record<string, number> {
   return { ...counts, [COMBINED_ACCOUNT_ID]: total };
 }
 
-/**
- * Dia's profile dots for the sidebar's footer: one dot per mailbox, the
- * current one lit; click one to switch. Empty with a single mailbox.
- */
-export function MailboxDots({
-  accounts,
-  selectedAccountId,
-  onSelectAccount,
-  className,
-}: {
-  accounts: GmailAccount[];
-  selectedAccountId: string | null;
-  onSelectAccount: (accountId: string) => void;
-  className?: string;
-}) {
-  const options = useMailboxOptions(accounts);
-  if (options.length < 2) return <span className={className} />;
-  return (
-    <div role="tablist" aria-label="Mailboxes" className={cn("flex items-center", className)}>
-      {options.map((option) => {
-        const selected = option.id === selectedAccountId;
-        return (
-          <HintTooltip key={option.id} label={option.name} hint={option.shortcut}>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={selected}
-              aria-label={option.name}
-              onClick={() => onSelectAccount(option.id)}
-              className="group/dot flex size-5 cursor-pointer items-center justify-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
-            >
-              <span
-                className={cn(
-                  "size-2 rounded-full transition-colors",
-                  selected
-                    ? "bg-sidebar-foreground"
-                    : "bg-sidebar-muted-foreground/40 group-hover/dot:bg-sidebar-muted-foreground/80",
-                )}
-              />
-            </button>
-          </HintTooltip>
-        );
-      })}
-    </div>
-  );
-}
-
-/**
- * Mailbox switcher, the sidebar's heading; aligned with the rows below it.
- * `children` are more items after the mailboxes (the sidebar's app menu).
- */
+/** Mailbox switcher, the menu-bar popover's heading. */
 export function MailboxSwitcher({
   accounts,
   selectedAccountId,
   onSelectAccount,
   className,
-  children,
 }: {
   accounts: GmailAccount[];
   selectedAccountId: string | null;
   onSelectAccount: (accountId: string) => void;
   className?: string;
-  children?: ReactNode;
 }) {
   const options = useMailboxOptions(accounts);
   const unread = useInboxUnread(accounts);
@@ -443,12 +433,6 @@ export function MailboxSwitcher({
               </RadixMenu.Item>
             );
           })}
-          {children ? (
-            <>
-              <DropdownMenuSeparator className="bg-foreground/15" />
-              {children}
-            </>
-          ) : null}
         </RadixMenu.Content>
       </RadixMenu.Portal>
     </RadixMenu.Root>
