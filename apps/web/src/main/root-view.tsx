@@ -3,6 +3,7 @@ import * as React from "react";
 import { startSyncedPreferences } from "./synced-preferences";
 import { applyAppTheme, startAppTheme } from "./theme/apply-theme";
 import { UpdateNotifier } from "./updates";
+import { ThemeEditorHost } from "./settings/theme/ThemeEditorHost";
 
 // Color theme (Settings → Appearance) for the current appearance, applied
 // before first paint. It also owns the `dark` class on <html>.
@@ -26,6 +27,8 @@ export function RootView() {
         <Outlet />
       </div>
       <UpdateNotifier />
+      {/* Above the views, so the theme editor stays open while you browse the app in its colors. */}
+      <ThemeEditorHost />
     </div>
   );
 }

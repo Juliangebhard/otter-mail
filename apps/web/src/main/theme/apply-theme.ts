@@ -1,5 +1,5 @@
 import { setSyncedPreference } from "../synced-preferences";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import {
   APP_THEMES,
   OTTER_DARK_THEME_COLORS,
@@ -8,13 +8,16 @@ import {
   getThemeColorsForAppearance,
   type ThemeAppearance,
   type ThemeColors,
+  type ThemeDefinition,
 } from "@otter-mail/shared/themes";
+import { getCustomThemes, subscribeToCustomThemes } from "./themePalette";
 
 /**
  * App color themes, the Otter Code model: each appearance (light, dark)
  * independently wears one theme. The choice lives in localStorage (shared by
  * every window of the app), and a `storage` event re-themes the other windows
- * live. "otter" is the stock palette defined in styles.css.
+ * live. "otter" is the stock palette defined in styles.css. Themes of your
+ * own (themePalette.ts, Otter Code's library) are worn the same way.
  */
 
 export const DEFAULT_THEME_ID = OTTER_THEME.id;
@@ -27,12 +30,23 @@ const STORAGE_KEY: Record<ThemeAppearance, "otter:theme:light" | "otter:theme:da
 };
 const CHANGE_EVENT = "otter:theme-change";
 
+/** A built-in, or one of your own. */
+function findTheme(id: string): ThemeDefinition | undefined {
+  return APP_THEMES.find((t) => t.id === id) ?? getCustomThemes().find((t) => t.id === id);
+}
+
+/** Every theme to pick from: the built-ins, then your own. */
+export function useAppThemes(): ReadonlyArray<ThemeDefinition> {
+  const custom = useSyncExternalStore(subscribeToCustomThemes, getCustomThemes);
+  return [...APP_THEMES, ...custom];
+}
+
 export type ThemeChoice = Record<ThemeAppearance, string>;
 
 export function getThemeChoice(): ThemeChoice {
   const read = (mode: ThemeAppearance) => {
     const id = localStorage.getItem(STORAGE_KEY[mode]);
-    return id && APP_THEMES.some((t) => t.id === id) ? id : INITIAL_THEME_ID;
+    return id && findTheme(id) ? id : INITIAL_THEME_ID;
   };
   return { light: read("light"), dark: read("dark") };
 }
@@ -45,7 +59,7 @@ export function setThemeForAppearance(mode: ThemeAppearance, themeId: string): v
 }
 
 export function themeColors(themeId: string, mode: ThemeAppearance): ThemeColors {
-  const theme = APP_THEMES.find((t) => t.id === themeId) ?? OTTER_THEME;
+  const theme = findTheme(themeId) ?? OTTER_THEME;
   return (
     getThemeColorsForAppearance(theme, mode) ??
     (mode === "dark" ? OTTER_DARK_THEME_COLORS : OTTER_LIGHT_THEME_COLORS)
@@ -122,7 +136,7 @@ const STYLE_ID = "otter-app-theme";
  * Light or dark. The desktop app's appearance setting flips the media query
  * itself; the web app stores an explicit choice instead (src/web/bridge.ts).
  */
-function appearance(): ThemeAppearance {
+export function appearance(): ThemeAppearance {
   const chosen = localStorage.getItem("otter:theme-source");
   if (chosen === "light" || chosen === "dark") return chosen;
   return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
@@ -130,6 +144,24 @@ function appearance(): ThemeAppearance {
 
 /** A theme shown in this window without being chosen (the palette's preview). */
 let previewId: string | null = null;
+
+/** The theme editor's draft (settings/theme), painted here until the editor closes. */
+let draft: { colors: ThemeColors; appearance: ThemeAppearance } | null = null;
+
+/** Paints the editor's draft on the app, in its appearance; nothing is stored or synced. */
+export function applyThemeColorPreview(colors: ThemeColors, appearance: ThemeAppearance): void {
+  draft = { colors, appearance };
+  window.dispatchEvent(new Event(CHANGE_EVENT));
+}
+
+/** Back to the chosen theme, once the editor closes. */
+export function refreshTheme(): void {
+  draft = null;
+  window.dispatchEvent(new Event(CHANGE_EVENT));
+}
+
+/** Your own themes are painted as stored, and keep their own primary. */
+const isCustom = (id: string) => !APP_THEMES.some((t) => t.id === id);
 
 /** Paints `themeId` here until cleared with null; nothing is stored or synced. */
 export function previewTheme(themeId: string | null): void {
@@ -155,10 +187,10 @@ function withoutTransitions(root: HTMLElement): void {
 
 /** Applies the theme for the current system/app appearance to this window. */
 export function applyAppTheme(): void {
-  const mode = appearance();
-  const themeId = previewId ?? getThemeChoice()[mode];
-  const colors = themeColors(themeId, mode);
-  const exact = APP_THEMES.find((t) => t.id === themeId)?.exact ?? false;
+  const mode = draft?.appearance ?? appearance();
+  const themeId = draft ? "__preview" : (previewId ?? getThemeChoice()[mode]);
+  const colors = draft?.colors ?? themeColors(themeId, mode);
+  const exact = draft !== null || isCustom(themeId) || (findTheme(themeId)?.exact ?? false);
 
   const root = document.documentElement;
   withoutTransitions(root);
@@ -190,17 +222,20 @@ export function startAppTheme(): () => void {
   mq.addEventListener("change", applyAppTheme);
   window.addEventListener(CHANGE_EVENT, applyAppTheme);
   window.addEventListener("storage", onStorage);
+  const unsubscribe = subscribeToCustomThemes(applyAppTheme);
   return () => {
     mq.removeEventListener("change", applyAppTheme);
     window.removeEventListener(CHANGE_EVENT, applyAppTheme);
     window.removeEventListener("storage", onStorage);
+    unsubscribe();
   };
 }
 
 /** Whether the theme this window wears keeps its own primary (no per-account color). */
 function isMonochrome(): boolean {
+  if (draft) return true;
   const id = previewId ?? getThemeChoice()[appearance()];
-  return APP_THEMES.find((t) => t.id === id)?.monochrome ?? false;
+  return isCustom(id) || (findTheme(id)?.monochrome ?? false);
 }
 
 /** `isMonochrome`, re-read on theme picks and appearance switches. */

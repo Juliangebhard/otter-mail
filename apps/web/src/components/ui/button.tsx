@@ -18,12 +18,21 @@ const buttonVariants = cva(
         destructive: "border-transparent bg-destructive text-white hover:bg-destructive/88",
         outline: "border-border bg-transparent text-foreground hover:bg-accent-surface",
         ghost: "border-transparent text-foreground hover:bg-accent-surface",
+        // Otter Code's names, for the theme editor ported from it.
+        secondary:
+          "border-transparent bg-accent-surface text-foreground hover:bg-accent-surface/80",
+        "ghost-destructive":
+          "border-transparent text-destructive-foreground hover:bg-destructive/10 [&_svg]:text-destructive-foreground",
       },
       size: {
         small:
           "h-7 px-[calc(--spacing(2.5)-1px)] text-[13px] [&_svg:not([class*='size-'])]:size-3.5",
         default: "h-8 px-[calc(--spacing(3)-1px)] text-sm [&_svg:not([class*='size-'])]:size-4",
         large: "h-9 px-[calc(--spacing(3.5)-1px)] text-sm [&_svg:not([class*='size-'])]:size-4",
+        // Otter Code's names, for the theme editor ported from it.
+        xs: "h-6 gap-1 px-[calc(--spacing(2)-1px)] text-xs [&_svg:not([class*='size-'])]:size-3.5",
+        sm: "h-7 px-[calc(--spacing(2.5)-1px)] text-[13px] [&_svg:not([class*='size-'])]:size-3.5",
+        "icon-xs": "size-6 px-0 [&_svg:not([class*='size-'])]:size-3.5",
       },
     },
   },
