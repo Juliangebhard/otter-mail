@@ -86,9 +86,30 @@ footer a:hover {
   padding: 0 2rem;
 }
 
+/* The header stays at the top; once the page scrolls under it, a hairline shows (after
+   Vercel's). Browsers without scroll-driven animations go without the line. */
+.top {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--bg);
+}
+@supports (animation-timeline: scroll()) {
+  .top {
+    animation: lift linear both;
+    animation-timeline: scroll();
+    animation-range: 0 3rem;
+  }
+}
+@keyframes lift {
+  to {
+    box-shadow: 0 1px 0 var(--line-soft);
+  }
+}
+html {
+  scroll-padding-top: 5.5rem;
+}
 .nav {
-  position: relative;
-  z-index: 2;
   display: flex;
   align-items: center;
   gap: 1.5rem;
@@ -381,9 +402,9 @@ footer a:hover {
 }
 .toc {
   position: sticky;
-  top: 2rem;
+  top: 6.5rem;
   align-self: start;
-  max-height: calc(100vh - 4rem);
+  max-height: calc(100vh - 8.5rem);
   overflow-y: auto;
 }
 .toc ol {
@@ -415,7 +436,7 @@ footer a:hover {
   font-variant-numeric: tabular-nums;
 }
 .entry {
-  scroll-margin-top: 2rem;
+  scroll-margin-top: 1rem;
 }
 .entry + .entry {
   margin-top: 4rem;

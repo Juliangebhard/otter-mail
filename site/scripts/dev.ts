@@ -1,7 +1,7 @@
 // The site for development, without building the web app: the pages in public/
 // as they are on disk (each with the landing page's header and footer, as the build
 // gives them) and the changelog, rebuilt at each visit. A reload shows an edit.
-// `pnpm dev:site`; the web app itself is `pnpm dev`.
+// `pnpm dev:site` (it restarts when these scripts change); the web app itself is `pnpm dev`.
 
 import * as NodeFS from "node:fs";
 import * as NodeHttp from "node:http";

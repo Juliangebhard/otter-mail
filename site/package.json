@@ -5,7 +5,7 @@
   "description": "mail.otterware.app: the landing page, privacy policy and terms, and the web app.",
   "scripts": {
     "build": "node scripts/build.ts",
-    "dev": "node scripts/dev.ts",
+    "dev": "node --watch scripts/dev.ts",
     "deploy": "node scripts/build.ts && wrangler deploy",
     "test": "vp test run",
     "typecheck": "tsc --noEmit"
