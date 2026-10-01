@@ -12,6 +12,7 @@ import {
   MailIcon,
   SendIcon,
   TextQuoteIcon,
+  FolderIcon,
   Trash2Icon,
   XIcon,
   MousePointer2Icon,
@@ -72,7 +73,7 @@ import { useAccounts, useMessage } from "./hooks";
 import type { GmailMessageSummary } from "./types";
 
 /** What the attached context items are, so the chip shows a fitting icon. */
-type ContextKind = "draft" | "sent" | "mail" | "mixed" | "quote";
+type ContextKind = "draft" | "sent" | "mail" | "mixed" | "quote" | "project";
 type ContextMeta = { subjects: string[]; count: number; kind: ContextKind };
 
 /** Classify one message from its labels. */
@@ -91,15 +92,17 @@ function contextKind(labelSets: string[][]): ContextKind {
 
 function ContextKindIcon({ kind, className }: { kind: ContextKind; className?: string }) {
   const Icon =
-    kind === "quote"
-      ? TextQuoteIcon
-      : kind === "draft"
-        ? FilePenLineIcon
-        : kind === "sent"
-          ? SendIcon
-          : kind === "mixed"
-            ? LayersIcon
-            : MailIcon;
+    kind === "project"
+      ? FolderIcon
+      : kind === "quote"
+        ? TextQuoteIcon
+        : kind === "draft"
+          ? FilePenLineIcon
+          : kind === "sent"
+            ? SendIcon
+            : kind === "mixed"
+              ? LayersIcon
+              : MailIcon;
   return <Icon className={className} />;
 }
 
@@ -784,7 +787,10 @@ export function AgentChatPanel({
   onClearQuote,
   closeTabRef,
   onClosePanel,
+  project,
 }: {
+  /** The project on screen: attached along with (or without) a conversation. */
+  project?: { id: string; name: string } | null;
   /** Account of the open conversation (context attach), null when none. */
   accountId: string | null;
   messageId: string | null;
@@ -938,7 +944,7 @@ export function AgentChatPanel({
   const openMessage = useMessage(accountId, messageId);
   const multiSelected = selectedRows && selectedRows.length > 0;
   // A highlighted excerpt wins over any auto-derived context.
-  const context: AgentContext | null = quote
+  const mailContext: AgentContext | null = quote
     ? contextFromQuote(quote)
     : multiSelected
       ? contextFromMessages(selectedRows, accountEmailById)
@@ -955,13 +961,22 @@ export function AgentChatPanel({
             ],
           }
         : null;
+  const context: AgentContext | null = project
+    ? { conversations: [], ...mailContext, project }
+    : mailContext;
+  /** Only the project is attached (no conversation). */
+  const projectOnly = Boolean(project) && !mailContext;
   // Draft / sent / mail / quote kind of what's attached, for the chip's icon.
   const contextLabelSets: string[][] = multiSelected
     ? selectedRows.map((r) => r.labelIds)
     : openMessage.data
       ? [openMessage.data.labelIds]
       : [];
-  const attachKind: ContextKind = quote ? "quote" : contextKind(contextLabelSets);
+  const attachKind: ContextKind = quote
+    ? "quote"
+    : projectOnly
+      ? "project"
+      : contextKind(contextLabelSets);
 
   // A fresh quote re-arms the attach toggle so it isn't silently dropped.
   useEffect(() => {
@@ -1136,8 +1151,12 @@ export function AgentChatPanel({
       sent: sent.length > 0 ? sent : undefined,
       context: attached
         ? {
-            count: attached.conversations.length,
-            subjects: quote ? [quote.text] : attached.conversations.map((x) => x.subject),
+            count: attached.conversations.length || 1,
+            subjects: quote
+              ? [quote.text]
+              : projectOnly && attached.project
+                ? [attached.project.name]
+                : attached.conversations.map((x) => x.subject),
             kind: attachKind,
           }
         : undefined,
@@ -1641,11 +1660,13 @@ export function AgentChatPanel({
   const hero = turns.length === 0 && hydrating !== activeId;
   const heroHeadline = quote
     ? "What should we do with this excerpt?"
-    : multiSelected
-      ? `What should we do with these ${selectedRows.length} conversations?`
-      : openMessage.data
-        ? `What should we do with “${clampTitle(openMessage.data.subject || "this conversation")}”?`
-        : "What should we do in your inbox?";
+    : projectOnly && project
+      ? `What should we do for “${clampTitle(project.name)}”?`
+      : multiSelected
+        ? `What should we do with these ${selectedRows.length} conversations?`
+        : openMessage.data
+          ? `What should we do with “${clampTitle(openMessage.data.subject || "this conversation")}”?`
+          : "What should we do in your inbox?";
 
   // Send button (Otter Code's ComposerPrimaryActions): queue vs steer while a
   // turn runs; holding ⌘ flips it for one message.
@@ -1938,19 +1959,23 @@ export function AgentChatPanel({
                         name={
                           quote
                             ? `“${quote.text}”`
-                            : context.conversations.length > 1
-                              ? `${context.conversations.length} conversations`
-                              : context.conversations[0].subject || "(no subject)"
+                            : projectOnly && project
+                              ? project.name
+                              : context.conversations.length > 1
+                                ? `${context.conversations.length} conversations`
+                                : context.conversations[0].subject || "(no subject)"
                         }
                         detail={
                           quote
                             ? "Quote"
-                            : context.conversations.length > 1
-                              ? context.conversations
-                                  .slice(0, 3)
-                                  .map((c) => c.subject || "(no subject)")
-                                  .join(" · ")
-                              : context.conversations[0].from
+                            : projectOnly
+                              ? "Project"
+                              : context.conversations.length > 1
+                                ? context.conversations
+                                    .slice(0, 3)
+                                    .map((c) => c.subject || "(no subject)")
+                                    .join(" · ")
+                                : context.conversations[0].from
                         }
                         title={attach ? "Attached to this message" : "Not attached"}
                         tile={<ContextKindIcon kind={attachKind} />}

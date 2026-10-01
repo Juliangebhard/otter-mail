@@ -17,6 +17,8 @@ export type AgentContext = {
     /** Present when the item is a highlighted excerpt, not the whole thread. */
     quote?: string;
   }[];
+  /** The project on screen, if any. */
+  project?: { id: string; name: string };
 };
 
 /** A text excerpt selected from a message, plus its thread pointer. */
@@ -68,6 +70,9 @@ export function buildHandoffText(
   provider: ProviderKind,
 ): string {
   const lines: string[] = [question.trim(), "", "— context from Otter Mail —"];
+  if (context.project) {
+    lines.push(`• Project “${context.project.name}” (projectId ${context.project.id})`);
+  }
   for (const c of context.conversations) {
     if (c.quote) {
       lines.push(

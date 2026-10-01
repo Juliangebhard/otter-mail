@@ -71,6 +71,25 @@ to another app. This page is where they're compared.
 | After archive: next / previous           | ✓                        | ✓            | ✓              |
 | Snooze                                   | —                        | —            | —              |
 
+## Projects
+
+A project keeps the conversations, documents, links and notes of one piece of work (a contract,
+a deal) together until it's settled. Projects follow the Otter account; the relay keeps which
+conversations are in one, never their mail.
+
+| Feature                                                         | Mac                 | Web | iPhone |
+| --------------------------------------------------------------- | ------------------- | --- | ------ |
+| Projects in the rail: open ones in the sidebar, settled folded  | ✓                   | ✓   | —      |
+| All projects: their conversations in one list, an overview page | ✓                   | ✓   | —      |
+| Add conversations (menu, drag onto a project), remove them      | ✓                   | ✓   | —      |
+| Conversations from every mailbox in one list                    | ✓                   | ✓   | —      |
+| Notes, links                                                    | ✓                   | ✓   | —      |
+| Documents: its conversations' attachments, as versions          | ✓                   | ✓   | —      |
+| Settle, reopen                                                  | ✓                   | ✓   | —      |
+| ⌘K: go to a project, new project; Recently viewed               | ✓                   | ✓   | —      |
+| Synced through the Otter account                                | ✓ (offline: queued) | ✓   | —      |
+| Uploaded files                                                  | —                   | —   | —      |
+
 ## Composing & sending
 
 | Feature                                | Mac                                            | Web | iPhone                   |
@@ -173,13 +192,17 @@ optional fix PRs. See [support.md](support.md).
 | Queued follow-ups                                  | ✓                           | ✓          | —                          |
 | Mail and calendar tools (Claude, Codex)            | ✓ (every mailbox)           | —          | —                          |
 | Theme tools: make, change and wear themes          | ✓                           | —          | —                          |
+| Project tools (Claude, Codex)                      | ✓                           | —          | —                          |
+| Projects for agents elsewhere (relay MCP, token)   | ✓ (Hermes)                  | ✓ (Hermes) | ✓ (Hermes)                 |
 
 Claude and Codex get Otter Mail's own tools (an MCP server in the Mac app's backend), so they
 need no mail CLI: search, read and sort mail, download attachments, save drafts and send, in
 any mailbox (Gmail or IMAP), and list, add, change and answer events in Google Calendar. A tool
 that changes a mailbox asks first unless the chat has full access; drafts don't ask. They can
 also make a theme or change one of the user's own, and wear a theme; a built-in never changes
-(changing one makes a copy, worn in its place).
+(changing one makes a copy, worn in its place). They manage projects too (create, add
+conversations and links, keep the notes, settle); Hermes gets the project tools from the relay,
+with an agent token.
 
 ## Translation
 

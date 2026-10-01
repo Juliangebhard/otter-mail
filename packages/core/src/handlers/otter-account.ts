@@ -5,7 +5,12 @@
  */
 
 import { OTTER_ACCOUNT_STATE_CHANNEL, type OtterAccountState } from "@otter-mail/contracts";
-import type { MeResponse, RelayEvent } from "@otter-mail/contracts/relay";
+import type {
+  CreateAgentTokenResponse,
+  ListAgentTokensResponse,
+  MeResponse,
+  RelayEvent,
+} from "@otter-mail/contracts/relay";
 
 import { SignInCancelledError } from "../google.js";
 import { broadcast, handle } from "../ipc.js";
@@ -31,6 +36,7 @@ import {
   signOutDevice,
 } from "../services/otter-account.js";
 import { forgetSyncedPreferences, pullPreferences } from "../services/preferences.js";
+import { pullProjects } from "../services/projects.js";
 import { getRealtimeState, startRealtime, stopRealtime } from "../services/realtime.js";
 import { removeLocalAccount } from "./gmail.js";
 
@@ -94,7 +100,17 @@ async function syncPreferences(): Promise<void> {
   );
 }
 
+async function syncProjects(): Promise<void> {
+  await pullProjects().catch((err: unknown) =>
+    logger.info("otter-account", `Projects sync failed: ${String(err)}`),
+  );
+}
+
 async function onEvent(event: RelayEvent): Promise<void> {
+  if (event.type === "projects") {
+    await syncProjects();
+    return;
+  }
   if (event.type === "accounts") {
     await refresh();
     return;
@@ -116,6 +132,7 @@ function start(): void {
     onConnected: () => {
       void refresh();
       void syncPreferences();
+      void syncProjects();
       // Catch up on whatever changed while disconnected.
       void syncAllAccounts({ force: true, trigger: "push" });
     },
@@ -186,6 +203,26 @@ export function registerOtterAccountHandlers(): void {
     const token = (params as { token?: unknown } | undefined)?.token;
     if (typeof token !== "string") throw new Error('Invalid parameter: "token".');
     await signOutDevice(token);
+  });
+
+  // Agent tokens: agents elsewhere (Hermes) reach the account's projects at the relay's /mcp.
+  handle("otter:listAgentTokens", async () => ({
+    ...(await relayRequest<ListAgentTokensResponse>("GET", "/v1/agent-tokens")),
+    mcpUrl: `${platform().relayUrl}/mcp`,
+  }));
+
+  handle("otter:createAgentToken", async (params: unknown) => {
+    const name = (params as { name?: unknown } | undefined)?.name;
+    if (typeof name !== "string" || !name.trim()) throw new Error('Invalid parameter: "name".');
+    return relayRequest<CreateAgentTokenResponse>("POST", "/v1/agent-tokens", {
+      name: name.trim(),
+    });
+  });
+
+  handle("otter:deleteAgentToken", async (params: unknown) => {
+    const id = (params as { id?: unknown } | undefined)?.id;
+    if (typeof id !== "string") throw new Error('Invalid parameter: "id".');
+    await relayRequest("DELETE", `/v1/agent-tokens/${encodeURIComponent(id)}`);
   });
 
   // Deletes the Otter account on the relay; this device's Gmail accounts and mail stay.

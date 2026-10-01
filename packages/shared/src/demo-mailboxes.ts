@@ -808,6 +808,78 @@ const work: SeedAccount = {
         ],
       },
       {
+        subject: "Northwind renewal: order form",
+        labels: ["INBOX", "Clients/Northwind"],
+        messages: [
+          {
+            from: karim,
+            hoursAgo: 24 * 3 + 5,
+            text: "Sam,\n\nFirst draft of Northwind's renewal order form attached: 160 seats, SSO add-on, 12 months from 1 November. Can you check the SSO wording before I send it?\n\nKarim",
+            attachments: [
+              {
+                filename: "Northwind_Order_Form_v1.pdf",
+                mimeType: "application/pdf",
+                content: pdf("Northwind order form - v1", [
+                  "Seats: 160",
+                  "SSO add-on: included",
+                  "Term: 12 months from 1 November",
+                  "Price: 38 EUR per seat per month",
+                ]),
+              },
+            ],
+          },
+          {
+            to: [karim],
+            hoursAgo: 24 * 3 + 1,
+            text: "Looks good. SSO should say 'SAML 2.0 and OIDC'. Send it over.",
+          },
+          {
+            from: olu,
+            to: [karim, p("Sam Park", "sam@acme.example")],
+            hoursAgo: 24 * 2 + 3,
+            text: "Thanks both. Our legal team's redlines are in the attached v2: mostly the liability cap and a 30-day notice period.\n\nOluwaseun",
+            attachments: [
+              {
+                filename: "Northwind Order Form v2 (redlines).pdf",
+                mimeType: "application/pdf",
+                content: pdf("Northwind order form - v2 (redlines)", [
+                  "Seats: 160",
+                  "SSO add-on: SAML 2.0 and OIDC",
+                  "Liability cap: 12 months of fees (was 6)",
+                  "Notice period: 30 days",
+                ]),
+              },
+            ],
+          },
+        ],
+      },
+      {
+        subject: "Northwind order form — final for signature",
+        labels: ["INBOX", "Clients/Northwind"],
+        messages: [
+          {
+            from: karim,
+            to: [olu],
+            cc: [p("Sam Park", "sam@acme.example")],
+            hoursAgo: 20,
+            unread: true,
+            text: "Hi Oluwaseun,\n\nWe accept the liability cap; the notice period stays at 60 days. Final version attached, ready for signature on your side.\n\nKarim",
+            attachments: [
+              {
+                filename: "Northwind_Order_Form_FINAL.pdf",
+                mimeType: "application/pdf",
+                content: pdf("Northwind order form - final", [
+                  "Seats: 160",
+                  "SSO add-on: SAML 2.0 and OIDC",
+                  "Liability cap: 12 months of fees",
+                  "Notice period: 60 days",
+                ]),
+              },
+            ],
+          },
+        ],
+      },
+      {
         subject: "Northwind — kickoff notes & next steps",
         labels: ["Clients/Northwind"],
         messages: [

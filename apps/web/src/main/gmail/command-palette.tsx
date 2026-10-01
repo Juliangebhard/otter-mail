@@ -19,6 +19,9 @@ import {
   CheckIcon,
   ChevronRightIcon,
   FileIcon,
+  FolderIcon,
+  FolderKanbanIcon,
+  FolderPlusIcon,
   InboxIcon,
   LayersIcon,
   ListChecksIcon,
@@ -60,6 +63,8 @@ import { shortcutLabelFor, useKeybindingsState } from "../keybindings/store";
 import { requestTour, startSetup } from "../onboarding/onboarding";
 import { updateNow, useUpdateState } from "../updates";
 import { requestProblemReport } from "../support/report-problem";
+import { PROJECTS_MAILBOX, useProjects } from "./projects";
+import { requestNewProject } from "./project-menus";
 
 /**
  * Command palette (⌘K), modeled on Otter Code's: a frosted card anchored near
@@ -80,7 +85,9 @@ type CommandPaletteProps = {
   /** Runs the typed text as a Gmail search in the Search mailbox. */
   onSearchMail: (query: string) => void;
   onGoToView: (viewId: string) => void;
+  /** A mailbox, or PROJECTS_MAILBOX. */
   onSelectAccount: (accountId: string) => void;
+  onOpenProject: (projectId: string) => void;
   onCompose: () => void;
   onOpenSettings: (pane?: SettingsPane) => void;
   onNewView: () => void;
@@ -180,6 +187,7 @@ export function CommandPalette({
   onSearchMail,
   onGoToView,
   onSelectAccount,
+  onOpenProject,
   onCompose,
   onOpenSettings,
   onNewView,
@@ -226,6 +234,7 @@ export function CommandPalette({
   const mailResults = (searchResults.data?.pages[0]?.messages ?? []).slice(0, MAX_MAIL_RESULTS);
 
   const close = () => onOpenChange(false);
+  const projects = useProjects().data;
 
   // Shortcut labels follow the live keybindings (Settings › Keybindings).
   const { resolved: keybindings } = useKeybindingsState();
@@ -326,6 +335,12 @@ export function CommandPalette({
       },
       { id: "new-view", icon: <PlusIcon className={ICON} />, title: "New view", run: onNewView },
       {
+        id: "new-project",
+        icon: <FolderPlusIcon className={ICON} />,
+        title: "New project",
+        run: () => requestNewProject({ open: true }),
+      },
+      {
         id: "settings",
         icon: <SettingsIcon className={ICON} />,
         title: "Settings",
@@ -415,10 +430,30 @@ export function CommandPalette({
             }))
         : [];
 
+    const projectItems: PaletteItem[] = [
+      {
+        id: "projects",
+        icon: <FolderKanbanIcon className={ICON} />,
+        title: "All projects",
+        checked: selectedAccountId === PROJECTS_MAILBOX,
+        run: () => onSelectAccount(PROJECTS_MAILBOX),
+      },
+      ...(projects ?? [])
+        .filter((p) => p.status === "active")
+        .map((project) => ({
+          id: `project:${project.id}`,
+          icon: <FolderIcon className={ICON} />,
+          title: project.name,
+          keywords: "project",
+          run: () => onOpenProject(project.id),
+        })),
+    ];
+
     const staticGroups = filter([
       { id: "actions", label: "Actions", items: actions },
       { id: "mailboxes", label: "Mailboxes", items: mailboxes },
       { id: "views", label: "Views", items: viewItems },
+      { id: "projects", label: "Projects", items: projectItems },
     ]);
 
     const mail: PaletteItem[] = needle
@@ -486,6 +521,8 @@ export function CommandPalette({
     onNewView,
     onOpenSettings,
     onSelectAccount,
+    onOpenProject,
+    projects,
     onGoToView,
     onOpenMessage,
     onSearchMail,

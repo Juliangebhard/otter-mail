@@ -13,6 +13,7 @@ import { ErrorBoundaryView } from "~/components/ui/error-boundary-view";
 import type { SettingsPane } from "./gmail/api";
 import { COMBINED_ACCOUNT_ID } from "./gmail/custom-views";
 import { SEARCH_MAILBOX } from "./gmail/gmail-query";
+import { PROJECTS_MAILBOX } from "./gmail/projects";
 
 const rootRoute = createRootRouteWithContext<{
   queryClient: QueryClient;
@@ -78,12 +79,14 @@ const settingsRoute = createRoute({
   component: () => null,
 });
 
-// Mailboxes are account ids (their email addresses) or `all`, the combined
-// mailbox. Labels are Gmail's (or IMAP's) ids and views' ids, but the app's
-// own `__name__` ones read as `name`: the combined mailbox's built-in views
-// and Search.
-const toMailbox = (segment: string) => (segment === "all" ? COMBINED_ACCOUNT_ID : segment);
-const fromMailbox = (id: string) => (id === COMBINED_ACCOUNT_ID ? "all" : id);
+// Mailboxes are account ids (their email addresses), `all`, the combined
+// mailbox, or `projects` (its labels are `all` and project ids). Labels are
+// Gmail's (or IMAP's) ids and views' ids, but the app's own `__name__` ones
+// read as `name`: the combined mailbox's built-in views and Search.
+const toMailbox = (segment: string) =>
+  segment === "all" ? COMBINED_ACCOUNT_ID : segment === "projects" ? PROJECTS_MAILBOX : segment;
+const fromMailbox = (id: string) =>
+  id === COMBINED_ACCOUNT_ID ? "all" : id === PROJECTS_MAILBOX ? "projects" : id;
 const BUILT_IN_VIEWS = new Set([
   "inbox",
   "starred",

@@ -66,7 +66,9 @@ import {
   useSendMessage,
 } from "./hooks";
 import { gmailApi } from "./api";
-import { CategoryChip, InboxChip, LabelChip, isCategoryLabelId } from "./label-chip";
+import { CategoryChip, InboxChip, LabelChip, ProjectChip, isCategoryLabelId } from "./label-chip";
+import { projectsApi, useProjects } from "./projects";
+import { AddToProjectItems } from "./project-menus";
 import { SenderAvatar } from "./sender-avatar";
 import { ConversationSummary } from "./conversation-summary";
 import {
@@ -95,6 +97,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
   DropdownMenuTrigger,
   ContextMenu,
   ContextMenuTrigger,
@@ -146,6 +149,8 @@ type MessageReaderProps = {
   onSearchSender?: (email: string) => void;
   /** Right end of the window's title band (panel toggle), drawn in this header. */
   titleTrailing?: ReactNode;
+  /** Opens a project the conversation is in (its chip). */
+  onOpenProject?: (projectId: string) => void;
 };
 
 export type DownloadAttachment = (
@@ -2011,6 +2016,7 @@ export function MessageReader({
   onComposeTo,
   onSearchSender,
   titleTrailing,
+  onOpenProject,
 }: MessageReaderProps) {
   // Reply/reply-all/forward handlers exist only when a message is open; the
   // render below refreshes this ref so the once-mounted listener stays current.
@@ -2107,6 +2113,7 @@ export function MessageReader({
   useEffect(() => setUnfolded(false), [messageId]);
   const seededRef = useRef<string | null>(null);
   const readerAccounts = useAccounts();
+  const projects = useProjects().data ?? [];
 
   // Quote-from-selection: a highlighted excerpt (parent DOM or an HTML iframe)
   // is reported up; when the chat panel is open, home-view attaches it as a
@@ -2229,6 +2236,11 @@ export function MessageReader({
   // Labels belong to the conversation: shown and edited as the union over it.
   const conversationLabelIds = [...new Set(rows.flatMap((m) => m.labelIds))];
   const conversationId = threadId ?? message.threadId ?? message.id;
+  const readerEmail =
+    readerAccounts.data?.find((a) => a.id === accountId)?.email.toLowerCase() ?? "";
+  const inProjects = projects.filter((p) =>
+    p.threads.some((t) => t.email === readerEmail && t.threadId === conversationId),
+  );
 
   const isUnread = isThread ? threadMessages.some((m) => m.unread) : message.unread;
 
@@ -2458,7 +2470,8 @@ export function MessageReader({
       </span>
       {conversationLabelIds.includes("INBOX") ||
       (categories && conversationLabelIds.some(isCategoryLabelId)) ||
-      messageLabels.length > 0 ? (
+      messageLabels.length > 0 ||
+      inProjects.length > 0 ? (
         <span
           className={
             wrap
@@ -2466,6 +2479,14 @@ export function MessageReader({
               : "flex min-w-0 shrink items-center gap-1 overflow-hidden"
           }
         >
+          {inProjects.map((p) => (
+            <ProjectChip
+              key={p.id}
+              name={p.name}
+              onOpen={() => onOpenProject?.(p.id)}
+              onRemove={() => void projectsApi.removeThread(p.id, readerEmail, conversationId)}
+            />
+          ))}
           {conversationLabelIds.includes("INBOX") ? <InboxChip onRemove={handleArchive} /> : null}
           {(categories ? conversationLabelIds.filter(isCategoryLabelId) : []).map((id) => (
             <CategoryChip
@@ -2689,6 +2710,14 @@ export function MessageReader({
               <DropdownMenuItem icon={<MousePointer2Icon />} onSelect={() => onOpenChat?.()}>
                 Chat about this with the agent
               </DropdownMenuItem>
+              <DropdownMenuSub label="Add to project">
+                <AddToProjectItems
+                  threads={[{ accountId, threadId: conversationId }]}
+                  suggestedName={message.subject}
+                  Item={DropdownMenuItem}
+                  Separator={DropdownMenuSeparator}
+                />
+              </DropdownMenuSub>
               {isTrashed || isJunk ? (
                 <>
                   <DropdownMenuSeparator />

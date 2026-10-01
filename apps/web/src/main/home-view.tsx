@@ -83,6 +83,12 @@ import { ALL_MAIL_LABEL_ID } from "./gmail/label-names";
 import { useMonochromeTheme } from "./theme/apply-theme";
 import { features } from "./features";
 import { useMailboxes } from "./mailboxes";
+import { ALL_PROJECTS, PROJECTS_MAILBOX, useProject, useProjects } from "./gmail/projects";
+import { ProjectsSidebar } from "./gmail/projects-sidebar";
+import { ProjectsOverview } from "./gmail/projects-overview";
+import { ProjectView } from "./gmail/project-view";
+import { NewProjectDialog } from "./gmail/project-menus";
+import { UpdateCard } from "./updates";
 import { useRecordRecentlyViewed } from "./recently-viewed";
 import { SetupFlow } from "./onboarding/setup";
 import { Tour } from "./onboarding/tour";
@@ -102,9 +108,9 @@ const RAIL_WIDTH = 52;
 
 /** A place in the mail, as the route names it (router.tsx). */
 type MailLoc = {
-  /** An account id, or COMBINED_ACCOUNT_ID. */
+  /** An account id, COMBINED_ACCOUNT_ID, or PROJECTS_MAILBOX. */
   mailbox: string;
-  /** A label or view id, or SEARCH_MAILBOX. */
+  /** A label or view id (in Projects, ALL_PROJECTS or a project's id), or SEARCH_MAILBOX. */
   label: string;
   /** The conversation (or message) open in the reader. */
   messageId: string | null;
@@ -138,7 +144,12 @@ function useRouteMailLoc(): MailLoc | null {
   return null;
 }
 
-const inboxOf = (mailbox: string) => (mailbox === COMBINED_ACCOUNT_ID ? INBOX_VIEW_ID : "INBOX");
+const inboxOf = (mailbox: string) =>
+  mailbox === COMBINED_ACCOUNT_ID
+    ? INBOX_VIEW_ID
+    : mailbox === PROJECTS_MAILBOX
+      ? ALL_PROJECTS
+      : "INBOX";
 
 /** Where the mail was last time (custom-views' saved location). */
 function savedLoc(): MailLoc {
@@ -154,7 +165,8 @@ function savedLoc(): MailLoc {
  */
 function placeFor(loc: MailLoc, accounts: GmailAccount[], combined: boolean): MailLoc {
   const there =
-    loc.mailbox === COMBINED_ACCOUNT_ID ? combined : accounts.some((a) => a.id === loc.mailbox);
+    loc.mailbox === PROJECTS_MAILBOX ||
+    (loc.mailbox === COMBINED_ACCOUNT_ID ? combined : accounts.some((a) => a.id === loc.mailbox));
   if (there) return loc;
   const mailbox = combined ? COMBINED_ACCOUNT_ID : (accounts[0]?.id ?? loc.mailbox);
   return { mailbox, label: inboxOf(mailbox), messageId: null, account: null, focusId: null };
@@ -442,6 +454,12 @@ function MailHome() {
   }, []);
 
   const isCombined = selectedAccountId === COMBINED_ACCOUNT_ID && mailboxes.combined;
+  // Projects (the rail's), where the mail of every mailbox is too.
+  const isProjects = selectedAccountId === PROJECTS_MAILBOX;
+  const spansMailboxes = isCombined || isProjects;
+  const selectedProject = useProject(isProjects ? selectedLabelId : null);
+  const projectsQuery = useProjects();
+  const projectsLoaded = projectsQuery.isSuccess;
 
   const globalSync = useGlobalSyncStatus(accountIds);
   useGmailWriteFailureToasts();
@@ -668,7 +686,18 @@ function MailHome() {
   useKeybindingContext("settingsOpen", settingsRoute !== null);
   useKeybindingContext("messageOpen", selectedMessageId !== null);
   const goTo = (combinedViewId: string, labelId: string) => {
-    go({ label: isCombined ? combinedViewId : labelId, messageId: null });
+    // From Projects, to the first mailbox's.
+    const mailbox = isProjects
+      ? mailboxes.combined
+        ? COMBINED_ACCOUNT_ID
+        : firstRealAccountId
+      : selectedAccountId;
+    if (!mailbox) return;
+    go({
+      mailbox,
+      label: mailbox === COMBINED_ACCOUNT_ID ? combinedViewId : labelId,
+      messageId: null,
+    });
   };
   const jumpToMailbox = (digit: number) => {
     const { ids, combined, select } = accountSwitchRef.current;
@@ -788,14 +817,22 @@ function MailHome() {
 
   const effectiveAccountId = isCombined
     ? COMBINED_ACCOUNT_ID
-    : selectedAccountId && accounts.some((a) => a.id === selectedAccountId)
-      ? selectedAccountId
-      : firstRealAccountId;
+    : isProjects
+      ? PROJECTS_MAILBOX
+      : selectedAccountId && accounts.some((a) => a.id === selectedAccountId)
+        ? selectedAccountId
+        : firstRealAccountId;
 
   // If the selected view disappears (deleted, or it has no rules for the
   // active account), fall back to Inbox.
   useEffect(() => {
     if (!initialized || !viewsLoaded || selectedLabelId === SEARCH_MAILBOX) return;
+    // A project deleted (here or elsewhere): all of them.
+    if (isProjects) {
+      if (projectsLoaded && selectedLabelId !== ALL_PROJECTS && !selectedProject)
+        correct({ label: ALL_PROJECTS, messageId: null });
+      return;
+    }
     if (isCombined) {
       if (!views.some((v) => v.id === selectedLabelId)) correct({ label: INBOX_VIEW_ID });
       return;
@@ -803,11 +840,21 @@ function MailHome() {
     const view = views.find((v) => v.id === selectedLabelId);
     if (!view) return; // plain label
     if (view.mailbox !== effectiveAccountId) correct({ label: "INBOX" });
-  }, [initialized, viewsLoaded, isCombined, views, selectedLabelId, effectiveAccountId]);
+  }, [
+    initialized,
+    viewsLoaded,
+    isCombined,
+    views,
+    selectedLabelId,
+    effectiveAccountId,
+    isProjects,
+    projectsLoaded,
+    selectedProject,
+  ]);
 
   // Local-first: keep the on-disk cache synced in the background. Combined mode
   // refreshes all accounts via its own list handler (sentinel isn't a real account).
-  useAccountSync(isCombined ? null : effectiveAccountId);
+  useAccountSync(spansMailboxes ? null : effectiveAccountId);
 
   // Per-account branding: the primary (send, unread dot, focus ring) and the
   // accent take the active account's color; selection surfaces stay
@@ -835,8 +882,16 @@ function MailHome() {
     root.setProperty("--ring", brand);
   }, [brand]);
 
-  // Resolve the selected view to concrete per-account rules.
+  // Resolve the selected view to concrete per-account rules. Projects list
+  // their conversations like a combined view (every mailbox's), without rules.
   const combined = (() => {
+    if (isProjects) {
+      return {
+        viewId: `projects:${selectedLabelId}`,
+        name: selectedProject?.name ?? "All projects",
+        rules: [],
+      };
+    }
     if (isCombined) {
       const view = views.find((v) => v.id === selectedLabelId) ?? views[0];
       return {
@@ -880,6 +935,13 @@ function MailHome() {
     go({ label: labelId, messageId: null });
   };
 
+  /** A project's page, with its conversations in the list. */
+  const openProject = (id: string) => {
+    console.log("[HomeView:openProject]");
+    setComposeOpen(false);
+    go({ mailbox: PROJECTS_MAILBOX, label: id, messageId: null, account: null, focusId: null });
+  };
+
   const handleSelectMessage = (messageId: string, accountId: string, focusId?: string) => {
     console.log("[HomeView:selectMessage]", { messageId, accountId, focusId });
     setComposeOpen(false);
@@ -915,7 +977,7 @@ function MailHome() {
     setSearchTabs((tabs) => tabs.map((t) => (t.id === id ? { ...t, ...patch } : t)));
   // Where a new search looks by default: the mailbox you started it from.
   const defaultScope = (): string[] =>
-    isCombined || !effectiveAccountId
+    isCombined || isProjects || !effectiveAccountId
       ? combined && selectedLabelId !== SEARCH_MAILBOX
         ? [...new Set(combined.rules.map((r) => r.accountId))]
         : accountIds
@@ -1034,7 +1096,7 @@ function MailHome() {
 
   /** Opens a message of `owner`'s where it is: Combined stays put, another account's inbox opens. */
   const openMessage = (owner: string, messageId: string) => {
-    const switching = !isCombined && owner !== effectiveAccountId;
+    const switching = !spansMailboxes && owner !== effectiveAccountId;
     go({
       ...(switching ? { mailbox: owner, label: "INBOX" } : {}),
       messageId,
@@ -1085,8 +1147,9 @@ function MailHome() {
   syncNowRef.current = syncNow;
   useEffect(() => window.desktopBridge.on("mail:syncNow", () => syncNowRef.current()), []);
 
-  const composeAccountId = isCombined ? firstRealAccountId : effectiveAccountId;
-  const readerAccount = readerAccountId ?? (isCombined ? firstRealAccountId : effectiveAccountId);
+  const composeAccountId = spansMailboxes ? firstRealAccountId : effectiveAccountId;
+  const readerAccount =
+    readerAccountId ?? (spansMailboxes ? firstRealAccountId : effectiveAccountId);
   useRecordRecentlyViewed({
     ready: initialized,
     href: router.state.location.href,
@@ -1098,7 +1161,9 @@ function MailHome() {
     accounts,
     views,
   });
-  const hasListTarget = isCombined || effectiveAccountId != null;
+  // Without a project yet, Projects is only its overview (which says how to start one).
+  const hasListTarget =
+    (isCombined || effectiveAccountId != null) && !(isProjects && projectsQuery.data?.length === 0);
 
   // Full-height columns: each pane owns its slice of the title band (on the
   // chrome); the content panel is painted behind them from under that band.
@@ -1185,6 +1250,20 @@ function MailHome() {
                           onBack={leaveSettings}
                         />
                       </>
+                    ) : isProjects ? (
+                      <>
+                        <SidebarTitle />
+                        <ProjectsSidebar
+                          selectedLabelId={selectedLabelId}
+                          onSelectLabel={handleSelectLabel}
+                          searchSelected={activeSearch?.id === topSearchId}
+                          searchPending={Boolean(
+                            searchTabs.find((t) => t.id === topSearchId)?.draft.trim(),
+                          )}
+                          onOpenSearch={() => openSearch()}
+                        />
+                        <UpdateCard />
+                      </>
                     ) : (
                       <AccountsSidebar
                         onEditView={(viewId, mailbox) =>
@@ -1231,7 +1310,7 @@ function MailHome() {
                 >
                   <MessageList
                     headerLeading={sidebarOpen ? null : <TitlebarInset />}
-                    accountId={(isCombined ? firstRealAccountId : effectiveAccountId) ?? ""}
+                    accountId={(spansMailboxes ? firstRealAccountId : effectiveAccountId) ?? ""}
                     labelId={selectedLabelId}
                     combined={combined}
                     accountIds={accountIds}
@@ -1245,6 +1324,7 @@ function MailHome() {
                     onOpenChat={openChat}
                     onSearchView={searchFromView}
                     viewQueryRef={viewQueryRef}
+                    project={isProjects && !activeSearch ? { id: selectedLabelId } : undefined}
                     search={
                       activeSearch
                         ? {
@@ -1288,6 +1368,19 @@ function MailHome() {
                     }}
                     prefill={mailtoPrefill ?? undefined}
                   />
+                ) : isProjects && !selectedMessageId && !searchActive ? (
+                  selectedProject ? (
+                    <ProjectView
+                      project={selectedProject}
+                      onOpenMessage={(accountId, messageId) =>
+                        handleSelectMessage(messageId, accountId)
+                      }
+                      onAskAgent={openChat}
+                      onDeleted={() => handleSelectLabel(ALL_PROJECTS)}
+                    />
+                  ) : (
+                    <ProjectsOverview onOpenProject={openProject} />
+                  )
                 ) : readerAccount ? (
                   <MessageReader
                     titleTrailing={titleTrailing}
@@ -1309,6 +1402,7 @@ function MailHome() {
                       setComposeOpen(true);
                     }}
                     onSearchSender={(email) => handleSearchChange(`from:${email}`)}
+                    onOpenProject={openProject}
                   />
                 ) : (
                   <div className="flex h-full items-center justify-center">
@@ -1346,6 +1440,11 @@ function MailHome() {
                       selectedRows={chatSelection}
                       quote={pendingQuote}
                       onClearQuote={() => setPendingQuote(null)}
+                      project={
+                        selectedProject && !searchActive
+                          ? { id: selectedProject.id, name: selectedProject.name }
+                          : null
+                      }
                     />
                   </div>
                 </div>
@@ -1386,6 +1485,8 @@ function MailHome() {
         />
       ) : null}
 
+      <NewProjectDialog onOpenProject={openProject} />
+
       {accounts.length > 0 ? (
         <CommandPalette
           open={paletteOpen}
@@ -1397,13 +1498,14 @@ function MailHome() {
           onSearchMail={(q) => openSearch(q)}
           onGoToView={handlePaletteGoToView}
           onSelectAccount={handleSelectAccount}
+          onOpenProject={openProject}
           onCompose={() => setComposeOpen(true)}
           onOpenSettings={(pane = "general") => openSettings({ pane, viewId: null, mailbox: null })}
           onNewView={() =>
             openSettings({
               pane: "views",
               viewId: "new",
-              mailbox: isCombined ? COMBINED_ACCOUNT_ID : effectiveAccountId,
+              mailbox: spansMailboxes ? COMBINED_ACCOUNT_ID : effectiveAccountId,
             })
           }
           onToggleChat={toggleChat}

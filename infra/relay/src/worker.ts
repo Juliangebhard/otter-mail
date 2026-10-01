@@ -15,7 +15,9 @@ import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import {
   GMAIL_SIGN_IN_CANCELLED,
+  type CreateAgentTokenResponse,
   type ListAccountsResponse,
+  type ListAgentTokensResponse,
   type MeResponse,
   type PreferencesResponse,
   type RelayEvent,
@@ -23,11 +25,14 @@ import {
   TUNNEL_CLOSE,
 } from "@otter-mail/contracts/relay";
 import type { MailProviderKind } from "@otter-mail/contracts/mail";
+import { PROJECT_LIMITS, type ListProjectsResponse } from "@otter-mail/contracts/projects";
 
 import { createAuth, googleClientIds, googleKeys, type Auth } from "./auth.ts";
 import * as gmail from "./gmail.ts";
 import { InvalidTokenError, verifyGoogleJwt } from "./google-jwt.ts";
+import * as mcp from "./mcp.ts";
 import * as preferences from "./preferences.ts";
+import * as projects from "./projects.ts";
 import * as store from "./store.ts";
 import * as tunnel from "./tunnel.ts";
 import { SESSION_HEADER, type UserHub } from "./user-hub.ts";
@@ -320,6 +325,157 @@ authed.put(
   },
 );
 
+// ── Projects (projects.ts) ──────────────────────────────────────────────────
+
+async function projectsChanged(env: Env, userId: string): Promise<void> {
+  await hub(env, userId).publish({ type: "projects" });
+}
+
+/** A write the relay refused: 404 without the project, 413 past its limits. */
+const refuse = (refusal: projects.Refusal | null) => {
+  if (refusal === "missing") throw new HTTPException(404, { message: "No such project." });
+  if (refusal === "full") throw new HTTPException(413, { message: "Too many for a project." });
+};
+
+const itemId = z.string().regex(/^[a-zA-Z0-9_-]{1,64}$/);
+const timestamp = z.number().int().nonnegative();
+
+authed.get("/projects", async (c) =>
+  c.json({
+    projects: await projects.list(c.var.db, c.var.session.user.id),
+  } satisfies ListProjectsResponse),
+);
+
+authed.put(
+  "/projects/:id",
+  zValidator("param", z.object({ id: itemId }), rejectInvalid),
+  zValidator(
+    "json",
+    z.object({
+      name: z.string().trim().min(1).max(PROJECT_LIMITS.name),
+      status: z.enum(["active", "settled"]),
+      notes: z.string().max(PROJECT_LIMITS.notes),
+      createdAt: timestamp,
+      settledAt: timestamp.nullable(),
+    }),
+    rejectInvalid,
+  ),
+  async (c) => {
+    const userId = c.var.session.user.id;
+    refuse(await projects.put(c.var.db, userId, c.req.valid("param").id, c.req.valid("json")));
+    await projectsChanged(c.env, userId);
+    return c.body(null, 204);
+  },
+);
+
+authed.delete(
+  "/projects/:id",
+  zValidator("param", z.object({ id: itemId }), rejectInvalid),
+  async (c) => {
+    const userId = c.var.session.user.id;
+    if (await projects.remove(c.var.db, userId, c.req.valid("param").id)) {
+      await projectsChanged(c.env, userId);
+    }
+    return c.body(null, 204);
+  },
+);
+
+const threadParams = z.object({
+  id: itemId,
+  email: mailbox,
+  threadId: z.string().min(1).max(512),
+});
+
+authed.put(
+  "/projects/:id/threads/:email/:threadId",
+  zValidator("param", threadParams, rejectInvalid),
+  zValidator("json", z.object({ addedAt: timestamp }), rejectInvalid),
+  async (c) => {
+    const userId = c.var.session.user.id;
+    const { id, email, threadId } = c.req.valid("param");
+    refuse(await projects.putThread(c.var.db, userId, id, email, threadId, c.req.valid("json")));
+    await projectsChanged(c.env, userId);
+    return c.body(null, 204);
+  },
+);
+
+authed.delete(
+  "/projects/:id/threads/:email/:threadId",
+  zValidator("param", threadParams, rejectInvalid),
+  async (c) => {
+    const userId = c.var.session.user.id;
+    const { id, email, threadId } = c.req.valid("param");
+    await projects.removeThread(c.var.db, userId, id, email, threadId);
+    await projectsChanged(c.env, userId);
+    return c.body(null, 204);
+  },
+);
+
+const linkParams = z.object({ id: itemId, linkId: itemId });
+
+authed.put(
+  "/projects/:id/links/:linkId",
+  zValidator("param", linkParams, rejectInvalid),
+  zValidator(
+    "json",
+    z.object({
+      url: z.url().max(PROJECT_LIMITS.url),
+      title: z.string().max(PROJECT_LIMITS.title),
+      addedAt: timestamp,
+    }),
+    rejectInvalid,
+  ),
+  async (c) => {
+    const userId = c.var.session.user.id;
+    const { id, linkId } = c.req.valid("param");
+    refuse(await projects.putLink(c.var.db, userId, id, linkId, c.req.valid("json")));
+    await projectsChanged(c.env, userId);
+    return c.body(null, 204);
+  },
+);
+
+authed.delete(
+  "/projects/:id/links/:linkId",
+  zValidator("param", linkParams, rejectInvalid),
+  async (c) => {
+    const userId = c.var.session.user.id;
+    const { id, linkId } = c.req.valid("param");
+    await projects.removeLink(c.var.db, userId, id, linkId);
+    await projectsChanged(c.env, userId);
+    return c.body(null, 204);
+  },
+);
+
+// ── Agent tokens (mcp.ts) ───────────────────────────────────────────────────
+
+authed.get("/agent-tokens", async (c) =>
+  c.json({
+    tokens: await mcp.listTokens(c.var.db, c.var.session.user.id),
+  } satisfies ListAgentTokensResponse),
+);
+
+authed.post(
+  "/agent-tokens",
+  zValidator("json", z.object({ name: z.string().trim().min(1).max(100) }), rejectInvalid),
+  async (c) =>
+    c.json(
+      (await mcp.createToken(
+        c.var.db,
+        c.var.session.user.id,
+        c.req.valid("json").name,
+      )) satisfies CreateAgentTokenResponse,
+    ),
+);
+
+authed.delete(
+  "/agent-tokens/:id",
+  zValidator("param", z.object({ id: z.string().max(64) }), rejectInvalid),
+  async (c) => {
+    await mcp.deleteToken(c.var.db, c.var.session.user.id, c.req.valid("param").id);
+    return c.body(null, 204);
+  },
+);
+
 /** The device's event stream, handed to the user's Durable Object. */
 authed.get("/events", async (c) => {
   if (c.req.header("upgrade")?.toLowerCase() !== "websocket") {
@@ -373,6 +529,23 @@ authed.get(
 );
 
 app.route("/v1", authed);
+
+// ── MCP, for agents (mcp.ts) ────────────────────────────────────────────────
+
+/** The project tools, for an agent token's account (Streamable HTTP, stateless). */
+app.all("/mcp", async (c) => {
+  const token = /^Bearer (.+)$/i.exec(c.req.header("authorization") ?? "")?.[1];
+  const userId = token ? await mcp.tokenUser(c.var.db, token) : null;
+  if (!userId) {
+    return c.json({ error: "An agent token is required (Settings › Assistant)." }, 401, {
+      "WWW-Authenticate": 'Bearer realm="otter-mail"',
+    });
+  }
+  return mcp.serve(
+    c.req.raw,
+    projects.backend(c.var.db, userId, () => projectsChanged(c.env, userId)),
+  );
+});
 
 // ── Gmail push ──────────────────────────────────────────────────────────────
 

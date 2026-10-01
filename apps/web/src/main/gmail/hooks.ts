@@ -69,6 +69,7 @@ function invalidateMailCaches(qc: ReturnType<typeof useQueryClient>): void {
     "gmail:searchMessages",
     "gmail:thread",
     "gmail:labels",
+    "gmail:projectThreads",
   ]) {
     void qc.invalidateQueries({ queryKey: [key] });
   }

@@ -1,5 +1,6 @@
 import {
   CircleUserRoundIcon,
+  FolderKanbanIcon,
   LayersIcon,
   LogInIcon,
   MessageSquareIcon,
@@ -25,6 +26,7 @@ import type { SettingsPane } from "./api";
 import { useOtterAccount } from "../otter-account";
 import { OtterAvatar } from "../settings/otter-account-pane";
 import { requestProblemReport } from "../support/report-problem";
+import { PROJECTS_MAILBOX, useProjectUnreadCounts } from "./projects";
 
 /** A rail button: a square that lights up on hover, and stays lit where you are. */
 const RAIL_BUTTON =
@@ -33,9 +35,9 @@ const RAIL_BUTTON_SELECTED = "bg-sidebar-row-selected text-sidebar-foreground";
 
 /**
  * The rail down the window's left edge (ChatGPT's): the mailboxes, a dot on
- * those with unread mail in the Inbox, then who you are at the bottom, with
- * the app's menu. It stays when the sidebar hides, so switching mailboxes
- * never needs the sidebar.
+ * those with unread mail in the Inbox, then Projects, then who you are at the
+ * bottom, with the app's menu. It stays when the sidebar hides, so switching
+ * mailboxes never needs the sidebar.
  */
 export function MailboxRail({
   accounts,
@@ -47,8 +49,9 @@ export function MailboxRail({
   syncing,
 }: {
   accounts: GmailAccount[];
-  /** The mailbox showing; none is lit while Settings is. */
+  /** The mailbox showing (or Projects, PROJECTS_MAILBOX); none is lit while Settings is. */
   selectedAccountId: string | null;
+  /** A mailbox, or PROJECTS_MAILBOX. */
   onSelectAccount: (accountId: string) => void;
   settingsOpen: boolean;
   /** The app's menu: Settings (a pane, General by default) and Sync now. */
@@ -58,6 +61,8 @@ export function MailboxRail({
 }) {
   const options = useMailboxOptions(accounts);
   const unread = useInboxUnread(accounts);
+  const projectsUnread = Object.values(useProjectUnreadCounts().data ?? {}).some((n) => n > 0);
+  const projectsSelected = !settingsOpen && selectedAccountId === PROJECTS_MAILBOX;
   const addAccount = useAddAccount();
 
   const handleAddGmail = async () => {
@@ -118,6 +123,25 @@ export function MailboxRail({
               <PlusIcon className="size-4.5" />
             </button>
           </AddMailboxMenu>
+        </HintTooltip>
+        {/* Projects span every mailbox: a place of their own, after them. */}
+        <span aria-hidden className="my-1 h-px w-5 bg-border" />
+        <HintTooltip label="Projects" side="right">
+          <button
+            type="button"
+            aria-label="Projects"
+            aria-current={projectsSelected ? "page" : undefined}
+            onClick={() => onSelectAccount(PROJECTS_MAILBOX)}
+            className={cn(RAIL_BUTTON, projectsSelected && RAIL_BUTTON_SELECTED)}
+          >
+            <FolderKanbanIcon className="size-5" />
+            {projectsUnread ? (
+              <span
+                aria-hidden
+                className="absolute right-0.5 top-0.5 size-1.5 rounded-full bg-sidebar-foreground"
+              />
+            ) : null}
+          </button>
         </HintTooltip>
       </div>
       <span className="flex-1" />

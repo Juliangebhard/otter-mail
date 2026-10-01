@@ -86,7 +86,7 @@ type RowDragProps = {
 };
 
 /** A sidebar row's box (Settings' nav mirrors it). */
-const SIDEBAR_ROW =
+export const SIDEBAR_ROW =
   "group flex h-8 w-full cursor-pointer items-center gap-2.5 rounded-lg text-left text-sm font-normal outline-none transition-[background-color,color] focus-visible:ring-2 focus-visible:ring-focus-ring active:bg-sidebar-row-active";
 
 /** Gmail's labels API only accepts colors from its fixed palette. */
@@ -199,7 +199,7 @@ function SearchRow({
 
 /** Sidebar row (Codex): 14px regular text, muted icon, a rounded pill on hover
     and when selected; counts live in the badge only. */
-function SkRow({
+export function SkRow({
   icon,
   title,
   selected,
@@ -272,16 +272,19 @@ function SkRow({
   );
 }
 
-function Section({
+export function Section({
   title,
   action,
   children,
   dropZone,
   tour,
+  defaultOpen = true,
 }: {
   title: string;
   action?: ReactNode;
   children: ReactNode;
+  /** Folded until opened (Projects' Settled). */
+  defaultOpen?: boolean;
   /** Its `data-tour` part, for the tour's spotlight. */
   tour?: string;
   dropZone?: {
@@ -291,7 +294,7 @@ function Section({
     onDrop: (e: ReactDragEvent<HTMLDivElement>) => void;
   };
 }) {
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(defaultOpen);
   return (
     <div className="mt-4" data-tour={tour}>
       <div
@@ -329,7 +332,7 @@ function Section({
   );
 }
 
-function SectionAddButton({ label, onClick }: { label: string; onClick: () => void }) {
+export function SectionAddButton({ label, onClick }: { label: string; onClick: () => void }) {
   return (
     <HintTooltip label={label}>
       <button
