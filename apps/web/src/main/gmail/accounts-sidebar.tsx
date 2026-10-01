@@ -336,7 +336,7 @@ export function Section({
 export function SpaceHeading({ title, children }: { title: string; children?: ReactNode }) {
   return (
     <div className="shrink-0 px-(--sidebar-content-inset) pb-2 pt-(--radius-xl)">
-      <h2 className="flex h-9 items-center gap-1 ps-(--sidebar-row-content-inset) text-base font-semibold tracking-tight text-sidebar-foreground">
+      <h2 className="flex h-9 items-center gap-1 ps-(--sidebar-row-content-inset) text-lg font-semibold tracking-tight text-sidebar-foreground">
         <span className="min-w-0 flex-1 truncate">{title}</span>
         {children}
       </h2>
@@ -959,7 +959,7 @@ export function MailboxSidebarPage({
             <button
               type="button"
               onClick={onCompose}
-              className={`${SIDEBAR_ROW} bg-sidebar-control-surface px-(--sidebar-row-content-inset) text-sidebar-foreground hover:bg-sidebar-row-hover`}
+              className={`${SIDEBAR_ROW} px-(--sidebar-row-content-inset) text-sidebar-foreground hover:bg-sidebar-row-hover`}
             >
               <SquarePenIcon className="size-4 shrink-0 text-sidebar-muted-foreground group-hover:text-sidebar-foreground" />
               <span className="truncate">New message</span>

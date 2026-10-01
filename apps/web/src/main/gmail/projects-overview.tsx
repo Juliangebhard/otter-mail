@@ -8,13 +8,39 @@
 import { useState } from "react";
 import { CircleCheckIcon, FolderIcon, FolderKanbanIcon, SearchIcon } from "lucide-react";
 
-import { Button } from "~/components/ui/button";
-import { EmptyState } from "~/components/ui/empty-state";
 import { getAccountColor } from "./account-style";
 import { useAccounts } from "./hooks";
 import { requestNewProject } from "./project-menus";
 import { useProjectUnreadCounts, useProjects, type Project } from "./projects";
 import { cn } from "./ui";
+
+/** Kinds of work to start from, while there's no project (ChatGPT's suggestions). */
+const STARTERS = [
+  {
+    emoji: "📄",
+    title: "A contract",
+    name: "Contract",
+    description: "Every version, the redlines and who's signed, across the threads.",
+  },
+  {
+    emoji: "🤝",
+    title: "A deal",
+    name: "Deal",
+    description: "The back and forth with a client or partner, until it closes.",
+  },
+  {
+    emoji: "🧑‍💼",
+    title: "A hire",
+    name: "Hire",
+    description: "Candidates, interviews and the offer, from every mailbox.",
+  },
+  {
+    emoji: "✈️",
+    title: "A trip",
+    name: "Trip",
+    description: "Bookings, confirmations and plans in one place.",
+  },
+] as const;
 
 function ago(ms: number): string {
   const mins = Math.floor((Date.now() - ms) / 60_000);
@@ -107,50 +133,63 @@ export function ProjectsOverview({ onOpenProject }: { onOpenProject: (id: string
   );
 
   if (projects.isSuccess && all.length === 0) {
+    // ChatGPT's Scheduled: what it's for, then a few to start from.
     return (
-      <div className="flex h-full items-center justify-center">
-        <EmptyState
-          className="max-w-sm px-8"
-          media={<FolderKanbanIcon className="size-10 stroke-[1.25] text-muted-foreground" />}
-          title="No projects yet"
-          description="A project keeps a piece of work's conversations, from any mailbox, with its documents, links and notes, until it's settled. Your agent can start one too."
-          actions={
-            <Button variant="accent" onClick={() => requestNewProject({ open: true })}>
-              New project
-            </Button>
-          }
-        />
+      <div className="flex h-full items-center justify-center overflow-y-auto">
+        <div className="flex w-full max-w-2xl flex-col items-center px-8 py-12">
+          <FolderKanbanIcon className="size-12 stroke-[1.25] text-muted-foreground" />
+          <h1 className="mt-4 text-xl font-medium text-foreground">Start a project</h1>
+          <p className="mt-1 text-center text-sm text-muted-foreground">
+            Keep one piece of work's conversations, from any mailbox, with its documents, links and
+            notes, until it's settled. Your agent can start one too.
+          </p>
+          <div className="mt-10 grid w-full grid-cols-[repeat(auto-fit,minmax(16rem,1fr))] gap-3">
+            {STARTERS.map((starter) => (
+              <button
+                key={starter.name}
+                type="button"
+                onClick={() => requestNewProject({ open: true, name: starter.name })}
+                className="flex items-start gap-3.5 rounded-2xl border border-dashed border-border px-5 py-4 text-left outline-none transition-colors hover:bg-accent-surface/60 focus-visible:ring-2 focus-visible:ring-focus-ring"
+              >
+                <span aria-hidden className="text-2xl leading-none">
+                  {starter.emoji}
+                </span>
+                <span className="flex min-w-0 flex-col gap-0.5">
+                  <span className="text-[15px] text-foreground">{starter.title}</span>
+                  <span className="text-sm text-muted-foreground">{starter.description}</span>
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="min-h-0 flex-1 overflow-y-auto">
-      <div className="mx-auto w-full max-w-3xl px-8 pb-16 pt-6">
-        <div className="flex items-center gap-3">
-          <div className="min-w-0 flex-1">
-            <h1 className="text-2xl font-semibold tracking-tight text-foreground">Projects</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {active.length === 1 ? "1 active project" : `${active.length} active projects`}
-              {settled.length > 0 ? `, ${settled.length} settled` : ""}
-            </p>
+      <div className="mx-auto w-full max-w-3xl px-8 pb-16 pt-8">
+        {/* ChatGPT's "All": a large title, search with New beside it, then tabs. */}
+        <h1 className="text-[28px] font-medium tracking-tight text-foreground">Projects</h1>
+        <div className="mt-6 flex items-center gap-3">
+          <div className="flex h-10 min-w-0 flex-1 items-center gap-2.5 rounded-full border border-border px-4 focus-within:border-input">
+            <SearchIcon className="size-4 shrink-0 text-muted-foreground" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search"
+              className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
+            />
           </div>
-          <Button size="small" onClick={() => requestNewProject({ open: true })}>
+          <button
+            type="button"
+            onClick={() => requestNewProject({ open: true })}
+            className="h-10 shrink-0 rounded-full bg-foreground px-4 text-sm font-medium text-background outline-none transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-focus-ring"
+          >
             New project
-          </Button>
+          </button>
         </div>
-
-        {/* ChatGPT's "All": search, then tabs. */}
-        <div className="mt-6 flex h-9 items-center gap-2 rounded-full border border-border/70 px-3.5 focus-within:border-input">
-          <SearchIcon className="size-4 shrink-0 text-muted-foreground" />
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search projects"
-            className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
-          />
-        </div>
-        <div className="mt-4 flex gap-1" role="tablist">
+        <div className="mt-5 flex gap-1" role="tablist">
           {(
             [
               ["active", "Active", active.length],
@@ -164,7 +203,7 @@ export function ProjectsOverview({ onOpenProject }: { onOpenProject: (id: string
               aria-selected={tab === id}
               onClick={() => setTab(id)}
               className={cn(
-                "h-8 rounded-full px-3.5 text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-focus-ring",
+                "h-9 rounded-full px-4 text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-focus-ring",
                 tab === id
                   ? "bg-accent-surface text-foreground"
                   : "text-muted-foreground hover:text-foreground",

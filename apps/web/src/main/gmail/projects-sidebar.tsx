@@ -155,7 +155,7 @@ export function ProjectsSidebar({
           <button
             type="button"
             onClick={() => requestNewProject({ open: true })}
-            className={`${SIDEBAR_ROW} bg-sidebar-control-surface px-(--sidebar-row-content-inset) text-sidebar-foreground hover:bg-sidebar-row-hover`}
+            className={`${SIDEBAR_ROW} px-(--sidebar-row-content-inset) text-sidebar-foreground hover:bg-sidebar-row-hover`}
           >
             <FolderPlusIcon className="size-4 shrink-0 text-sidebar-muted-foreground group-hover:text-sidebar-foreground" />
             <span className="truncate">New project</span>
@@ -180,7 +180,13 @@ export function ProjectsSidebar({
             />
           }
         >
-          {active.map(row)}
+          {active.length > 0 ? (
+            active.map(row)
+          ) : (
+            <p className="px-(--sidebar-row-content-inset) py-1.5 text-sm text-sidebar-muted-foreground/70">
+              No projects
+            </p>
+          )}
         </Section>
         {settled.length > 0 ? (
           <Section title="Settled" defaultOpen={false}>
