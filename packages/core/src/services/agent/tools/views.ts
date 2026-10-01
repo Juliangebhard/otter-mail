@@ -197,6 +197,7 @@ export const viewTools: AgentTool[] = [
   {
     name: "delete_view",
     title: "Delete view",
+    permanent: true,
     description: "Deletes a view. The mail and its labels stay as they are.",
     input: {
       type: "object",

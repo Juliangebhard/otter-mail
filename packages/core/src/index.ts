@@ -73,6 +73,7 @@ export async function startCore(platform: Platform): Promise<void> {
 export { broadcast, handle, registeredHandlers, type Handler } from "./ipc.js";
 export { fromBase64, toBase64 } from "./bytes.js";
 export { SIGNED_OUT_MESSAGE, SignInCancelledError } from "./google.js";
+export { readJson, writeJson } from "./json-file.js";
 export { logger } from "./logger.js";
 export type * from "./platform.js";
 export * as accountStore from "./services/account-store.js";

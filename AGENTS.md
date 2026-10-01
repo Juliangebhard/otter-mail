@@ -22,7 +22,8 @@ when a feature lands or goes.
   - `src/handlers/`: the Mac-only handlers (tray, default mail app, …); `backend.ts` there holds
     the ones the backend serves.
   - `src/services/`: Google sign-in (loopback OAuth), tray, Apple's translator, the local agents
-    (Claude, Codex; Hermes is in core), default mail app.
+    (Claude, Codex; Hermes is in core) and the MCP server that gives them, and other agents on
+    the Mac with a token, Otter Mail's tools, default mail app.
   - `src/windows/`: the main window, the menu-bar popover, and where their pages load from.
   - `src/updates.ts`: electron-updater against GitHub Releases.
 - `apps/web`: the React renderer, one build for both apps. `index.html` is the main window,

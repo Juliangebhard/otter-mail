@@ -8,6 +8,8 @@
 
 import { registeredHandlers } from "../../../ipc.js";
 import { turnedOffMailboxes } from "../../mail-sync.js";
+import type { AgentAccess } from "@otter-mail/contracts/agent-tokens";
+
 import type { GmailAccount } from "../../../types.js";
 import type { Emit, RuntimeMode } from "../types.js";
 
@@ -19,12 +21,14 @@ export type ToolFiles = {
   read(path: string): Promise<{ name: string; bytes: Uint8Array }>;
 };
 
-/** Who is calling: one agent chat. */
+/** Who is calling: one agent chat, or an agent on the Mac with a token. */
 export type ToolCaller = {
   /** The chat's runtime mode now: full access makes changes without asking. */
   mode(): RuntimeMode;
   /** The turn running now, which approvals are asked on; null between turns. */
   turn(): { requestId: string; emit: Emit } | null;
+  /** Which tools it gets (default all): an agent's access, given with its token. */
+  access?(): AgentAccess;
   files?: ToolFiles;
 };
 
@@ -49,6 +53,8 @@ export type AgentTool = {
   input: { type: "object"; properties: Record<string, unknown>; required?: string[] };
   /** Only reads. Anything else confirms before changing a mailbox. */
   readOnly?: boolean;
+  /** Can't be undone: it sends something to someone, or deletes for good. Not "safe". */
+  permanent?: boolean;
   /** Needs files on this device (attachments). */
   needsFiles?: boolean;
   run(args: ToolArgs, ctx: ToolContext): Promise<unknown>;

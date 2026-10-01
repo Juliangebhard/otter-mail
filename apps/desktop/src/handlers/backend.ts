@@ -2,9 +2,11 @@
  * The Mac-only channels the mail backend serves itself (backend.ts), as core
  * handlers: the menu-bar popover's mini inbox, read from the local mail cache
  * (the popover doesn't sync on its own; it reflects what sync already wrote),
- * syncing every mailbox, and an attachment's bytes for main to drag out.
+ * syncing every mailbox, an attachment's bytes for main to drag out, and the
+ * agents on this Mac given Otter Mail's tools (services/agent/connected-agents.ts).
  */
 
+import type { AgentAccess, AgentTokens, ConnectedAgent } from "@otter-mail/contracts/agent-tokens";
 import {
   accountStore,
   getAttachmentBytes,
@@ -15,6 +17,14 @@ import {
   type GmailAccount,
   type GmailMessageSummary,
 } from "@otter-mail/core";
+
+import {
+  addAgent,
+  listAgents,
+  removeAgent,
+  setAgentAccess,
+} from "../services/agent/connected-agents.js";
+import { serverUrl } from "../services/agent/mcp-server.js";
 
 const PREVIEW_LIMIT = 15;
 
@@ -55,4 +65,31 @@ export function registerBackendHandlers(): void {
     const { accountId, messageId, attachmentId } = params as Record<string, string>;
     return getAttachmentBytes(accountId, messageId, attachmentId);
   });
+
+  handle("mcp:listAgents", async (): Promise<AgentTokens<ConnectedAgent>> => ({
+    url: await serverUrl(),
+    tokens: await listAgents(),
+  }));
+
+  // Answers the token, this once.
+  handle("mcp:addAgent", async (params: unknown) => {
+    const p = params as Record<string, unknown> | undefined;
+    const name = typeof p?.name === "string" ? p.name.trim() : "";
+    if (!name) throw new Error("Name the agent.");
+    return addAgent(name.slice(0, 80), access(p?.access));
+  });
+
+  handle("mcp:setAgentAccess", async (params: unknown) => {
+    const p = params as Record<string, unknown> | undefined;
+    await setAgentAccess(String(p?.id), access(p?.access));
+  });
+
+  handle("mcp:removeAgent", async (params: unknown) => {
+    await removeAgent(String((params as Record<string, unknown> | undefined)?.id));
+  });
+}
+
+function access(value: unknown): AgentAccess {
+  if (value === "read-only" || value === "safe" || value === "full-access") return value;
+  throw new Error("Unknown access.");
 }

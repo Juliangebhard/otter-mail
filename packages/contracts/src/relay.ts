@@ -22,6 +22,7 @@ export interface RelayUser {
   picture: string | null;
 }
 
+import type { AgentToken } from "./agent-tokens.js";
 import type { ImapSettings, MailProviderKind } from "./mail.js";
 
 /** A mailbox linked to an Otter account, with the profile shown in the app. */
@@ -179,24 +180,16 @@ export type RelayEvent =
   | { type: "projects" };
 
 /**
- * Agent tokens: how an agent that runs elsewhere (Hermes) reaches the
- * account's projects through the relay's MCP server, `POST /mcp` (Streamable
- * HTTP, stateless) with `Authorization: Bearer <token>`. A token opens the
- * project tools (project-tools.ts) and nothing else: no mail, no mailboxes,
- * no preferences.
+ * Agent tokens (agent-tokens.ts): how an agent that runs elsewhere (Hermes)
+ * reaches the account's projects through the relay's MCP server, `POST /mcp`
+ * (Streamable HTTP, stateless). A token opens the project tools
+ * (project-tools.ts) and nothing else: no mail, no mailboxes, no preferences.
  *
  * - `GET /v1/agent-tokens` → `ListAgentTokensResponse`
  * - `POST /v1/agent-tokens` with `{ name }` → `CreateAgentTokenResponse`: the
  *   token is shown this once; the relay keeps only its hash.
  * - `DELETE /v1/agent-tokens/:id` revokes it.
  */
-export interface AgentToken {
-  id: string;
-  name: string;
-  createdAt: number;
-  lastUsedAt: number | null;
-}
-
 export interface ListAgentTokensResponse {
   tokens: AgentToken[];
 }

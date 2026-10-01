@@ -13,6 +13,14 @@ export async function readJson<T>(name: string): Promise<T | null> {
   }
 }
 
+/** Each file's latest write, which the next one waits for, so an older one never lands last. */
+const writes = new Map<string, Promise<void>>();
+
 export async function writeJson(name: string, value: unknown): Promise<void> {
-  await platform().files.write(name, JSON.stringify(value, null, 2));
+  const text = JSON.stringify(value, null, 2);
+  const write = (writes.get(name) ?? Promise.resolve())
+    .catch(() => {})
+    .then(() => platform().files.write(name, text));
+  writes.set(name, write);
+  await write;
 }

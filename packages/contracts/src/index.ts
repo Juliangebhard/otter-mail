@@ -64,7 +64,10 @@ export interface BridgeFeatures {
   openFiles: boolean;
   /** Handing a support report to a locally installed agent in Terminal. */
   externalAgent: boolean;
-  /** Codex and Claude, the command-line agents installed on this computer. */
+  /**
+   * Codex and Claude, the command-line agents installed on this computer, and
+   * Otter Mail's tools for any agent on it (agent-tokens.ts' ConnectedAgent).
+   */
   localAgents: boolean;
 }
 

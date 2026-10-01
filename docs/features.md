@@ -197,6 +197,7 @@ optional fix PRs. See [support.md](support.md).
 | Project tools (Claude, Codex)                      | ✓                           | —          | —                          |
 | View tools: make, change and delete views          | ✓                           | —          | —                          |
 | Projects for agents elsewhere (relay MCP, token)   | ✓ (Hermes)                  | ✓ (Hermes) | ✓ (Hermes)                 |
+| Tools for other agents on the Mac (MCP, token)     | ✓ (Claude Code, Cursor, …)  | —          | —                          |
 
 Claude and Codex get Otter Mail's own tools (an MCP server in the Mac app's backend), so they
 need no mail CLI: search, read and sort mail, download attachments, save drafts and send, in
@@ -206,6 +207,13 @@ also make a theme or change one of the user's own, and wear a theme; a built-in 
 (changing one makes a copy, worn in its place). They manage projects too (create, add
 conversations and links, keep the notes, settle); Hermes gets the project tools from the relay,
 with an agent token.
+
+Other agents on the Mac (Claude Code or Codex in a terminal, Cursor, …) get the same tools from
+that server while the app is open, with a token made in Settings › Agents (its address stays the
+same from launch to launch). Each token is read only, safe or full access, and nothing asks
+again: safe is anything that can be undone (archive, label, trash, drafts, projects), never
+sending mail or invitations or deleting for good. Agents that run in the cloud (Langdock,
+claude.ai connectors) can't reach a server on the Mac.
 
 ## Translation
 

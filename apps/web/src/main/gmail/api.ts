@@ -1,4 +1,5 @@
 import type { ImapSettings } from "@otter-mail/contracts";
+import type { AgentAccess, AgentTokens, ConnectedAgent } from "@otter-mail/contracts/agent-tokens";
 import type {
   ComposeAttachment,
   ContactSuggestion,
@@ -711,4 +712,13 @@ export const gmailApi = {
 
   agentDeleteSession: (provider: ProviderKind, sessionId: string): Promise<{ ok: boolean }> =>
     ipc("agent:deleteSession", { provider, sessionId }),
+
+  // Agents on the Mac given Otter Mail's tools with a token (the Mac only).
+  connectedAgents: (): Promise<AgentTokens<ConnectedAgent>> => ipc("mcp:listAgents"),
+  /** Answers the token, this once. */
+  addConnectedAgent: (name: string, access: AgentAccess): Promise<string> =>
+    ipc("mcp:addAgent", { name, access }),
+  setConnectedAgentAccess: (id: string, access: AgentAccess): Promise<void> =>
+    ipc("mcp:setAgentAccess", { id, access }),
+  removeConnectedAgent: (id: string): Promise<void> => ipc("mcp:removeAgent", { id }),
 };
