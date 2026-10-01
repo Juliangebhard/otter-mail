@@ -1,12 +1,12 @@
 /**
  * All projects, in the main pane while no conversation is open (the list
  * next to it has their conversations): each active project with where it
- * stands (its notes' first line), its mailboxes and how much is unread; the
- * settled ones folded after them. Picking one opens its page.
+ * stands (its notes' first line), its mailboxes and how much is unread, with
+ * search and Active / Settled tabs (ChatGPT's "All"). Picking one opens its page.
  */
 
 import { useState } from "react";
-import { ChevronDownIcon, CircleCheckIcon, FolderIcon, FolderKanbanIcon } from "lucide-react";
+import { CircleCheckIcon, FolderIcon, FolderKanbanIcon, SearchIcon } from "lucide-react";
 
 import { Button } from "~/components/ui/button";
 import { EmptyState } from "~/components/ui/empty-state";
@@ -15,8 +15,6 @@ import { useAccounts } from "./hooks";
 import { requestNewProject } from "./project-menus";
 import { useProjectUnreadCounts, useProjects, type Project } from "./projects";
 import { cn } from "./ui";
-
-const SETTLED_OPEN_KEY = "gmail:projects:settled-open";
 
 function ago(ms: number): string {
   const mins = Math.floor((Date.now() - ms) / 60_000);
@@ -87,14 +85,18 @@ function ProjectRow({
 export function ProjectsOverview({ onOpenProject }: { onOpenProject: (id: string) => void }) {
   const projects = useProjects();
   const unread = useProjectUnreadCounts().data ?? {};
-  const [settledOpen, setSettledOpen] = useState(
-    () => localStorage.getItem(SETTLED_OPEN_KEY) === "1",
-  );
+  const [tab, setTab] = useState<"active" | "settled">("active");
+  const [query, setQuery] = useState("");
   const all = projects.data ?? [];
   const active = all.filter((p) => p.status === "active").sort((a, b) => b.updatedAt - a.updatedAt);
   const settled = all
     .filter((p) => p.status === "settled")
     .sort((a, b) => (b.settledAt ?? 0) - (a.settledAt ?? 0));
+  // A search looks through names and notes.
+  const needle = query.trim().toLowerCase();
+  const shown = (tab === "active" ? active : settled).filter(
+    (p) => !needle || `${p.name}\n${p.notes}`.toLowerCase().includes(needle),
+  );
   const row = (project: Project) => (
     <ProjectRow
       key={project.id}
@@ -138,37 +140,55 @@ export function ProjectsOverview({ onOpenProject }: { onOpenProject: (id: string
           </Button>
         </div>
 
-        {active.length > 0 ? (
-          <div className="mt-6 divide-y divide-border/60 overflow-hidden rounded-2xl border border-border/60 bg-card">
-            {active.map(row)}
-          </div>
-        ) : null}
-
-        {settled.length > 0 ? (
-          <>
+        {/* ChatGPT's "All": search, then tabs. */}
+        <div className="mt-6 flex h-9 items-center gap-2 rounded-full border border-border/70 px-3.5 focus-within:border-input">
+          <SearchIcon className="size-4 shrink-0 text-muted-foreground" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search projects"
+            className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
+          />
+        </div>
+        <div className="mt-4 flex gap-1" role="tablist">
+          {(
+            [
+              ["active", "Active", active.length],
+              ["settled", "Settled", settled.length],
+            ] as const
+          ).map(([id, label, count]) => (
             <button
+              key={id}
               type="button"
-              onClick={() =>
-                setSettledOpen((open) => {
-                  localStorage.setItem(SETTLED_OPEN_KEY, open ? "0" : "1");
-                  return !open;
-                })
-              }
-              aria-expanded={settledOpen}
-              className="mt-8 flex h-7 items-center gap-1 text-[13px] text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-focus-ring"
+              role="tab"
+              aria-selected={tab === id}
+              onClick={() => setTab(id)}
+              className={cn(
+                "h-8 rounded-full px-3.5 text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-focus-ring",
+                tab === id
+                  ? "bg-accent-surface text-foreground"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
             >
-              Settled
-              <ChevronDownIcon
-                className={cn("size-3.5 transition-transform", !settledOpen && "-rotate-90")}
-              />
+              {label}
+              <span className="ms-1.5 tabular-nums text-muted-foreground">{count}</span>
             </button>
-            {settledOpen ? (
-              <div className="mt-2 divide-y divide-border/60 overflow-hidden rounded-2xl border border-border/60 bg-card">
-                {settled.map(row)}
-              </div>
-            ) : null}
-          </>
-        ) : null}
+          ))}
+        </div>
+
+        {shown.length > 0 ? (
+          <div className="mt-3 divide-y divide-border/60 overflow-hidden rounded-2xl border border-border/60 bg-card">
+            {shown.map(row)}
+          </div>
+        ) : (
+          <p className="mt-6 text-sm text-muted-foreground">
+            {needle
+              ? "No project matches."
+              : tab === "active"
+                ? "Nothing active: every project is settled."
+                : "Settled projects show here, with everything they gathered."}
+          </p>
+        )}
       </div>
     </div>
   );

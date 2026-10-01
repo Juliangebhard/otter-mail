@@ -9,8 +9,7 @@
 import { useEffect, useSyncExternalStore } from "react";
 import { getAccountDisplayName } from "./gmail/account-style";
 import { senderLabel } from "./gmail/address";
-import { COMBINED_ACCOUNT_ID, isCustomMailboxId } from "./gmail/custom-views";
-import { CUSTOM_ALL } from "./gmail/custom-mailboxes";
+import { COMBINED_ACCOUNT_ID, isViewSpaceId } from "./gmail/custom-views";
 import { SEARCH_MAILBOX } from "./gmail/gmail-query";
 import { useLabels, useMessage } from "./gmail/hooks";
 import { ALL_PROJECTS, PROJECTS_MAILBOX, useProjects } from "./gmail/projects";
@@ -156,28 +155,20 @@ export function useRecordRecentlyViewed({
         ? "All mailboxes"
         : account
           ? getAccountDisplayName(account)
-          : (views.find((v) => v.kind === "custom" && v.id === mailbox)?.name ?? null);
-    // A custom mailbox's labels are all its mail and its filters, by name.
-    const custom = isCustomMailboxId(mailbox);
-    const view = custom ? undefined : views.find((v) => v.id === label);
+          : isViewSpaceId(mailbox)
+            ? "Views"
+            : null;
+    // A view's space is its list: the view itself.
+    const view = views.find((v) => v.id === (isViewSpaceId(mailbox) ? mailbox : label));
     const ownLabel = ownLabels?.find((l) => l.id === label);
-    const title = custom
-      ? label === CUSTOM_ALL
-        ? "All mail"
-        : label
-      : (view?.name ?? SYSTEM_LABEL_NAMES[label] ?? (ownLabel && labelDisplayName(ownLabel)));
+    const title =
+      view?.name ?? SYSTEM_LABEL_NAMES[label] ?? (ownLabel && labelDisplayName(ownLabel));
     if (context && title) {
       place = {
         href,
         context,
         title,
-        icon: custom
-          ? label === CUSTOM_ALL
-            ? "allmail"
-            : "label"
-          : view
-            ? view.kind
-            : (SYSTEM_LABEL_ICONS[label] ?? "label"),
+        icon: view ? view.kind : (SYSTEM_LABEL_ICONS[label] ?? "label"),
       };
     }
   }

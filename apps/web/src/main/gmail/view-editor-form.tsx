@@ -226,7 +226,7 @@ export function ViewEditorForm({
 
   if (accounts.length === 0) {
     return (
-      <SettingsSection title="Custom mailboxes">
+      <SettingsSection title="Views">
         <SettingsRow title="No accounts" description="Connect an account to make one." />
       </SettingsSection>
     );
@@ -252,15 +252,15 @@ export function ViewEditorForm({
           className="-ms-1 inline-flex cursor-pointer items-center gap-1 rounded-md px-1 text-[13px] text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-focus-ring"
         >
           <ChevronLeftIcon className="size-3.5" />
-          Custom mailboxes
+          Views
         </button>
         <h2 className="text-[26px] font-medium leading-8 tracking-[-0.01em] text-foreground">
-          {view ? `Edit “${view.name}”` : "New custom mailbox"}
+          {view ? `Edit “${view.name}”` : "New view"}
         </h2>
         <p className="text-[13px] text-muted-foreground">
           {isDefault
             ? "A folder of All mailboxes."
-            : "A mailbox in the rail, after your mailboxes."}
+            : "A space in the rail, after your mailboxes: just its list."}
         </p>
       </div>
 

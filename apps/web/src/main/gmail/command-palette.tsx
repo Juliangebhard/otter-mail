@@ -337,7 +337,7 @@ export function CommandPalette({
       {
         id: "new-view",
         icon: <PlusIcon className={ICON} />,
-        title: "New custom mailbox",
+        title: "New view",
         keywords: "view filter",
         run: onNewView,
       },
@@ -421,21 +421,22 @@ export function CommandPalette({
         checked: selectedAccountId === account.id,
         run: () => onSelectAccount(account.id),
       })),
+    ];
+
+    // Views are spaces; All mailboxes' folders only when 2+ accounts are
+    // connected (matches the sidebar).
+    const viewItems: PaletteItem[] = [
       ...views
         .filter((v) => v.kind === "custom")
         .map((view) => ({
-          id: `mailbox:${view.id}`,
+          id: `view:${view.id}`,
           icon: <ListFilterIcon className={ICON} />,
           title: view.name,
-          keywords: "custom mailbox view",
+          keywords: "view space",
           checked: selectedAccountId === view.id,
           run: () => onSelectAccount(view.id),
         })),
-    ];
-
-    // All mailboxes' folders are only offered when 2+ accounts are connected (matches the sidebar).
-    const viewItems: PaletteItem[] =
-      accounts.length > 1
+      ...(accounts.length > 1
         ? views
             .filter((v) => v.kind !== "custom")
             .map((view) => ({
@@ -445,7 +446,8 @@ export function CommandPalette({
               keywords: "go to view",
               run: () => onGoToView(view.id),
             }))
-        : [];
+        : []),
+    ];
 
     const projectItems: PaletteItem[] = [
       {

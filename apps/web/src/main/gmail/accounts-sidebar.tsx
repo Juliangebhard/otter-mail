@@ -39,7 +39,6 @@ import {
   TagIcon,
   SearchIcon,
   SquarePenIcon,
-  PencilIcon,
 } from "lucide-react";
 import {
   useLabels,
@@ -53,7 +52,6 @@ import {
 } from "./hooks";
 import type { GmailLabel, MailView } from "./types";
 import { COMBINED_ACCOUNT_ID, INBOX_VIEW_ID } from "./custom-views";
-import { CUSTOM_ALL, useCustomMailboxFilters } from "./custom-mailboxes";
 import { ALL_MAIL_LABEL_ID } from "./label-names";
 import { buildLabelTree, type LabelTreeNode } from "./label-tree";
 import {
@@ -334,6 +332,40 @@ export function Section({
   );
 }
 
+/** A space's heading, past the panel's rounded corner (Codex's "Codex"), with its actions at the right. */
+export function SpaceHeading({ title, children }: { title: string; children?: ReactNode }) {
+  return (
+    <div className="shrink-0 px-(--sidebar-content-inset) pb-2 pt-(--radius-xl)">
+      <h2 className="flex h-9 items-center gap-1 ps-(--sidebar-row-content-inset) text-base font-semibold tracking-tight text-sidebar-foreground">
+        <span className="min-w-0 flex-1 truncate">{title}</span>
+        {children}
+      </h2>
+    </div>
+  );
+}
+
+/** Search, in a space's heading: lit while it's the place showing, a dot while one is kept. */
+export function SearchButton({
+  selected,
+  pending,
+  onClick,
+}: {
+  selected: boolean;
+  pending: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <HintTooltip label="Search" shortcut="search.focus">
+      <IconBtn label="Search" active={selected} onClick={onClick} className="relative">
+        <SearchIcon className="size-4" />
+        {pending && !selected ? (
+          <span aria-hidden className="absolute right-1 top-1 size-1.5 rounded-full bg-primary" />
+        ) : null}
+      </IconBtn>
+    </HintTooltip>
+  );
+}
+
 export function SectionAddButton({ label, onClick }: { label: string; onClick: () => void }) {
   return (
     <HintTooltip label={label}>
@@ -535,8 +567,6 @@ function LabelNode({
 }
 
 type AccountsSidebarProps = {
-  /** Opens Settings → Custom mailboxes on one ("new" to create one). */
-  onEditView: (viewId: string, mailbox: string | null) => void;
   selectedAccountId: string | null;
   onSelectAccount: (accountId: string) => void;
   selectedLabelId: string;
@@ -565,11 +595,7 @@ type AccountsSidebarProps = {
 export function AccountsSidebar(props: AccountsSidebarProps) {
   const { selectedAccountId, onSelectAccount } = props;
   const { accounts } = useMailboxes();
-  // The rail's order: the mailboxes, then the custom ones.
-  const mailboxIds = [
-    ...useMailboxOptions(accounts).map((o) => o.id),
-    ...props.views.filter((v) => v.kind === "custom").map((v) => v.id),
-  ];
+  const mailboxIds = useMailboxOptions(accounts).map((o) => o.id);
   const index = mailboxIds.indexOf(selectedAccountId ?? "");
   const pageIds = index < 0 ? [selectedAccountId ?? ""] : mailboxIds;
 
@@ -648,20 +674,14 @@ export function AccountsSidebar(props: AccountsSidebarProps) {
           return (
             <div key={id} className="h-full w-full shrink-0 snap-start snap-always">
               {current ? (
-                <SidebarPage {...props} active />
+                <MailboxSidebarPage {...props} active />
               ) : (
                 // Another mailbox as it looks once switched to: its inbox.
-                <SidebarPage
+                <MailboxSidebarPage
                   {...props}
                   active={false}
                   selectedAccountId={id}
-                  selectedLabelId={
-                    id === COMBINED_ACCOUNT_ID
-                      ? INBOX_VIEW_ID
-                      : id.startsWith("v_")
-                        ? CUSTOM_ALL
-                        : "INBOX"
-                  }
+                  selectedLabelId={id === COMBINED_ACCOUNT_ID ? INBOX_VIEW_ID : "INBOX"}
                   searchSelected={false}
                   searchPending={false}
                   searches={[]}
@@ -677,10 +697,12 @@ export function AccountsSidebar(props: AccountsSidebarProps) {
   );
 }
 
-/** One mailbox's page of the sidebar: its heading, rows and labels (a custom one's: its filters). */
-function SidebarPage({
+/**
+ * One mailbox's page of the sidebar: its heading (with Search), New message,
+ * its folders and labels. The rail's hover shows one on its own (a peek).
+ */
+export function MailboxSidebarPage({
   active,
-  onEditView,
   selectedAccountId,
   onSelectAccount,
   selectedLabelId,
@@ -698,8 +720,7 @@ function SidebarPage({
   active: boolean;
 }) {
   const isCombined = selectedAccountId === COMBINED_ACCOUNT_ID;
-  const custom = views.find((v) => v.kind === "custom" && v.id === selectedAccountId) ?? null;
-  const ownAccountId = isCombined || custom ? null : selectedAccountId;
+  const ownAccountId = isCombined ? null : selectedAccountId;
 
   const labelsQuery = useLabels(ownAccountId);
   const capabilities = useCapabilities(ownAccountId);
@@ -731,37 +752,13 @@ function SidebarPage({
   const account = accounts.find((a) => a.id === selectedAccountId);
   const mailboxName = isCombined
     ? "All mailboxes"
-    : custom
-      ? custom.name
-      : account
-        ? getAccountDisplayName(account)
-        : "Mailbox";
+    : account
+      ? getAccountDisplayName(account)
+      : "Mailbox";
   const labels: GmailLabel[] = labelsQuery.data ?? [];
-  // The combined mailbox's folders are its built-in views; a custom one is
-  // all its mail, then each of its filters.
-  const { filters } = useCustomMailboxFilters(custom, accounts);
-  const folders: MailView[] = custom
-    ? [
-        { ...custom, id: CUSTOM_ALL, name: "All mail" },
-        ...filters.map((f) => ({
-          id: f.id,
-          name: f.name,
-          kind: "custom" as const,
-          rules: f.rules,
-        })),
-      ]
-    : views.filter((v) => v.kind !== "custom");
-  const viewUnreadCounts = useViewUnreadCounts(folders, accounts, isCombined || custom != null);
-  const folderIcon = (view: MailView) => {
-    if (!custom) return viewIcon(view);
-    if (view.id === CUSTOM_ALL) return <MailsIcon className="size-4" />;
-    const color = filters.find((f) => f.id === view.id)?.color;
-    return color ? (
-      <TagIcon className="size-4 fill-current" style={{ color }} />
-    ) : (
-      <TagIcon className="size-4" />
-    );
-  };
+  // The combined mailbox's folders are its built-in views.
+  const folders = views.filter((v) => v.kind !== "custom");
+  const viewUnreadCounts = useViewUnreadCounts(folders, accounts, isCombined);
 
   // Same order as the Combined built-in views. All Mail isn't a Gmail label
   // (archived mail just lacks INBOX), so it's listed without one — and, like
@@ -947,27 +944,13 @@ function SidebarPage({
   return (
     <SearchRowsContext.Provider value={renderSearchRows}>
       <div className="flex h-full min-w-0 flex-col" inert={!active}>
-        {/* The mailbox's name, the sidebar's heading (Codex's "Codex"), past
-            the panel's rounded corner; the rail beside it switches. */}
-        <div className="shrink-0 px-(--sidebar-content-inset) pb-2 pt-(--radius-xl)">
-          <h2 className="group flex h-9 items-center gap-1 px-(--sidebar-row-content-inset) text-base font-semibold tracking-tight text-sidebar-foreground">
-            <span className="min-w-0 flex-1 truncate">{mailboxName}</span>
-            {custom ? (
-              <HintTooltip label="Edit mailbox">
-                <IconBtn
-                  label="Edit mailbox"
-                  onClick={() => onEditView(custom.id, COMBINED_ACCOUNT_ID)}
-                  className="opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
-                >
-                  <PencilIcon className="size-3.5" />
-                </IconBtn>
-              </HintTooltip>
-            ) : null}
-          </h2>
-        </div>
+        {/* The mailbox's name; the rail beside it switches. */}
+        <SpaceHeading title={mailboxName}>
+          <SearchButton selected={searchSelected} pending={searchPending} onClick={onOpenSearch} />
+        </SpaceHeading>
 
-        {/* New message (Codex's "New chat"), then Search, which is a mailbox:
-            selecting it opens Gmail search in the list. */}
+        {/* New message (Codex's "New chat"). Search, in the heading, is a
+            mailbox: it opens Gmail search in the list. */}
         <div
           className="flex shrink-0 flex-col gap-0.5 px-(--sidebar-content-inset)"
           data-tour={active ? "compose" : undefined}
@@ -982,23 +965,16 @@ function SidebarPage({
               <span className="truncate">New message</span>
             </button>
           </HintTooltip>
-          <SkRow
-            icon={<SearchIcon className="size-4" />}
-            title="Search"
-            selected={searchSelected}
-            dot={searchPending}
-            onClick={onOpenSearch}
-          />
         </div>
 
         <div className="min-h-0 flex-1 scroll-fade-y overflow-y-auto px-(--sidebar-content-inset) pb-8 pt-3">
-          {isCombined || custom ? (
+          {isCombined ? (
             <>
               {folders.map((view) => (
                 <Fragment key={view.id}>
                   {withEmptyMenu(
                     <SkRow
-                      icon={folderIcon(view)}
+                      icon={viewIcon(view)}
                       title={view.name}
                       selected={selectedLabelId === view.id}
                       badge={viewUnreadCounts[view.id] ?? 0}
@@ -1007,7 +983,7 @@ function SidebarPage({
                         onSelectLabel(view.id);
                       }}
                     />,
-                    custom ? "" : viewFolder(view).labelId,
+                    viewFolder(view).labelId,
                     viewFolder(view).accountIds,
                   )}
                   <SearchRows parent={view.id} />

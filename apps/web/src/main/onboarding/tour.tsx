@@ -51,8 +51,8 @@ const STOPS: TourStop[] = [
   },
   {
     target: "projects",
-    title: "Custom mailboxes and projects",
-    body: "Under your mailboxes, make your own with +: filters that can span them, like every newsletter or receipts from any account. Projects keep one piece of work's conversations, documents and notes together until it's settled.",
+    title: "Views and projects",
+    body: "Under your mailboxes: views, which + makes, each one list of what its filters find across them (every newsletter, receipts from any account), then Projects, which keep a piece of work's conversations, documents and notes together until it's settled. Hover one to peek at its sidebar.",
   },
   {
     target: "list",

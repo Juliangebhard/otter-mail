@@ -28,8 +28,8 @@ import { SettingsGroup, SettingsPageContainer, SettingsRow } from "./settings-ui
 import { searchableSetting } from "./settings-search";
 
 /**
- * Settings › Custom mailboxes (custom views): mailboxes made of filters, in
- * the rail after the real ones. Each row says what it shows (label chips,
+ * Settings › Views: saved filters across the mailboxes, each a space of its
+ * own in the rail (its list, no sidebar). Each row says what it shows (label chips,
  * accounts, live counts); editing opens the rule editor in place.
  */
 
@@ -195,7 +195,7 @@ export function ViewsPane({
     }
     const editingView =
       editingId === "new" ? null : (views.find((v) => v.id === editingId) ?? null);
-    // A custom mailbox can draw on every mailbox, whichever it was made in
+    // A view can draw on every mailbox, whichever it was made in
     // (views were once each mailbox's own).
     const mailbox = editingView?.mailbox ?? editingMailbox ?? COMBINED_MAILBOX;
     return (
@@ -221,20 +221,20 @@ export function ViewsPane({
   return (
     <SettingsPageContainer
       searchId={searchableSetting("views").id}
-      title="Custom mailboxes"
-      description="Saved filters, across your mailboxes, each one a mailbox in the rail after them."
+      title="Views"
+      description="Saved filters across your mailboxes. Each is a space in the rail: just its list."
       action={
         <Btn size="sm" variant="outline" onClick={() => onOpenView("new", COMBINED_MAILBOX)}>
           <PlusIcon className="size-3.5" />
-          New custom mailbox
+          New view
         </Btn>
       }
     >
       <SettingsGroup>
         {custom.length === 0 ? (
           <SettingsRow
-            title="No custom mailboxes yet"
-            description="A custom mailbox is a saved filter, like “01 Action” across every account, or receipts from any of them."
+            title="No views yet"
+            description="A view is a saved filter, like “01 Action” across every account, or receipts from any of them."
           />
         ) : (
           custom.map((view) => (
@@ -263,16 +263,14 @@ export function ViewsPane({
           if (!o) setConfirmDelete(null);
         }}
         title={`Delete “${confirmDelete?.name ?? ""}”?`}
-        confirmLabel="Delete mailbox"
+        confirmLabel="Delete view"
         confirmVariant="accent"
         onConfirm={() => {
           if (confirmDelete) void deleteView(confirmDelete.id);
           setConfirmDelete(null);
         }}
       >
-        <Text variant="small">
-          The mailbox leaves the rail. Your mail and labels aren't touched.
-        </Text>
+        <Text variant="small">The view leaves the rail. Your mail and labels aren't touched.</Text>
       </Dialog>
     </SettingsPageContainer>
   );

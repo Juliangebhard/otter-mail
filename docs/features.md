@@ -26,6 +26,8 @@ to another app. This page is where they're compared.
 | IMAP through the relay tunnel               | — (direct)         | ✓ (TLS 1.3 servers only)            | — (direct)              |
 | Several mailboxes: on/off, reorder          | ✓                  | ✓                                   | ✓                       |
 | Mailbox rail: switch, unread dots, add      | ✓                  | ✓                                   | — (drawer)              |
+| Rail of spaces: mailboxes, views, Projects  | ✓                  | ✓                                   | —                       |
+| Hover a space to peek at its sidebar        | ✓                  | ✓                                   | —                       |
 | Combined mailbox (all accounts)             | ✓                  | ✓                                   | ✓ ("All")               |
 | Rename and color a mailbox (synced)         | ✓                  | ✓                                   | ✓                       |
 | Google profile picture per mailbox          | ✓ (kept current)   | ✓ (kept current)                    | —                       |
@@ -164,7 +166,7 @@ conversations are in one, never their mail.
 | Recently viewed, back and forward (Mac: title bar; web: browser's)    | ✓   | ✓   | —                                                                          |
 | Settings search (/ or ⌘F in Settings)                                 | ✓   | ✓   | —                                                                          |
 | Changelog (opens the site's, from ⌘K and Settings' ? menu)            | ✓   | ✓   | —                                                                          |
-| Custom mailboxes (filters across mailboxes, in the rail)              | ✓   | ✓   | —                                                                          |
+| Views: filters across mailboxes, each a space (its list) in the rail  | ✓   | ✓   | —                                                                          |
 | Preferences synced through the Otter account                          | ✓   | ✓   | ✓ (theme, advance, mailboxes, notifications, languages, agent, signatures) |
 
 ## Support
@@ -249,7 +251,7 @@ profile`).
 - iPhone: sender photos (contacts, Gravatar, logos) instead of initials only.
 - iPhone: create, rename and delete labels; Empty Trash / Junk.
 - iPhone: multi-select, and undo after archive or trash.
-- iPhone: custom mailboxes.
+- iPhone: views.
 - iPhone: push notifications (APNs) when the app is closed.
 - iPhone: save or share an attachment from Quick Look.
 - Mac and web: Mark all as read (iPhone has it).

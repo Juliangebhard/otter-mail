@@ -12,7 +12,7 @@ import { EmptyState } from "~/components/ui/empty-state";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast, type ToastId } from "./gmail/toast";
 import { setDraftOpener } from "./gmail/undo-send";
-import { AccountsSidebar } from "./gmail/accounts-sidebar";
+import { AccountsSidebar, MailboxSidebarPage } from "./gmail/accounts-sidebar";
 import { MailboxRail } from "./gmail/mailbox-rail";
 import { MessageList } from "./gmail/message-list";
 import { MessageReader } from "./gmail/message-reader";
@@ -70,7 +70,8 @@ import type { GmailAccount, GmailMessageSummary } from "./gmail/types";
 import {
   useMailViews,
   resolveRules,
-  isCustomMailboxId,
+  isViewSpaceId,
+  VIEW_LIST,
   loadLastLocation,
   saveLastLocation,
   COMBINED_ACCOUNT_ID,
@@ -84,7 +85,6 @@ import { ALL_MAIL_LABEL_ID } from "./gmail/label-names";
 import { useMonochromeTheme } from "./theme/apply-theme";
 import { features } from "./features";
 import { useMailboxes } from "./mailboxes";
-import { CUSTOM_ALL, useCustomMailboxFilters } from "./gmail/custom-mailboxes";
 import { ALL_PROJECTS, PROJECTS_MAILBOX, useProject, useProjects } from "./gmail/projects";
 import { ProjectsSidebar } from "./gmail/projects-sidebar";
 import { ProjectsOverview } from "./gmail/projects-overview";
@@ -149,8 +149,8 @@ function useRouteMailLoc(): MailLoc | null {
 const inboxOf = (mailbox: string) =>
   mailbox === COMBINED_ACCOUNT_ID
     ? INBOX_VIEW_ID
-    : isCustomMailboxId(mailbox)
-      ? CUSTOM_ALL
+    : isViewSpaceId(mailbox)
+      ? VIEW_LIST
       : mailbox === PROJECTS_MAILBOX
         ? ALL_PROJECTS
         : "INBOX";
@@ -165,19 +165,19 @@ function savedLoc(): MailLoc {
 /**
  * `loc` among the mailboxes there are: one turned off (or "All mailboxes"
  * off, or one not there at all) gives way to what's first now (Combined when
- * it's on, else the first account), at its inbox. Custom mailboxes count as
- * there until the views are known (`customIds` null).
+ * it's on, else the first account), at its inbox. Views count as there
+ * until they're known (`viewIds` null).
  */
 function placeFor(
   loc: MailLoc,
   accounts: GmailAccount[],
   combined: boolean,
-  customIds: string[] | null,
+  viewIds: string[] | null,
 ): MailLoc {
   const there =
     loc.mailbox === PROJECTS_MAILBOX ||
-    (isCustomMailboxId(loc.mailbox)
-      ? !customIds || customIds.includes(loc.mailbox)
+    (isViewSpaceId(loc.mailbox)
+      ? !viewIds || viewIds.includes(loc.mailbox)
       : loc.mailbox === COMBINED_ACCOUNT_ID
         ? combined
         : accounts.some((a) => a.id === loc.mailbox));
@@ -340,13 +340,13 @@ function MailHome() {
   // mailboxes are known, it's always one of theirs (effects below catch the
   // route up), so nothing shows a place only to leave it at once.
   const placed = routeLoc ?? lastMail;
-  const customMailboxes = views.filter((v) => v.kind === "custom");
+  const viewSpaces = views.filter((v) => v.kind === "custom");
   const mailLoc = ready
     ? placeFor(
         placed ?? savedLoc(),
         accounts,
         mailboxes.combined,
-        viewsLoaded ? customMailboxes.map((v) => v.id) : null,
+        viewsLoaded ? viewSpaces.map((v) => v.id) : null,
       )
     : placed;
   const initialized = ready && mailLoc !== null;
@@ -478,10 +478,9 @@ function MailHome() {
   const isCombined = selectedAccountId === COMBINED_ACCOUNT_ID && mailboxes.combined;
   // Projects (the rail's), where the mail of every mailbox is too.
   const isProjects = selectedAccountId === PROJECTS_MAILBOX;
-  // A custom mailbox: filters across the mailboxes, all their mail or one filter's.
-  const customMailbox = customMailboxes.find((v) => v.id === selectedAccountId) ?? null;
-  const customFilters = useCustomMailboxFilters(customMailbox, accounts);
-  const spansMailboxes = isCombined || isProjects || customMailbox != null;
+  // A view's space: its list, with no sidebar.
+  const viewSpace = viewSpaces.find((v) => v.id === selectedAccountId) ?? null;
+  const spansMailboxes = isCombined || isProjects || viewSpace != null;
   const selectedProject = useProject(isProjects ? selectedLabelId : null);
   const projectsQuery = useProjects();
   const projectsLoaded = projectsQuery.isSuccess;
@@ -515,7 +514,8 @@ function MailHome() {
   const [settingsSidebarOpen, setSettingsSidebarOpen] = useState(
     () => localStorage.getItem("gmail:settings-sidebar-open") !== "0",
   );
-  const sidebarOpen = settingsRoute ? settingsSidebarOpen : mailSidebarOpen;
+  // A view's space has no sidebar: only its list.
+  const sidebarOpen = settingsRoute ? settingsSidebarOpen : mailSidebarOpen && !viewSpace;
   // Entering or leaving Settings swaps panes in place rather than animating them.
   const { active: panelAnimationsActive, durationMs: panelAnimationDurationMs } =
     usePanelAnimationSettings(settingsRoute ? "settings" : "mail");
@@ -711,9 +711,9 @@ function MailHome() {
   useKeybindingContext("settingsOpen", settingsRoute !== null);
   useKeybindingContext("messageOpen", selectedMessageId !== null);
   const goTo = (combinedViewId: string, labelId: string) => {
-    // From Projects or a custom mailbox, to the first mailbox's.
+    // From Projects or a view, to the first mailbox's.
     const mailbox =
-      isProjects || customMailbox
+      isProjects || viewSpace
         ? mailboxes.combined
           ? COMBINED_ACCOUNT_ID
           : firstRealAccountId
@@ -845,8 +845,8 @@ function MailHome() {
     ? COMBINED_ACCOUNT_ID
     : isProjects
       ? PROJECTS_MAILBOX
-      : customMailbox
-        ? customMailbox.id
+      : viewSpace
+        ? viewSpace.id
         : selectedAccountId && accounts.some((a) => a.id === selectedAccountId)
           ? selectedAccountId
           : firstRealAccountId;
@@ -861,18 +861,14 @@ function MailHome() {
         correct({ label: ALL_PROJECTS, messageId: null });
       return;
     }
-    if (customMailbox) {
-      const known =
-        selectedLabelId === CUSTOM_ALL ||
-        !customFilters.loaded ||
-        customFilters.filters.some((f) => f.id === selectedLabelId);
-      if (!known) correct({ label: CUSTOM_ALL });
+    if (viewSpace) {
+      if (selectedLabelId !== VIEW_LIST) correct({ label: VIEW_LIST });
       return;
     }
-    // A custom view as a label (views were once in each mailbox): its own mailbox.
+    // A view as a label (views were once in each mailbox): its own space.
     const view = views.find((v) => v.id === selectedLabelId);
     if (view?.kind === "custom") {
-      correct({ mailbox: view.id, label: CUSTOM_ALL });
+      correct({ mailbox: view.id, label: VIEW_LIST });
       return;
     }
     if (isCombined && !view) correct({ label: INBOX_VIEW_ID });
@@ -886,8 +882,7 @@ function MailHome() {
     isProjects,
     projectsLoaded,
     selectedProject,
-    customMailbox,
-    customFilters,
+    viewSpace,
   ]);
 
   // Local-first: keep the on-disk cache synced in the background. Combined mode
@@ -930,12 +925,11 @@ function MailHome() {
         rules: [],
       };
     }
-    if (customMailbox) {
-      const filter = customFilters.filters.find((f) => f.id === selectedLabelId);
+    if (viewSpace) {
       return {
-        viewId: `${customMailbox.id}:${filter?.id ?? CUSTOM_ALL}`,
-        name: filter?.name ?? customMailbox.name,
-        rules: filter?.rules ?? resolveRules(customMailbox, accounts),
+        viewId: viewSpace.id,
+        name: viewSpace.name,
+        rules: resolveRules(viewSpace, accounts),
       };
     }
     if (isCombined) {
@@ -974,6 +968,52 @@ function MailHome() {
     setComposeOpen(false);
     go({ label: labelId, messageId: null });
   };
+
+  // ── Peeking at a space ────────────────────────────────────────────────────
+  // Hovering a mailbox or Projects in the rail shows its sidebar over the
+  // window after a beat (at once while one shows), so a folder or project in
+  // another space is one click away. It stays while the pointer is in it, and
+  // goes a moment after it leaves (not while a menu or dialog of it is open).
+  // A conversation dragged onto the rail opens it too, to drop on a label.
+  const [peek, setPeek] = useState<string | null>(null);
+  const peekTimer = useRef(0);
+  const hoverSpace = (spaceId: string | null) => {
+    window.clearTimeout(peekTimer.current);
+    if (spaceId) {
+      peekTimer.current = window.setTimeout(() => setPeek(spaceId), peek ? 0 : 120);
+      return;
+    }
+    const close = () => {
+      if (document.querySelector('[role="menu"], [role="dialog"]')) {
+        peekTimer.current = window.setTimeout(close, 300);
+        return;
+      }
+      setPeek(null);
+    };
+    peekTimer.current = window.setTimeout(close, 200);
+  };
+  useEffect(() => {
+    const done = () => setPeek(null);
+    window.addEventListener("drop", done);
+    window.addEventListener("dragend", done);
+    return () => {
+      window.removeEventListener("drop", done);
+      window.removeEventListener("dragend", done);
+    };
+  }, []);
+  /** Goes to a space (at its first place, or `label`), closing the peek. */
+  const goToSpace = (spaceId: string, label?: string) => {
+    window.clearTimeout(peekTimer.current);
+    setPeek(null);
+    if (label === undefined) handleSelectAccount(spaceId);
+    else {
+      setComposeOpen(false);
+      go({ mailbox: spaceId, label, messageId: null, account: null, focusId: null });
+    }
+  };
+  // The space showing has its own sidebar docked, unless it's hidden.
+  const peekSpace =
+    peek && !(peek === effectiveAccountId && sidebarOpen && !settingsRoute) ? peek : null;
 
   /** A project's page, with its conversations in the list. */
   const openProject = (id: string) => {
@@ -1187,8 +1227,8 @@ function MailHome() {
   syncNowRef.current = syncNow;
   useEffect(() => window.desktopBridge.on("mail:syncNow", () => syncNowRef.current()), []);
 
-  // From a custom mailbox, the first of the mailboxes it draws on.
-  const composeAccountId = customMailbox
+  // From a view, the first of the mailboxes it draws on.
+  const composeAccountId = viewSpace
     ? (combined?.rules[0]?.accountId ?? firstRealAccountId)
     : spansMailboxes
       ? firstRealAccountId
@@ -1248,10 +1288,11 @@ function MailHome() {
               the sidebar hides. */}
           <MailboxRail
             accounts={accounts}
-            customMailboxes={customMailboxes}
-            onEditCustomMailbox={(viewId) =>
+            views={viewSpaces}
+            onEditView={(viewId) =>
               openSettings({ pane: "views", viewId, mailbox: COMBINED_ACCOUNT_ID })
             }
+            onHoverSpace={hoverSpace}
             selectedAccountId={effectiveAccountId}
             onSelectAccount={handleSelectAccount}
             settingsOpen={settingsRoute !== null}
@@ -1269,6 +1310,48 @@ function MailHome() {
               aria-hidden
               className="pointer-events-none absolute bottom-1 left-0 right-1 top-(--workspace-topbar-height) -z-10 rounded-xl border border-(--panel-edge) bg-canvas"
             />
+            {peekSpace ? (
+              // Another space's sidebar, floating over this one while the
+              // pointer is on its rail button or in it (ChatGPT's peek).
+              <div
+                key={peekSpace}
+                onMouseEnter={() => hoverSpace(peekSpace)}
+                onMouseLeave={() => hoverSpace(null)}
+                style={{ width: sidebarPane.width }}
+                className="absolute bottom-1 left-0 top-(--workspace-topbar-height) z-40 flex flex-col overflow-hidden rounded-xl border border-(--panel-edge) bg-canvas text-sidebar-foreground shadow-[0_16px_40px_-12px_rgb(0_0_0/45%)] transition-[opacity,translate] duration-150 ease-out starting:-translate-x-2 starting:opacity-0"
+              >
+                <div className="flex min-h-0 flex-1 flex-col bg-(--sidebar-panel-surface)">
+                  {peekSpace === PROJECTS_MAILBOX ? (
+                    <ProjectsSidebar
+                      selectedLabelId={isProjects ? selectedLabelId : ""}
+                      onSelectLabel={(label) => goToSpace(PROJECTS_MAILBOX, label)}
+                      searchSelected={false}
+                      searchPending={false}
+                      onOpenSearch={() => goToSpace(PROJECTS_MAILBOX)}
+                    />
+                  ) : (
+                    <MailboxSidebarPage
+                      active
+                      selectedAccountId={peekSpace}
+                      onSelectAccount={(id) => goToSpace(id)}
+                      selectedLabelId={peekSpace === effectiveAccountId ? selectedLabelId : ""}
+                      onSelectLabel={(label) => goToSpace(peekSpace, label)}
+                      views={views}
+                      onCompose={() => {
+                        setPeek(null);
+                        setComposeOpen(true);
+                      }}
+                      searchSelected={false}
+                      searchPending={false}
+                      onOpenSearch={() => goToSpace(peekSpace)}
+                      searches={[]}
+                      onSelectSearch={() => {}}
+                      onCloseSearch={() => {}}
+                    />
+                  )}
+                </div>
+              </div>
+            ) : null}
             {sidebarPresent ? (
               <>
                 <div
@@ -1313,11 +1396,8 @@ function MailHome() {
                         />
                         <UpdateCard />
                       </>
-                    ) : (
+                    ) : viewSpace ? null : (
                       <AccountsSidebar
-                        onEditView={(viewId, mailbox) =>
-                          openSettings({ pane: "views", viewId, mailbox })
-                        }
                         selectedAccountId={effectiveAccountId}
                         onSelectAccount={handleSelectAccount}
                         selectedLabelId={selectedLabelId}
@@ -1373,6 +1453,11 @@ function MailHome() {
                     onOpenChat={openChat}
                     onSearchView={searchFromView}
                     viewQueryRef={viewQueryRef}
+                    space={
+                      viewSpace
+                        ? { name: viewSpace.name, onCompose: () => setComposeOpen(true) }
+                        : undefined
+                    }
                     project={isProjects && !activeSearch ? { id: selectedLabelId } : undefined}
                     search={
                       activeSearch
@@ -1504,7 +1589,9 @@ function MailHome() {
       </div>
 
       {/* Pinned titlebar toggles (Otter Code): same window spot whatever the panes do. */}
-      <SidebarControl sidebarOpen={sidebarOpen} onToggleSidebar={toggleSidebar} />
+      {viewSpace && !settingsRoute ? null : (
+        <SidebarControl sidebarOpen={sidebarOpen} onToggleSidebar={toggleSidebar} />
+      )}
       {!settingsRoute ? (
         <PanelControl
           open={chatOpen}

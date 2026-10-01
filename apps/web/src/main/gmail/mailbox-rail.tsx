@@ -17,6 +17,7 @@ import {
   DropdownMenuTrigger,
 } from "./menu";
 import { HintTooltip, cn } from "./ui";
+import type { ReactNode } from "react";
 import { AccountPicture } from "./account-picture";
 import { AddMailboxMenu, readableError } from "./add-mailbox";
 import { useAddAccount, useViewUnreadCounts } from "./hooks";
@@ -35,15 +36,17 @@ const RAIL_BUTTON =
 const RAIL_BUTTON_SELECTED = "bg-sidebar-row-selected text-sidebar-foreground";
 
 /**
- * The rail down the window's left edge (ChatGPT's): the mailboxes, then the
- * custom ones (filters across them), a dot on those with unread mail (a
- * mailbox's in its Inbox), then Projects, then who you are at the bottom, with the app's menu. It stays when the sidebar hides, so switching
- * mailboxes never needs the sidebar.
+ * The rail down the window's left edge (ChatGPT's): the spaces. Each mailbox
+ * (a dot when its Inbox has unread mail), each view (its list alone), then
+ * Projects; who you are at the bottom, with the app's menu. It stays when the
+ * sidebar hides. Hovering a mailbox or Projects peeks at its sidebar
+ * (`onHoverSpace`), to go somewhere in it without switching first.
  */
 export function MailboxRail({
   accounts,
-  customMailboxes,
-  onEditCustomMailbox,
+  views,
+  onEditView,
+  onHoverSpace,
   selectedAccountId,
   onSelectAccount,
   settingsOpen,
@@ -52,14 +55,15 @@ export function MailboxRail({
   syncing,
 }: {
   accounts: GmailAccount[];
-  /** Custom views, as mailboxes of their own. */
-  customMailboxes: MailView[];
+  /** The custom views, each a space. */
+  views: MailView[];
   /** Settings' editor for one ("new" makes one). */
-  onEditCustomMailbox: (viewId: string) => void;
-  /** The mailbox showing (or Projects, PROJECTS_MAILBOX); none is lit while Settings is. */
+  onEditView: (viewId: string) => void;
+  /** The space under the pointer, if it has a sidebar to peek at; null when it leaves. */
+  onHoverSpace: (spaceId: string | null) => void;
+  /** The space showing (a mailbox, a view or PROJECTS_MAILBOX); none is lit while Settings is. */
   selectedAccountId: string | null;
-  /** A mailbox, or PROJECTS_MAILBOX. */
-  onSelectAccount: (accountId: string) => void;
+  onSelectAccount: (spaceId: string) => void;
   settingsOpen: boolean;
   /** The app's menu: Settings (a pane, General by default) and Sync now. */
   onOpenSettings: (pane?: SettingsPane) => void;
@@ -68,10 +72,8 @@ export function MailboxRail({
 }) {
   const options = useMailboxOptions(accounts);
   const unread = useInboxUnread(accounts);
-  // A custom mailbox's dot: unread mail in it.
-  const customUnread = useViewUnreadCounts(customMailboxes, accounts);
+  const viewUnread = useViewUnreadCounts(views, accounts);
   const projectsUnread = Object.values(useProjectUnreadCounts().data ?? {}).some((n) => n > 0);
-  const projectsSelected = !settingsOpen && selectedAccountId === PROJECTS_MAILBOX;
   const addAccount = useAddAccount();
 
   const handleAddGmail = async () => {
@@ -84,112 +86,115 @@ export function MailboxRail({
     }
   };
 
+  /** A space's square: lit where you are, a dot for unread mail. */
+  const spaceButton = (
+    id: string,
+    name: string,
+    mark: ReactNode,
+    dot: boolean,
+    peek: boolean,
+    extra?: { tour?: string },
+  ) => {
+    const selected = !settingsOpen && id === selectedAccountId;
+    return (
+      <button
+        type="button"
+        aria-label={name}
+        aria-current={selected ? "page" : undefined}
+        data-tour={extra?.tour}
+        onClick={() => onSelectAccount(id)}
+        onMouseEnter={() => onHoverSpace(peek ? id : null)}
+        onDragEnter={() => onHoverSpace(peek ? id : null)}
+        className={cn(RAIL_BUTTON, selected && RAIL_BUTTON_SELECTED)}
+      >
+        {mark}
+        {dot ? (
+          <span
+            aria-hidden
+            className="absolute right-0.5 top-0.5 size-1.5 rounded-full bg-sidebar-foreground"
+          />
+        ) : null}
+      </button>
+    );
+  };
+
   return (
     <nav
-      aria-label="Mailboxes"
+      aria-label="Spaces"
       data-app-sidebar=""
+      onMouseLeave={() => onHoverSpace(null)}
       className="flex w-(--workspace-rail-width) shrink-0 flex-col items-center pb-(--sidebar-content-inset) text-sidebar-foreground"
     >
       {/* Under the title band, and past the panel's rounded corner: level with
           the sidebar's heading. */}
       <div aria-hidden className="drag-region h-(--workspace-topbar-height) w-full shrink-0" />
       <div className="mt-(--radius-xl) flex flex-col items-center gap-1" data-tour="mailbox">
-        {options.map((option) => {
-          const selected = !settingsOpen && option.id === selectedAccountId;
-          return (
-            <HintTooltip key={option.id} label={option.name} hint={option.shortcut} side="right">
-              <button
-                type="button"
-                aria-label={option.name}
-                aria-current={selected ? "page" : undefined}
-                onClick={() => onSelectAccount(option.id)}
-                className={cn(RAIL_BUTTON, selected && RAIL_BUTTON_SELECTED)}
-              >
-                {option.account ? (
-                  <AccountPicture
-                    account={option.account}
-                    className="size-6 rounded-md text-[11px]"
-                  />
-                ) : (
-                  <LayersIcon className="size-5" />
-                )}
-                {(unread[option.id] ?? 0) > 0 ? (
-                  <span
-                    aria-hidden
-                    className="absolute right-0.5 top-0.5 size-1.5 rounded-full bg-sidebar-foreground"
-                  />
-                ) : null}
-              </button>
-            </HintTooltip>
-          );
-        })}
-        {customMailboxes.length > 0 ? (
-          <span aria-hidden className="my-1 h-px w-5 bg-border" />
-        ) : null}
-        {customMailboxes.map((view) => {
-          const selected = !settingsOpen && view.id === selectedAccountId;
-          return (
-            <ContextMenu key={view.id}>
-              <ContextMenuTrigger>
-                <HintTooltip label={view.name} side="right">
-                  <button
-                    type="button"
-                    aria-label={view.name}
-                    aria-current={selected ? "page" : undefined}
-                    onClick={() => onSelectAccount(view.id)}
-                    className={cn(RAIL_BUTTON, selected && RAIL_BUTTON_SELECTED)}
-                  >
-                    <span className="flex size-6 items-center justify-center rounded-md border border-sidebar-muted-foreground/40 text-[11px] font-semibold uppercase leading-none">
-                      {view.name.trim()[0] ?? "?"}
-                    </span>
-                    {(customUnread[view.id] ?? 0) > 0 ? (
-                      <span
-                        aria-hidden
-                        className="absolute right-0.5 top-0.5 size-1.5 rounded-full bg-sidebar-foreground"
-                      />
-                    ) : null}
-                  </button>
-                </HintTooltip>
-              </ContextMenuTrigger>
-              <ContextMenuContent>
-                <ContextMenuItem onSelect={() => onEditCustomMailbox(view.id)}>
-                  Edit mailbox…
-                </ContextMenuItem>
-              </ContextMenuContent>
-            </ContextMenu>
-          );
-        })}
-        <HintTooltip label="Add mailbox" side="right">
+        {/* Mailboxes peek at their sidebars, which name them: no tooltip. */}
+        {options.map((option) => (
+          <span key={option.id} className="contents">
+            {spaceButton(
+              option.id,
+              option.name,
+              option.account ? (
+                <AccountPicture
+                  account={option.account}
+                  className="size-6 rounded-md text-[11px]"
+                />
+              ) : (
+                <LayersIcon className="size-5" />
+              ),
+              (unread[option.id] ?? 0) > 0,
+              true,
+            )}
+          </span>
+        ))}
+        <HintTooltip label="Add mailbox or view" side="right">
           <AddMailboxMenu
             onGmail={() => void handleAddGmail()}
             onAdded={(account) => onSelectAccount(account.id)}
-            onCustom={() => onEditCustomMailbox("new")}
+            onView={() => onEditView("new")}
           >
-            <button type="button" aria-label="Add mailbox" className={RAIL_BUTTON}>
+            <button
+              type="button"
+              aria-label="Add mailbox or view"
+              onMouseEnter={() => onHoverSpace(null)}
+              className={RAIL_BUTTON}
+            >
               <PlusIcon className="size-4.5" />
             </button>
           </AddMailboxMenu>
         </HintTooltip>
-        {/* Projects span every mailbox: a place of their own, after them. */}
+        {views.length > 0 ? <span aria-hidden className="my-1 h-px w-5 bg-border" /> : null}
+        {views.map((view) => (
+          <ContextMenu key={view.id}>
+            <ContextMenuTrigger>
+              <HintTooltip label={view.name} side="right">
+                {spaceButton(
+                  view.id,
+                  view.name,
+                  <span className="flex size-6 items-center justify-center rounded-md border border-sidebar-muted-foreground/40 text-[11px] font-semibold uppercase leading-none">
+                    {view.name.trim()[0] ?? "?"}
+                  </span>,
+                  (viewUnread[view.id] ?? 0) > 0,
+                  false,
+                )}
+              </HintTooltip>
+            </ContextMenuTrigger>
+            <ContextMenuContent>
+              <ContextMenuItem onSelect={() => onEditView(view.id)}>Edit view…</ContextMenuItem>
+            </ContextMenuContent>
+          </ContextMenu>
+        ))}
+        {/* Projects span every mailbox: a space of their own, after them. */}
         <span aria-hidden className="my-1 h-px w-5 bg-border" />
-        <HintTooltip label="Projects" side="right">
-          <button
-            type="button"
-            aria-label="Projects"
-            data-tour="projects"
-            aria-current={projectsSelected ? "page" : undefined}
-            onClick={() => onSelectAccount(PROJECTS_MAILBOX)}
-            className={cn(RAIL_BUTTON, projectsSelected && RAIL_BUTTON_SELECTED)}
-          >
-            <FolderKanbanIcon className="size-5" />
-            {projectsUnread ? (
-              <span
-                aria-hidden
-                className="absolute right-0.5 top-0.5 size-1.5 rounded-full bg-sidebar-foreground"
-              />
-            ) : null}
-          </button>
-        </HintTooltip>
+        {spaceButton(
+          PROJECTS_MAILBOX,
+          "Projects",
+          <FolderKanbanIcon className="size-5" />,
+          projectsUnread,
+          true,
+          { tour: "projects" },
+        )}
       </div>
       <span className="flex-1" />
       <AccountMenu

@@ -1,21 +1,22 @@
 /**
- * The sidebar while Projects is picked in the rail (ChatGPT's projects): New
- * project and Search, then every active project's conversations together,
+ * The sidebar while Projects is picked in the rail (ChatGPT's projects): its
+ * heading with Search, New project, then every active project's conversations together,
  * each active project, and the settled ones folded at the end. Conversations
  * dragged from the list drop onto a project to join it.
  */
 
 import { useState } from "react";
-import {
-  CircleCheckIcon,
-  FolderIcon,
-  FolderKanbanIcon,
-  FolderPlusIcon,
-  SearchIcon,
-} from "lucide-react";
+import { CircleCheckIcon, FolderKanbanIcon, FolderPlusIcon } from "lucide-react";
 
-import { HintTooltip } from "./ui";
-import { SIDEBAR_ROW, Section, SectionAddButton, SkRow } from "./accounts-sidebar";
+import { HintTooltip, cn } from "./ui";
+import {
+  SIDEBAR_ROW,
+  SearchButton,
+  Section,
+  SectionAddButton,
+  SkRow,
+  SpaceHeading,
+} from "./accounts-sidebar";
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from "./menu";
 import { requestNewProject } from "./project-menus";
 import {
@@ -41,6 +42,7 @@ function ProjectRow({
 }) {
   const [dropActive, setDropActive] = useState(false);
   const settled = project.status === "settled";
+  const count = project.threads.length;
   const addDropped = (threads: { accountId: string; threadId: string }[]) => {
     console.log("[ProjectsSidebar:dropThreads]", { count: threads.length });
     projectsApi.addThreads(project.id, threads).then(
@@ -56,32 +58,44 @@ function ProjectRow({
   return (
     <ContextMenu>
       <ContextMenuTrigger>
-        <SkRow
-          icon={
-            settled ? <CircleCheckIcon className="size-4" /> : <FolderIcon className="size-4" />
-          }
-          title={project.name}
-          selected={selected}
-          badge={settled ? undefined : unread}
-          dropActive={dropActive}
+        {/* Two lines (ChatGPT's Scheduled): the name, then how it stands. */}
+        <button
+          type="button"
           onClick={onSelect}
-          dragProps={{
-            onDragOver: (e) => {
-              if (!isThreadDrag(e.dataTransfer)) return;
-              e.preventDefault();
-              e.dataTransfer.dropEffect = "copy";
-              setDropActive(true);
-            },
-            onDragLeave: () => setDropActive(false),
-            onDrop: (e) => {
-              setDropActive(false);
-              const payload = readThreadDrag(e.dataTransfer);
-              if (!payload) return;
-              e.preventDefault();
-              addDropped(payload.threads);
-            },
+          onDragOver={(e) => {
+            if (!isThreadDrag(e.dataTransfer)) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = "copy";
+            setDropActive(true);
           }}
-        />
+          onDragLeave={() => setDropActive(false)}
+          onDrop={(e) => {
+            setDropActive(false);
+            const payload = readThreadDrag(e.dataTransfer);
+            if (!payload) return;
+            e.preventDefault();
+            addDropped(payload.threads);
+          }}
+          className={cn(
+            "flex w-full flex-col rounded-lg px-(--sidebar-row-content-inset) py-1.5 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-focus-ring",
+            selected
+              ? "bg-sidebar-row-selected text-sidebar-foreground"
+              : "text-sidebar-foreground/90 hover:bg-sidebar-row-hover hover:text-sidebar-foreground",
+            dropActive && "bg-sidebar-row-hover ring-1 ring-inset ring-primary/70",
+          )}
+        >
+          <span className="truncate text-sm">{project.name}</span>
+          <span className="truncate text-[13px] text-sidebar-muted-foreground">
+            {settled && project.settledAt
+              ? `Settled ${new Date(project.settledAt).toLocaleDateString([], { month: "short", day: "numeric" })}`
+              : [
+                  `${count} conversation${count === 1 ? "" : "s"}`,
+                  unread > 0 ? `${unread} unread` : "",
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+          </span>
+        </button>
       </ContextMenuTrigger>
       <ContextMenuContent>
         <ContextMenuItem
@@ -132,11 +146,9 @@ export function ProjectsSidebar({
 
   return (
     <div className="flex h-full min-w-0 flex-col">
-      <div className="shrink-0 px-(--sidebar-content-inset) pb-2 pt-(--radius-xl)">
-        <h2 className="flex h-9 items-center px-(--sidebar-row-content-inset) text-base font-semibold tracking-tight text-sidebar-foreground">
-          Projects
-        </h2>
-      </div>
+      <SpaceHeading title="Projects">
+        <SearchButton selected={searchSelected} pending={searchPending} onClick={onOpenSearch} />
+      </SpaceHeading>
 
       <div className="flex shrink-0 flex-col gap-0.5 px-(--sidebar-content-inset)">
         <HintTooltip label="New project">
@@ -149,13 +161,6 @@ export function ProjectsSidebar({
             <span className="truncate">New project</span>
           </button>
         </HintTooltip>
-        <SkRow
-          icon={<SearchIcon className="size-4" />}
-          title="Search"
-          selected={searchSelected}
-          dot={searchPending}
-          onClick={onOpenSearch}
-        />
       </div>
 
       <div className="min-h-0 flex-1 scroll-fade-y overflow-y-auto px-(--sidebar-content-inset) pb-8 pt-3">

@@ -29,17 +29,17 @@ export function readableError(err: unknown): string {
   return raw.replace(/^Error invoking remote method '[^']*':\s*/, "").replace(/^Error:\s*/, "");
 }
 
-/** "Add mailbox" as a menu: Gmail, other mail (the IMAP dialog), or a custom mailbox. */
+/** "Add mailbox" as a menu: Gmail, other mail (the IMAP dialog), or (in the rail) a view. */
 export function AddMailboxMenu({
   onGmail,
   onAdded,
-  onCustom,
+  onView,
   align = "start",
   children,
 }: {
   onGmail: () => void;
-  /** A custom mailbox: filters across the mailboxes (Settings' editor). */
-  onCustom?: () => void;
+  /** A view: filters across the mailboxes, a space of its own (Settings' editor). */
+  onView?: () => void;
   /** The IMAP mailbox just added. */
   onAdded?: (account: GmailAccount) => void;
   align?: "start" | "end";
@@ -58,11 +58,11 @@ export function AddMailboxMenu({
           <DropdownMenuItem icon={<ServerIcon />} onSelect={() => setImapOpen(true)}>
             Other mail (IMAP)
           </DropdownMenuItem>
-          {onCustom ? (
+          {onView ? (
             <>
               <DropdownMenuSeparator />
-              <DropdownMenuItem icon={<ListFilterIcon />} onSelect={onCustom}>
-                Custom mailbox…
+              <DropdownMenuItem icon={<ListFilterIcon />} onSelect={onView}>
+                View…
               </DropdownMenuItem>
             </>
           ) : null}

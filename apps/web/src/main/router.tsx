@@ -79,11 +79,11 @@ const settingsRoute = createRoute({
   component: () => null,
 });
 
-// Mailboxes are account ids (their email addresses), `all`, the combined
-// mailbox, a custom mailbox (a view's id: its labels are `all` and its
-// filters' names), or `projects` (`all` and project ids). Labels are Gmail's
-// (or IMAP's) ids and views' ids, but the app's own `__name__` ones read as
-// `name`: the combined mailbox's built-in views and Search.
+// Spaces are account ids (their email addresses), `all` (the combined
+// mailbox), a view's id (its one label is `all`), or `projects` (labels `all`
+// and project ids). Labels are Gmail's (or IMAP's) ids and views' ids, but
+// the app's own `__name__` ones read as `name`: the combined mailbox's
+// built-in views and Search.
 const toMailbox = (segment: string) =>
   segment === "all" ? COMBINED_ACCOUNT_ID : segment === "projects" ? PROJECTS_MAILBOX : segment;
 const fromMailbox = (id: string) =>

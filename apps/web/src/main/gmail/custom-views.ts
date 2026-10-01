@@ -58,11 +58,12 @@ export function defaultRulesFor(kind: ViewKind, accounts: GmailAccount[]): ViewR
 }
 
 /**
- * Custom mailboxes are custom views: a set of filters (labels, across
- * mailboxes) that sits in the rail like a mailbox. Their ids are views'
- * (`v_…`), never an account's address.
+ * A custom view is a space of its own in the rail: only its list, no
+ * sidebar. Its ids are views' (`v_…`), never an account's address, and its
+ * one "label" is VIEW_LIST.
  */
-export const isCustomMailboxId = (id: string) => id.startsWith("v_");
+export const isViewSpaceId = (id: string) => id.startsWith("v_");
+export const VIEW_LIST = "all";
 
 /**
  * Resolves a view to the concrete rules used for querying, pruned to accounts
