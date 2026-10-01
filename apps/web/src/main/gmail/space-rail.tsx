@@ -39,9 +39,9 @@ const RAIL_BUTTON_SELECTED = "bg-sidebar-row-selected text-sidebar-foreground";
 
 const UNREAD_DOTS = "gmail:rail-unread-dots";
 
-/** Whether the rail dots the spaces with unread mail (Settings › General; on unless turned off). */
+/** Whether the rail dots the spaces with unread mail (Settings › General; off unless turned on). */
 export function useRailUnreadDots(): [boolean, (on: boolean) => void] {
-  const read = () => localStorage.getItem(UNREAD_DOTS) !== "0";
+  const read = () => localStorage.getItem(UNREAD_DOTS) === "1";
   const [on, setOn] = useState(read);
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {
@@ -61,8 +61,8 @@ export function useRailUnreadDots(): [boolean, (on: boolean) => void] {
 /**
  * The rail down the window's left edge (ChatGPT's): the spaces (spaces.ts).
  * Each mailbox, then each view with the + that makes one, then Projects; who
- * you are at the bottom, with the app's menu. A dot marks a mailbox whose
- * Inbox (or a view whose list) has unread mail, unless turned off. It stays
+ * you are at the bottom, with the app's menu. With the setting on, a dot
+ * marks a mailbox whose Inbox (or a view whose list) has unread mail. It stays
  * when the sidebar hides; then hovering a mailbox or Projects peeks at its
  * sidebar (`onHoverSpace`).
  */

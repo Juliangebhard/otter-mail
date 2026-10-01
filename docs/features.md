@@ -25,7 +25,7 @@ to another app. This page is where they're compared.
 | Add an IMAP mailbox, servers discovered     | ✓                  | ✓ (no domain autoconfig file: CORS) | ✓                       |
 | IMAP through the relay tunnel               | — (direct)         | ✓ (TLS 1.3 servers only)            | — (direct)              |
 | Several mailboxes: on/off, reorder          | ✓                  | ✓                                   | ✓                       |
-| Rail: switch, unread dots (can be off)      | ✓                  | ✓                                   | — (drawer)              |
+| Rail: switch, unread dots (a setting)       | ✓                  | ✓                                   | — (drawer)              |
 | Rail of spaces: mailboxes, views, Projects  | ✓                  | ✓                                   | —                       |
 | Sidebar collapsed: hover a space to peek    | ✓                  | ✓                                   | —                       |
 | Combined mailbox (all accounts)             | ✓                  | ✓                                   | ✓ ("All")               |
