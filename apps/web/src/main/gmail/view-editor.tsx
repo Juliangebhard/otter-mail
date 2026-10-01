@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { Dialog } from "~/components/ui/dialog";
 import { Field } from "~/components/ui/field";
 import { Input } from "~/components/ui/input";
@@ -150,46 +150,105 @@ function AddLabelMenu({
   );
 }
 
-function ChipRow({
-  title,
-  labelIds,
-  excluded,
-  emptyHint,
+/** A word of the expression ("in", "with", "or"): quiet, so the chips read as its terms. */
+function Word({ children }: { children: ReactNode }) {
+  return <span className="text-[13px] text-muted-foreground">{children}</span>;
+}
+
+/** One mailbox's clause: in it, with these labels, without those. */
+function Clause({
+  account,
+  picks,
   labels,
-  usedIds,
-  onAdd,
+  loading,
+  onChange,
   onRemove,
 }: {
-  title: string;
-  labelIds: string[];
-  excluded?: boolean;
-  emptyHint?: string;
+  account: GmailAccount;
+  picks: AccountPicks;
   labels: GmailLabel[];
-  usedIds: Set<string>;
-  onAdd: (labelId: string) => void;
-  onRemove: (labelId: string) => void;
+  loading: boolean;
+  onChange: (picks: AccountPicks) => void;
+  onRemove: () => void;
 }) {
   const byId = new Map(labels.map((l) => [l.id, l]));
+  const used = new Set([...picks.allOf, ...picks.noneOf]);
+  const terms = (key: "allOf" | "noneOf") =>
+    picks[key].map((id) => (
+      <RuleChip
+        key={id}
+        label={byId.get(id)}
+        labelId={id}
+        excluded={key === "noneOf"}
+        onRemove={() => onChange({ ...picks, [key]: picks[key].filter((x) => x !== id) })}
+      />
+    ));
   return (
-    <div className="flex items-start gap-3">
-      <span className="w-24 shrink-0 pt-0.5 text-[13px] text-muted-foreground">{title}</span>
-      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1">
-        {labelIds.map((id) => (
-          <RuleChip
-            key={id}
-            label={byId.get(id)}
-            labelId={id}
-            excluded={excluded}
-            onRemove={() => onRemove(id)}
+    <div className="group/clause flex items-start gap-2 rounded-lg px-3 py-2.5 hover:bg-accent-surface/40">
+      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-1.5 gap-y-1.5">
+        <Word>in</Word>
+        <span className="inline-flex h-5 items-center gap-1.5 rounded-md bg-accent-surface px-1.5 text-[13px] text-foreground">
+          <span
+            className="size-2 rounded-full"
+            style={{ backgroundColor: getAccountColor(account) }}
           />
-        ))}
-        {labelIds.length === 0 && emptyHint ? (
-          <span className="pe-1 text-xs text-muted-foreground/60">{emptyHint}</span>
-        ) : null}
-        <AddLabelMenu labels={labels} usedIds={usedIds} onPick={onAdd} />
+          {getAccountDisplayName(account)}
+        </span>
+        {loading && labels.length === 0 ? (
+          <Word>loading labels…</Word>
+        ) : (
+          <>
+            <Word>with</Word>
+            {terms("allOf")}
+            {picks.allOf.length === 0 ? <Word>any label</Word> : null}
+            <AddLabelMenu
+              labels={labels}
+              usedIds={used}
+              onPick={(id) => onChange({ ...picks, allOf: [...picks.allOf, id] })}
+            />
+            <Word>without</Word>
+            {terms("noneOf")}
+            <AddLabelMenu
+              labels={labels}
+              usedIds={used}
+              onPick={(id) => onChange({ ...picks, noneOf: [...picks.noneOf, id] })}
+            />
+          </>
+        )}
       </div>
+      <button
+        type="button"
+        aria-label={`Remove ${getAccountDisplayName(account)}`}
+        onClick={onRemove}
+        className="mt-0.5 rounded-md p-0.5 text-muted-foreground opacity-0 outline-none hover:text-foreground focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-focus-ring group-hover/clause:opacity-100"
+      >
+        <XIcon className="size-3.5" />
+      </button>
     </div>
   );
+}
+
+/** The view in words: "Receipts in Personal, or Finance and not Unread in Work". */
+function sentence(
+  picks: Picks,
+  accounts: GmailAccount[],
+  labelsOf: (accountId: string) => GmailLabel[],
+): string {
+  return Object.entries(picks)
+    .filter(([, p]) => p.allOf.length + p.noneOf.length > 0)
+    .flatMap(([accountId, p]) => {
+      const account = accounts.find((a) => a.id === accountId);
+      if (!account) return [];
+      const name = (id: string) =>
+        chipName(
+          labelsOf(accountId).find((l) => l.id === id),
+          id,
+        );
+      const has = p.allOf.map(name).join(" and ") || "All mail";
+      const not = p.noneOf.length ? ` and not ${p.noneOf.map(name).join(" or ")}` : "";
+      return [`${has}${not} in ${getAccountDisplayName(account)}`];
+    })
+    .join(", or ");
 }
 
 /** The editor, open while `open`; mount it with a `key` per view (its fields start from it). */
@@ -212,18 +271,21 @@ export function ViewEditorDialog({
   const [mark, setMark] = useState({ icon: view?.icon ?? null, color: view?.color ?? null });
   const [picking, setPicking] = useState(false);
   const [picks, setPicks] = useState<Picks>(() =>
-    rulesToPicks(view == null ? [] : (view.rules ?? defaultRulesFor(view.kind, accounts))),
+    view == null
+      ? accounts[0]
+        ? { [accounts[0].id]: { allOf: [], noneOf: [] } }
+        : {}
+      : rulesToPicks(view.rules ?? defaultRulesFor(view.kind, accounts)),
   );
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const isDefault = view != null && view.kind !== "custom";
 
-  const update = (accountId: string, fn: (p: AccountPicks) => AccountPicks) => {
-    setPicks((prev) => ({
-      ...prev,
-      [accountId]: fn(prev[accountId] ?? { allOf: [], noneOf: [] }),
-    }));
-  };
+  const labelsOf = (accountId: string) =>
+    accountLabels.find((a) => a.accountId === accountId)?.labels ?? [];
+  // The mailboxes it draws on, in order, and those it could add.
+  const clauses = Object.keys(picks).flatMap((id) => accounts.filter((a) => a.id === id));
+  const others = accounts.filter((a) => !(a.id in picks));
 
   const rules = useMemo(() => picksToRules(picks), [picks]);
   const draftCounts = useCombinedCounts(rules, `draft:${view?.id ?? "new"}`, open);
@@ -232,16 +294,11 @@ export function ViewEditorDialog({
   // Mutations are optimistic: it closes at once; an error rolls back, with a toast.
   const save = () => void onSave({ id: view?.id, name: name.trim(), rules, ...mark });
 
-  const matchLine =
-    rules.length === 0
-      ? "Add a label to at least one mailbox"
-      : draftCounts.data
-        ? `${draftCounts.data.total.toLocaleString()} message${draftCounts.data.total === 1 ? "" : "s"}${
-            draftCounts.data.unread > 0
-              ? ` · ${draftCounts.data.unread.toLocaleString()} unread`
-              : ""
-          }`
-        : "Counting…";
+  const matchLine = draftCounts.data
+    ? `${draftCounts.data.total.toLocaleString()} message${draftCounts.data.total === 1 ? "" : "s"}${
+        draftCounts.data.unread > 0 ? `, ${draftCounts.data.unread.toLocaleString()} unread` : ""
+      }`
+    : "Counting…";
 
   return (
     <>
@@ -303,95 +360,83 @@ export function ViewEditorDialog({
         </Field>
         {picking ? <ViewIconPicker icon={mark.icon} color={mark.color} onChange={setMark} /> : null}
 
-        <div className="mt-2 flex items-baseline gap-2">
-          <span className="flex-1 text-[13px] font-medium text-foreground">
-            Show mail that matches
-          </span>
-          <span
-            className={cn(
-              "text-xs tabular-nums",
-              rules.length === 0 ? "text-muted-foreground/60" : "text-muted-foreground",
-            )}
-          >
-            {matchLine}
-          </span>
-        </div>
-        <div className="divide-y divide-border/60 rounded-xl border border-border/60">
-          {accounts.length === 0 ? (
-            <p className="px-4 py-3.5 text-[13px] text-muted-foreground">
-              Add a mailbox (Settings › Mailboxes) to make a view.
-            </p>
-          ) : null}
-          {accounts.map((account) => {
-            const entry = accountLabels.find((a) => a.accountId === account.id);
-            const labels = entry?.labels ?? [];
-            const p = picks[account.id] ?? { allOf: [], noneOf: [] };
-            const usedIds = new Set([...p.allOf, ...p.noneOf]);
-            const included = p.allOf.length > 0 || p.noneOf.length > 0;
-            return (
-              <div key={account.id} className="space-y-2.5 px-4 py-3.5">
-                <div className="flex min-w-0 items-center gap-2">
-                  <span
-                    className="size-2 shrink-0 rounded-full"
-                    style={{ backgroundColor: getAccountColor(account) }}
-                  />
-                  <span className="shrink-0 text-sm text-foreground">
-                    {getAccountDisplayName(account)}
-                  </span>
-                  <span className="truncate text-[13px] text-muted-foreground">
-                    {account.email}
-                  </span>
-                  {!included ? (
-                    <span className="ms-auto shrink-0 text-2xs text-muted-foreground/60">
-                      Not included
+        <div className="mt-1 text-[13px] font-medium text-foreground">Show conversations</div>
+        {accounts.length === 0 ? (
+          <p className="text-[13px] text-muted-foreground">
+            Add a mailbox (Settings › Mailboxes) to make a view.
+          </p>
+        ) : (
+          <div className="rounded-xl border border-border/60 p-1">
+            {clauses.map((account, index) => (
+              <div key={account.id}>
+                {index > 0 ? (
+                  <div className="flex items-center gap-2 px-3 py-0.5">
+                    <span className="h-px flex-1 bg-border/60" />
+                    <span className="text-2xs font-medium uppercase tracking-wide text-muted-foreground">
+                      or
                     </span>
-                  ) : null}
-                </div>
-                {labels.length === 0 && anyLoading ? (
-                  <p className="text-xs text-muted-foreground/70">Loading labels…</p>
-                ) : (
-                  <div className="space-y-2">
-                    <ChipRow
-                      title="Must have"
-                      labelIds={p.allOf}
-                      emptyHint={p.noneOf.length > 0 ? "Any mail" : undefined}
-                      labels={labels}
-                      usedIds={usedIds}
-                      onAdd={(id) =>
-                        update(account.id, (cur) => ({ ...cur, allOf: [...cur.allOf, id] }))
-                      }
-                      onRemove={(id) =>
-                        update(account.id, (cur) => ({
-                          ...cur,
-                          allOf: cur.allOf.filter((x) => x !== id),
-                        }))
-                      }
-                    />
-                    <ChipRow
-                      title="Must not have"
-                      labelIds={p.noneOf}
-                      excluded
-                      labels={labels}
-                      usedIds={usedIds}
-                      onAdd={(id) =>
-                        update(account.id, (cur) => ({ ...cur, noneOf: [...cur.noneOf, id] }))
-                      }
-                      onRemove={(id) =>
-                        update(account.id, (cur) => ({
-                          ...cur,
-                          noneOf: cur.noneOf.filter((x) => x !== id),
-                        }))
-                      }
-                    />
+                    <span className="h-px flex-1 bg-border/60" />
                   </div>
-                )}
+                ) : null}
+                <Clause
+                  account={account}
+                  picks={picks[account.id]}
+                  labels={labelsOf(account.id)}
+                  loading={anyLoading}
+                  onChange={(next) => setPicks((prev) => ({ ...prev, [account.id]: next }))}
+                  onRemove={() =>
+                    setPicks((prev) =>
+                      Object.fromEntries(Object.entries(prev).filter(([id]) => id !== account.id)),
+                    )
+                  }
+                />
               </div>
-            );
-          })}
-        </div>
-        <p className="text-[13px] text-muted-foreground">
-          Mail must carry every “must have” label and none of the “must not have” ones. Results from
-          each mailbox are combined.
+            ))}
+            {others.length > 0 ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className="m-1 inline-flex h-7 items-center gap-1 rounded-md px-2 text-[13px] text-muted-foreground outline-none hover:bg-accent-surface hover:text-foreground focus-visible:ring-2 focus-visible:ring-focus-ring"
+                  >
+                    <PlusIcon className="size-3.5" />
+                    {clauses.length > 0 ? "Or in another mailbox" : "In a mailbox"}
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start">
+                  {others.map((account) => (
+                    <DropdownMenuItem
+                      key={account.id}
+                      icon={
+                        <span className="flex size-4 items-center justify-center">
+                          <span
+                            className="size-2 rounded-full"
+                            style={{ backgroundColor: getAccountColor(account) }}
+                          />
+                        </span>
+                      }
+                      onSelect={() =>
+                        setPicks((prev) => ({ ...prev, [account.id]: { allOf: [], noneOf: [] } }))
+                      }
+                    >
+                      {getAccountDisplayName(account)}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : null}
+          </div>
+        )}
+        {/* The whole expression in words, and what it finds now. */}
+        <p className="text-[13px] leading-5 text-muted-foreground">
+          {rules.length === 0 ? (
+            "Pick a label to have, or not have, in a mailbox."
+          ) : (
+            <>
+              <span className="text-foreground">{sentence(picks, accounts, labelsOf)}</span>
+              {` · ${matchLine}`}
+            </>
+          )}
         </p>
       </Dialog>
 
