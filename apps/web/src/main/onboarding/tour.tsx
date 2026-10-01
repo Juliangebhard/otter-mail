@@ -37,7 +37,7 @@ const STOPS: TourStop[] = [
   {
     target: "mailbox",
     title: "Your mailboxes",
-    body: "Your mailboxes, down the left edge: click one, or swipe the sidebar. With two or more, All mailboxes reads them as one. You and Settings are at the bottom.",
+    body: "Your mailboxes, down the left edge: click one, or hover it to peek at its sidebar. With two or more, All mailboxes reads them as one. You and Settings are at the bottom.",
     keys: [{ command: "mailbox.jump.1", label: "Jump to mailbox 1…9" }],
   },
   {

@@ -2,9 +2,6 @@ import {
   Fragment,
   createContext,
   useContext,
-  useEffect,
-  useLayoutEffect,
-  useRef,
   useState,
   type ComponentProps,
   type CSSProperties,
@@ -51,7 +48,7 @@ import {
   useViewUnreadCounts,
 } from "./hooks";
 import type { GmailLabel, MailView } from "./types";
-import { COMBINED_ACCOUNT_ID, INBOX_VIEW_ID } from "./custom-views";
+import { COMBINED_ACCOUNT_ID } from "./custom-views";
 import { ALL_MAIL_LABEL_ID } from "./label-names";
 import { buildLabelTree, type LabelTreeNode } from "./label-tree";
 import {
@@ -66,7 +63,7 @@ import { renameLabelKeybindings, useKeybindingsState } from "../keybindings/stor
 import { formatShortcut, parseShortcut } from "../keybindings/keys";
 import { LabelShortcutDialog } from "../settings/keybindings-pane";
 import { UnreadPill, HintTooltip, IconBtn } from "./ui";
-import { SidebarTitle, useMailboxOptions } from "./top-bar";
+import { SidebarTitle } from "./top-bar";
 import { getAccountDisplayName } from "./account-style";
 import { useMailboxes } from "../mailboxes";
 import { UpdateCard } from "../updates";
@@ -584,114 +581,14 @@ type AccountsSidebarProps = {
   onCloseSearch: (id: string) => void;
 };
 
-/**
- * The sidebar: its mailboxes' pages side by side (Dia's profiles) between the
- * title and the footer, in a horizontal scroller that snaps a page at a time.
- * The swipe is the platform's own scrolling: macOS follows the fingers,
- * carries the momentum, rubber-bands at the ends and settles on a page with
- * its own physics. Where it comes to rest picks the mailbox; the other
- * switches (the rail, ⌘1…) scroll there.
- */
+/** The sidebar: the mailbox's page between the title and the footer. */
 export function AccountsSidebar(props: AccountsSidebarProps) {
-  const { selectedAccountId, onSelectAccount } = props;
-  const { accounts } = useMailboxes();
-  const mailboxIds = useMailboxOptions(accounts).map((o) => o.id);
-  const index = mailboxIds.indexOf(selectedAccountId ?? "");
-  const pageIds = index < 0 ? [selectedAccountId ?? ""] : mailboxIds;
-
-  const scroller = useRef<HTMLDivElement>(null);
-  // The page the scroller is at (or heading to), so its own resting doesn't
-  // pick a mailbox again, and a switch from elsewhere knows to scroll.
-  const shown = useRef(-1);
-  // Whether the user has moved the scroller since it last scrolled itself:
-  // only then does where it rests pick a mailbox.
-  const swiped = useRef(false);
-  const onUserScroll = () => {
-    swiped.current = true;
-  };
-
-  // A switch from elsewhere scrolls to its page (at once the first time).
-  useLayoutEffect(() => {
-    const el = scroller.current;
-    if (!el || index < 0 || shown.current === index) return;
-    const first = shown.current < 0;
-    shown.current = index;
-    swiped.current = false;
-    el.scrollTo({ left: index * el.clientWidth, behavior: first ? "instant" : "smooth" });
-  }, [index]);
-  // Resizing the sidebar keeps the page in place.
-  useEffect(() => {
-    const el = scroller.current;
-    if (!el) return;
-    const observer = new ResizeObserver(() => {
-      if (shown.current >= 0) el.scrollLeft = shown.current * el.clientWidth;
-    });
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
-
-  // Where a swipe comes to rest picks the mailbox.
-  const settleTimer = useRef(0);
-  const settled = () => {
-    const el = scroller.current;
-    if (!el || !el.clientWidth) return;
-    const at = Math.round(el.scrollLeft / el.clientWidth);
-    if (at === shown.current || !mailboxIds[at]) return;
-    // Its own scroll cut short (a layout change re-snaps it): carry on.
-    if (!swiped.current) {
-      el.scrollTo({ left: shown.current * el.clientWidth, behavior: "smooth" });
-      return;
-    }
-    shown.current = at;
-    onSelectAccount(mailboxIds[at]);
-  };
-  useEffect(() => {
-    const el = scroller.current;
-    if (!el) return;
-    el.addEventListener("scrollend", settled);
-    return () => el.removeEventListener("scrollend", settled);
-  });
-
   return (
     <div className="flex h-full min-w-0 flex-col">
       <SidebarTitle />
-
-      <div
-        ref={scroller}
-        onWheel={onUserScroll}
-        onTouchStart={onUserScroll}
-        onPointerDown={onUserScroll}
-        onKeyDown={onUserScroll}
-        // Where there's no scrollend (older Safari), a pause in scrolling stands in.
-        onScroll={() => {
-          window.clearTimeout(settleTimer.current);
-          settleTimer.current = window.setTimeout(settled, 150);
-        }}
-        className="flex min-h-0 flex-1 snap-x snap-mandatory overflow-x-auto overflow-y-hidden overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-      >
-        {pageIds.map((id) => {
-          const current = id === (selectedAccountId ?? "");
-          return (
-            <div key={id} className="h-full w-full shrink-0 snap-start snap-always">
-              {current ? (
-                <MailboxSidebarPage {...props} active />
-              ) : (
-                // Another mailbox as it looks once switched to: its inbox.
-                <MailboxSidebarPage
-                  {...props}
-                  active={false}
-                  selectedAccountId={id}
-                  selectedLabelId={id === COMBINED_ACCOUNT_ID ? INBOX_VIEW_ID : "INBOX"}
-                  searchSelected={false}
-                  searchPending={false}
-                  searches={[]}
-                />
-              )}
-            </div>
-          );
-        })}
+      <div className="min-h-0 flex-1">
+        <MailboxSidebarPage {...props} />
       </div>
-
       <UpdateCard />
     </div>
   );
@@ -702,7 +599,6 @@ export function AccountsSidebar(props: AccountsSidebarProps) {
  * its folders and labels. The rail's hover shows one on its own (a peek).
  */
 export function MailboxSidebarPage({
-  active,
   selectedAccountId,
   onSelectAccount,
   selectedLabelId,
@@ -715,10 +611,7 @@ export function MailboxSidebarPage({
   searches,
   onSelectSearch,
   onCloseSearch,
-}: AccountsSidebarProps & {
-  /** The page showing; a neighbor drawn during a swipe is inert. */
-  active: boolean;
-}) {
+}: AccountsSidebarProps) {
   const isCombined = selectedAccountId === COMBINED_ACCOUNT_ID;
   const ownAccountId = isCombined ? null : selectedAccountId;
 
@@ -943,7 +836,7 @@ export function MailboxSidebarPage({
 
   return (
     <SearchRowsContext.Provider value={renderSearchRows}>
-      <div className="flex h-full min-w-0 flex-col" inert={!active}>
+      <div className="flex h-full min-w-0 flex-col">
         {/* The mailbox's name; the rail beside it switches. */}
         <SpaceHeading title={mailboxName}>
           <SearchButton selected={searchSelected} pending={searchPending} onClick={onOpenSearch} />
@@ -953,7 +846,7 @@ export function MailboxSidebarPage({
             mailbox: it opens Gmail search in the list. */}
         <div
           className="flex shrink-0 flex-col gap-0.5 px-(--sidebar-content-inset)"
-          data-tour={active ? "compose" : undefined}
+          data-tour="compose"
         >
           <HintTooltip label="New message" shortcut="compose.new">
             <button

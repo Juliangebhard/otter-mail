@@ -1342,7 +1342,6 @@ function MailHome() {
                     />
                   ) : (
                     <MailboxSidebarPage
-                      active
                       selectedAccountId={peekSpace}
                       onSelectAccount={(id) => goToSpace(id)}
                       selectedLabelId={peekSpace === effectiveAccountId ? selectedLabelId : ""}
