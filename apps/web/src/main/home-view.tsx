@@ -1317,14 +1317,21 @@ function MailHome() {
                 key={peekSpace}
                 onMouseEnter={() => hoverSpace(peekSpace)}
                 onMouseLeave={() => hoverSpace(null)}
-                style={{ width: sidebarPane.width }}
                 // A card of its own (ChatGPT's): an even gap (--peek-gap) inside
                 // the content panel, its corners concentric with the panel's
-                // (the panel's radius less the gap); lighter than the window
-                // in dark themes, raised by its shadow in light ones.
-                className="absolute bottom-[calc(0.25rem+var(--peek-gap))] left-(--peek-gap) top-[calc(var(--workspace-topbar-height)+var(--peek-gap))] z-40 flex flex-col overflow-hidden rounded-[calc(var(--radius-xl)-var(--peek-gap))] [--peek-gap:0.25rem] border border-(--panel-edge) bg-canvas text-sidebar-foreground shadow-[0_18px_48px_-12px_rgb(0_0_0/30%)] transition-[opacity,translate] duration-150 ease-out starting:-translate-x-2 starting:opacity-0 dark:shadow-[0_18px_48px_-12px_rgb(0_0_0/70%)]"
+                // (the panel's radius less the gap), wearing the docked
+                // sidebar's surface, raised by its shadow.
+                style={{ width: `calc(${sidebarPane.width}px - 2 * var(--peek-gap))` }}
+                className="absolute bottom-[calc(0.25rem+var(--peek-gap))] left-(--peek-gap) top-[calc(var(--workspace-topbar-height)+var(--peek-gap))] z-40 overflow-hidden rounded-[calc(var(--radius-xl)-var(--peek-gap))] [--peek-gap:0.25rem] border border-(--panel-edge) bg-canvas text-sidebar-foreground shadow-[0_18px_48px_-12px_rgb(0_0_0/30%)] transition-opacity duration-150 ease-out starting:opacity-0 dark:shadow-[0_18px_48px_-12px_rgb(0_0_0/70%)]"
               >
-                <div className="flex min-h-0 flex-1 flex-col bg-(--sidebar-panel-surface)">
+                <div aria-hidden className="absolute inset-0 bg-(--sidebar-panel-surface)" />
+                {/* The sidebar itself, exactly where it docks (back past the
+                    gap and the edge, at full width), so going there leaves
+                    every row in place and only the card goes. */}
+                <div
+                  style={{ width: sidebarPane.width }}
+                  className="absolute bottom-[calc(-1*(var(--peek-gap)+1px))] left-[calc(-1*(var(--peek-gap)+1px))] top-[calc(-1*(var(--peek-gap)+1px))] flex flex-col"
+                >
                   {peekSpace === PROJECTS_MAILBOX ? (
                     <ProjectsSidebar
                       selectedLabelId={isProjects ? selectedLabelId : ""}
