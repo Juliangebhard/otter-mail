@@ -21,7 +21,6 @@ import {
 import {
   addAgent,
   listAgents,
-  pendingApprovals,
   removeAgent,
   setAgentAccess,
 } from "../services/agent/connected-agents.js";
@@ -88,12 +87,9 @@ export function registerBackendHandlers(): void {
   handle("mcp:removeAgent", async (params: unknown) => {
     await removeAgent(String((params as Record<string, unknown> | undefined)?.id));
   });
-
-  // Answered with agent:respondApproval, like a chat's.
-  handle("mcp:approvals", async () => pendingApprovals());
 }
 
 function access(value: unknown): AgentAccess {
-  if (value === "read-only" || value === "supervised" || value === "full-access") return value;
+  if (value === "read-only" || value === "safe" || value === "full-access") return value;
   throw new Error("Unknown access.");
 }

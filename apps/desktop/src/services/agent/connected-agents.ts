@@ -2,27 +2,18 @@
  * Agents on this Mac that Otter Mail doesn't run itself (Claude Code, Codex in
  * a terminal, Cursor, …): each gets Otter Mail's tools at the MCP server
  * (mcp-server.ts) with an agent token made in Settings › Agents (contracts'
- * agent-tokens.ts). Its changes ask as its access says; with no chat to ask
- * in, they ask the main window, and a notification brings it up.
+ * agent-tokens.ts). Making the token was the user's say: its access decides
+ * which tools it gets, and nothing asks again.
  */
 
-import { AGENT_APPROVALS_CHANNEL, allowQuestion, type AgentApproval } from "@otter-mail/contracts";
 import {
   agentTokenHash,
   newAgentToken,
   type AgentAccess,
   type ConnectedAgent,
 } from "@otter-mail/contracts/agent-tokens";
-import {
-  broadcast,
-  cancelToolApprovals,
-  readJson,
-  writeJson,
-  type Emit,
-  type ToolCaller,
-} from "@otter-mail/core";
+import { readJson, writeJson, type ToolCaller } from "@otter-mail/core";
 
-import { tellMain } from "../../main-link.js";
 import { deviceFiles } from "./local.js";
 
 type StoredAgent = ConnectedAgent & { hash: string };
@@ -62,15 +53,13 @@ export async function setAgentAccess(id: string, access: AgentAccess): Promise<v
   await save();
 }
 
-/** Revokes an agent's token: what it waits on the user to allow won't happen. */
+/** Revokes an agent's token. */
 export async function removeAgent(id: string): Promise<void> {
   const agents = await load();
   const index = agents.findIndex((a) => a.id === id);
   if (index >= 0) agents.splice(index, 1);
   await save();
-  const caller = callers.get(id);
   callers.delete(id);
-  if (caller) cancelToolApprovals(caller);
 }
 
 /** The caller a token stands for, or null. */
@@ -86,32 +75,16 @@ export async function agentCaller(token: string): Promise<ToolCaller | null> {
   return callerOf(agent);
 }
 
-// ── Callers and their approvals ─────────────────────────────────────────────
-
 /** One per agent, so its changes run in the order it asked for them. */
 const callers = new Map<string, ToolCaller>();
-const approvals = new Map<string, AgentApproval>();
-
-export const pendingApprovals = (): AgentApproval[] => [...approvals.values()];
 
 function callerOf(agent: StoredAgent): ToolCaller {
   const existing = callers.get(agent.id);
   if (existing) return existing;
-  const emit: Emit = (event) => {
-    if (event.type === "approval") {
-      const { id, title, detail = "" } = event.approval;
-      approvals.set(id, { id, agent: agent.name, title, detail });
-      tellMain({ kind: "notify", title: allowQuestion(agent.name, title), body: detail });
-    } else if (event.type === "approvalResolved") {
-      approvals.delete(event.approvalId);
-    } else return;
-    broadcast(AGENT_APPROVALS_CHANNEL, pendingApprovals());
-  };
   const caller: ToolCaller = {
-    mode: () => (agent.access === "full-access" ? "full-access" : "approval-required"),
-    readOnly: () => agent.access === "read-only",
-    // No chat to ask in: its approvals go to the main window.
-    turn: () => ({ requestId: agent.id, emit }),
+    mode: () => "full-access",
+    access: () => agent.access,
+    turn: () => null,
     files: deviceFiles,
   };
   callers.set(agent.id, caller);

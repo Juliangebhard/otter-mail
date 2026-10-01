@@ -71,25 +71,6 @@ export interface BridgeFeatures {
   localAgents: boolean;
 }
 
-/** A change an agent on the Mac (ConnectedAgent) waits on the user to allow (`mcp:approvals`). */
-export interface AgentApproval {
-  id: string;
-  /** The agent's name ("Claude Code"). */
-  agent: string;
-  /** What the tool does ("Send email"). */
-  title: string;
-  /** Exactly what will happen. */
-  detail: string;
-}
-
-/** Push channel carrying every `AgentApproval` waiting, whenever one comes or goes. */
-export const AGENT_APPROVALS_CHANNEL = "mcp:approvals";
-
-/** How an approval asks: "Allow Claude Code to send email?". */
-export function allowQuestion(agent: string, title: string): string {
-  return `Allow ${agent} to ${title.charAt(0).toLowerCase()}${title.slice(1)}?`;
-}
-
 export interface DesktopBridge {
   /** `process.platform` in the desktop app, "web" in a browser. */
   platform: "darwin" | "linux" | "win32" | "web" | (string & {});

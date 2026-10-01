@@ -5,8 +5,6 @@ import { router, queryClient } from "./router";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { ToastProvider } from "./gmail/toast";
 import { ReportProblemDialog } from "./support/report-problem";
-import { AgentApprovalDialog } from "./agent-approval-dialog";
-import { features } from "./features";
 
 declare const __APP_DISPLAY_NAME__: string | undefined;
 
@@ -26,7 +24,6 @@ root.render(
       <ToastProvider>
         <RouterProvider router={router} />
         <ReportProblemDialog />
-        {features.localAgents ? <AgentApprovalDialog /> : null}
       </ToastProvider>
     </QueryClientProvider>
   </React.StrictMode>,

@@ -1,3 +1,5 @@
+import type { AgentAccess } from "@otter-mail/contracts/agent-tokens";
+
 /** What any agent is told about Otter Mail's tools, whether Otter Mail runs it or not. */
 export const TOOL_INSTRUCTIONS = [
   "The user's mailboxes (Gmail, IMAP, …) and their calendars are yours through the otter-mail tools: list_accounts, search_mail, list_threads, get_thread, get_attachment, update_threads, save_draft, send_email, list_events, create_event and the rest. Use them for anything about the user's mail or calendar, rather than a mail CLI.",
@@ -14,8 +16,20 @@ export const AGENT_INSTRUCTIONS = [
   "Messages may end with a '— context from Otter Mail —' block that points at conversations by mailbox and threadId, or at a project by its id; read them with get_thread and get_project when you need them.",
 ].join("\n");
 
+/** What the user's choice of access leaves out, told to an agent that has it. */
+const ACCESS_NOTES: Record<AgentAccess, string | null> = {
+  "read-only": "The user gave you read-only access: you can read, but not change anything.",
+  safe: "The user gave you safe access: you can make any change that can be undone (archive, label, trash, drafts, projects), but not send mail, invite people or delete anything for good. For those, prepare what you can, such as a draft, and tell the user.",
+  "full-access": null,
+};
+
 /** The MCP server's instructions to agents Otter Mail doesn't run (connected-agents.ts). */
-export const CONNECTED_AGENT_INSTRUCTIONS = [
-  "Otter Mail is the user's mail client, open on this Mac.",
-  TOOL_INSTRUCTIONS,
-].join("\n");
+export function connectedAgentInstructions(access: AgentAccess): string {
+  return [
+    "Otter Mail is the user's mail client, open on this Mac.",
+    TOOL_INSTRUCTIONS,
+    ACCESS_NOTES[access],
+  ]
+    .filter(Boolean)
+    .join("\n");
+}

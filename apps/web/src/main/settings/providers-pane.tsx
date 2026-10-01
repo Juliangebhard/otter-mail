@@ -10,6 +10,7 @@ import type { AgentAccess, ConnectedAgent } from "@otter-mail/contracts/agent-to
 import { Field } from "~/components/ui/field";
 import { Switch } from "~/components/ui/switch";
 import { Text } from "~/components/ui/text";
+import { Toggle, ToggleGroup } from "~/components/ui/toggle-group";
 import { toast } from "../gmail/toast";
 import { CheckIcon, RotateCwIcon, StarIcon } from "lucide-react";
 import {
@@ -33,13 +34,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Btn, cn } from "../gmail/ui";
 import {
   DraftInput,
+  RowSelect,
   SettingsPageContainer,
   SettingsRow,
   SettingsSection,
   TextInput,
 } from "./settings-ui";
 import { searchableSetting } from "./settings-search";
-import { AgentTokensSection, CopyField } from "./agent-tokens-section";
+import { AgentTokensSection } from "./agent-tokens-section";
 import { features } from "../features";
 import { RUNTIME_MODE_OPTIONS } from "../gmail/model-picker";
 import {
@@ -742,46 +744,58 @@ function FollowUpSection() {
   );
 }
 
-const AGENT_ACCESS: { value: AgentAccess; label: string }[] = [
-  { value: "read-only", label: "Read only" },
-  { value: "supervised", label: "Supervised" },
-  { value: "full-access", label: "Full access" },
+const AGENT_ACCESS: { value: AgentAccess; label: string; description: string }[] = [
+  {
+    value: "read-only",
+    label: "Read only",
+    description: "Reads your mail, calendars and projects. Changes nothing.",
+  },
+  {
+    value: "safe",
+    label: "Safe",
+    description:
+      "Anything you can undo: archive, label, trash, drafts, projects. Never sends or deletes for good.",
+  },
+  {
+    value: "full-access",
+    label: "Full access",
+    description: "Anything, sending mail and calendar invitations included.",
+  },
 ];
 
-function AgentAccessSelect({
-  value,
-  onChange,
-  label,
-}: {
-  value: AgentAccess;
-  onChange: (access: AgentAccess) => void;
-  label: string;
-}) {
-  return (
-    <Select value={value} onValueChange={(next) => onChange(next as AgentAccess)}>
-      <SelectTrigger variant="pill" aria-label={label}>
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        {AGENT_ACCESS.map((option) => (
-          <SelectItem key={option.value} value={option.value}>
-            {option.label}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  );
-}
+/**
+ * One line to paste in Terminal that adds the server, with a new token, to
+ * each agent: Claude Code's own command; for Codex, whose `mcp add` takes no
+ * header, the server in its config.toml (replacing an older one); Cursor's
+ * install link (cursor.com/docs/mcp/install-links), which asks first.
+ */
+const AGENT_COMMANDS: { agent: string; text: (url: string, token: string) => string }[] = [
+  {
+    agent: "Claude Code",
+    text: (url, token) =>
+      `claude mcp add --scope user --transport http otter-mail ${url} --header "Authorization: Bearer ${token}"`,
+  },
+  {
+    agent: "Codex",
+    text: (url, token) =>
+      `codex mcp remove otter-mail >/dev/null 2>&1; printf '\\n[mcp_servers.otter-mail]\\nurl = "${url}"\\nhttp_headers = { Authorization = "Bearer ${token}" }\\n' >> ~/.codex/config.toml`,
+  },
+  {
+    agent: "Cursor",
+    text: (url, token) =>
+      `open 'cursor://anysphere.cursor-deeplink/mcp/install?name=otter-mail&config=${btoa(JSON.stringify({ url, headers: { Authorization: `Bearer ${token}` } }))}'`,
+  },
+];
 
 /**
  * Agents on this Mac that Otter Mail doesn't run (Claude Code, Cursor, …) get
  * its tools at the Mac app's MCP server with a token made here, each with as
- * much access as it's given. A supervised agent's changes ask in the main
- * window (agent-approval-dialog.tsx).
+ * much access as it's given. Nothing asks again: making the token was the
+ * user's say.
  */
 function ConnectedAgentsSection() {
   const qc = useQueryClient();
-  const [access, setAccess] = useState<AgentAccess>("supervised");
+  const [access, setAccess] = useState<AgentAccess>("safe");
   const change = useMutation({
     mutationFn: ({ id, access }: { id: string; access: AgentAccess }) =>
       gmailApi.setConnectedAgentAccess(id, access),
@@ -792,7 +806,7 @@ function ConnectedAgentsSection() {
   return (
     <AgentTokensSection<ConnectedAgent>
       {...searchableSetting("connected-agents")}
-      description="Claude Code, Cursor or any agent that speaks MCP can use Otter Mail's tools while the app is open: your mailboxes, calendars, projects and views."
+      description="Claude Code, Codex, Cursor or any agent that speaks MCP can use your mail, calendars, projects and views while Otter Mail is open."
       queryKey="mcp:agents"
       list={gmailApi.connectedAgents}
       create={(name) => gmailApi.addConnectedAgent(name, access)}
@@ -800,27 +814,34 @@ function ConnectedAgentsSection() {
       defaultName="Claude Code"
       newTokenFields={
         <Field label="Access" orientation="vertical">
-          <AgentAccessSelect value={access} onChange={setAccess} label="Access" />
-          <Text variant="small">
-            A supervised agent changes your mail only once you allow it, here in Otter Mail.
+          <ToggleGroup
+            aria-label="Access"
+            className="w-full"
+            value={[access]}
+            onValueChange={(next) => {
+              if (next[0]) setAccess(next[0] as AgentAccess);
+            }}
+          >
+            {AGENT_ACCESS.map((option) => (
+              <Toggle key={option.value} value={option.value} className="flex-1">
+                {option.label}
+              </Toggle>
+            ))}
+          </ToggleGroup>
+          <Text variant="small" color="secondary">
+            {AGENT_ACCESS.find((o) => o.value === access)?.description}
           </Text>
         </Field>
       }
       renderControl={(agent) => (
-        <AgentAccessSelect
+        <RowSelect
           value={agent.access}
-          onChange={(next) => change.mutate({ id: agent.id, access: next })}
-          label={`${agent.name}'s access`}
+          onValueChange={(next) => change.mutate({ id: agent.id, access: next as AgentAccess })}
+          options={AGENT_ACCESS}
+          ariaLabel={`${agent.name}'s access`}
         />
       )}
-      renderSetup={(url, token) => (
-        <>
-          <Text variant="small">Add Otter Mail to Claude Code with this command:</Text>
-          <CopyField
-            value={`claude mcp add --scope user --transport http otter-mail ${url} --header "Authorization: Bearer ${token}"`}
-          />
-        </>
-      )}
+      commands={AGENT_COMMANDS}
     />
   );
 }

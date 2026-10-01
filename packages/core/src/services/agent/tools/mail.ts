@@ -792,6 +792,7 @@ export const mailTools: AgentTool[] = [
   {
     name: "delete_draft",
     title: "Delete a draft",
+    permanent: true,
     description: "Deletes a draft (its draftId is in get_thread).",
     input: {
       type: "object",
@@ -809,6 +810,7 @@ export const mailTools: AgentTool[] = [
   {
     name: "send_email",
     title: "Send email",
+    permanent: true,
     description:
       "Sends a message: new, a reply (replyTo) or a forward (forward). Only when the user asked for it to be sent; otherwise use save_draft. With draftId, that draft is deleted once it's sent.",
     input: {

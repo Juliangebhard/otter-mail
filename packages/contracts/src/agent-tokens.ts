@@ -15,8 +15,12 @@ export interface AgentToken {
   lastUsedAt: number | null;
 }
 
-/** What an agent on the Mac may do: only read, change once the user allows it, or anything. */
-export type AgentAccess = "read-only" | "supervised" | "full-access";
+/**
+ * What an agent on the Mac may do, chosen with its token (so nothing asks
+ * again): only read; "safe", anything that can be undone (archive, label,
+ * trash, drafts, projects), never sending or deleting for good; or anything.
+ */
+export type AgentAccess = "read-only" | "safe" | "full-access";
 
 /** An agent on the Mac (Claude Code, Cursor, …) given Otter Mail's tools. */
 export interface ConnectedAgent extends AgentToken {

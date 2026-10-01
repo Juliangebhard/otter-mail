@@ -210,9 +210,10 @@ with an agent token.
 
 Other agents on the Mac (Claude Code or Codex in a terminal, Cursor, …) get the same tools from
 that server while the app is open, with a token made in Settings › Agents (its address stays the
-same from launch to launch). Each token is read only, supervised or full access; a supervised
-agent's changes wait for Allow in the main window, and a notification brings it up. Agents that
-run in the cloud (Langdock, claude.ai connectors) can't reach a server on the Mac.
+same from launch to launch). Each token is read only, safe or full access, and nothing asks
+again: safe is anything that can be undone (archive, label, trash, drafts, projects), never
+sending mail or invitations or deleting for good. Agents that run in the cloud (Langdock,
+claude.ai connectors) can't reach a server on the Mac.
 
 ## Translation
 

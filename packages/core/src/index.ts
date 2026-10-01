@@ -85,7 +85,6 @@ export { TOOL_OUTPUT_CHARS, claudeStep, codexStep } from "./services/agent/steps
 export {
   OTTER_TOOLS_SERVER,
   agentTools,
-  answerToolApproval,
   cancelToolApprovals,
   runAgentTool,
   type AgentTool,

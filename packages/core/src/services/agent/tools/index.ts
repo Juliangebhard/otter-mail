@@ -34,10 +34,13 @@ export function toolTitle(name: string): string | undefined {
   return TOOLS.find((t) => t.name === name)?.title;
 }
 
-/** The tools a caller can use (attachments need files on the device; a read-only caller only reads). */
+/** The tools a caller can use: attachments need files on the device, and its access may leave out changes. */
 export function agentTools(caller: ToolCaller): AgentTool[] {
+  const access = caller.access?.() ?? "full-access";
   return TOOLS.filter(
-    (t) => (!t.needsFiles || caller.files) && (t.readOnly || !caller.readOnly?.()),
+    (t) =>
+      (!t.needsFiles || caller.files) &&
+      (t.readOnly || access === "full-access" || (access === "safe" && !t.permanent)),
   );
 }
 
@@ -54,7 +57,7 @@ export function answerToolApproval(approvalId: string, decision: ApprovalDecisio
   return Boolean(waiting);
 }
 
-/** Drops a caller's open approvals (its turn stopped, or it lost access): those tool calls fail. */
+/** Drops a chat's open approvals (its turn stopped): those tool calls fail. */
 export function cancelToolApprovals(caller: ToolCaller): void {
   for (const waiting of pending.values()) if (waiting.caller === caller) waiting.resolve("cancel");
 }

@@ -195,6 +195,7 @@ export const calendarTools: AgentTool[] = [
   {
     name: "create_event",
     title: "Add an event",
+    permanent: true,
     description: "Adds an event to the mailbox's calendar, inviting any attendees.",
     input: {
       type: "object",
@@ -217,6 +218,7 @@ export const calendarTools: AgentTool[] = [
   {
     name: "update_event",
     title: "Change an event",
+    permanent: true,
     description: "Changes an event: only the fields given change.",
     input: {
       type: "object",
@@ -241,6 +243,7 @@ export const calendarTools: AgentTool[] = [
   {
     name: "delete_event",
     title: "Delete an event",
+    permanent: true,
     description:
       "Deletes an event from the mailbox's calendar (for an invitation, decline it instead).",
     input: {
@@ -269,6 +272,7 @@ export const calendarTools: AgentTool[] = [
   {
     name: "respond_to_event",
     title: "Answer an invitation",
+    permanent: true,
     description: "Accepts, declines or tentatively accepts an invitation; the organizer is told.",
     input: {
       type: "object",

@@ -27,7 +27,7 @@ import {
 import { appInfo } from "../../backend-protocol.js";
 import { logger } from "../../logger.js";
 import { agentCaller } from "./connected-agents.js";
-import { CONNECTED_AGENT_INSTRUCTIONS } from "./instructions.js";
+import { connectedAgentInstructions } from "./instructions.js";
 import { deviceFiles } from "./local.js";
 
 export const MCP_SERVER_NAME = OTTER_TOOLS_SERVER;
@@ -57,7 +57,11 @@ function mcpServer(caller: ToolCaller, instructions: string | undefined): Server
       title: tool.title,
       description: tool.description,
       inputSchema: tool.input,
-      annotations: { readOnlyHint: Boolean(tool.readOnly), openWorldHint: false },
+      annotations: {
+        readOnlyHint: Boolean(tool.readOnly),
+        destructiveHint: Boolean(tool.permanent),
+        openWorldHint: false,
+      },
     })),
   }));
   // The signal aborts when the agent hangs up, so a change it stopped waiting for won't happen.
@@ -91,7 +95,10 @@ async function serve(req: http.IncomingMessage, res: http.ServerResponse): Promi
     return;
   }
   // A chat's agent has these in its prompt already (instructions.ts).
-  const server = mcpServer(caller, chat ? undefined : CONNECTED_AGENT_INSTRUCTIONS);
+  const server = mcpServer(
+    caller,
+    chat ? undefined : connectedAgentInstructions(caller.access?.() ?? "full-access"),
+  );
   const transport = new StreamableHTTPServerTransport({
     sessionIdGenerator: undefined,
     enableJsonResponse: true,
