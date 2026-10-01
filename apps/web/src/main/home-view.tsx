@@ -1318,9 +1318,12 @@ function MailHome() {
                 onMouseEnter={() => hoverSpace(peekSpace)}
                 onMouseLeave={() => hoverSpace(null)}
                 style={{ width: sidebarPane.width }}
-                className="absolute bottom-1 left-0 top-(--workspace-topbar-height) z-40 flex flex-col overflow-hidden rounded-xl border border-(--panel-edge) bg-canvas text-sidebar-foreground shadow-[0_16px_40px_-12px_rgb(0_0_0/45%)] transition-[opacity,translate] duration-150 ease-out starting:-translate-x-2 starting:opacity-0"
+                // A card of its own (ChatGPT's): an even gap from the rail,
+                // the title band and the window's foot; lighter than the
+                // window in dark themes, raised by its shadow in light ones.
+                className="absolute bottom-2 left-1.5 top-[calc(var(--workspace-topbar-height)+0.375rem)] z-40 flex flex-col overflow-hidden rounded-2xl border border-border/60 bg-popover text-sidebar-foreground shadow-[0_18px_48px_-12px_rgb(0_0_0/30%)] transition-[opacity,translate] duration-150 ease-out starting:-translate-x-2 starting:opacity-0 dark:bg-[color-mix(in_srgb,var(--popover)_90%,var(--popover-foreground))] dark:shadow-[0_18px_48px_-12px_rgb(0_0_0/70%)]"
               >
-                <div className="flex min-h-0 flex-1 flex-col bg-(--sidebar-panel-surface)">
+                <div className="flex min-h-0 flex-1 flex-col">
                   {peekSpace === PROJECTS_MAILBOX ? (
                     <ProjectsSidebar
                       selectedLabelId={isProjects ? selectedLabelId : ""}
