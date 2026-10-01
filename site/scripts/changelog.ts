@@ -11,6 +11,7 @@ import {
   releasedEntries,
   type ChangelogEntry,
 } from "@otter-mail/shared/changelog";
+import { siteFooter, siteNav } from "./layout.ts";
 
 const repo = NodePath.resolve(import.meta.dirname, "../..");
 const notes = NodePath.join(repo, "changelog");
@@ -46,20 +47,6 @@ const markdown = new Marked({
     },
   },
 });
-
-/**
- * The landing page's header, so every page wears the same one: its <nav>, with
- * links to the landing page's own sections made absolute.
- */
-function siteNav(): string {
-  const landing = NodeFS.readFileSync(
-    NodePath.resolve(import.meta.dirname, "../public/index.html"),
-    "utf8",
-  );
-  const nav = /<nav class="nav">[\s\S]*?<\/nav>/.exec(landing);
-  if (!nav) throw new Error('site/public/index.html: no <nav class="nav">');
-  return nav[0].replace(/href="#/g, 'href="/#');
-}
 
 /**
  * Writes dist/changelog/index.html: every released note (up to `current`) on
@@ -107,7 +94,7 @@ ${markdown.parse(e.body.replace(/^## /gm, "### "))}
       ${siteNav()}
     </div>
 
-    <main class="changelog">
+    <main class="page changelog">
       <div class="wrap">
         <header>
           <h1>Changelog</h1>
@@ -123,12 +110,7 @@ ${toc}
 ${notesHtml}
           </div>
         </div>
-        <footer>
-          <a href="/changelog/">Changelog</a><a href="/privacy/">Privacy</a
-          ><a href="/terms/">Terms</a
-          ><a href="https://github.com/otterware-app/otter-mail">GitHub</a
-          ><a href="https://github.com/otterware-app">Otterware</a>
-        </footer>
+        ${siteFooter()}
       </div>
     </main>
 
