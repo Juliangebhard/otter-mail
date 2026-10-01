@@ -260,7 +260,7 @@ export function ViewEditorForm({
         <p className="text-[13px] text-muted-foreground">
           {isDefault
             ? "A folder of All mailboxes."
-            : "In the rail, after your mailboxes, with its own Inbox, Starred, Sent and All Mail."}
+            : "A mailbox in the rail, after your mailboxes."}
         </p>
       </div>
 

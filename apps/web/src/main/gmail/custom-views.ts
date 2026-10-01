@@ -64,33 +64,6 @@ export function defaultRulesFor(kind: ViewKind, accounts: GmailAccount[]): ViewR
  */
 export const isCustomMailboxId = (id: string) => id.startsWith("v_");
 
-const CUSTOM_MAILBOX_FOLDERS = new Set<ViewKind>([
-  "inbox",
-  "starred",
-  "sent",
-  "drafts",
-  "important",
-  "allmail",
-]);
-
-/**
- * A custom mailbox's folders, as views: its mail that's also in the Inbox,
- * Starred…, and All Mail, all of it. Their ids are the combined mailbox's
- * built-in views' (INBOX_VIEW_ID…).
- */
-export function customMailboxFolders(mailbox: MailView, accounts: GmailAccount[]): MailView[] {
-  const rules = resolveRules(mailbox, accounts);
-  return DEFAULT_VIEWS.filter((folder) => CUSTOM_MAILBOX_FOLDERS.has(folder.kind)).map((folder) => {
-    const label = systemLabelForKind(folder.kind);
-    return {
-      ...folder,
-      rules: label
-        ? rules.map((r) => (r.allOf.includes(label) ? r : { ...r, allOf: [...r.allOf, label] }))
-        : rules,
-    };
-  });
-}
-
 /**
  * Resolves a view to the concrete rules used for querying, pruned to accounts
  * that still exist. Built-in views with null rules fall back to their dynamic

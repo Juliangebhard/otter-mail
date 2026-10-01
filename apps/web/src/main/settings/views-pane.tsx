@@ -222,7 +222,7 @@ export function ViewsPane({
     <SettingsPageContainer
       searchId={searchableSetting("views").id}
       title="Custom mailboxes"
-      description="Mailboxes made of filters, across your mailboxes, in the rail after them. Each has its own Inbox, Starred, Sent and All Mail."
+      description="Saved filters, across your mailboxes, each one a mailbox in the rail after them."
       action={
         <Btn size="sm" variant="outline" onClick={() => onOpenView("new", COMBINED_MAILBOX)}>
           <PlusIcon className="size-3.5" />

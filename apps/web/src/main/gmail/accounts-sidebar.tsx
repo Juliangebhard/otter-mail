@@ -52,7 +52,8 @@ import {
   useViewUnreadCounts,
 } from "./hooks";
 import type { GmailLabel, MailView } from "./types";
-import { COMBINED_ACCOUNT_ID, INBOX_VIEW_ID, customMailboxFolders } from "./custom-views";
+import { COMBINED_ACCOUNT_ID, INBOX_VIEW_ID } from "./custom-views";
+import { CUSTOM_ALL, useCustomMailboxFilters } from "./custom-mailboxes";
 import { ALL_MAIL_LABEL_ID } from "./label-names";
 import { buildLabelTree, type LabelTreeNode } from "./label-tree";
 import {
@@ -655,7 +656,11 @@ export function AccountsSidebar(props: AccountsSidebarProps) {
                   active={false}
                   selectedAccountId={id}
                   selectedLabelId={
-                    id.startsWith("__") || id.startsWith("v_") ? INBOX_VIEW_ID : "INBOX"
+                    id === COMBINED_ACCOUNT_ID
+                      ? INBOX_VIEW_ID
+                      : id.startsWith("v_")
+                        ? CUSTOM_ALL
+                        : "INBOX"
                   }
                   searchSelected={false}
                   searchPending={false}
@@ -672,7 +677,7 @@ export function AccountsSidebar(props: AccountsSidebarProps) {
   );
 }
 
-/** One mailbox's page of the sidebar: its heading, rows and labels (a custom one's: its folders). */
+/** One mailbox's page of the sidebar: its heading, rows and labels (a custom one's: its filters). */
 function SidebarPage({
   active,
   onEditView,
@@ -732,12 +737,31 @@ function SidebarPage({
         ? getAccountDisplayName(account)
         : "Mailbox";
   const labels: GmailLabel[] = labelsQuery.data ?? [];
-  // The combined mailbox's folders are its built-in views; a custom one's,
-  // its filters within each.
-  const folders = custom
-    ? customMailboxFolders(custom, accounts)
+  // The combined mailbox's folders are its built-in views; a custom one is
+  // all its mail, then each of its filters.
+  const { filters } = useCustomMailboxFilters(custom, accounts);
+  const folders: MailView[] = custom
+    ? [
+        { ...custom, id: CUSTOM_ALL, name: "All mail" },
+        ...filters.map((f) => ({
+          id: f.id,
+          name: f.name,
+          kind: "custom" as const,
+          rules: f.rules,
+        })),
+      ]
     : views.filter((v) => v.kind !== "custom");
   const viewUnreadCounts = useViewUnreadCounts(folders, accounts, isCombined || custom != null);
+  const folderIcon = (view: MailView) => {
+    if (!custom) return viewIcon(view);
+    if (view.id === CUSTOM_ALL) return <MailsIcon className="size-4" />;
+    const color = filters.find((f) => f.id === view.id)?.color;
+    return color ? (
+      <TagIcon className="size-4 fill-current" style={{ color }} />
+    ) : (
+      <TagIcon className="size-4" />
+    );
+  };
 
   // Same order as the Combined built-in views. All Mail isn't a Gmail label
   // (archived mail just lacks INBOX), so it's listed without one — and, like
@@ -974,7 +998,7 @@ function SidebarPage({
                 <Fragment key={view.id}>
                   {withEmptyMenu(
                     <SkRow
-                      icon={viewIcon(view)}
+                      icon={folderIcon(view)}
                       title={view.name}
                       selected={selectedLabelId === view.id}
                       badge={viewUnreadCounts[view.id] ?? 0}

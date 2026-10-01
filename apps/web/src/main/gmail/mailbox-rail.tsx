@@ -20,7 +20,6 @@ import { HintTooltip, cn } from "./ui";
 import { AccountPicture } from "./account-picture";
 import { AddMailboxMenu, readableError } from "./add-mailbox";
 import { useAddAccount, useViewUnreadCounts } from "./hooks";
-import { customMailboxFolders } from "./custom-views";
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from "./menu";
 import { useInboxUnread, useMailboxOptions } from "./top-bar";
 import type { GmailAccount, MailView } from "./types";
@@ -37,8 +36,8 @@ const RAIL_BUTTON_SELECTED = "bg-sidebar-row-selected text-sidebar-foreground";
 
 /**
  * The rail down the window's left edge (ChatGPT's): the mailboxes, then the
- * custom ones (filters across them), a dot on those with unread mail in the
- * Inbox, then Projects, then who you are at the bottom, with the app's menu. It stays when the sidebar hides, so switching
+ * custom ones (filters across them), a dot on those with unread mail (a
+ * mailbox's in its Inbox), then Projects, then who you are at the bottom, with the app's menu. It stays when the sidebar hides, so switching
  * mailboxes never needs the sidebar.
  */
 export function MailboxRail({
@@ -69,11 +68,8 @@ export function MailboxRail({
 }) {
   const options = useMailboxOptions(accounts);
   const unread = useInboxUnread(accounts);
-  // A custom mailbox's dot: unread in its Inbox.
-  const customUnread = useViewUnreadCounts(
-    customMailboxes.map((v) => ({ ...customMailboxFolders(v, accounts)[0], id: v.id })),
-    accounts,
-  );
+  // A custom mailbox's dot: unread mail in it.
+  const customUnread = useViewUnreadCounts(customMailboxes, accounts);
   const projectsUnread = Object.values(useProjectUnreadCounts().data ?? {}).some((n) => n > 0);
   const projectsSelected = !settingsOpen && selectedAccountId === PROJECTS_MAILBOX;
   const addAccount = useAddAccount();

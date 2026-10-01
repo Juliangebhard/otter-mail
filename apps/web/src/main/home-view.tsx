@@ -70,7 +70,6 @@ import type { GmailAccount, GmailMessageSummary } from "./gmail/types";
 import {
   useMailViews,
   resolveRules,
-  customMailboxFolders,
   isCustomMailboxId,
   loadLastLocation,
   saveLastLocation,
@@ -85,6 +84,7 @@ import { ALL_MAIL_LABEL_ID } from "./gmail/label-names";
 import { useMonochromeTheme } from "./theme/apply-theme";
 import { features } from "./features";
 import { useMailboxes } from "./mailboxes";
+import { CUSTOM_ALL, useCustomMailboxFilters } from "./gmail/custom-mailboxes";
 import { ALL_PROJECTS, PROJECTS_MAILBOX, useProject, useProjects } from "./gmail/projects";
 import { ProjectsSidebar } from "./gmail/projects-sidebar";
 import { ProjectsOverview } from "./gmail/projects-overview";
@@ -147,11 +147,13 @@ function useRouteMailLoc(): MailLoc | null {
 }
 
 const inboxOf = (mailbox: string) =>
-  mailbox === COMBINED_ACCOUNT_ID || isCustomMailboxId(mailbox)
+  mailbox === COMBINED_ACCOUNT_ID
     ? INBOX_VIEW_ID
-    : mailbox === PROJECTS_MAILBOX
-      ? ALL_PROJECTS
-      : "INBOX";
+    : isCustomMailboxId(mailbox)
+      ? CUSTOM_ALL
+      : mailbox === PROJECTS_MAILBOX
+        ? ALL_PROJECTS
+        : "INBOX";
 
 /** Where the mail was last time (custom-views' saved location). */
 function savedLoc(): MailLoc {
@@ -476,9 +478,9 @@ function MailHome() {
   const isCombined = selectedAccountId === COMBINED_ACCOUNT_ID && mailboxes.combined;
   // Projects (the rail's), where the mail of every mailbox is too.
   const isProjects = selectedAccountId === PROJECTS_MAILBOX;
-  // A custom mailbox: filters across the mailboxes, with folders like the combined one's.
+  // A custom mailbox: filters across the mailboxes, all their mail or one filter's.
   const customMailbox = customMailboxes.find((v) => v.id === selectedAccountId) ?? null;
-  const customFolders = customMailbox ? customMailboxFolders(customMailbox, accounts) : [];
+  const customFilters = useCustomMailboxFilters(customMailbox, accounts);
   const spansMailboxes = isCombined || isProjects || customMailbox != null;
   const selectedProject = useProject(isProjects ? selectedLabelId : null);
   const projectsQuery = useProjects();
@@ -709,17 +711,17 @@ function MailHome() {
   useKeybindingContext("settingsOpen", settingsRoute !== null);
   useKeybindingContext("messageOpen", selectedMessageId !== null);
   const goTo = (combinedViewId: string, labelId: string) => {
-    // From Projects, to the first mailbox's.
-    const mailbox = isProjects
-      ? mailboxes.combined
-        ? COMBINED_ACCOUNT_ID
-        : firstRealAccountId
-      : selectedAccountId;
+    // From Projects or a custom mailbox, to the first mailbox's.
+    const mailbox =
+      isProjects || customMailbox
+        ? mailboxes.combined
+          ? COMBINED_ACCOUNT_ID
+          : firstRealAccountId
+        : selectedAccountId;
     if (!mailbox) return;
     go({
       mailbox,
-      label:
-        mailbox === COMBINED_ACCOUNT_ID || isCustomMailboxId(mailbox) ? combinedViewId : labelId,
+      label: mailbox === COMBINED_ACCOUNT_ID ? combinedViewId : labelId,
       messageId: null,
     });
   };
@@ -860,13 +862,17 @@ function MailHome() {
       return;
     }
     if (customMailbox) {
-      if (!customFolders.some((f) => f.id === selectedLabelId)) correct({ label: INBOX_VIEW_ID });
+      const known =
+        selectedLabelId === CUSTOM_ALL ||
+        !customFilters.loaded ||
+        customFilters.filters.some((f) => f.id === selectedLabelId);
+      if (!known) correct({ label: CUSTOM_ALL });
       return;
     }
     // A custom view as a label (views were once in each mailbox): its own mailbox.
     const view = views.find((v) => v.id === selectedLabelId);
     if (view?.kind === "custom") {
-      correct({ mailbox: view.id, label: INBOX_VIEW_ID });
+      correct({ mailbox: view.id, label: CUSTOM_ALL });
       return;
     }
     if (isCombined && !view) correct({ label: INBOX_VIEW_ID });
@@ -881,6 +887,7 @@ function MailHome() {
     projectsLoaded,
     selectedProject,
     customMailbox,
+    customFilters,
   ]);
 
   // Local-first: keep the on-disk cache synced in the background. Combined mode
@@ -924,11 +931,11 @@ function MailHome() {
       };
     }
     if (customMailbox) {
-      const folder = customFolders.find((f) => f.id === selectedLabelId) ?? customFolders[0];
+      const filter = customFilters.filters.find((f) => f.id === selectedLabelId);
       return {
-        viewId: `${customMailbox.id}:${folder.id}`,
-        name: folder.name,
-        rules: resolveRules(folder, accounts),
+        viewId: `${customMailbox.id}:${filter?.id ?? CUSTOM_ALL}`,
+        name: filter?.name ?? customMailbox.name,
+        rules: filter?.rules ?? resolveRules(customMailbox, accounts),
       };
     }
     if (isCombined) {
