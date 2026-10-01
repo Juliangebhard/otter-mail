@@ -970,8 +970,8 @@ function MailHome() {
   };
 
   // ── Peeking at a space ────────────────────────────────────────────────────
-  // Hovering a mailbox or Projects in the rail shows its sidebar over the
-  // window after a beat (at once while one shows), so a folder or project in
+  // With the sidebar collapsed, hovering a mailbox or Projects in the rail
+  // shows its sidebar over the window after a beat (at once while one shows), so a folder or project in
   // another space is one click away. It stays while the pointer is in it, and
   // goes a moment after it leaves (not while a menu or dialog of it is open).
   // A conversation dragged onto the rail opens it too, to drop on a label.
@@ -1011,9 +1011,8 @@ function MailHome() {
       go({ mailbox: spaceId, label, messageId: null, account: null, focusId: null });
     }
   };
-  // The space showing has its own sidebar docked, unless it's hidden.
-  const peekSpace =
-    peek && !(peek === effectiveAccountId && sidebarOpen && !settingsRoute) ? peek : null;
+  // Only while the sidebar is collapsed (or a view's space has none).
+  const peekSpace = peek && !sidebarOpen ? peek : null;
 
   /** A project's page, with its conversations in the list. */
   const openProject = (id: string) => {
@@ -1292,7 +1291,7 @@ function MailHome() {
             onEditView={(viewId) =>
               openSettings({ pane: "views", viewId, mailbox: COMBINED_ACCOUNT_ID })
             }
-            onHoverSpace={hoverSpace}
+            onHoverSpace={sidebarOpen ? undefined : hoverSpace}
             selectedAccountId={effectiveAccountId}
             onSelectAccount={handleSelectAccount}
             settingsOpen={settingsRoute !== null}

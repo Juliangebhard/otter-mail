@@ -59,8 +59,11 @@ export function MailboxRail({
   views: MailView[];
   /** Settings' editor for one ("new" makes one). */
   onEditView: (viewId: string) => void;
-  /** The space under the pointer, if it has a sidebar to peek at; null when it leaves. */
-  onHoverSpace: (spaceId: string | null) => void;
+  /**
+   * The space under the pointer, if it has a sidebar to peek at; null when it
+   * leaves. Absent while the sidebar shows: the rail has tooltips instead.
+   */
+  onHoverSpace?: (spaceId: string | null) => void;
   /** The space showing (a mailbox, a view or PROJECTS_MAILBOX); none is lit while Settings is. */
   selectedAccountId: string | null;
   onSelectAccount: (spaceId: string) => void;
@@ -86,25 +89,26 @@ export function MailboxRail({
     }
   };
 
-  /** A space's square: lit where you are, a dot for unread mail. */
+  /** A space's square: lit where you are, a dot for unread mail; named by a tooltip unless it peeks. */
   const spaceButton = (
     id: string,
     name: string,
     mark: ReactNode,
     dot: boolean,
     peek: boolean,
-    extra?: { tour?: string },
+    extra?: { tour?: string; shortcut?: string },
   ) => {
     const selected = !settingsOpen && id === selectedAccountId;
-    return (
+    const peeks = peek && onHoverSpace != null;
+    const button = (
       <button
         type="button"
         aria-label={name}
         aria-current={selected ? "page" : undefined}
         data-tour={extra?.tour}
         onClick={() => onSelectAccount(id)}
-        onMouseEnter={() => onHoverSpace(peek ? id : null)}
-        onDragEnter={() => onHoverSpace(peek ? id : null)}
+        onMouseEnter={() => onHoverSpace?.(peeks ? id : null)}
+        onDragEnter={() => onHoverSpace?.(peeks ? id : null)}
         className={cn(RAIL_BUTTON, selected && RAIL_BUTTON_SELECTED)}
       >
         {mark}
@@ -116,20 +120,28 @@ export function MailboxRail({
         ) : null}
       </button>
     );
+    return peek && !peeks ? (
+      <HintTooltip label={name} hint={extra?.shortcut} side="right">
+        {button}
+      </HintTooltip>
+    ) : (
+      button
+    );
   };
 
   return (
     <nav
       aria-label="Spaces"
       data-app-sidebar=""
-      onMouseLeave={() => onHoverSpace(null)}
+      onMouseLeave={() => onHoverSpace?.(null)}
       className="flex w-(--workspace-rail-width) shrink-0 flex-col items-center pb-(--sidebar-content-inset) text-sidebar-foreground"
     >
       {/* Under the title band, and past the panel's rounded corner: level with
           the sidebar's heading. */}
       <div aria-hidden className="drag-region h-(--workspace-topbar-height) w-full shrink-0" />
       <div className="mt-(--radius-xl) flex flex-col items-center gap-1" data-tour="mailbox">
-        {/* Mailboxes peek at their sidebars, which name them: no tooltip. */}
+        {/* Mailboxes peek at their sidebars, which name them, while the
+            sidebar is collapsed; otherwise a tooltip names them. */}
         {options.map((option) => (
           <span key={option.id} className="contents">
             {spaceButton(
@@ -145,6 +157,7 @@ export function MailboxRail({
               ),
               (unread[option.id] ?? 0) > 0,
               true,
+              { shortcut: option.shortcut },
             )}
           </span>
         ))}
@@ -157,7 +170,7 @@ export function MailboxRail({
             <button
               type="button"
               aria-label="Add mailbox or view"
-              onMouseEnter={() => onHoverSpace(null)}
+              onMouseEnter={() => onHoverSpace?.(null)}
               className={RAIL_BUTTON}
             >
               <PlusIcon className="size-4.5" />
