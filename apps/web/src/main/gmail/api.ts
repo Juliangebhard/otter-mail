@@ -1,4 +1,5 @@
-import type { ImapSettings } from "@otter-mail/contracts";
+import type { AgentApproval, ImapSettings } from "@otter-mail/contracts";
+import type { AgentAccess, AgentTokens, ConnectedAgent } from "@otter-mail/contracts/agent-tokens";
 import type {
   ComposeAttachment,
   ContactSuggestion,
@@ -682,9 +683,10 @@ export const gmailApi = {
   ): Promise<{ attachments: ChatAttachment[]; errors: string[] }> =>
     ipc("agent:stageAttachments", { items }),
 
+  /** Otter Mail's own tools' approvals (a chat's, or an agent's on the Mac) need no provider. */
   agentRespondApproval: (params: {
-    provider: ProviderKind;
-    requestId: string;
+    provider?: ProviderKind;
+    requestId?: string;
     approvalId: string;
     decision: ApprovalDecision;
   }): Promise<{ ok: boolean }> => ipc("agent:respondApproval", params),
@@ -711,4 +713,15 @@ export const gmailApi = {
 
   agentDeleteSession: (provider: ProviderKind, sessionId: string): Promise<{ ok: boolean }> =>
     ipc("agent:deleteSession", { provider, sessionId }),
+
+  // Agents on the Mac given Otter Mail's tools with a token (the Mac only).
+  connectedAgents: (): Promise<AgentTokens<ConnectedAgent>> => ipc("mcp:listAgents"),
+  /** Answers the token, this once. */
+  addConnectedAgent: (name: string, access: AgentAccess): Promise<string> =>
+    ipc("mcp:addAgent", { name, access }),
+  setConnectedAgentAccess: (id: string, access: AgentAccess): Promise<void> =>
+    ipc("mcp:setAgentAccess", { id, access }),
+  removeConnectedAgent: (id: string): Promise<void> => ipc("mcp:removeAgent", { id }),
+  /** What they wait on the user to allow; pushed on AGENT_APPROVALS_CHANNEL. */
+  connectedAgentApprovals: (): Promise<AgentApproval[]> => ipc("mcp:approvals"),
 };

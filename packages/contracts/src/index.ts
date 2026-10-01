@@ -64,8 +64,30 @@ export interface BridgeFeatures {
   openFiles: boolean;
   /** Handing a support report to a locally installed agent in Terminal. */
   externalAgent: boolean;
-  /** Codex and Claude, the command-line agents installed on this computer. */
+  /**
+   * Codex and Claude, the command-line agents installed on this computer, and
+   * Otter Mail's tools for any agent on it (agent-tokens.ts' ConnectedAgent).
+   */
   localAgents: boolean;
+}
+
+/** A change an agent on the Mac (ConnectedAgent) waits on the user to allow (`mcp:approvals`). */
+export interface AgentApproval {
+  id: string;
+  /** The agent's name ("Claude Code"). */
+  agent: string;
+  /** What the tool does ("Send email"). */
+  title: string;
+  /** Exactly what will happen. */
+  detail: string;
+}
+
+/** Push channel carrying every `AgentApproval` waiting, whenever one comes or goes. */
+export const AGENT_APPROVALS_CHANNEL = "mcp:approvals";
+
+/** How an approval asks: "Allow Claude Code to send email?". */
+export function allowQuestion(agent: string, title: string): string {
+  return `Allow ${agent} to ${title.charAt(0).toLowerCase()}${title.slice(1)}?`;
 }
 
 export interface DesktopBridge {

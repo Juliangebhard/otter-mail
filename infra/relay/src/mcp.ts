@@ -1,7 +1,7 @@
 /**
  * The relay's MCP server, for agents that run elsewhere (Hermes): the
  * account's projects and nothing more (the relay never sees mail). Agents
- * sign in with an agent token (contracts' relay.ts), made in Settings;
+ * sign in with an agent token (contracts' agent-tokens.ts), made in Settings;
  * the relay keeps only its hash.
  */
 
@@ -15,17 +15,12 @@ import {
   type ProjectTool,
   type ProjectBackend,
 } from "@otter-mail/contracts/project-tools";
-import type { AgentToken } from "@otter-mail/contracts/relay";
+import { agentTokenHash, newAgentToken, type AgentToken } from "@otter-mail/contracts/agent-tokens";
 
 import { agentTokens } from "./schema.ts";
 import type { Db } from "./store.ts";
 
 const TOKEN_PREFIX = "otter_";
-
-async function sha256(text: string): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
-  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
-}
 
 const toAgentToken = (row: typeof agentTokens.$inferSelect): AgentToken => ({
   id: row.id,
@@ -49,11 +44,10 @@ export async function createToken(
   userId: string,
   name: string,
 ): Promise<{ token: string; agentToken: AgentToken }> {
-  const bytes = crypto.getRandomValues(new Uint8Array(32));
-  const token = TOKEN_PREFIX + btoa(String.fromCharCode(...bytes)).replace(/[+/=]/g, "");
+  const { token, hash } = await newAgentToken(TOKEN_PREFIX);
   const [row] = await db
     .insert(agentTokens)
-    .values({ id: crypto.randomUUID(), userId, name, hash: await sha256(token) })
+    .values({ id: crypto.randomUUID(), userId, name, hash })
     .returning();
   return { token, agentToken: toAgentToken(row) };
 }
@@ -72,7 +66,7 @@ export async function tokenUser(db: Db, token: string): Promise<string | null> {
   const [row] = await db
     .update(agentTokens)
     .set({ lastUsedAt: new Date() })
-    .where(eq(agentTokens.hash, await sha256(token)))
+    .where(eq(agentTokens.hash, await agentTokenHash(token)))
     .returning({ userId: agentTokens.userId });
   return row?.userId ?? null;
 }

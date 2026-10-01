@@ -19,7 +19,6 @@ import {
   normalizeHermesBaseUrl,
   probeHermesSessions,
 } from "./hermes.js";
-import { answerToolApproval } from "./tools/index.js";
 import {
   getHermesKey,
   getProviderSettings,
@@ -267,8 +266,6 @@ export async function respondApproval(
   decision: ApprovalDecision,
 ): Promise<void> {
   logger.info("agent", "approval", { provider: kind, requestId, decision });
-  // Otter Mail's own tools ask too (tools/index.ts).
-  if (answerToolApproval(approvalId, decision)) return;
   await provider(kind).respondApproval(requestId, approvalId, decision);
 }
 

@@ -1,12 +1,20 @@
 /**
- * Where Codex and Claude (local CLIs) work on this Mac: their workspace, and
- * the absolute paths of the attachments core stages in the app's files.
+ * Where agents on this Mac work: Codex's and Claude's workspace, the absolute
+ * paths of the attachments core stages in the app's files, and the files
+ * Otter Mail's tools hand any agent here.
  */
 
+import { randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 
-import { ATTACHMENTS_DIR, type ChatAttachment, type Platform } from "@otter-mail/core";
+import {
+  ATTACHMENTS_DIR,
+  type ChatAttachment,
+  type Platform,
+  type ToolFiles,
+} from "@otter-mail/core";
 
 import { appInfo } from "../../backend-protocol.js";
 import { requestMain } from "../../main-link.js";
@@ -30,6 +38,22 @@ export async function attachmentsDir(): Promise<string> {
 export function attachmentPath(attachment: ChatAttachment): string {
   return path.join(appInfo().stateDir, attachment.path);
 }
+
+/** The tools' files: attachments land in the attachments folder (Claude may read there). */
+export const deviceFiles: ToolFiles = {
+  async save(name, bytes) {
+    const dir = path.join(await attachmentsDir(), "mail", randomUUID());
+    await fs.mkdir(dir, { recursive: true });
+    const file = path.join(dir, path.basename(name).replace(/^\.+/, "_") || "attachment");
+    await fs.writeFile(file, bytes);
+    return file;
+  },
+  async read(file) {
+    const resolved = file.startsWith("~/") ? path.join(os.homedir(), file.slice(2)) : file;
+    if (!path.isAbsolute(resolved)) throw new Error(`Give the file's full path: ${file}`);
+    return { name: path.basename(resolved), bytes: new Uint8Array(await fs.readFile(resolved)) };
+  },
+};
 
 /**
  * Otter Code's attachment context, appended to the prompt for every

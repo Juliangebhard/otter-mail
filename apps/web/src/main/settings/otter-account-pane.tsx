@@ -1,18 +1,23 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { OtterAccountState, OtterDevice } from "@otter-mail/contracts";
-import { BotIcon, CopyIcon, LaptopIcon } from "lucide-react";
+import { LaptopIcon } from "lucide-react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { Dialog } from "~/components/ui/dialog";
-import { Field } from "~/components/ui/field";
-import { Input } from "~/components/ui/input";
 import { Text } from "~/components/ui/text";
 import { useAccounts } from "../gmail/hooks";
 import { toast } from "../gmail/toast";
 import { Btn, cn } from "../gmail/ui";
 import { otterApi, useOtterAccount } from "../otter-account";
-import { SettingsGroup, SettingsPageContainer, SettingsRow, SettingsSection } from "./settings-ui";
+import { AgentTokensSection } from "./agent-tokens-section";
+import {
+  SettingsGroup,
+  SettingsPageContainer,
+  SettingsRow,
+  SettingsSection,
+  timeAgo,
+} from "./settings-ui";
 import { searchableSetting } from "./settings-search";
 
 /**
@@ -23,15 +28,6 @@ import { searchableSetting } from "./settings-search";
  */
 
 const errorText = (err: unknown) => (err instanceof Error ? err.message : String(err));
-
-function timeAgo(ts: number): string {
-  const mins = Math.floor((Date.now() - ts) / 60_000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  return `${Math.floor(hrs / 24)}d ago`;
-}
 
 export function OtterAvatar({
   user,
@@ -131,120 +127,22 @@ function DevicesSection() {
   );
 }
 
-function CopyField({ value }: { value: string }) {
-  return (
-    <div className="flex items-center gap-2">
-      <Input
-        value={value}
-        readOnly
-        onFocus={(e) => e.target.select()}
-        className="font-mono text-xs"
-      />
-      <Btn
-        size="sm"
-        onClick={() =>
-          void navigator.clipboard.writeText(value).then(() => toast.success("Copied"))
-        }
-      >
-        <CopyIcon className="size-3.5" />
-        Copy
-      </Btn>
-    </div>
-  );
-}
-
 /**
  * Agents that run elsewhere (Hermes) manage the account's projects through
- * the relay's MCP server, with a token made here (shown once). Claude and
- * Codex on the Mac have Otter Mail's own tools already.
+ * the relay's MCP server, with a token made here. Claude and Codex on the Mac
+ * have Otter Mail's own tools already.
  */
 function AgentsSection() {
-  const qc = useQueryClient();
-  const tokens = useQuery({ queryKey: ["otter:agentTokens"], queryFn: otterApi.listAgentTokens });
-  const [creating, setCreating] = useState(false);
-  const [name, setName] = useState("Hermes");
-  const [created, setCreated] = useState<string | null>(null);
-  const refresh = () => void qc.invalidateQueries({ queryKey: ["otter:agentTokens"] });
-  const revoke = useMutation({
-    mutationFn: (id: string) => otterApi.deleteAgentToken(id),
-    onSuccess: refresh,
-    onError: (err) => toast.error("Couldn't revoke the token", { description: errorText(err) }),
-  });
-
   return (
-    <SettingsSection
+    <AgentTokensSection
       title="Agents"
       description="Agents that run elsewhere, like Hermes, can create and manage your projects through Otter Mail's MCP server, with a token. They get your projects, not your mail."
-      headerAction={
-        <Btn size="sm" onClick={() => setCreating(true)}>
-          New token…
-        </Btn>
-      }
-    >
-      {tokens.data ? (
-        <SettingsRow
-          title="MCP server"
-          description="Streamable HTTP; send the token as a Bearer token."
-        >
-          <div className="pb-2 pt-1">
-            <CopyField value={tokens.data.mcpUrl} />
-          </div>
-        </SettingsRow>
-      ) : null}
-      {tokens.isError ? (
-        <SettingsRow title="Couldn't load your tokens" description={errorText(tokens.error)} />
-      ) : (
-        tokens.data?.tokens.map((token) => (
-          <SettingsRow
-            key={token.id}
-            title={
-              <span className="flex items-center gap-2">
-                <BotIcon className="size-4 text-muted-foreground" />
-                {token.name}
-              </span>
-            }
-            description={token.lastUsedAt ? `Last used ${timeAgo(token.lastUsedAt)}` : "Never used"}
-            control={
-              <Btn size="sm" disabled={revoke.isPending} onClick={() => revoke.mutate(token.id)}>
-                Revoke
-              </Btn>
-            }
-          />
-        ))
-      )}
-
-      <Dialog
-        open={creating}
-        onOpenChange={setCreating}
-        title="New agent token"
-        confirmLabel="Create"
-        confirmDisabled={!name.trim()}
-        onConfirm={async () => {
-          const result = await otterApi.createAgentToken(name.trim());
-          refresh();
-          setCreated(result.token);
-        }}
-      >
-        <Field label="Name" orientation="vertical">
-          <Input value={name} onChange={(e) => setName(e.target.value)} autoFocus />
-        </Field>
-      </Dialog>
-
-      <Dialog
-        open={created != null}
-        onOpenChange={(open) => {
-          if (!open) setCreated(null);
-        }}
-        title="Your agent's token"
-        confirmLabel="Done"
-        onConfirm={() => setCreated(null)}
-      >
-        <Text variant="small">
-          Give your agent this token with the MCP server's address. It won't be shown again.
-        </Text>
-        <CopyField value={created ?? ""} />
-      </Dialog>
-    </SettingsSection>
+      queryKey="otter:agentTokens"
+      list={otterApi.listAgentTokens}
+      create={otterApi.createAgentToken}
+      revoke={otterApi.deleteAgentToken}
+      defaultName="Hermes"
+    />
   );
 }
 

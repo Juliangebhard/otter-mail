@@ -4,10 +4,7 @@ import {
   type OtterAccountState,
   type OtterDevice,
 } from "@otter-mail/contracts";
-import type {
-  CreateAgentTokenResponse,
-  ListAgentTokensResponse,
-} from "@otter-mail/contracts/relay";
+import type { AgentTokens } from "@otter-mail/contracts/agent-tokens";
 
 /**
  * The Otter account (sign-in to sync accounts across Macs and get mail by
@@ -27,11 +24,10 @@ export const otterApi = {
   signOutDevice: (token: string) => invoke<void>("otter:signOutDevice", { token }),
   /** Deletes the Otter account on the relay; this Mac's accounts and mail stay. */
   deleteAccount: () => invoke<OtterAccountState>("otter:deleteAccount"),
-  /** Tokens agents elsewhere (Hermes) reach the account's projects with, at `mcpUrl`. */
-  listAgentTokens: () =>
-    invoke<ListAgentTokensResponse & { mcpUrl: string }>("otter:listAgentTokens"),
-  createAgentToken: (name: string) =>
-    invoke<CreateAgentTokenResponse>("otter:createAgentToken", { name }),
+  /** Tokens agents elsewhere (Hermes) reach the account's projects with, at the relay's MCP server. */
+  listAgentTokens: () => invoke<AgentTokens>("otter:listAgentTokens"),
+  /** Answers the token, this once. */
+  createAgentToken: (name: string) => invoke<string>("otter:createAgentToken", { name }),
   deleteAgentToken: (id: string) => invoke<void>("otter:deleteAgentToken", { id }),
 };
 

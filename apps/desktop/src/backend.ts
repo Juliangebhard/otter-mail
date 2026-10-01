@@ -20,6 +20,7 @@ import { logger, sendLogsTo } from "./logger.js";
 import { postToMain, settleRequest, tellMain } from "./main-link.js";
 import { desktopPlatform, resumeListeners } from "./platform.js";
 import { migrateHermesKey } from "./services/agent/local.js";
+import { serverUrl } from "./services/agent/mcp-server.js";
 
 // One log: main writes this process's lines with its own.
 sendLogsTo((level, scope, message, data) => tellMain({ kind: "log", level, scope, message, data }));
@@ -29,6 +30,10 @@ async function start(): Promise<void> {
   await migrateHermesKey(platform.secrets);
   await startCore(platform);
   registerBackendHandlers();
+  // Agents on this Mac reach the tools whether or not a chat has started.
+  serverUrl().catch((error: unknown) =>
+    logger.error("backend", "MCP server failed to start", error),
+  );
   onSettingsChanged((settings, patch) => tellMain({ kind: "settings", settings, patch }));
   postToMain({ type: "ready", channels: [...registeredHandlers().keys()] });
 }

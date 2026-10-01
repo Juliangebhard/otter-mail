@@ -25,6 +25,8 @@ export type ToolCaller = {
   mode(): RuntimeMode;
   /** The turn running now, which approvals are asked on; null between turns. */
   turn(): { requestId: string; emit: Emit } | null;
+  /** Only the tools that read: an agent given read-only access. */
+  readOnly?(): boolean;
   files?: ToolFiles;
 };
 

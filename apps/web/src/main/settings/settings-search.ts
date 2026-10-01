@@ -309,6 +309,13 @@ export const SETTINGS_SEARCH_ITEMS = [
     pane: "agents",
     searchTerms: ["chat queue steer running agent"],
   },
+  {
+    id: "connected-agents",
+    title: "Agents on this Mac",
+    pane: "agents",
+    available: features.localAgents,
+    searchTerms: ["mcp server token connect claude code codex cursor external tools"],
+  },
 ] as const satisfies ReadonlyArray<SettingsSearchItem>;
 
 export type SettingsSearchItemId = (typeof SETTINGS_SEARCH_ITEMS)[number]["id"];

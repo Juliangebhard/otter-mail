@@ -7,6 +7,7 @@
 import { handle } from "../ipc.js";
 import { ATTACHMENTS_DIR, stageAttachment } from "../services/agent/attachments.js";
 import * as agent from "../services/agent/service.js";
+import { answerToolApproval } from "../services/agent/tools/index.js";
 import { preferenceChanged } from "../services/preferences.js";
 import {
   PROVIDER_KINDS,
@@ -168,7 +169,10 @@ export function registerAgentHandlers(): void {
     const decision = p?.decision as ApprovalDecision;
     if (!["once", "session", "always", "deny"].includes(decision))
       throw new Error("Unknown decision.");
-    await agent.respondApproval(providerOf(p), str(p?.requestId), str(p?.approvalId), decision);
+    const approvalId = str(p?.approvalId);
+    // Otter Mail's own tools ask for themselves (a chat's, or an agent's on the Mac); the rest, the chat's agent.
+    if (!answerToolApproval(approvalId, decision))
+      await agent.respondApproval(providerOf(p), str(p?.requestId), approvalId, decision);
     return { ok: true };
   });
 

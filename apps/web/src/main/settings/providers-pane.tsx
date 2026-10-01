@@ -5,7 +5,11 @@
  */
 
 import { useEffect, useState, type ReactNode } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import type { AgentAccess, ConnectedAgent } from "@otter-mail/contracts/agent-tokens";
+import { Field } from "~/components/ui/field";
 import { Switch } from "~/components/ui/switch";
+import { Text } from "~/components/ui/text";
 import { toast } from "../gmail/toast";
 import { CheckIcon, RotateCwIcon, StarIcon } from "lucide-react";
 import {
@@ -35,6 +39,8 @@ import {
   TextInput,
 } from "./settings-ui";
 import { searchableSetting } from "./settings-search";
+import { AgentTokensSection, CopyField } from "./agent-tokens-section";
+import { features } from "../features";
 import { RUNTIME_MODE_OPTIONS } from "../gmail/model-picker";
 import {
   modelKey,
@@ -704,6 +710,7 @@ export function ProvidersPane() {
         <AgentEditor kind={current.kind} state={state} provider={current} update={update} />
       )}
       <FollowUpSection />
+      {features.localAgents ? <ConnectedAgentsSection /> : null}
     </SettingsPageContainer>
   );
 }
@@ -732,5 +739,88 @@ function FollowUpSection() {
         }
       />
     </SettingsSection>
+  );
+}
+
+const AGENT_ACCESS: { value: AgentAccess; label: string }[] = [
+  { value: "read-only", label: "Read only" },
+  { value: "supervised", label: "Supervised" },
+  { value: "full-access", label: "Full access" },
+];
+
+function AgentAccessSelect({
+  value,
+  onChange,
+  label,
+}: {
+  value: AgentAccess;
+  onChange: (access: AgentAccess) => void;
+  label: string;
+}) {
+  return (
+    <Select value={value} onValueChange={(next) => onChange(next as AgentAccess)}>
+      <SelectTrigger variant="pill" aria-label={label}>
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        {AGENT_ACCESS.map((option) => (
+          <SelectItem key={option.value} value={option.value}>
+            {option.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
+/**
+ * Agents on this Mac that Otter Mail doesn't run (Claude Code, Cursor, …) get
+ * its tools at the Mac app's MCP server with a token made here, each with as
+ * much access as it's given. A supervised agent's changes ask in the main
+ * window (agent-approval-dialog.tsx).
+ */
+function ConnectedAgentsSection() {
+  const qc = useQueryClient();
+  const [access, setAccess] = useState<AgentAccess>("supervised");
+  const change = useMutation({
+    mutationFn: ({ id, access }: { id: string; access: AgentAccess }) =>
+      gmailApi.setConnectedAgentAccess(id, access),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ["mcp:agents"] }),
+    onError: (error) =>
+      toast.error(`Could not save: ${error instanceof Error ? error.message : String(error)}`),
+  });
+  return (
+    <AgentTokensSection<ConnectedAgent>
+      {...searchableSetting("connected-agents")}
+      description="Claude Code, Cursor or any agent that speaks MCP can use Otter Mail's tools while the app is open: your mailboxes, calendars, projects and views."
+      queryKey="mcp:agents"
+      list={gmailApi.connectedAgents}
+      create={(name) => gmailApi.addConnectedAgent(name, access)}
+      revoke={gmailApi.removeConnectedAgent}
+      defaultName="Claude Code"
+      newTokenFields={
+        <Field label="Access" orientation="vertical">
+          <AgentAccessSelect value={access} onChange={setAccess} label="Access" />
+          <Text variant="small">
+            A supervised agent changes your mail only once you allow it, here in Otter Mail.
+          </Text>
+        </Field>
+      }
+      renderControl={(agent) => (
+        <AgentAccessSelect
+          value={agent.access}
+          onChange={(next) => change.mutate({ id: agent.id, access: next })}
+          label={`${agent.name}'s access`}
+        />
+      )}
+      renderSetup={(url, token) => (
+        <>
+          <Text variant="small">Add Otter Mail to Claude Code with this command:</Text>
+          <CopyField
+            value={`claude mcp add --scope user --transport http otter-mail ${url} --header "Authorization: Bearer ${token}"`}
+          />
+        </>
+      )}
+    />
   );
 }

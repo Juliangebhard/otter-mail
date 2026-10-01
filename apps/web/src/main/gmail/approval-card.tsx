@@ -5,6 +5,7 @@
  * of the chat, and stopping the turn, are behind "…".
  */
 
+import { allowQuestion } from "@otter-mail/contracts";
 import { EllipsisIcon, FileIcon, HandIcon } from "lucide-react";
 import { useEffect, useRef, type ReactNode } from "react";
 import type { ApprovalDecision, ApprovalRequest } from "./api";
@@ -54,7 +55,7 @@ function question(agent: string, approval: ApprovalRequest): ReactNode {
       // Otter Mail's tools ask with their title ("Send email"); other tools, generically.
       return approval.title === "Tool approval"
         ? `Allow ${agent} to use a tool?`
-        : `Allow ${agent} to ${approval.title[0]!.toLowerCase()}${approval.title.slice(1)}?`;
+        : allowQuestion(agent, approval.title);
   }
 }
 

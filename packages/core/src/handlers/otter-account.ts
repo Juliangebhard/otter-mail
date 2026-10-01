@@ -5,6 +5,7 @@
  */
 
 import { OTTER_ACCOUNT_STATE_CHANNEL, type OtterAccountState } from "@otter-mail/contracts";
+import type { AgentTokens } from "@otter-mail/contracts/agent-tokens";
 import type {
   CreateAgentTokenResponse,
   ListAgentTokensResponse,
@@ -206,17 +207,19 @@ export function registerOtterAccountHandlers(): void {
   });
 
   // Agent tokens: agents elsewhere (Hermes) reach the account's projects at the relay's /mcp.
-  handle("otter:listAgentTokens", async () => ({
-    ...(await relayRequest<ListAgentTokensResponse>("GET", "/v1/agent-tokens")),
-    mcpUrl: `${platform().relayUrl}/mcp`,
+  handle("otter:listAgentTokens", async (): Promise<AgentTokens> => ({
+    url: `${platform().relayUrl}/mcp`,
+    tokens: (await relayRequest<ListAgentTokensResponse>("GET", "/v1/agent-tokens")).tokens,
   }));
 
+  // Answers the token, this once.
   handle("otter:createAgentToken", async (params: unknown) => {
     const name = (params as { name?: unknown } | undefined)?.name;
     if (typeof name !== "string" || !name.trim()) throw new Error('Invalid parameter: "name".');
-    return relayRequest<CreateAgentTokenResponse>("POST", "/v1/agent-tokens", {
+    const created = await relayRequest<CreateAgentTokenResponse>("POST", "/v1/agent-tokens", {
       name: name.trim(),
     });
+    return created.token;
   });
 
   handle("otter:deleteAgentToken", async (params: unknown) => {
