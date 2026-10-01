@@ -1,8 +1,8 @@
 /**
  * A view's mark in the rail (and wherever it's named): an icon or an emoji,
  * in a color, picked in the view's dialog; its initial until one is picked.
- * Views keep the pick as `icon` (an icon's key below, or the emoji itself)
- * and `color` (one of VIEW_COLORS).
+ * Views keep the pick as `icon` (an icon's key, or the emoji itself) and
+ * `color` (shared's view-marks.ts).
  */
 
 import { useState } from "react";
@@ -50,10 +50,12 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
+import { VIEW_COLORS, type ViewIconKey } from "@otter-mail/shared/view-marks";
 import { cn } from "./ui";
 import type { MailView } from "./types";
 
-export const VIEW_ICONS: Record<string, LucideIcon> = {
+/** Each icon key's drawing (shared's VIEW_ICON_KEYS, which the agents offer too). */
+export const VIEW_ICONS: Record<ViewIconKey, LucideIcon> = {
   star: StarIcon,
   bookmark: BookmarkIcon,
   heart: HeartIcon,
@@ -139,25 +141,13 @@ const VIEW_EMOJI = [
   "🦦",
 ];
 
-/** Apple's tag colors, readable in light and dark. */
-export const VIEW_COLORS = [
-  "#8e8e93",
-  "#ff3b30",
-  "#ff9500",
-  "#ffcc00",
-  "#34c759",
-  "#00c7be",
-  "#007aff",
-  "#5856d6",
-  "#af52de",
-  "#ff2d55",
-] as const;
+const COLORS = Object.values(VIEW_COLORS);
 
 type Mark = Pick<MailView, "name" | "icon" | "color">;
 
 /** A view's mark: its icon (in its color), its emoji, or its initial. */
 export function ViewMark({ view, className }: { view: Mark; className?: string }) {
-  const Icon = view.icon ? VIEW_ICONS[view.icon] : undefined;
+  const Icon = view.icon ? VIEW_ICONS[view.icon as ViewIconKey] : undefined;
   if (Icon) {
     return (
       <Icon
@@ -200,7 +190,9 @@ export function ViewIconPicker({
   color: string | null;
   onChange: (pick: { icon: string | null; color: string | null }) => void;
 }) {
-  const [tab, setTab] = useState<"icon" | "emoji">(icon && !VIEW_ICONS[icon] ? "emoji" : "icon");
+  const [tab, setTab] = useState<"icon" | "emoji">(
+    icon && !(icon in VIEW_ICONS) ? "emoji" : "icon",
+  );
   return (
     <div className="rounded-xl border border-border/60 p-3">
       <div className="flex items-center gap-2">
@@ -259,7 +251,7 @@ export function ViewIconPicker({
       </div>
       {tab === "icon" ? (
         <div className="mt-3 flex items-center gap-1.5">
-          {VIEW_COLORS.map((c) => (
+          {COLORS.map((c) => (
             <button
               key={c}
               type="button"

@@ -195,6 +195,7 @@ optional fix PRs. See [support.md](support.md).
 | Mail and calendar tools (Claude, Codex)            | ✓ (every mailbox)           | —          | —                          |
 | Theme tools: make, change and wear themes          | ✓                           | —          | —                          |
 | Project tools (Claude, Codex)                      | ✓                           | —          | —                          |
+| View tools: make, change and delete views          | ✓                           | —          | —                          |
 | Projects for agents elsewhere (relay MCP, token)   | ✓ (Hermes)                  | ✓ (Hermes) | ✓ (Hermes)                 |
 
 Claude and Codex get Otter Mail's own tools (an MCP server in the Mac app's backend), so they
