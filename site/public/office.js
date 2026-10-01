@@ -1251,11 +1251,16 @@
       land,
     });
   }
-  const restOn = (m, list) => {
+  /** Lays a letter on a pile, and settles the pile (on a tray `z` high). */
+  const restOn = (m, list, z) => {
     letGo(m);
     m.state = "rest";
     m.yaw = (random() - 0.5) * 0.3;
     list.push(m);
+    if (z !== undefined) settle(list, z);
+  };
+  const settle = (list, z) => {
+    for (const [i, m] of list.entries()) m.z = z + 0.16 + i * 0.055;
   };
 
   function spawn() {
@@ -1384,7 +1389,7 @@
           peak: 1.3,
           dur: 0.9,
           land: () => {
-            restOn(r, outbox);
+            restOn(r, outbox, DESK_Z);
             Object.assign(agent, { mail: null, reply: null, t: 0 });
           },
         });
@@ -1412,12 +1417,19 @@
       pause(0.35),
     ]);
     if (m.kind === "inbox") {
+      // The counter is out of reach: she slides it the rest of the way.
       play(p, [
         reach(
           p,
           () => trayTop(TO_YOU, LEDGE + 0.06, toYou),
-          0.35,
-          () => restOn(m, toYou),
+          0.3,
+          () => {
+            fly(m, () => trayTop(TO_YOU, LEDGE + 0.06, toYou), {
+              peak: 0.25,
+              dur: 0.4,
+              land: () => restOn(m, toYou, LEDGE + 0.06),
+            });
+          },
         ),
         retract(p),
       ]);
@@ -1489,7 +1501,7 @@
             fly(m, [INBOX[0], INBOX[1], DESK_Z + 0.16 + (inbox.length + i) * 0.055], {
               peak: 0.15,
               dur: 0.25 + i * 0.08,
-              land: () => restOn(m, inbox),
+              land: () => restOn(m, inbox, DESK_Z),
             });
             rows.unshift(row(m.id, m.avatar, true));
           });
@@ -1530,6 +1542,7 @@
             outbox.splice(outbox.indexOf(m), 1);
             hold(p, m);
           }
+          settle(outbox, DESK_Z);
         },
       ),
       retract(p),
@@ -1608,6 +1621,7 @@
         0.35,
         () => {
           inbox.splice(inbox.indexOf(m), 1);
+          settle(inbox, DESK_Z);
           hold(p, m);
           press(p, "J");
           const r = rowOf(m);
