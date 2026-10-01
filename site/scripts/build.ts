@@ -6,6 +6,7 @@ import { execFileSync } from "node:child_process";
 import * as NodeFS from "node:fs";
 import * as NodePath from "node:path";
 import { writeChangelog } from "./changelog.ts";
+import { withSiteLayout } from "./layout.ts";
 
 const site = NodePath.resolve(import.meta.dirname, "..");
 const web = NodePath.resolve(site, "../apps/web/dist");
@@ -15,6 +16,12 @@ execFileSync("pnpm", ["--filter", "@otter-mail/web", "build"], { cwd: site, stdi
 
 NodeFS.rmSync(dist, { recursive: true, force: true });
 NodeFS.cpSync(NodePath.join(site, "public"), dist, { recursive: true });
+// Every page wears the landing page's header and footer.
+for (const name of NodeFS.readdirSync(dist, { recursive: true, encoding: "utf8" })) {
+  if (!name.endsWith(".html")) continue;
+  const page = NodePath.join(dist, name);
+  NodeFS.writeFileSync(page, withSiteLayout(NodeFS.readFileSync(page, "utf8")));
+}
 NodeFS.cpSync(NodePath.join(web, "assets"), NodePath.join(dist, "assets"), { recursive: true });
 NodeFS.copyFileSync(NodePath.join(web, "index.html"), NodePath.join(dist, "app.html"));
 // Released notes only: the version main last released (the Release workflow records it).

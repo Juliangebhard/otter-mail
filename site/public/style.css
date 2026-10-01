@@ -4,7 +4,6 @@
   --fg: #121211;
   --text: #2c2c2a;
   --muted: rgba(18, 18, 17, 0.55);
-  --soft: rgba(18, 18, 17, 0.68);
   --line: rgba(18, 18, 17, 0.12);
 }
 * {
@@ -28,11 +27,6 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
 }
-main {
-  max-width: 44rem;
-  margin: 0 auto;
-  padding: 5rem 1.5rem 4rem;
-}
 a {
   color: var(--fg);
   text-underline-offset: 0.2em;
@@ -40,13 +34,6 @@ a {
 }
 a:hover {
   text-decoration-color: currentColor;
-}
-h1 {
-  color: var(--fg);
-  font-size: 2.4rem;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  margin: 1rem 0 0.25rem;
 }
 h2 {
   color: var(--fg);
@@ -74,34 +61,6 @@ footer a {
 footer a:hover {
   text-decoration: underline;
 }
-.updated {
-  color: var(--muted);
-  font-size: 0.9rem;
-}
-
-.button {
-  display: inline-block;
-  padding: 0.7rem 1.4rem;
-  border-radius: 999px;
-  background: var(--fg);
-  color: var(--bg);
-  font-weight: 600;
-  text-decoration: none;
-  transition: opacity 0.15s;
-}
-.button:hover {
-  opacity: 0.88;
-}
-.button.secondary {
-  background: transparent;
-  color: var(--fg);
-  box-shadow: inset 0 0 0 1px var(--line);
-  transition: box-shadow 0.15s;
-}
-.button.secondary:hover {
-  opacity: 1;
-  box-shadow: inset 0 0 0 1px var(--fg);
-}
 
 /* The landing page: the mail client's own neutral look, framed like a product sheet. */
 .landing {
@@ -116,10 +75,6 @@ footer a:hover {
   background: var(--bg);
   font-family: var(--sans);
   overflow-x: clip;
-}
-.landing main {
-  max-width: none;
-  padding: 0;
 }
 .landing ::selection {
   background: rgba(18, 18, 17, 0.85);
@@ -358,11 +313,11 @@ footer a:hover {
   text-align: center;
 }
 
-/* The changelog: every note on one page, the versions down the side (after conductor.build's). */
-.changelog > .wrap > header {
+/* The pages under the nav (the changelog, privacy, terms): a title, then the page. */
+.page header {
   padding: 4rem 0 0;
 }
-.changelog h1 {
+.page h1 {
   margin: 0;
   color: var(--fg);
   font-size: 2.25rem;
@@ -370,10 +325,20 @@ footer a:hover {
   line-height: 1.1;
   letter-spacing: -0.03em;
 }
-.changelog header p {
+.page header p {
   margin: 0.5rem 0 0;
   color: var(--dim);
 }
+
+/* Privacy, terms: one column of text. */
+.doc {
+  max-width: 44rem;
+}
+.doc header {
+  margin-bottom: 2.5rem;
+}
+
+/* The changelog: every note on one page, the versions down the side (after conductor.build's). */
 .changelog-layout {
   display: grid;
   grid-template-columns: 13rem minmax(0, 44rem);
@@ -472,7 +437,8 @@ footer a:hover {
   font-size: 0.8125rem;
   text-align: center;
 }
-.entry code {
+.entry code,
+.doc code {
   font: 0.85em var(--mono);
 }
 
