@@ -104,12 +104,14 @@ footer a:hover {
   font-weight: 600;
   letter-spacing: -0.01em;
   text-decoration: none;
+  white-space: nowrap;
 }
 .logo img {
   border-radius: 6px;
 }
 .nav .links {
   display: flex;
+  align-items: center;
   gap: 1.5rem;
   margin-left: auto;
 }
@@ -120,6 +122,25 @@ footer a:hover {
 }
 .nav .links a:hover {
   color: var(--fg);
+}
+/* The repository, as GitHub's own Star button. */
+.nav .links .star {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  height: 1.75rem;
+  padding: 0 0.7rem 0 0.6rem;
+  border-radius: 999px;
+  box-shadow: 0 0 0 1px var(--line);
+  color: var(--fg);
+  font-weight: 500;
+  transition: box-shadow 0.15s;
+}
+.nav .links .star:hover {
+  box-shadow: 0 0 0 1px rgba(18, 18, 17, 0.3);
+}
+.star svg {
+  fill: currentColor;
 }
 
 .hero {
@@ -476,6 +497,9 @@ footer a:hover {
   .nav .links a:first-child {
     display: none;
   }
+  .nav .links {
+    gap: 1.1rem;
+  }
   .hero {
     padding-top: 3rem;
   }
@@ -486,6 +510,15 @@ footer a:hover {
     grid-template-columns: 1fr;
     gap: 2rem;
     margin-top: 4rem;
+  }
+}
+@media (max-width: 24rem) {
+  .nav {
+    gap: 1rem;
+  }
+  /* Privacy is in the footer too. */
+  .nav .links a[href="/privacy/"] {
+    display: none;
   }
 }
 @media (prefers-reduced-motion: no-preference) {
