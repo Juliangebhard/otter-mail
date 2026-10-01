@@ -145,6 +145,10 @@ export interface MailView {
   name: string;
   kind: ViewKind;
   rules: ViewRule[] | null;
-  /** Owning mailbox: an account id, or "__combined__". Absent = combined. */
+  /** Where it was made: an account id, or "__combined__" (views were once each mailbox's). */
   mailbox?: string;
+  /** Its mark in the rail: an icon's key or an emoji (custom views; absent = its initial). */
+  icon?: string | null;
+  /** The icon's color (or the initial's). */
+  color?: string | null;
 }

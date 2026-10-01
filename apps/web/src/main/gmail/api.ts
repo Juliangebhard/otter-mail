@@ -381,7 +381,14 @@ export type TranslationStatus =
   | "unsupported"
   | "unavailable";
 
-export type SaveViewParams = { id?: string; name: string; rules: ViewRule[]; mailbox?: string };
+export type SaveViewParams = {
+  id?: string;
+  name: string;
+  rules: ViewRule[];
+  mailbox?: string;
+  icon?: string | null;
+  color?: string | null;
+};
 
 export type SettingsPane =
   | "general"

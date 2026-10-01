@@ -24,7 +24,6 @@ import {
   FolderPlusIcon,
   InboxIcon,
   LayersIcon,
-  ListFilterIcon,
   ListChecksIcon,
   MonitorIcon,
   MoonIcon,
@@ -66,6 +65,7 @@ import { updateNow, useUpdateState } from "../updates";
 import { requestProblemReport } from "../support/report-problem";
 import { useProjects } from "./projects";
 import { PROJECTS_SPACE } from "./spaces";
+import { ViewMark } from "./view-icon";
 import { requestNewProject } from "./project-menus";
 
 /**
@@ -431,7 +431,7 @@ export function CommandPalette({
         .filter((v) => v.kind === "custom")
         .map((view) => ({
           id: `view:${view.id}`,
-          icon: <ListFilterIcon className={ICON} />,
+          icon: <ViewMark view={view} className="size-4 text-[13px]" />,
           title: view.name,
           keywords: "view space",
           checked: selectedAccountId === view.id,

@@ -546,6 +546,8 @@ export function registerGmailHandlers(): void {
         name,
         rules: parseRules(p?.rules),
         mailbox: asString(p?.mailbox),
+        icon: p?.icon === null ? null : asString(p?.icon),
+        color: p?.color === null ? null : asString(p?.color),
       });
       broadcast("gmail:views-changed");
       preferenceChanged("views");

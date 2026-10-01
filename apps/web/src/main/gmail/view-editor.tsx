@@ -14,6 +14,7 @@ import {
 import { BanIcon, PlusIcon, XIcon } from "lucide-react";
 import { LabelChip } from "./label-chip";
 import { cn } from "./ui";
+import { ViewIconPicker, ViewMark } from "./view-icon";
 import { useAllAccountLabels, useCombinedCounts } from "./hooks";
 import { defaultRulesFor } from "./custom-views";
 import { getAccountColor, getAccountDisplayName } from "./account-style";
@@ -22,14 +23,20 @@ import type { GmailAccount, GmailLabel, MailView, ViewRule } from "./types";
 
 /**
  * Making a view, or changing one, in a dialog over the mail (Smart
- * Mailbox-style): its name, then each mailbox's "Must have" / "Must not have"
- * labels, added from a menu. A view is a space in the rail: its list alone.
+ * Mailbox-style): its mark and name, then each mailbox's "Must have" / "Must
+ * not have" labels, added from a menu. A view is a space in the rail: its list alone.
  */
 type ViewEditorProps = {
   /** The view being edited; null when making one. */
   view: MailView | null;
   accounts: GmailAccount[];
-  onSave: (input: { id?: string; name: string; rules: ViewRule[] }) => Promise<unknown>;
+  onSave: (input: {
+    id?: string;
+    name: string;
+    rules: ViewRule[];
+    icon: string | null;
+    color: string | null;
+  }) => Promise<unknown>;
   onDelete: (id: string) => Promise<unknown>;
   onReset: (id: string) => Promise<unknown>;
   onClose: () => void;
@@ -202,6 +209,8 @@ export function ViewEditorDialog({
   const anyLoading = accountLabels.some((a) => a.isLoading);
 
   const [name, setName] = useState(view?.name ?? "");
+  const [mark, setMark] = useState({ icon: view?.icon ?? null, color: view?.color ?? null });
+  const [picking, setPicking] = useState(false);
   const [picks, setPicks] = useState<Picks>(() =>
     rulesToPicks(view == null ? [] : (view.rules ?? defaultRulesFor(view.kind, accounts))),
   );
@@ -221,7 +230,7 @@ export function ViewEditorDialog({
 
   const canSave = name.trim().length > 0 && rules.length > 0;
   // Mutations are optimistic: it closes at once; an error rolls back, with a toast.
-  const save = () => void onSave({ id: view?.id, name: name.trim(), rules });
+  const save = () => void onSave({ id: view?.id, name: name.trim(), rules, ...mark });
 
   const matchLine =
     rules.length === 0
@@ -269,13 +278,30 @@ export function ViewEditorDialog({
         }
       >
         <Field label="Name" orientation="vertical">
-          <Input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="e.g. Action Required"
-            autoFocus={view == null}
-          />
+          <div className="flex items-center gap-2">
+            {isDefault ? null : (
+              <button
+                type="button"
+                aria-label="Choose an icon"
+                aria-expanded={picking}
+                onClick={() => setPicking((open) => !open)}
+                className={cn(
+                  "flex size-8 shrink-0 items-center justify-center rounded-lg border border-input outline-none hover:bg-accent-surface focus-visible:ring-2 focus-visible:ring-focus-ring",
+                  picking && "bg-accent-surface",
+                )}
+              >
+                <ViewMark view={{ name: name || "?", ...mark }} />
+              </button>
+            )}
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Action Required"
+              autoFocus={view == null}
+            />
+          </div>
         </Field>
+        {picking ? <ViewIconPicker icon={mark.icon} color={mark.color} onChange={setMark} /> : null}
 
         <div className="mt-2 flex items-baseline gap-2">
           <span className="flex-1 text-[13px] font-medium text-foreground">

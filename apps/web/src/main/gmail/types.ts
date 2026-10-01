@@ -127,8 +127,12 @@ export type MailView = {
   kind: ViewKind;
   /** null = use the dynamic default for this kind (only for inbox/sent). */
   rules: ViewRule[] | null;
-  /** Owning mailbox: an account id, or "__combined__". Absent = combined. */
+  /** Where it was made: an account id, or "__combined__" (views were once each mailbox's). */
   mailbox?: string;
+  /** Its mark in the rail: an icon's key or an emoji (custom views; absent = its initial). */
+  icon?: string | null;
+  /** The icon's color (or the initial's). */
+  color?: string | null;
 };
 
 /** Per-account local-sync progress, exposed to the renderer for status UI. */

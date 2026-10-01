@@ -166,7 +166,7 @@ conversations are in one, never their mail.
 | Recently viewed, back and forward (Mac: title bar; web: browser's)    | ✓   | ✓   | —                                                                          |
 | Settings search (/ or ⌘F in Settings)                                 | ✓   | ✓   | —                                                                          |
 | Changelog (opens the site's, from ⌘K and Settings' ? menu)            | ✓   | ✓   | —                                                                          |
-| Views: filters across mailboxes, each a space in the rail (+, dialog) | ✓   | ✓   | —                                                                          |
+| Views: filters across mailboxes, a space in the rail (icon or emoji)  | ✓   | ✓   | —                                                                          |
 | Preferences synced through the Otter account                          | ✓   | ✓   | ✓ (theme, advance, mailboxes, notifications, languages, agent, signatures) |
 
 ## Support

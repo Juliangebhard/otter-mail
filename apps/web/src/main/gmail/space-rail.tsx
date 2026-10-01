@@ -31,6 +31,7 @@ import { OtterAvatar } from "../settings/otter-account-pane";
 import { requestProblemReport } from "../support/report-problem";
 import { setSyncedPreference } from "../synced-preferences";
 import { PROJECTS_SPACE } from "./spaces";
+import { ViewMark } from "./view-icon";
 
 /** A rail button: a square that lights up on hover, and stays lit where you are. */
 const RAIL_BUTTON =
@@ -192,11 +193,7 @@ export function SpaceRail({
               {spaceButton({
                 id: view.id,
                 name: view.name,
-                mark: (
-                  <span className="flex size-6 items-center justify-center rounded-md border border-sidebar-muted-foreground/40 text-[11px] font-semibold uppercase leading-none">
-                    {view.name.trim()[0] ?? "?"}
-                  </span>
-                ),
+                mark: <ViewMark view={view} />,
                 dot: (viewUnread[view.id] ?? 0) > 0,
                 peek: false,
               })}

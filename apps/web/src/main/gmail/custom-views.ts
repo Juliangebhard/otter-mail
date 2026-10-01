@@ -186,7 +186,15 @@ export function useMailViews() {
       patchViews((views) =>
         input.id
           ? views.map((v) =>
-              v.id === input.id ? { ...v, name: input.name, rules: input.rules } : v,
+              v.id === input.id
+                ? {
+                    ...v,
+                    name: input.name,
+                    rules: input.rules,
+                    ...(input.icon !== undefined ? { icon: input.icon } : {}),
+                    ...(input.color !== undefined ? { color: input.color } : {}),
+                  }
+                : v,
             )
           : [
               ...views,
@@ -196,6 +204,8 @@ export function useMailViews() {
                 kind: "custom",
                 rules: input.rules,
                 mailbox: input.mailbox ?? COMBINED_ACCOUNT_ID,
+                icon: input.icon ?? null,
+                color: input.color ?? null,
               },
             ],
       ),
