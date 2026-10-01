@@ -15,28 +15,50 @@
 
   // ── The look ────────────────────────────────────────────────────────────────
 
-  const INK = "34, 56, 90";
-  const GLASS = "116, 152, 204";
+  const INK = "44, 54, 72";
+  const GLASS = "140, 164, 196";
   const BLUE = "47, 124, 246";
-  const ROSE = "214, 80, 92";
-  const GREEN = "64, 150, 92";
   const LABELS = { northwind: "142, 99, 206", hiring: "222, 132, 28", finance: "28, 150, 108" };
   const AVATARS = ["142, 99, 206", "47, 124, 246", "222, 132, 28", "28, 150, 108", "214, 80, 92"];
-  const SKIN = "253, 250, 246";
-  const PANTS = "70, 82, 104";
-  const HAIR = ["52, 44, 40", "122, 86, 62", "200, 156, 92", "150, 152, 160"];
+  // People and things: muted, solid colors (the glass is for the building).
+  const SKIN = ["244, 214, 188", "226, 184, 150", "198, 148, 110", "152, 106, 74", "116, 80, 56"];
+  const HAIR = ["46, 38, 34", "104, 74, 52", "196, 156, 102", "176, 176, 182", "30, 28, 28"];
+  const SHIRTS = {
+    violet: "128, 114, 172",
+    amber: "206, 146, 78",
+    navy: "62, 80, 112",
+    sage: "116, 154, 132",
+    rose: "192, 124, 124",
+    slate: "118, 138, 172",
+    sand: "204, 178, 132",
+    plum: "142, 112, 150",
+  };
+  const PANTS = ["58, 64, 78", "92, 102, 122", "150, 138, 118"];
+  const LEAF = ["96, 142, 104", "122, 170, 128"];
+  const OAK = "226, 208, 182";
+  const CHAIR = "84, 90, 104";
+  const SCREEN = "196, 201, 210";
   const SANS = '-apple-system, BlinkMacSystemFont, "Inter Variable", Inter, system-ui, sans-serif';
   const MONO = 'ui-monospace, "SF Mono", Menlo, Consolas, monospace';
 
   const look = (tint, top, front, side, edge, back = 0) => ({ tint, top, front, side, edge, back });
-  const GLASS_S = look(GLASS, 0.07, 0.11, 0.17, 0.42, 0.1);
-  const PANE_S = look(GLASS, 0.035, 0.05, 0.08, 0.3, 0.05);
-  const FLOOR_S = look(GLASS, 0.06, 0.12, 0.16, 0.3);
-  const WALL_S = look("238, 242, 248", 0.9, 0.9, 0.85, 0.32);
-  const WHITE_S = look("255, 255, 255", 0.97, 0.92, 0.85, 0.5);
-  const AGENT_S = look(BLUE, 0.22, 0.2, 0.3, 0.55);
-  const JUNK_S = look("232, 234, 238", 0.95, 0.9, 0.85, 0.42);
-  const solid = (rgb, a = 1) => look(rgb, 0.72 * a, 0.8 * a, 0.92 * a, 0.5);
+  const tone = (rgb, k) =>
+    rgb
+      .split(",")
+      .map((v) => Math.round(k > 1 ? +v + (255 - +v) * (k - 1) : +v * k))
+      .join(", ");
+  /** Something solid: lit from above, a little darker on the side. */
+  const solid = (rgb, edge = 0.4) => ({
+    ...look(rgb, 1, 1, 1, edge),
+    tints: [tone(rgb, 1.16), rgb, tone(rgb, 0.86)],
+  });
+  const GLASS_S = look(GLASS, 0.06, 0.09, 0.14, 0.38, 0.08);
+  const PANE_S = look(GLASS, 0.03, 0.045, 0.07, 0.28, 0.04);
+  const FLOOR_S = look("236, 233, 227", 0.5, 0.8, 0.9, 0.22);
+  const WALL_S = solid("246, 244, 240", 0.28);
+  const WHITE_S = solid("252, 252, 251", 0.42);
+  const AGENT_S = look(BLUE, 0.3, 0.26, 0.36, 0.55);
+  const JUNK_S = solid("226, 228, 232", 0.38);
   const tinted = (s, rgb) => ({ ...s, ink: rgb, edge: 0.7 });
 
   const rgba = (rgb, a) => `rgba(${rgb}, ${Math.max(0, Math.min(1, a)).toFixed(3)})`;
@@ -86,7 +108,7 @@
   };
   const vector = ([x, y, z]) => [(x * CY - y * SY) * u, ((x * SY + y * CY) * SP - z * CP) * u];
   // The back of the office fades a little.
-  const fog = (depth) => clamp(0.55 + ((depth + 10) / 20) * 0.45, 0.55, 1);
+  const fog = (depth) => clamp(0.82 + ((depth + 10) / 20) * 0.18, 0.82, 1);
 
   // ── Drawing: everything is queued with its depth, then painted back to front ─
 
@@ -156,8 +178,8 @@
         if (!shown[k]) return;
         const [nx, ny, nz] = normals[k];
         const up = nz / Math.hypot(nx, ny, nz);
-        const tone = up > 0.5 ? s.top : Math.abs(nx) > Math.abs(ny) ? s.side : s.front;
-        ctx.fillStyle = rgba(s.tint, tone * f);
+        const kind = up > 0.5 ? 0 : Math.abs(nx) > Math.abs(ny) ? 2 : 1;
+        ctx.fillStyle = rgba(s.tints?.[kind] ?? s.tint, [s.top, s.front, s.side][kind] * f);
         path(face.map((i) => pts[i]));
         ctx.fill();
       });
@@ -218,10 +240,10 @@
     later(depth, () => {
       const f = fog(depth);
       const outline = hull([...bottom, ...top]);
-      ctx.fillStyle = rgba(s.tint, s.side * f);
+      ctx.fillStyle = rgba(s.tints?.[1] ?? s.tint, s.side * f);
       path(outline);
       ctx.fill();
-      ctx.fillStyle = rgba(s.tint, s.top * f);
+      ctx.fillStyle = rgba(s.tints?.[0] ?? s.tint, s.top * f);
       path(top);
       ctx.fill();
       ctx.strokeStyle = rgba(s.ink ?? INK, s.edge * f);
@@ -230,6 +252,25 @@
       path(top);
       ctx.stroke();
     });
+  }
+
+  /** A soft shadow on the floor. */
+  function shadow(x, y, r, alpha = 0.16) {
+    plane(
+      [x, y, 0.005],
+      [1, 0, 0],
+      [0, 1, 0],
+      [0, 0],
+      () => {
+        const g = ctx.createRadialGradient(0, 0, 0, 0, 0, r);
+        g.addColorStop(0, rgba(INK, alpha));
+        g.addColorStop(1, rgba(INK, 0));
+        ctx.fillStyle = g;
+        dot(0, 0, r);
+        ctx.fill();
+      },
+      FLOOR + 2,
+    );
   }
 
   /** A ball (a sphere is a circle from every side). */
@@ -385,13 +426,11 @@
         }
         ctx.stroke();
         const rug = (x, y, w, d, rgb) => {
-          ctx.fillStyle = rgba(rgb, 0.07 * f);
+          ctx.fillStyle = rgba(rgb, 0.16 * f);
           roundRect(x - fx, y - fy, w, d, 0.3);
           ctx.fill();
         };
-        rug(-18.6, -3.4, 10.4, 3.4, LABELS.northwind);
-        rug(OFFICE.x0, -8, OFFICE.x1 - OFFICE.x0, 6.4, BLUE);
-        rug(-0.4, 1.9, 7.6, 4.2, GREEN);
+        rug(-0.4, 1.9, 7.6, 4.2, "196, 178, 150");
       },
       FLOOR + 1,
     );
@@ -403,11 +442,11 @@
     yourOffice(t);
     lounge(t);
     for (const [x, y, s] of [
-      [-3, -2.9, 1],
+      [-8.8, -0.4, 1],
       [4.8, -4.6, 1.1],
       [16.9, -2.4, 1.2],
       [-0.5, 2.5, 0.9],
-      [6.6, 2.7, 1],
+      [7.4, 2.5, 1],
     ]) {
       plant(x, y, s, t);
     }
@@ -492,7 +531,7 @@
     box(BASKET[0] - 0.7, BASKET[1] - 0.38, BASKET[2], 1.4, 0.76, 0.34, tinted(GLASS_S, INK));
 
     const { x, y, w, h, z } = HOLES;
-    box(x, y, 0, w * 3 + 0.1, 0.6, z + h * 4 + 0.05, WHITE_S);
+    box(x, y, 0, w * 3 + 0.1, 0.6, z + h * 4 + 0.05, solid(OAK));
     plane([x + 0.05, y + 0.61, z + h * 4], ...FRONT_FACE, [w * 3, h * 4], (f) => {
       ctx.lineWidth = 0.03;
       ctx.strokeStyle = rgba(INK, 0.4 * f);
@@ -530,7 +569,7 @@
 
     // The reception desk, its counter, the bell, the tray for you.
     box(-16, -5.3, 0, 5.8, 1.15, DESK_Z, WHITE_S);
-    box(-16.2, -4.15, 0, 6.2, 0.4, LEDGE, tinted(GLASS_S, LABELS.northwind));
+    box(-16.2, -4.15, 0, 6.2, 0.4, LEDGE, solid(OAK));
     box(-16.3, -4.2, LEDGE, 6.4, 0.5, 0.06, WHITE_S);
     cylinder(BELL[0], BELL[1], LEDGE + 0.06, 0.2, 0.05, WHITE_S);
     ball(BELL[0], BELL[1], LEDGE + 0.2, 0.15, "236, 200, 120", 0.95);
@@ -568,8 +607,9 @@
     }
 
     // The postbox, for replies on their way out.
-    cylinder(POSTBOX[0], POSTBOX[1], 0, 0.48, 1.25, solid(ROSE, 0.85));
-    cylinder(POSTBOX[0], POSTBOX[1], 1.25, 0.56, 0.12, solid(ROSE, 0.95));
+    shadow(POSTBOX[0], POSTBOX[1], 0.75);
+    cylinder(POSTBOX[0], POSTBOX[1], 0, 0.48, 1.25, solid("196, 92, 90"));
+    cylinder(POSTBOX[0], POSTBOX[1], 1.25, 0.56, 0.12, solid("176, 80, 78"));
     plane([POSTBOX[0] - 0.22, POSTBOX[1] + 0.49, 1.05], ...FRONT_FACE, [0.44, 0.1], (f) => {
       ctx.fillStyle = rgba(INK, 0.7 * f);
       ctx.fillRect(0, 0, 0.44, 0.07);
@@ -580,13 +620,13 @@
   function openPlan() {
     // Two desks facing each other.
     box(-7.6, -1.9, 0, 4.4, 1.6, DESK_Z, WHITE_S);
-    box(-7.6, -1.13, DESK_Z, 4.4, 0.06, 0.45, tinted(GLASS_S, GREEN));
+    box(-7.6, -1.13, DESK_Z, 4.4, 0.06, 0.45, GLASS_S);
     monitor([-6.5, -1.4, DESK_Z], -1, "back");
     monitor([-4.7, -0.7, DESK_Z], 1, "doc");
 
     // The coffee.
     box(-7.5, WALL_Y, 0, 3.3, 0.85, 0.95, WHITE_S);
-    box(-7.2, WALL_Y + 0.1, 0.95, 0.8, 0.6, 0.9, GLASS_S);
+    box(-7.2, WALL_Y + 0.1, 0.95, 0.8, 0.6, 0.9, solid("72, 76, 86", 0.5));
     box(-7.05, WALL_Y + 0.55, 1.25, 0.5, 0.18, 0.3, WHITE_S);
     cylinder(-5.3, WALL_Y + 0.5, 0.95, 0.1, 0.16, WHITE_S);
     steam(-6.8, WALL_Y + 0.65, 1.9);
@@ -650,7 +690,7 @@
     monitor([x + w / 2, dy + 0.4, DESK_Z], 1, "mac");
     box(x + w / 2 - 0.5, dy + 1, DESK_Z, 1, 0.36, 0.04, WHITE_S);
     // The iPhone, face up.
-    slab(x + w - 0.6, dy + 0.55, DESK_Z, 0.36, 0.64, 0.04, WHITE_S);
+    slab(x + w - 0.6, dy + 0.55, DESK_Z, 0.36, 0.64, 0.04, solid(SCREEN, 0.5));
     plane(
       [x + w - 0.57, dy + 0.58, DESK_Z + 0.045],
       [0.003, 0, 0],
@@ -682,25 +722,18 @@
 
     // The archive.
     const { x: cx, y: cy } = CABINET;
-    box(cx, cy, 0, 1.5, 1.3, 1.7, GLASS_S);
+    shadow(cx + 0.75, cy + 0.65, 1.1, 0.1);
+    box(cx, cy, 0, 1.5, 1.3, 1.7, solid("214, 218, 224"));
     for (let i = 0; i < 3; i++) {
       const out = i === 2 ? ease(drawer) * 0.7 : 0;
-      box(
-        cx + 0.08,
-        cy + 0.05 + out,
-        0.08 + i * 0.54,
-        1.34,
-        1.22,
-        0.48,
-        look(GLASS, 0.06, 0.1, 0.14, 0.42),
-      );
+      box(cx + 0.08, cy + 0.05 + out, 0.08 + i * 0.54, 1.34, 1.22, 0.48, solid("230, 233, 238"));
       box(cx + 0.55, cy + 1.27 + out, 0.3 + i * 0.54, 0.4, 0.05, 0.08, WHITE_S);
     }
     letters([cx + 0.15, cy + 1.31, 1.68], "ARCHIVE", 0.17, INK, 0.75);
   }
 
   function lounge() {
-    const tone = solid("170, 186, 210", 0.85);
+    const tone = solid("196, 190, 182");
     box(0.6, 2.2, 0.12, 4.8, 0.32, 1.05, tone);
     box(0.6, 2.52, 0.12, 4.8, 0.95, 0.32, tone);
     box(0.3, 2.2, 0.12, 0.3, 1.27, 0.7, tone);
@@ -712,27 +745,30 @@
   }
 
   function plant(x, y, s, t) {
-    cylinder(x, y, 0, 0.32 * s, 0.5 * s, solid("214, 196, 176", 0.9));
+    shadow(x, y, 0.55 * s);
+    cylinder(x, y, 0, 0.3 * s, 0.5 * s, solid("238, 234, 228"));
     const leaves = [
-      [0, 0, 0.95, 0.36],
-      [0.22, 0.1, 0.8, 0.28],
-      [-0.2, 0.05, 0.82, 0.3],
-      [0.05, -0.18, 1.2, 0.3],
-      [-0.08, 0.16, 1.25, 0.26],
+      [-0.05, -0.12, 1.25, 0.3, 0],
+      [0.18, -0.05, 1.05, 0.28, 0],
+      [-0.22, 0.02, 0.95, 0.27, 0],
+      [0.02, 0.1, 0.85, 0.3, 1],
+      [0.2, 0.16, 1.15, 0.24, 1],
+      [-0.12, 0.18, 1.3, 0.22, 1],
     ];
-    leaves.forEach(([dx, dy, z, r], i) => {
-      const sway = Math.sin(t * 0.9 + i + x) * 0.03;
-      ball(x + (dx + sway) * s, y + dy * s, z * s, r * s, GREEN, 0.55, 0.35);
+    leaves.forEach(([dx, dy, z, r, light], i) => {
+      const sway = Math.sin(t * 0.9 + i + x) * 0.025;
+      ball(x + (dx + sway) * s, y + dy * s, z * s, r * s, LEAF[light], 1, 0.3);
     });
   }
 
   /** A monitor on a desk, its screen facing +y (dir 1) or away (-1). */
   function monitor([x, y, z], dir, kind, t) {
-    box(x - 0.08, y - 0.08, z, 0.16, 0.16, 0.3, WHITE_S);
-    box(x - 0.3, y - 0.2, z, 0.6, 0.4, 0.04, WHITE_S);
+    const body = solid(SCREEN, 0.5);
+    box(x - 0.08, y - 0.08, z, 0.16, 0.16, 0.3, body);
+    box(x - 0.3, y - 0.2, z, 0.6, 0.4, 0.04, body);
     const w = kind === "mac" ? 2.2 : 1.7;
     const h = kind === "mac" ? 1.3 : 1;
-    block([x - w / 2, y - 0.04, z + 0.25], [w, 0, 0], [0, 0.08, 0], [0, 0, h], WHITE_S);
+    block([x - w / 2, y - 0.04, z + 0.25], [w, 0, 0], [0, 0.08, 0], [0, 0, h], body);
     if (dir > 0)
       screen(
         [x - w / 2 + 0.07, y + 0.05, z + 0.25 + h - 0.07],
@@ -846,12 +882,11 @@
 
   // ── People ──────────────────────────────────────────────────────────────────
 
-  const person = (x, y, yaw, shirt, hair, extra = {}) => ({
+  const person = (x, y, yaw, colors, extra = {}) => ({
     x,
     y,
     yaw,
-    shirt,
-    hair,
+    ...colors,
     sitting: false,
     chair: true,
     phase: 0,
@@ -863,19 +898,31 @@
     rest: 0,
     ...extra,
   });
-  const secretary = person(-13.2, -5.85, Math.PI / 2, LABELS.northwind, HAIR[0], { sitting: true });
-  const courier = person(...COURIER_HOME, Math.PI / 2, LABELS.hiring, HAIR[2]);
-  const you = person(12.9, -4.75, -Math.PI / 2, "52, 72, 104", HAIR[1], { sitting: true });
-  const helper = person(7.7, -4.85, -Math.PI / 2, BLUE, null, { sitting: true, agent: true });
+  const look3 = (shirt, skin, hair, pants = 0) => ({
+    shirt,
+    skin: SKIN[skin],
+    hair: HAIR[hair],
+    pants: PANTS[pants],
+  });
+  const secretary = person(-13.2, -5.85, Math.PI / 2, look3(SHIRTS.violet, 1, 0), {
+    sitting: true,
+  });
+  const courier = person(...COURIER_HOME, Math.PI / 2, look3(SHIRTS.amber, 3, 4, 1));
+  const you = person(12.9, -4.75, -Math.PI / 2, look3(SHIRTS.navy, 0, 1), { sitting: true });
+  const helper = person(7.7, -4.85, -Math.PI / 2, { shirt: BLUE }, { sitting: true, agent: true });
   const others = [
-    person(-6.5, -2.4, Math.PI / 2, LABELS.finance, HAIR[1], { sitting: true, typing: true }),
-    person(-4.7, 0.35, -Math.PI / 2, ROSE, HAIR[2], { sitting: true, typing: true }),
-    person(-1.4, -4.35, -Math.PI / 2, "70, 130, 180", HAIR[0], { sitting: true, nodding: true }),
-    person(0.8, -4.35, -Math.PI / 2, "196, 150, 84", HAIR[3], { sitting: true }),
-    person(3.15, -5.7, Math.PI, LABELS.finance, HAIR[1], { sitting: true, talking: true }),
-    person(3.2, 2.95, Math.PI / 2, ROSE, HAIR[0], { sitting: true, chair: false, reading: true }),
+    person(-6.5, -2.4, Math.PI / 2, look3(SHIRTS.sage, 2, 4), { sitting: true, typing: true }),
+    person(-4.7, 0.35, -Math.PI / 2, look3(SHIRTS.rose, 0, 2, 2), { sitting: true, typing: true }),
+    person(-1.4, -4.35, -Math.PI / 2, look3(SHIRTS.slate, 4, 0), { sitting: true, nodding: true }),
+    person(0.8, -4.35, -Math.PI / 2, look3(SHIRTS.sand, 1, 3), { sitting: true }),
+    person(3.15, -5.7, Math.PI, look3(SHIRTS.plum, 3, 1, 2), { sitting: true, talking: true }),
+    person(3.2, 2.95, Math.PI / 2, look3(SHIRTS.rose, 2, 0), {
+      sitting: true,
+      chair: false,
+      reading: true,
+    }),
   ];
-  const wanderer = person(-5.2, -6.2, Math.PI / 2, "120, 110, 190", HAIR[2], { sipping: true });
+  const wanderer = person(-5.2, -6.2, Math.PI / 2, look3(SHIRTS.slate, 0, 2, 1), { sipping: true });
   const people = [secretary, courier, you, helper, wanderer, ...others];
 
   const facing = (p) => [Math.cos(p.yaw), Math.sin(p.yaw), 0];
@@ -936,25 +983,28 @@
   function drawPerson(p) {
     const f = facing(p);
     const s = across(p);
-    const shirt = p.agent ? AGENT_S : solid(p.shirt, 0.9);
-    const legs = p.agent ? AGENT_S : solid(PANTS, 0.9);
+    const shirt = p.agent ? AGENT_S : solid(p.shirt);
+    const legs = p.agent ? AGENT_S : solid(p.pants);
     const hip = hipOf(p);
+    shadow(p.x, p.y, p.sitting ? 0.42 : 0.32);
     if (p.sitting && p.chair) {
-      cylinder(p.x, p.y, 0, 0.3, 0.05, WHITE_S);
-      box(p.x - 0.04, p.y - 0.04, 0.05, 0.08, 0.08, 0.38, WHITE_S);
+      const chair = solid(CHAIR, 0.5);
+      cylinder(p.x, p.y, 0, 0.3, 0.05, chair);
+      box(p.x - 0.04, p.y - 0.04, 0.05, 0.08, 0.08, 0.38, chair);
       block(
         add([p.x, p.y, 0.43], add(mul(f, -0.3), mul(s, -0.3))),
         mul(f, 0.6),
         mul(s, 0.6),
         [0, 0, 0.08],
-        WHITE_S,
+        chair,
       );
+      // A low mesh back, behind them.
       block(
-        add([p.x, p.y, 0.51], add(mul(f, -0.36), mul(s, -0.27))),
-        mul(f, 0.07),
-        mul(s, 0.54),
-        [0, 0, 0.6],
-        WHITE_S,
+        add([p.x, p.y, 0.58], add(mul(f, -0.38), mul(s, -0.25))),
+        mul(f, 0.06),
+        mul(s, 0.5),
+        [0, 0, 0.38],
+        look(CHAIR, 0.5, 0.42, 0.55, 0.55),
       );
     }
     for (const side of [-1, 1]) {
@@ -990,7 +1040,7 @@
         WHITE_S,
       );
       plane(
-        [p.x - 0.36, p.y + f[1] * 0.5 + 0.02, c[2] + 0.42],
+        [p.x - 0.36, p.y + f[1] * 0.5 + 0.022, c[2] + 0.42],
         [0.0072, 0, 0],
         [0, 0, -0.0072],
         [100, 70],
@@ -1018,13 +1068,17 @@
       const R = 0.22 * u;
       const f = fog(depth);
       dot(sx, sy, R);
-      ctx.fillStyle = rgba(p.agent ? BLUE : SKIN, (p.agent ? 0.3 : 0.98) * f);
+      ctx.fillStyle = rgba(p.agent ? BLUE : p.skin, (p.agent ? 0.35 : 1) * f);
       ctx.fill();
       if (p.hair) {
+        // Hair: a ball over the head, further down the back the more it faces away.
+        const [bx, by] = vector([-Math.cos(p.yaw), -Math.sin(p.yaw), 0]);
+        const away = (1 - toward / 0.82) / 2;
         ctx.save();
         ctx.clip();
-        ctx.fillStyle = rgba(p.hair, 0.88 * f);
-        ctx.fillRect(sx - R, sy - R, 2 * R, R * (toward > 0.3 ? 0.8 : toward < -0.3 ? 1.65 : 1.15));
+        ctx.fillStyle = rgba(p.hair, f);
+        dot(sx + (bx / u) * R * 0.35, sy - R * (0.62 - away * 0.9) + (by / u) * R * 0.3, R * 1.02);
+        ctx.fill();
         ctx.restore();
         dot(sx, sy, R);
       }
@@ -1502,22 +1556,24 @@
   function wander() {
     const p = wanderer;
     const coffee = [-5.2, -6.2];
+    // Out past the meeting room, not through it.
     const way = [
-      [-2.8, -3],
-      [-2.8, AISLE],
+      [-5.2, -3],
+      [-2.7, -3],
+      [-2.7, AISLE],
       [6.3, AISLE],
       [6.3, 4.3],
     ];
     play(p, [
       walk(p, way),
-      turn(p, Math.PI - 0.5, 0.5),
+      turn(p, facingTo(p, [3.2, 2.95]), 0.5),
       pause(4.5, () => {
         p.nodding = true;
       }),
       pause(0.01, () => {
         p.nodding = false;
       }),
-      walk(p, [way[2], way[1], way[0], coffee]),
+      walk(p, [way[3], way[2], way[1], way[0], coffee]),
       turn(p, Math.PI / 2, 0.5),
       pause(5),
     ]);
@@ -1654,7 +1710,7 @@
         ctx.fillRect(74, 46, 16, 14);
       }
       if (m.approved) {
-        ctx.strokeStyle = rgba(GREEN, alpha);
+        ctx.strokeStyle = rgba(LABELS.finance, alpha);
         ctx.lineWidth = 6;
         ctx.beginPath();
         ctx.moveTo(12, 50);

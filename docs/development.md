@@ -17,6 +17,7 @@
 | `pnpm dev:web`           | The web app alone, against `VITE_RELAY_URL`.                                       |
 | `pnpm dev:demo`          | The web app on a made-up mailbox, no accounts (see [Demo mailbox](#demo-mailbox)). |
 | `pnpm dev:mail`          | A local IMAP server with a seeded mailbox (see [IMAP locally](#imap-locally)).     |
+| `pnpm dev:site`          | The website alone (landing page, changelog, legal pages) on :4321, from `site/`.   |
 | `pnpm dev:ios`           | Builds the iPhone app and runs it in the simulator (see `apps/ios/README.md`).     |
 | `pnpm ios:resources`     | Re-exports the themes and demo mailbox the iPhone app bundles.                     |
 | `pnpm start`             | Runs the built app unpackaged (`pnpm build` first).                                |
