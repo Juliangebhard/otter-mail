@@ -1322,9 +1322,9 @@ function MailHome() {
                 // the content panel, its corners concentric with the panel's
                 // (the panel's radius less the gap); lighter than the window
                 // in dark themes, raised by its shadow in light ones.
-                className="absolute bottom-[calc(0.25rem+var(--peek-gap))] left-(--peek-gap) top-[calc(var(--workspace-topbar-height)+var(--peek-gap))] z-40 flex flex-col overflow-hidden rounded-[calc(var(--radius-xl)-var(--peek-gap))] [--peek-gap:0.25rem] border border-border/60 bg-popover text-sidebar-foreground shadow-[0_18px_48px_-12px_rgb(0_0_0/30%)] transition-[opacity,translate] duration-150 ease-out starting:-translate-x-2 starting:opacity-0 dark:bg-[color-mix(in_srgb,var(--popover)_90%,var(--popover-foreground))] dark:shadow-[0_18px_48px_-12px_rgb(0_0_0/70%)]"
+                className="absolute bottom-[calc(0.25rem+var(--peek-gap))] left-(--peek-gap) top-[calc(var(--workspace-topbar-height)+var(--peek-gap))] z-40 flex flex-col overflow-hidden rounded-[calc(var(--radius-xl)-var(--peek-gap))] [--peek-gap:0.25rem] border border-(--panel-edge) bg-canvas text-sidebar-foreground shadow-[0_18px_48px_-12px_rgb(0_0_0/30%)] transition-[opacity,translate] duration-150 ease-out starting:-translate-x-2 starting:opacity-0 dark:shadow-[0_18px_48px_-12px_rgb(0_0_0/70%)]"
               >
-                <div className="flex min-h-0 flex-1 flex-col">
+                <div className="flex min-h-0 flex-1 flex-col bg-(--sidebar-panel-surface)">
                   {peekSpace === PROJECTS_MAILBOX ? (
                     <ProjectsSidebar
                       selectedLabelId={isProjects ? selectedLabelId : ""}
