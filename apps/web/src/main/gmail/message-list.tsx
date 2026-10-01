@@ -1560,10 +1560,14 @@ export function MessageList({
       >
         {headerLeading}
         <div className="min-w-0 flex-1 truncate text-sm text-muted-foreground">
-          {space ? <span className="font-medium text-foreground">{space.name} · </span> : null}
-          {project
-            ? formatConversationSummary(mailboxTotal, mailboxUnread)
-            : formatMailboxSummary(mailboxTotal, mailboxUnread)}
+          {/* A view's space has the title band's controls beside it: its name alone. */}
+          {space ? (
+            <span className="font-medium text-foreground">{space.name}</span>
+          ) : project ? (
+            formatConversationSummary(mailboxTotal, mailboxUnread)
+          ) : (
+            formatMailboxSummary(mailboxTotal, mailboxUnread)
+          )}
         </div>
         {space ? (
           <HintTooltip label="Edit view">

@@ -94,6 +94,7 @@ describe("view tools", () => {
     });
     expect(confirmed[0]).toContain("Make the view “Money”");
     expect(confirmed[0]).toContain("me@work.example: finance, not unread");
+    expect(confirmed[0]).toContain("Wearing money in green");
     expect(saved).toMatchObject({
       name: "Money",
       matches: { total: 3, unread: 1 },

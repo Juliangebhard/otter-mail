@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import {
   CircleUserRoundIcon,
-  FolderKanbanIcon,
+  FolderClosedIcon,
   LayersIcon,
   LogInIcon,
   MessageSquareIcon,
@@ -219,7 +219,7 @@ export function SpaceRail({
         {spaceButton({
           id: PROJECTS_SPACE,
           name: "Projects",
-          mark: <FolderKanbanIcon className="size-5" />,
+          mark: <FolderClosedIcon className="size-5" />,
           peek: true,
           tour: "projects",
         })}

@@ -106,6 +106,10 @@ function iconArg(args: ToolArgs): string | null | undefined {
   throw new Error(`"${icon}" isn't an icon. Icons: ${VIEW_ICON_KEYS.join(", ")}; or an emoji.`);
 }
 
+/** A view color's name ("blue"), for approvals. */
+const colorName = (hex: string) =>
+  Object.entries(VIEW_COLORS).find(([, value]) => value === hex)?.[0] ?? hex;
+
 /** A color by name (or its hex); null clears it. */
 function colorArg(args: ToolArgs): string | null | undefined {
   if (args.color === null) return null;
@@ -174,7 +178,9 @@ export const viewTools: AgentTool[] = [
             : `Make the view “${name}”`,
           ...(parsed?.summary ?? []),
           ...(icon !== undefined || color !== undefined
-            ? [`Wearing ${icon ?? existing?.icon ?? "its initial"}${color ? ` in ${color}` : ""}`]
+            ? [
+                `Wearing ${icon ?? existing?.icon ?? "its initial"}${color ? ` in ${colorName(color)}` : ""}`,
+              ]
             : []),
         ].join("\n"),
       );

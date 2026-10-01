@@ -209,6 +209,14 @@ export function useMailViews() {
               },
             ],
       ),
+    // The saved view in place of its pending one at once, so whoever goes
+    // to it (a new view opens in its space) finds it before the refetch.
+    onSuccess: (saved) =>
+      qc.setQueryData<MailView[]>(VIEWS_QUERY_KEY, (views = DEFAULT_VIEWS) =>
+        views.some((v) => v.id === saved.id)
+          ? views.map((v) => (v.id === saved.id ? saved : v))
+          : views.map((v) => (v.id === `pending:${saved.name}` ? saved : v)),
+      ),
     onError: (_err, _vars, context) => {
       rollback(context);
       toast.error("Could not save the view");
