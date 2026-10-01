@@ -85,6 +85,8 @@ it; the web app needs it (the relay keeps its Gmail sign-ins alive).
   a browser, e.g. the T3 preview). `pnpm dev:desktop` runs the Mac app (Vite dev server +
   main-process watcher + Electron with reload); `pnpm dev:web` the web app alone. Both apps render
   the same `apps/web`, so UI work is checked in the browser. See docs/development.md.
+- `pnpm dev:site`: the website alone (the landing page, changelog, privacy and terms) on :4321,
+  served from `site/` as you edit; a reload shows the change.
 - `pnpm dev:ios`: the iPhone app in the simulator (it has the same demo mailbox, from the welcome
   screen).
 - `pnpm dev:demo`: the web app on a seeded demo mailbox (a pretend Gmail, no Google or Otter

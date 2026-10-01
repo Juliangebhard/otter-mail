@@ -90,9 +90,11 @@ ${markdown.parse(e.body.replace(/^## /gm, "### "))}
     <link rel="stylesheet" href="/style.css" />
   </head>
   <body class="landing">
-    <div class="wrap">
-      ${siteNav()}
-    </div>
+    <header class="top">
+      <div class="wrap">
+        ${siteNav()}
+      </div>
+    </header>
 
     <main class="page changelog">
       <div class="wrap">
