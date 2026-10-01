@@ -1,8 +1,8 @@
 /**
  * Projects (contracts' projects.ts): the backend's channels and the hooks
  * the sidebar, the list and the project page read them with. Projects are a
- * place of their own, like a mailbox (the rail's Projects): its "labels" are
- * every active project's conversations (ALL_PROJECTS) and each project.
+ * space of their own (spaces.ts): its "labels" are every active project's
+ * conversations (ALL_PROJECTS) and each project.
  */
 
 import { useEffect } from "react";
@@ -23,9 +23,6 @@ import type {
 import type { GmailMessageSummary } from "./types";
 
 export type { Project, ProjectDocument, ProjectLink, ProjectThread };
-
-/** Projects, where a mailbox would be (`/projects/…` in the route). */
-export const PROJECTS_MAILBOX = "__projects__";
 
 /** Projects' first "label": every active project's conversations. Other labels are project ids. */
 export const ALL_PROJECTS = "all";

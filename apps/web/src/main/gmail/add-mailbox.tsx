@@ -1,19 +1,13 @@
 import { useState, type ReactNode } from "react";
 import type { ImapSettings, MailServer } from "@otter-mail/contracts";
-import { ChevronRightIcon, ListFilterIcon, MailIcon, ServerIcon } from "lucide-react";
+import { ChevronRightIcon, MailIcon, ServerIcon } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { Dialog } from "~/components/ui/dialog";
 import { Field } from "~/components/ui/field";
 import { Input } from "~/components/ui/input";
 import { gmailApi } from "./api";
 import { useAddImapAccount, useSignInImap } from "./hooks";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "./menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "./menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./select";
 import type { GmailAccount } from "./types";
 import { cn } from "./ui";
@@ -29,17 +23,14 @@ export function readableError(err: unknown): string {
   return raw.replace(/^Error invoking remote method '[^']*':\s*/, "").replace(/^Error:\s*/, "");
 }
 
-/** "Add mailbox" as a menu: Gmail, other mail (the IMAP dialog), or (in the rail) a view. */
+/** "Add mailbox" as a menu: Gmail, or other mail (the IMAP dialog). */
 export function AddMailboxMenu({
   onGmail,
   onAdded,
-  onView,
   align = "start",
   children,
 }: {
   onGmail: () => void;
-  /** A view: filters across the mailboxes, a space of its own (Settings' editor). */
-  onView?: () => void;
   /** The IMAP mailbox just added. */
   onAdded?: (account: GmailAccount) => void;
   align?: "start" | "end";
@@ -58,14 +49,6 @@ export function AddMailboxMenu({
           <DropdownMenuItem icon={<ServerIcon />} onSelect={() => setImapOpen(true)}>
             Other mail (IMAP)
           </DropdownMenuItem>
-          {onView ? (
-            <>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem icon={<ListFilterIcon />} onSelect={onView}>
-                View…
-              </DropdownMenuItem>
-            </>
-          ) : null}
         </DropdownMenuContent>
       </DropdownMenu>
       <ImapAccountDialog open={imapOpen} onOpenChange={setImapOpen} onAdded={onAdded} />

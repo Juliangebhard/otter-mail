@@ -35,7 +35,6 @@ export const SETTINGS_SECTION_LABELS: Readonly<Record<SettingsPane, string>> = {
   appearance: "Appearance",
   keybindings: "Keybindings",
   accounts: "Mailboxes",
-  views: "Views",
   agents: "Agents",
 };
 
@@ -81,6 +80,12 @@ export const SETTINGS_SEARCH_ITEMS = [
     pane: "general",
     available: features.menuBar,
     searchTerms: ["tray status bar unread inbox popover"],
+  },
+  {
+    id: "rail-unread-dots",
+    title: "Show unread dots in the rail",
+    pane: "general",
+    searchTerms: ["unread dot indicator mailboxes views sidebar rail badge"],
   },
   {
     id: "dock-badge",
@@ -264,13 +269,6 @@ export const SETTINGS_SEARCH_ITEMS = [
     title: "Remove account",
     pane: "accounts",
     searchTerms: ["delete mailbox sign out"],
-  },
-  // Views
-  {
-    id: "views",
-    title: "Views",
-    pane: "views",
-    searchTerms: ["saved filters searches rail new view space"],
   },
   // Agents
   {

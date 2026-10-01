@@ -41,7 +41,7 @@
     var(--workspace-controls-left) + var(--workspace-titlebar-control-size) +
       var(--workspace-titlebar-control-gap)
   );
-  /* The rail of mailboxes down the window's left edge (mailbox-rail.tsx),
+  /* The rail of spaces down the window's left edge (space-rail.tsx),
      under the title band; the panes start after it. */
   --workspace-rail-width: 52px;
   --app-scrollbar-width: 6px;

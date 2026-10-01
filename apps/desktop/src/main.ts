@@ -151,7 +151,7 @@ function setupApplicationMenu(): void {
           label: "Settings…",
           accelerator: "Command+,",
           click: async () => {
-            setSettingsTarget({ pane: "general", viewId: null, mailbox: null });
+            setSettingsTarget({ pane: "general" });
             await focusMainWindow();
             broadcast("settings:open");
           },

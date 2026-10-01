@@ -388,15 +388,10 @@ export type SettingsPane =
   | "appearance"
   | "keybindings"
   | "accounts"
-  | "views"
   | "agents"
   /** The Otter account page, opened from the user button at the bottom of the nav. */
   | "otter";
-export type SettingsTarget = {
-  pane: SettingsPane;
-  viewId?: string | null;
-  mailbox?: string | null;
-};
+export type SettingsTarget = { pane: SettingsPane };
 
 export type AddImapAccountParams = {
   email: string;

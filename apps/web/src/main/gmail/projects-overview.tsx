@@ -6,7 +6,7 @@
  */
 
 import { useState } from "react";
-import { CircleCheckIcon, FolderIcon, FolderKanbanIcon, SearchIcon } from "lucide-react";
+import { CircleCheckIcon, FolderIcon, FolderClosedIcon, SearchIcon } from "lucide-react";
 
 import { getAccountColor } from "./account-style";
 import { useAccounts } from "./hooks";
@@ -137,7 +137,7 @@ export function ProjectsOverview({ onOpenProject }: { onOpenProject: (id: string
     return (
       <div className="flex h-full items-center justify-center overflow-y-auto">
         <div className="flex w-full max-w-2xl flex-col items-center px-8 py-12">
-          <FolderKanbanIcon className="size-12 stroke-[1.25] text-muted-foreground" />
+          <FolderClosedIcon className="size-12 stroke-[1.25] text-muted-foreground" />
           <h1 className="mt-4 text-xl font-medium text-foreground">Start a project</h1>
           <p className="mt-1 text-center text-sm text-muted-foreground">
             Keep one piece of work's conversations, from any mailbox, with its documents, links and

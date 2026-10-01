@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
 import { Dialog } from "~/components/ui/dialog";
+import { Field } from "~/components/ui/field";
+import { Input } from "~/components/ui/input";
 import { Text } from "~/components/ui/text";
 import {
   DropdownMenu,
@@ -9,10 +11,9 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
 } from "./menu";
-import { BanIcon, ChevronLeftIcon, PlusIcon, Trash2Icon, XIcon } from "lucide-react";
+import { BanIcon, PlusIcon, XIcon } from "lucide-react";
 import { LabelChip } from "./label-chip";
-import { Btn, cn } from "./ui";
-import { SettingsRow, SettingsSection, TextInput } from "../settings/settings-ui";
+import { cn } from "./ui";
 import { useAllAccountLabels, useCombinedCounts } from "./hooks";
 import { defaultRulesFor } from "./custom-views";
 import { getAccountColor, getAccountDisplayName } from "./account-style";
@@ -20,19 +21,18 @@ import { SYSTEM_LABEL_NAMES, SYSTEM_LABEL_ORDER, labelDisplayName } from "./labe
 import type { GmailAccount, GmailLabel, MailView, ViewRule } from "./types";
 
 /**
- * Smart Mailbox-style view editor (Settings → Views). Each account is one
- * row of the rules card with "Must have" / "Must not have" chip rows; labels
- * are added from a menu. Mount with a `key` per view — initial state
- * derives from props at mount.
+ * Making a view, or changing one, in a dialog over the mail (Smart
+ * Mailbox-style): its name, then each mailbox's "Must have" / "Must not have"
+ * labels, added from a menu. A view is a space in the rail: its list alone.
  */
-type ViewEditorFormProps = {
-  /** The view being edited; null when creating a new custom view. */
+type ViewEditorProps = {
+  /** The view being edited; null when making one. */
   view: MailView | null;
   accounts: GmailAccount[];
   onSave: (input: { id?: string; name: string; rules: ViewRule[] }) => Promise<unknown>;
   onDelete: (id: string) => Promise<unknown>;
   onReset: (id: string) => Promise<unknown>;
-  onDone: () => void;
+  onClose: () => void;
 };
 
 type AccountPicks = { allOf: string[]; noneOf: string[] };
@@ -185,22 +185,26 @@ function ChipRow({
   );
 }
 
-export function ViewEditorForm({
+/** The editor, open while `open`; mount it with a `key` per view (its fields start from it). */
+export function ViewEditorDialog({
+  open,
   view,
   accounts,
   onSave,
   onDelete,
   onReset,
-  onDone,
-}: ViewEditorFormProps) {
-  const accountIds = accounts.map((a) => a.id);
-  const accountLabels = useAllAccountLabels(accountIds, true);
+  onClose,
+}: ViewEditorProps & { open: boolean }) {
+  const accountLabels = useAllAccountLabels(
+    accounts.map((a) => a.id),
+    open,
+  );
   const anyLoading = accountLabels.some((a) => a.isLoading);
 
-  const initialRules = view == null ? [] : (view.rules ?? defaultRulesFor(view.kind, accounts));
-
   const [name, setName] = useState(view?.name ?? "");
-  const [picks, setPicks] = useState<Picks>(() => rulesToPicks(initialRules));
+  const [picks, setPicks] = useState<Picks>(() =>
+    rulesToPicks(view == null ? [] : (view.rules ?? defaultRulesFor(view.kind, accounts))),
+  );
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const isDefault = view != null && view.kind !== "custom";
@@ -213,28 +217,15 @@ export function ViewEditorForm({
   };
 
   const rules = useMemo(() => picksToRules(picks), [picks]);
-  const draftCounts = useCombinedCounts(rules, `draft:${view?.id ?? "new"}`, true);
+  const draftCounts = useCombinedCounts(rules, `draft:${view?.id ?? "new"}`, open);
 
   const canSave = name.trim().length > 0 && rules.length > 0;
-
-  // Mutations are optimistic — close immediately, errors roll back + toast.
-  const handleSave = () => {
-    if (!canSave) return;
-    void onSave({ id: view?.id, name: name.trim(), rules });
-    onDone();
-  };
-
-  if (accounts.length === 0) {
-    return (
-      <SettingsSection title="Views">
-        <SettingsRow title="No accounts" description="Connect an account to make one." />
-      </SettingsSection>
-    );
-  }
+  // Mutations are optimistic: it closes at once; an error rolls back, with a toast.
+  const save = () => void onSave({ id: view?.id, name: name.trim(), rules });
 
   const matchLine =
     rules.length === 0
-      ? "Add a label to at least one account"
+      ? "Add a label to at least one mailbox"
       : draftCounts.data
         ? `${draftCounts.data.total.toLocaleString()} message${draftCounts.data.total === 1 ? "" : "s"}${
             draftCounts.data.unread > 0
@@ -244,44 +235,52 @@ export function ViewEditorForm({
         : "Counting…";
 
   return (
-    <div className="space-y-6">
-      <div className="space-y-1">
-        <button
-          type="button"
-          onClick={onDone}
-          className="-ms-1 inline-flex cursor-pointer items-center gap-1 rounded-md px-1 text-[13px] text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-focus-ring"
-        >
-          <ChevronLeftIcon className="size-3.5" />
-          Views
-        </button>
-        <h2 className="text-[26px] font-medium leading-8 tracking-[-0.01em] text-foreground">
-          {view ? `Edit “${view.name}”` : "New view"}
-        </h2>
-        <p className="text-[13px] text-muted-foreground">
-          {isDefault
+    <>
+      <Dialog
+        open={open && !confirmDelete}
+        onOpenChange={(next) => {
+          if (!next && !confirmDelete) onClose();
+        }}
+        size="xl"
+        title={view ? `Edit “${view.name}”` : "New view"}
+        description={
+          isDefault
             ? "A folder of All mailboxes."
-            : "A space in the rail, after your mailboxes: just its list."}
-        </p>
-      </div>
-
-      <SettingsSection title="Name">
-        <div className="p-4">
-          <TextInput
+            : "Mail from your mailboxes, by their labels: a space in the rail, just its list."
+        }
+        confirmLabel={view ? "Save" : "Create view"}
+        confirmDisabled={!canSave}
+        onConfirm={save}
+        destructiveAction={
+          view && view.kind === "custom"
+            ? { label: "Delete view", onClick: () => setConfirmDelete(true) }
+            : undefined
+        }
+        secondaryAction={
+          view && isDefault
+            ? {
+                label: "Reset to default",
+                onClick: async () => {
+                  await onReset(view.id);
+                  onClose();
+                },
+              }
+            : undefined
+        }
+      >
+        <Field label="Name" orientation="vertical">
+          <Input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.nativeEvent.isComposing) handleSave();
-            }}
             placeholder="e.g. Action Required"
             autoFocus={view == null}
-            className="max-w-72"
           />
-        </div>
-      </SettingsSection>
+        </Field>
 
-      <SettingsSection
-        title="Show mail that matches"
-        headerAction={
+        <div className="mt-2 flex items-baseline gap-2">
+          <span className="flex-1 text-[13px] font-medium text-foreground">
+            Show mail that matches
+          </span>
           <span
             className={cn(
               "text-xs tabular-nums",
@@ -290,127 +289,100 @@ export function ViewEditorForm({
           >
             {matchLine}
           </span>
-        }
-      >
-        {accounts.map((account) => {
-          const entry = accountLabels.find((a) => a.accountId === account.id);
-          const labels = entry?.labels ?? [];
-          const p = picks[account.id] ?? { allOf: [], noneOf: [] };
-          const usedIds = new Set([...p.allOf, ...p.noneOf]);
-          const included = p.allOf.length > 0 || p.noneOf.length > 0;
-          return (
-            <div key={account.id} className="space-y-2.5 px-4 py-3.5">
-              <div className="flex min-w-0 items-center gap-2">
-                <span
-                  className="size-2 shrink-0 rounded-full"
-                  style={{ backgroundColor: getAccountColor(account) }}
-                />
-                <span className="shrink-0 text-sm text-foreground">
-                  {getAccountDisplayName(account)}
-                </span>
-                <span className="truncate text-[13px] text-muted-foreground">{account.email}</span>
-                {!included ? (
-                  <span className="ms-auto shrink-0 text-2xs text-muted-foreground/60">
-                    Not included
+        </div>
+        <div className="divide-y divide-border/60 rounded-xl border border-border/60">
+          {accounts.length === 0 ? (
+            <p className="px-4 py-3.5 text-[13px] text-muted-foreground">
+              Add a mailbox (Settings › Mailboxes) to make a view.
+            </p>
+          ) : null}
+          {accounts.map((account) => {
+            const entry = accountLabels.find((a) => a.accountId === account.id);
+            const labels = entry?.labels ?? [];
+            const p = picks[account.id] ?? { allOf: [], noneOf: [] };
+            const usedIds = new Set([...p.allOf, ...p.noneOf]);
+            const included = p.allOf.length > 0 || p.noneOf.length > 0;
+            return (
+              <div key={account.id} className="space-y-2.5 px-4 py-3.5">
+                <div className="flex min-w-0 items-center gap-2">
+                  <span
+                    className="size-2 shrink-0 rounded-full"
+                    style={{ backgroundColor: getAccountColor(account) }}
+                  />
+                  <span className="shrink-0 text-sm text-foreground">
+                    {getAccountDisplayName(account)}
                   </span>
-                ) : null}
-              </div>
-              {labels.length === 0 && anyLoading ? (
-                <p className="text-xs text-muted-foreground/70">Loading labels…</p>
-              ) : (
-                <div className="space-y-2">
-                  <ChipRow
-                    title="Must have"
-                    labelIds={p.allOf}
-                    emptyHint={p.noneOf.length > 0 ? "Any mail" : undefined}
-                    labels={labels}
-                    usedIds={usedIds}
-                    onAdd={(id) =>
-                      update(account.id, (cur) => ({ ...cur, allOf: [...cur.allOf, id] }))
-                    }
-                    onRemove={(id) =>
-                      update(account.id, (cur) => ({
-                        ...cur,
-                        allOf: cur.allOf.filter((x) => x !== id),
-                      }))
-                    }
-                  />
-                  <ChipRow
-                    title="Must not have"
-                    labelIds={p.noneOf}
-                    excluded
-                    labels={labels}
-                    usedIds={usedIds}
-                    onAdd={(id) =>
-                      update(account.id, (cur) => ({ ...cur, noneOf: [...cur.noneOf, id] }))
-                    }
-                    onRemove={(id) =>
-                      update(account.id, (cur) => ({
-                        ...cur,
-                        noneOf: cur.noneOf.filter((x) => x !== id),
-                      }))
-                    }
-                  />
+                  <span className="truncate text-[13px] text-muted-foreground">
+                    {account.email}
+                  </span>
+                  {!included ? (
+                    <span className="ms-auto shrink-0 text-2xs text-muted-foreground/60">
+                      Not included
+                    </span>
+                  ) : null}
                 </div>
-              )}
-            </div>
-          );
-        })}
-      </SettingsSection>
-      <p className="-mt-3 text-[13px] text-muted-foreground">
-        Mail must carry every “must have” label and none of the “must not have” ones. Results from
-        each account are combined.
-      </p>
-
-      <div className="flex items-center gap-2">
-        {view && view.kind === "custom" ? (
-          <Btn
-            size="sm"
-            variant="ghost"
-            className="text-destructive-foreground hover:bg-destructive/10"
-            onClick={() => setConfirmDelete(true)}
-          >
-            <Trash2Icon className="size-3.5" />
-            Delete view
-          </Btn>
-        ) : null}
-        {view && isDefault ? (
-          <Btn
-            size="sm"
-            variant="ghost"
-            onClick={() => {
-              void onReset(view.id);
-              onDone();
-            }}
-          >
-            Reset to default
-          </Btn>
-        ) : null}
-        <div className="flex-1" />
-        <Btn size="sm" variant="ghost" onClick={onDone}>
-          Cancel
-        </Btn>
-        <Btn size="sm" variant="primary" disabled={!canSave} onClick={handleSave}>
-          {view ? "Save" : "Create view"}
-        </Btn>
-      </div>
+                {labels.length === 0 && anyLoading ? (
+                  <p className="text-xs text-muted-foreground/70">Loading labels…</p>
+                ) : (
+                  <div className="space-y-2">
+                    <ChipRow
+                      title="Must have"
+                      labelIds={p.allOf}
+                      emptyHint={p.noneOf.length > 0 ? "Any mail" : undefined}
+                      labels={labels}
+                      usedIds={usedIds}
+                      onAdd={(id) =>
+                        update(account.id, (cur) => ({ ...cur, allOf: [...cur.allOf, id] }))
+                      }
+                      onRemove={(id) =>
+                        update(account.id, (cur) => ({
+                          ...cur,
+                          allOf: cur.allOf.filter((x) => x !== id),
+                        }))
+                      }
+                    />
+                    <ChipRow
+                      title="Must not have"
+                      labelIds={p.noneOf}
+                      excluded
+                      labels={labels}
+                      usedIds={usedIds}
+                      onAdd={(id) =>
+                        update(account.id, (cur) => ({ ...cur, noneOf: [...cur.noneOf, id] }))
+                      }
+                      onRemove={(id) =>
+                        update(account.id, (cur) => ({
+                          ...cur,
+                          noneOf: cur.noneOf.filter((x) => x !== id),
+                        }))
+                      }
+                    />
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        <p className="text-[13px] text-muted-foreground">
+          Mail must carry every “must have” label and none of the “must not have” ones. Results from
+          each mailbox are combined.
+        </p>
+      </Dialog>
 
       <Dialog
         open={confirmDelete}
         onOpenChange={setConfirmDelete}
         title={`Delete “${view?.name ?? ""}”?`}
         confirmLabel="Delete view"
-        confirmVariant="accent"
-        onConfirm={() => {
-          if (view) void onDelete(view.id);
+        confirmVariant="destructive"
+        onConfirm={async () => {
+          if (view) await onDelete(view.id);
           setConfirmDelete(false);
-          onDone();
+          onClose();
         }}
       >
-        <Text variant="small">
-          The view leaves the sidebar. Your mail and labels aren't touched.
-        </Text>
+        <Text variant="small">The view leaves the rail. Your mail and labels aren't touched.</Text>
       </Dialog>
-    </div>
+    </>
   );
 }

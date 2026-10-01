@@ -9,10 +9,11 @@
 import { useEffect, useSyncExternalStore } from "react";
 import { getAccountDisplayName } from "./gmail/account-style";
 import { senderLabel } from "./gmail/address";
-import { COMBINED_ACCOUNT_ID, isViewSpaceId } from "./gmail/custom-views";
+import { COMBINED_ACCOUNT_ID } from "./gmail/custom-views";
+import { PROJECTS_SPACE, isViewSpaceId } from "./gmail/spaces";
 import { SEARCH_MAILBOX } from "./gmail/gmail-query";
 import { useLabels, useMessage } from "./gmail/hooks";
-import { ALL_PROJECTS, PROJECTS_MAILBOX, useProjects } from "./gmail/projects";
+import { ALL_PROJECTS, useProjects } from "./gmail/projects";
 import { SYSTEM_LABEL_NAMES, labelDisplayName } from "./gmail/label-names";
 import type { GmailAccount, MailView, ViewKind } from "./gmail/types";
 import type { SettingsPane } from "./gmail/api";
@@ -141,7 +142,7 @@ export function useRecordRecentlyViewed({
         icon: "conversation",
       };
     }
-  } else if (mailbox === PROJECTS_MAILBOX) {
+  } else if (mailbox === PROJECTS_SPACE) {
     const project = projects?.find((p) => p.id === label);
     if (label === ALL_PROJECTS) {
       place = { href, context: "Projects", title: "All projects", icon: "projects" };

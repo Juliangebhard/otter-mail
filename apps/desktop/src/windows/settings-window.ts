@@ -1,9 +1,5 @@
 export type SettingsTarget = {
-  pane: "general" | "appearance" | "keybindings" | "accounts" | "views" | "agents" | "otter";
-  /** For the views pane: a view id to edit, or "new" to create one. */
-  viewId?: string | null;
-  /** For "new": which mailbox (account id or "__combined__") owns the view. */
-  mailbox?: string | null;
+  pane: "general" | "appearance" | "keybindings" | "accounts" | "agents" | "otter";
 };
 
 // Where the in-app settings page should navigate on open. The main window

@@ -11,7 +11,7 @@ import {
   ClockIcon,
   FileIcon,
   FolderIcon,
-  FolderKanbanIcon,
+  FolderClosedIcon,
   InboxIcon,
   LayersIcon,
   MailIcon,
@@ -80,7 +80,7 @@ const RECENT_ICONS: Record<RecentIcon, typeof InboxIcon> = {
   conversation: MailIcon,
   settings: Settings2Icon,
   project: FolderIcon,
-  projects: FolderKanbanIcon,
+  projects: FolderClosedIcon,
 };
 
 /** The clock: where you've been lately (recently-viewed.ts), to go back to in one click. */

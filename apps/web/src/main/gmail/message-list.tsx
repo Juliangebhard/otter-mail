@@ -33,6 +33,7 @@ import {
   PaperclipIcon,
   FolderIcon,
   SquarePenIcon,
+  SlidersHorizontalIcon,
 } from "lucide-react";
 import { IconBtn, HintTooltip, cn } from "./ui";
 import {
@@ -87,8 +88,8 @@ type CombinedMeta = { mailbox: string | null; accountName: string; accountColor:
 type MessageListProps = {
   /** Rendered at the start of the title band (window title when the sidebar is hidden). */
   headerLeading?: ReactNode;
-  /** A view's space has no sidebar: the list names it, and New message is here. */
-  space?: { name: string; onCompose: () => void };
+  /** A view's space has no sidebar: the list names it, and New message and Edit are here. */
+  space?: { name: string; onCompose: () => void; onEdit: () => void };
   /** Active account — used for account-mode queries and as a fallback owner id. */
   accountId: string;
   labelId: string;
@@ -1564,6 +1565,13 @@ export function MessageList({
             ? formatConversationSummary(mailboxTotal, mailboxUnread)
             : formatMailboxSummary(mailboxTotal, mailboxUnread)}
         </div>
+        {space ? (
+          <HintTooltip label="Edit view">
+            <IconBtn label="Edit view" onClick={space.onEdit}>
+              <SlidersHorizontalIcon className="size-4" />
+            </IconBtn>
+          </HintTooltip>
+        ) : null}
         {space ? (
           <HintTooltip label="New message" shortcut="compose.new">
             <IconBtn label="New message" onClick={space.onCompose}>

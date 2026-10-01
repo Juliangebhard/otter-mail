@@ -6,17 +6,18 @@
  */
 
 import { useState } from "react";
-import { CircleCheckIcon, FolderKanbanIcon, FolderPlusIcon } from "lucide-react";
+import { CircleCheckIcon, FolderClosedIcon, FolderPlusIcon } from "lucide-react";
 
-import { HintTooltip, cn } from "./ui";
+import { cn } from "./ui";
 import {
-  SIDEBAR_ROW,
+  NewRow,
   SearchButton,
   Section,
   SectionAddButton,
+  SidebarBody,
   SkRow,
   SpaceHeading,
-} from "./accounts-sidebar";
+} from "./sidebar-ui";
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from "./menu";
 import { requestNewProject } from "./project-menus";
 import {
@@ -150,22 +151,15 @@ export function ProjectsSidebar({
         <SearchButton selected={searchSelected} pending={searchPending} onClick={onOpenSearch} />
       </SpaceHeading>
 
-      <div className="flex shrink-0 flex-col gap-0.5 px-(--sidebar-content-inset)">
-        <HintTooltip label="New project">
-          <button
-            type="button"
-            onClick={() => requestNewProject({ open: true })}
-            className={`${SIDEBAR_ROW} px-(--sidebar-row-content-inset) text-sidebar-foreground hover:bg-sidebar-row-hover`}
-          >
-            <FolderPlusIcon className="size-4 shrink-0 text-sidebar-muted-foreground group-hover:text-sidebar-foreground" />
-            <span className="truncate">New project</span>
-          </button>
-        </HintTooltip>
-      </div>
+      <NewRow
+        icon={<FolderPlusIcon />}
+        label="New project"
+        onClick={() => requestNewProject({ open: true })}
+      />
 
-      <div className="min-h-0 flex-1 scroll-fade-y overflow-y-auto px-(--sidebar-content-inset) pb-8 pt-3">
+      <SidebarBody>
         <SkRow
-          icon={<FolderKanbanIcon className="size-4" />}
+          icon={<FolderClosedIcon className="size-4" />}
           title="All projects"
           selected={selectedLabelId === ALL_PROJECTS}
           badge={allUnread}
@@ -193,7 +187,7 @@ export function ProjectsSidebar({
             {settled.map(row)}
           </Section>
         ) : null}
-      </div>
+      </SidebarBody>
     </div>
   );
 }

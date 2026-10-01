@@ -20,7 +20,7 @@ import {
   ChevronRightIcon,
   FileIcon,
   FolderIcon,
-  FolderKanbanIcon,
+  FolderClosedIcon,
   FolderPlusIcon,
   InboxIcon,
   LayersIcon,
@@ -64,7 +64,8 @@ import { shortcutLabelFor, useKeybindingsState } from "../keybindings/store";
 import { requestTour, startSetup } from "../onboarding/onboarding";
 import { updateNow, useUpdateState } from "../updates";
 import { requestProblemReport } from "../support/report-problem";
-import { PROJECTS_MAILBOX, useProjects } from "./projects";
+import { useProjects } from "./projects";
+import { PROJECTS_SPACE } from "./spaces";
 import { requestNewProject } from "./project-menus";
 
 /**
@@ -86,7 +87,7 @@ type CommandPaletteProps = {
   /** Runs the typed text as a Gmail search in the Search mailbox. */
   onSearchMail: (query: string) => void;
   onGoToView: (viewId: string) => void;
-  /** A mailbox, or PROJECTS_MAILBOX. */
+  /** A mailbox, or PROJECTS_SPACE. */
   onSelectAccount: (accountId: string) => void;
   onOpenProject: (projectId: string) => void;
   onCompose: () => void;
@@ -452,10 +453,10 @@ export function CommandPalette({
     const projectItems: PaletteItem[] = [
       {
         id: "projects",
-        icon: <FolderKanbanIcon className={ICON} />,
+        icon: <FolderClosedIcon className={ICON} />,
         title: "All projects",
-        checked: selectedAccountId === PROJECTS_MAILBOX,
-        run: () => onSelectAccount(PROJECTS_MAILBOX),
+        checked: selectedAccountId === PROJECTS_SPACE,
+        run: () => onSelectAccount(PROJECTS_SPACE),
       },
       ...(projects ?? [])
         .filter((p) => p.status === "active")
