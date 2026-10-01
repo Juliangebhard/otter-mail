@@ -91,9 +91,9 @@
           <h2>The Otter account (optional)</h2>
           <p>
             An Otter account (optional in the Mac app, required for the web app) brings your
-            mailboxes and preferences to every device you use and delivers new mail the moment it
-            arrives. For this, Otter Mail's server at <code>relay.mail.otterware.app</code> (run on
-            Cloudflare) stores:
+            mailboxes, preferences and projects to every device you use and delivers new mail the
+            moment it arrives. For this, Otter Mail's server at
+            <code>relay.mail.otterware.app</code> (run on Cloudflare) stores:
           </p>
           <ul>
             <li>your Google account's ID, address, name and picture, to know who is signed in;</li>
@@ -109,7 +109,16 @@
             <li>
               your preferences: app settings, saved views, keyboard shortcuts, the theme and the
               agent's settings, and, if you connect the Hermes agent, its address and API key, which
-              is stored encrypted.
+              is stored encrypted;
+            </li>
+            <li>
+              your projects: their names, status, notes and links, and which conversations belong to
+              them (a mailbox's address and Gmail's thread ID; never the conversation's subject or
+              content);
+            </li>
+            <li>
+              if you give an agent access to your projects, the token's name, when it was last used,
+              and a hash of the token (not the token itself).
             </li>
           </ul>
           <p>

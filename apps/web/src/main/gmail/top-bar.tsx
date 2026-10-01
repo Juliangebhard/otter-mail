@@ -10,6 +10,8 @@ import {
   ChevronRightIcon,
   ClockIcon,
   FileIcon,
+  FolderIcon,
+  FolderClosedIcon,
   InboxIcon,
   LayersIcon,
   MailIcon,
@@ -77,6 +79,8 @@ const RECENT_ICONS: Record<RecentIcon, typeof InboxIcon> = {
   label: TagIcon,
   conversation: MailIcon,
   settings: Settings2Icon,
+  project: FolderIcon,
+  projects: FolderClosedIcon,
 };
 
 /** The clock: where you've been lately (recently-viewed.ts), to go back to in one click. */

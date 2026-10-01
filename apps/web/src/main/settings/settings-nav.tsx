@@ -13,7 +13,6 @@ import {
   CircleHelpIcon,
   CircleUserRoundIcon,
   KeyboardIcon,
-  LayersIcon,
   PaletteIcon,
   Settings2Icon,
   MailIcon,
@@ -50,7 +49,6 @@ const SETTINGS_SECTION_ICONS: Readonly<
   appearance: PaletteIcon,
   keybindings: KeyboardIcon,
   accounts: MailIcon,
-  views: LayersIcon,
   agents: MousePointer2Icon,
 };
 

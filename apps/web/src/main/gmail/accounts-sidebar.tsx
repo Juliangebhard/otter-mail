@@ -2,13 +2,8 @@ import {
   Fragment,
   createContext,
   useContext,
-  useEffect,
-  useLayoutEffect,
-  useRef,
   useState,
   type ComponentProps,
-  type CSSProperties,
-  type DragEvent as ReactDragEvent,
   type ReactNode,
 } from "react";
 import { Dialog } from "~/components/ui/dialog";
@@ -51,7 +46,7 @@ import {
   useViewUnreadCounts,
 } from "./hooks";
 import type { GmailLabel, MailView } from "./types";
-import { COMBINED_ACCOUNT_ID, INBOX_VIEW_ID, useMailViews } from "./custom-views";
+import { COMBINED_ACCOUNT_ID } from "./custom-views";
 import { ALL_MAIL_LABEL_ID } from "./label-names";
 import { buildLabelTree, type LabelTreeNode } from "./label-tree";
 import {
@@ -65,29 +60,27 @@ import { labelMoveName } from "../keybindings/commands";
 import { renameLabelKeybindings, useKeybindingsState } from "../keybindings/store";
 import { formatShortcut, parseShortcut } from "../keybindings/keys";
 import { LabelShortcutDialog } from "../settings/keybindings-pane";
-import { UnreadPill, HintTooltip } from "./ui";
-import { SidebarTitle, useMailboxOptions } from "./top-bar";
+import { SidebarTitle } from "./top-bar";
 import { getAccountDisplayName } from "./account-style";
 import { useMailboxes } from "../mailboxes";
 import { UpdateCard } from "../updates";
+import {
+  NewRow,
+  SIDEBAR_ROW,
+  SearchButton,
+  Section,
+  SectionAddButton,
+  SidebarBody,
+  SkRow,
+  SpaceHeading,
+  type RowDragProps,
+} from "./sidebar-ui";
 import { AddMailboxMenu } from "./add-mailbox";
 import { useCapabilities } from "./capabilities";
 
 const LABEL_DRAG_MIME = "application/x-gmail-label";
 
 type LabelDragPayload = { id: string; name: string };
-
-type RowDragProps = {
-  draggable?: boolean;
-  onDragStart?: (e: ReactDragEvent<HTMLButtonElement>) => void;
-  onDragOver?: (e: ReactDragEvent<HTMLButtonElement>) => void;
-  onDragLeave?: (e: ReactDragEvent<HTMLButtonElement>) => void;
-  onDrop?: (e: ReactDragEvent<HTMLButtonElement>) => void;
-};
-
-/** A sidebar row's box (Settings' nav mirrors it). */
-const SIDEBAR_ROW =
-  "group flex h-8 w-full cursor-pointer items-center gap-2.5 rounded-lg text-left text-sm font-normal outline-none transition-[background-color,color] focus-visible:ring-2 focus-visible:ring-focus-ring active:bg-sidebar-row-active";
 
 /** Gmail's labels API only accepts colors from its fixed palette. */
 const GMAIL_LABEL_COLORS: { backgroundColor: string; textColor: string }[] = [
@@ -197,153 +190,6 @@ function SearchRow({
   );
 }
 
-/** Sidebar row (Codex): 14px regular text, muted icon, a rounded pill on hover
-    and when selected; counts live in the badge only. */
-function SkRow({
-  icon,
-  title,
-  selected,
-  badge,
-  trailing,
-  depth = 0,
-  onClick,
-  dragProps,
-  dropActive,
-  dot,
-}: {
-  icon: ReactNode;
-  title: string;
-  selected?: boolean;
-  badge?: number;
-  trailing?: ReactNode;
-  depth?: number;
-  onClick?: () => void;
-  dragProps?: RowDragProps;
-  dropActive?: boolean;
-  /** A small dot on the right: something is waiting here (a kept search). */
-  dot?: boolean;
-}) {
-  const style: CSSProperties = { paddingLeft: 10 + depth * 16 };
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      style={style}
-      {...dragProps}
-      className={[
-        SIDEBAR_ROW,
-        "pr-(--sidebar-row-content-inset)",
-        selected
-          ? "bg-sidebar-row-selected text-sidebar-foreground"
-          : "text-sidebar-foreground/90 hover:bg-sidebar-row-hover hover:text-sidebar-foreground",
-        dropActive ? "bg-sidebar-row-hover ring-1 ring-inset ring-primary/70" : "",
-      ].join(" ")}
-    >
-      <span
-        className={[
-          "flex shrink-0 items-center",
-          selected
-            ? "text-sidebar-foreground"
-            : "text-sidebar-muted-foreground group-hover:text-sidebar-foreground",
-        ].join(" ")}
-      >
-        {icon}
-      </span>
-      <span className="min-w-0 flex-1 truncate">{title}</span>
-      {trailing ? (
-        // One trailing slot: the count at rest, the row action on hover, so
-        // the action never reserves dead space next to the count.
-        <span className="relative ml-auto flex h-5 min-w-5 shrink-0 items-center justify-end">
-          {badge != null && badge > 0 ? (
-            <span className="group-hover:invisible group-focus-within:invisible">
-              <UnreadPill count={badge} selected={selected} />
-            </span>
-          ) : null}
-          <span className="absolute inset-y-0 right-0 flex items-center opacity-0 group-hover:opacity-100 group-focus-within:opacity-100">
-            {trailing}
-          </span>
-        </span>
-      ) : badge != null ? (
-        <UnreadPill count={badge} selected={selected} />
-      ) : dot ? (
-        <span aria-hidden className="ml-auto size-1.5 shrink-0 rounded-full bg-primary" />
-      ) : null}
-    </button>
-  );
-}
-
-function Section({
-  title,
-  action,
-  children,
-  dropZone,
-  tour,
-}: {
-  title: string;
-  action?: ReactNode;
-  children: ReactNode;
-  /** Its `data-tour` part, for the tour's spotlight. */
-  tour?: string;
-  dropZone?: {
-    active: boolean;
-    onDragOver: (e: ReactDragEvent<HTMLDivElement>) => void;
-    onDragLeave: (e: ReactDragEvent<HTMLDivElement>) => void;
-    onDrop: (e: ReactDragEvent<HTMLDivElement>) => void;
-  };
-}) {
-  const [open, setOpen] = useState(true);
-  return (
-    <div className="mt-4" data-tour={tour}>
-      <div
-        className={[
-          "group flex h-8 items-center gap-1 rounded-lg pr-1",
-          dropZone?.active ? "bg-sidebar-row-hover ring-1 ring-inset ring-primary/70" : "",
-        ].join(" ")}
-        onDragOver={dropZone?.onDragOver}
-        onDragLeave={dropZone?.onDragLeave}
-        onDrop={dropZone?.onDrop}
-      >
-        {/* A plain muted heading (Codex's "Projects"); the chevron shows on
-            hover, or while the section is collapsed. */}
-        <button
-          type="button"
-          onClick={() => setOpen((o) => !o)}
-          className="flex h-8 items-center gap-1 rounded-lg px-(--sidebar-row-content-inset) text-[13px] font-normal text-sidebar-muted-foreground outline-none hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-focus-ring"
-          aria-label={`Toggle ${title}`}
-        >
-          {title}
-          <ChevronDownIcon
-            className={[
-              "size-3.5 transition-[opacity,transform]",
-              open ? "opacity-0 group-hover:opacity-100" : "-rotate-90",
-            ].join(" ")}
-          />
-        </button>
-        <span className="flex-1" />
-        <span className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100">
-          {action}
-        </span>
-      </div>
-      {open ? children : null}
-    </div>
-  );
-}
-
-function SectionAddButton({ label, onClick }: { label: string; onClick: () => void }) {
-  return (
-    <HintTooltip label={label}>
-      <button
-        type="button"
-        aria-label={label}
-        onClick={onClick}
-        className="flex size-6 items-center justify-center rounded-md text-sidebar-muted-foreground outline-none hover:bg-sidebar-row-hover hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-focus-ring"
-      >
-        <PlusIcon className="size-4" />
-      </button>
-    </HintTooltip>
-  );
-}
-
 /** "+ Add …" footer row for a section. */
 function AddRow({ label, ...props }: { label: string } & ComponentProps<"button">) {
   return (
@@ -355,56 +201,6 @@ function AddRow({ label, ...props }: { label: string } & ComponentProps<"button"
       <PlusIcon className="size-4 shrink-0 text-sidebar-muted-foreground" />
       <span className="truncate">{label}</span>
     </button>
-  );
-}
-
-function ViewRow({
-  view,
-  selected,
-  unreadCount,
-  onSelect,
-  onEdit,
-  onDelete,
-  onReset,
-}: {
-  view: MailView;
-  selected: boolean;
-  unreadCount: number;
-  onSelect: () => void;
-  onEdit: () => void;
-  onDelete: () => void;
-  onReset: () => void;
-}): ReactNode {
-  return (
-    <ContextMenu>
-      <ContextMenuTrigger>
-        <SkRow
-          icon={viewIcon(view)}
-          title={view.name}
-          selected={selected}
-          badge={unreadCount}
-          onClick={() => {
-            console.log("[AccountsSidebar:selectView]", { viewId: view.id });
-            onSelect();
-          }}
-        />
-      </ContextMenuTrigger>
-      <ContextMenuContent>
-        <ContextMenuItem icon="pencil" onSelect={onEdit}>
-          Edit view…
-        </ContextMenuItem>
-        <ContextMenuSeparator />
-        {view.kind === "custom" ? (
-          <ContextMenuItem icon="trash" color="red" onSelect={onDelete}>
-            Delete view
-          </ContextMenuItem>
-        ) : (
-          <ContextMenuItem icon="arrow.counterclockwise" onSelect={onReset}>
-            Reset to default
-          </ContextMenuItem>
-        )}
-      </ContextMenuContent>
-    </ContextMenu>
   );
 }
 
@@ -580,8 +376,6 @@ function LabelNode({
 }
 
 type AccountsSidebarProps = {
-  /** Opens Settings → Views on a view ("new" to create one) for a mailbox. */
-  onEditView: (viewId: string, mailbox: string | null) => void;
   selectedAccountId: string | null;
   onSelectAccount: (accountId: string) => void;
   selectedLabelId: string;
@@ -599,123 +393,24 @@ type AccountsSidebarProps = {
   onCloseSearch: (id: string) => void;
 };
 
-/**
- * The sidebar: its mailboxes' pages side by side (Dia's profiles) between the
- * title and the footer, in a horizontal scroller that snaps a page at a time.
- * The swipe is the platform's own scrolling: macOS follows the fingers,
- * carries the momentum, rubber-bands at the ends and settles on a page with
- * its own physics. Where it comes to rest picks the mailbox; the other
- * switches (the rail, ⌘1…) scroll there.
- */
+/** The sidebar: the mailbox's page between the title and the footer. */
 export function AccountsSidebar(props: AccountsSidebarProps) {
-  const { selectedAccountId, onSelectAccount } = props;
-  const { accounts } = useMailboxes();
-  const mailboxIds = useMailboxOptions(accounts).map((o) => o.id);
-  const index = mailboxIds.indexOf(selectedAccountId ?? "");
-  const pageIds = index < 0 ? [selectedAccountId ?? ""] : mailboxIds;
-
-  const scroller = useRef<HTMLDivElement>(null);
-  // The page the scroller is at (or heading to), so its own resting doesn't
-  // pick a mailbox again, and a switch from elsewhere knows to scroll.
-  const shown = useRef(-1);
-  // Whether the user has moved the scroller since it last scrolled itself:
-  // only then does where it rests pick a mailbox.
-  const swiped = useRef(false);
-  const onUserScroll = () => {
-    swiped.current = true;
-  };
-
-  // A switch from elsewhere scrolls to its page (at once the first time).
-  useLayoutEffect(() => {
-    const el = scroller.current;
-    if (!el || index < 0 || shown.current === index) return;
-    const first = shown.current < 0;
-    shown.current = index;
-    swiped.current = false;
-    el.scrollTo({ left: index * el.clientWidth, behavior: first ? "instant" : "smooth" });
-  }, [index]);
-  // Resizing the sidebar keeps the page in place.
-  useEffect(() => {
-    const el = scroller.current;
-    if (!el) return;
-    const observer = new ResizeObserver(() => {
-      if (shown.current >= 0) el.scrollLeft = shown.current * el.clientWidth;
-    });
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
-
-  // Where a swipe comes to rest picks the mailbox.
-  const settleTimer = useRef(0);
-  const settled = () => {
-    const el = scroller.current;
-    if (!el || !el.clientWidth) return;
-    const at = Math.round(el.scrollLeft / el.clientWidth);
-    if (at === shown.current || !mailboxIds[at]) return;
-    // Its own scroll cut short (a layout change re-snaps it): carry on.
-    if (!swiped.current) {
-      el.scrollTo({ left: shown.current * el.clientWidth, behavior: "smooth" });
-      return;
-    }
-    shown.current = at;
-    onSelectAccount(mailboxIds[at]);
-  };
-  useEffect(() => {
-    const el = scroller.current;
-    if (!el) return;
-    el.addEventListener("scrollend", settled);
-    return () => el.removeEventListener("scrollend", settled);
-  });
-
   return (
     <div className="flex h-full min-w-0 flex-col">
       <SidebarTitle />
-
-      <div
-        ref={scroller}
-        onWheel={onUserScroll}
-        onTouchStart={onUserScroll}
-        onPointerDown={onUserScroll}
-        onKeyDown={onUserScroll}
-        // Where there's no scrollend (older Safari), a pause in scrolling stands in.
-        onScroll={() => {
-          window.clearTimeout(settleTimer.current);
-          settleTimer.current = window.setTimeout(settled, 150);
-        }}
-        className="flex min-h-0 flex-1 snap-x snap-mandatory overflow-x-auto overflow-y-hidden overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-      >
-        {pageIds.map((id) => {
-          const current = id === (selectedAccountId ?? "");
-          return (
-            <div key={id} className="h-full w-full shrink-0 snap-start snap-always">
-              {current ? (
-                <SidebarPage {...props} active />
-              ) : (
-                // Another mailbox as it looks once switched to: its inbox.
-                <SidebarPage
-                  {...props}
-                  active={false}
-                  selectedAccountId={id}
-                  selectedLabelId={id === COMBINED_ACCOUNT_ID ? INBOX_VIEW_ID : "INBOX"}
-                  searchSelected={false}
-                  searchPending={false}
-                  searches={[]}
-                />
-              )}
-            </div>
-          );
-        })}
+      <div className="min-h-0 flex-1">
+        <MailboxSidebarPage {...props} />
       </div>
-
       <UpdateCard />
     </div>
   );
 }
 
-/** One mailbox's page of the sidebar: its heading, rows, views and labels. */
-function SidebarPage({
-  active,
-  onEditView,
+/**
+ * One mailbox's page of the sidebar: its heading (with Search), New message,
+ * its folders and labels. The rail's hover shows one on its own (a peek).
+ */
+export function MailboxSidebarPage({
   selectedAccountId,
   onSelectAccount,
   selectedLabelId,
@@ -728,14 +423,12 @@ function SidebarPage({
   searches,
   onSelectSearch,
   onCloseSearch,
-}: AccountsSidebarProps & {
-  /** The page showing; a neighbor drawn during a swipe is inert. */
-  active: boolean;
-}) {
+}: AccountsSidebarProps) {
   const isCombined = selectedAccountId === COMBINED_ACCOUNT_ID;
+  const ownAccountId = isCombined ? null : selectedAccountId;
 
-  const labelsQuery = useLabels(isCombined ? null : selectedAccountId);
-  const capabilities = useCapabilities(isCombined ? null : selectedAccountId);
+  const labelsQuery = useLabels(ownAccountId);
+  const capabilities = useCapabilities(ownAccountId);
   // Mail in one folder at a time (IMAP): its labels are folders.
   const labelNoun = capabilities.multipleLabels ? "Label" : "Folder";
   const addAccount = useAddAccount();
@@ -768,16 +461,9 @@ function SidebarPage({
       ? getAccountDisplayName(account)
       : "Mailbox";
   const labels: GmailLabel[] = labelsQuery.data ?? [];
-  // Views belong to one mailbox; each mailbox (account or Combined) lists its own.
-  const countScope = isCombined ? accounts : accounts.filter((a) => a.id === selectedAccountId);
-  const viewUnreadCounts = useViewUnreadCounts(views, countScope, true);
-  const accountViews = isCombined
-    ? []
-    : views.filter((v) => v.kind === "custom" && v.mailbox === selectedAccountId);
-  const combinedViews = views.filter(
-    (v) => v.kind === "custom" && (v.mailbox ?? COMBINED_ACCOUNT_ID) === COMBINED_ACCOUNT_ID,
-  );
-  const { deleteView, resetView } = useMailViews();
+  // The combined mailbox's folders are its built-in views.
+  const folders = views.filter((v) => v.kind !== "custom");
+  const viewUnreadCounts = useViewUnreadCounts(folders, accounts, isCombined);
 
   // Same order as the Combined built-in views. All Mail isn't a Gmail label
   // (archived mail just lacks INBOX), so it's listed without one — and, like
@@ -921,12 +607,6 @@ function SidebarPage({
     },
   };
 
-  // Settings live in this window: open the view editor directly rather than
-  // round-tripping through the backend deep link.
-  const openViewEditor = (viewId: string) => {
-    onEditView(viewId, isCombined ? COMBINED_ACCOUNT_ID : selectedAccountId);
-  };
-
   /** Right-click on Junk/Trash (a mailbox's own, or Combined's) → Empty…. */
   const withEmptyMenu = (row: ReactNode, labelId: string, accountIds: string[]) => {
     if ((labelId !== "SPAM" && labelId !== "TRASH") || accountIds.length === 0) return row;
@@ -953,21 +633,6 @@ function SidebarPage({
       : accounts.map((a) => a.id),
   });
 
-  const viewRow = (view: MailView) => (
-    <Fragment key={view.id}>
-      <ViewRow
-        view={view}
-        selected={selectedLabelId === view.id}
-        unreadCount={viewUnreadCounts[view.id] ?? 0}
-        onSelect={() => onSelectLabel(view.id)}
-        onDelete={() => void deleteView(view.id)}
-        onReset={() => void resetView(view.id)}
-        onEdit={() => openViewEditor(view.id)}
-      />
-      <SearchRows parent={view.id} />
-    </Fragment>
-  );
-
   const renderSearchRows = (parent: string, depth: number) =>
     searches
       .filter((sr) => sr.parent === parent)
@@ -983,72 +648,44 @@ function SidebarPage({
 
   return (
     <SearchRowsContext.Provider value={renderSearchRows}>
-      <div className="flex h-full min-w-0 flex-col" inert={!active}>
-        {/* The mailbox's name, the sidebar's heading (Codex's "Codex"), past
-            the panel's rounded corner; the rail beside it switches. */}
-        <div className="shrink-0 px-(--sidebar-content-inset) pb-2 pt-(--radius-xl)">
-          <h2 className="flex h-9 items-center px-(--sidebar-row-content-inset) text-base font-semibold tracking-tight text-sidebar-foreground">
-            <span className="truncate">{mailboxName}</span>
-          </h2>
-        </div>
+      <div className="flex h-full min-w-0 flex-col">
+        {/* The mailbox's name; the rail beside it switches. */}
+        <SpaceHeading title={mailboxName}>
+          <SearchButton selected={searchSelected} pending={searchPending} onClick={onOpenSearch} />
+        </SpaceHeading>
 
-        {/* New message (Codex's "New chat"), then Search, which is a mailbox:
-            selecting it opens Gmail search in the list. */}
-        <div
-          className="flex shrink-0 flex-col gap-0.5 px-(--sidebar-content-inset)"
-          data-tour={active ? "compose" : undefined}
-        >
-          <HintTooltip label="New message" shortcut="compose.new">
-            <button
-              type="button"
-              onClick={onCompose}
-              className={`${SIDEBAR_ROW} bg-sidebar-control-surface px-(--sidebar-row-content-inset) text-sidebar-foreground hover:bg-sidebar-row-hover`}
-            >
-              <SquarePenIcon className="size-4 shrink-0 text-sidebar-muted-foreground group-hover:text-sidebar-foreground" />
-              <span className="truncate">New message</span>
-            </button>
-          </HintTooltip>
-          <SkRow
-            icon={<SearchIcon className="size-4" />}
-            title="Search"
-            selected={searchSelected}
-            dot={searchPending}
-            onClick={onOpenSearch}
-          />
-        </div>
+        {/* New message (Codex's "New chat"). Search, in the heading, is a
+            mailbox: it opens Gmail search in the list. */}
+        <NewRow
+          icon={<SquarePenIcon />}
+          label="New message"
+          shortcut="compose.new"
+          tour="compose"
+          onClick={onCompose}
+        />
 
-        <div className="min-h-0 flex-1 scroll-fade-y overflow-y-auto px-(--sidebar-content-inset) pb-8 pt-3">
+        <SidebarBody>
           {isCombined ? (
             <>
-              {views
-                .filter((v) => v.kind !== "custom")
-                .map((view) => (
-                  <Fragment key={view.id}>
-                    {withEmptyMenu(
-                      <SkRow
-                        icon={viewIcon(view)}
-                        title={view.name}
-                        selected={selectedLabelId === view.id}
-                        badge={viewUnreadCounts[view.id] ?? 0}
-                        onClick={() => {
-                          console.log("[AccountsSidebar:selectView]", { viewId: view.id });
-                          onSelectLabel(view.id);
-                        }}
-                      />,
-                      viewFolder(view).labelId,
-                      viewFolder(view).accountIds,
-                    )}
-                    <SearchRows parent={view.id} />
-                  </Fragment>
-                ))}
-
-              <Section
-                title="Views"
-                tour={active ? "views" : undefined}
-                action={<SectionAddButton label="Add view" onClick={() => openViewEditor("new")} />}
-              >
-                {combinedViews.map(viewRow)}
-              </Section>
+              {folders.map((view) => (
+                <Fragment key={view.id}>
+                  {withEmptyMenu(
+                    <SkRow
+                      icon={viewIcon(view)}
+                      title={view.name}
+                      selected={selectedLabelId === view.id}
+                      badge={viewUnreadCounts[view.id] ?? 0}
+                      onClick={() => {
+                        console.log("[AccountsSidebar:selectView]", { viewId: view.id });
+                        onSelectLabel(view.id);
+                      }}
+                    />,
+                    viewFolder(view).labelId,
+                    viewFolder(view).accountIds,
+                  )}
+                  <SearchRows parent={view.id} />
+                </Fragment>
+              ))}
             </>
           ) : (
             <>
@@ -1084,14 +721,6 @@ function SidebarPage({
                   </Fragment>
                 );
               })}
-
-              <Section
-                title="Views"
-                tour={active ? "views" : undefined}
-                action={<SectionAddButton label="Add view" onClick={() => openViewEditor("new")} />}
-              >
-                {accountViews.map(viewRow)}
-              </Section>
 
               {selectedAccountId ? (
                 <Section
@@ -1143,7 +772,7 @@ function SidebarPage({
               ) : null}
             </>
           )}
-        </div>
+        </SidebarBody>
 
         <Dialog
           open={createLabelOpen}

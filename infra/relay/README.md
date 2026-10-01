@@ -1,6 +1,6 @@
 # Otter Mail relay
 
-https://relay.mail.otterware.app, a Cloudflare Worker. It gives Otter Mail five things (the
+https://relay.mail.otterware.app, a Cloudflare Worker. It gives Otter Mail six things (the
 Mac app works without it; the web app needs it):
 
 - **Otter accounts.** Sign in with Google once per Mac, and the mailboxes you use come along to
@@ -13,6 +13,14 @@ Mac app works without it; the web app needs it):
   UI choices like the theme, as sections of JSON per Otter account, plus the Hermes API key,
   sealed with a key derived from the auth secret. A change is pushed to the account's other
   devices over the same WebSocket as mail. See `src/preferences.ts`.
+- **Projects.** The conversations, links and notes of one piece of work, until it's settled
+  (`packages/contracts/src/projects.ts`). Three tables: the projects, their threads (mailbox
+  and Gmail thread ID, never a subject) and their links, each written on its own so devices and
+  agents changing different parts of a project don't overwrite each other; every write sends
+  the `projects` event. Agents that run elsewhere (Hermes) manage them over MCP at `/mcp`
+  (Streamable HTTP, stateless) with an agent token made in Settings; the relay keeps its
+  SHA-256 hash. The tools are the contracts' `project-tools.ts`, the same the Mac app gives
+  Claude and Codex. See `src/projects.ts` and `src/mcp.ts`.
 - **Gmail sign-in for the web app.** A browser can't keep a Google refresh token by itself, so
   the relay does the OAuth exchange with the web client and seals the refresh token (only the
   relay can open it, and only for the Otter user it was issued to). The browser keeps the sealed
@@ -59,8 +67,8 @@ Mac ◀──── WebSocket /v1/events ◀── UserHub (Durable Object, one 
 ## Code map
 
 - `src/worker.ts`: routes (Hono). `/v1/auth/*` is better-auth; `/v1/me`, `/v1/accounts`,
-  `/v1/preferences`, `/v1/events` and `/v1/tunnel` need a session; `/push/gmail` takes Pub/Sub
-  pushes.
+  `/v1/preferences`, `/v1/projects`, `/v1/agent-tokens`, `/v1/events` and `/v1/tunnel` need a
+  session; `/mcp` takes an agent token; `/push/gmail` takes Pub/Sub pushes.
 - `src/tunnel.ts`: the web app's TCP tunnel (`cloudflare:sockets`), and which hosts and ports
   it may reach.
 - `src/auth.ts`: better-auth: Google sign-in (ID tokens from the Mac app, the redirect flow for
@@ -69,6 +77,8 @@ Mac ◀──── WebSocket /v1/events ◀── UserHub (Durable Object, one 
   Signing a session out closes its sockets.
 - `src/gmail.ts`: the web app's Gmail sign-in popup, and token refreshes.
 - `src/preferences.ts`: merging preference sections, sealing the Hermes key.
+- `src/projects.ts`: projects, their threads and links; the project tools' store.
+- `src/mcp.ts`: agent tokens, and the MCP server agents reach projects through.
 - `src/keys.ts`: keys derived from the auth secret, one per purpose.
 - `src/google-jwt.ts`: verifies Google-signed JWTs (jose): ID tokens, and Pub/Sub's push tokens.
 - `src/user-hub.ts`: the Durable Object holding each user's sockets (hibernating).

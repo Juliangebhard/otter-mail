@@ -9,6 +9,7 @@ import { registerCalendarHandlers } from "./handlers/calendar.js";
 import { registerGmailHandlers } from "./handlers/gmail.js";
 import { registerImapAccountHandlers } from "./handlers/imap-accounts.js";
 import { registerOtterAccountHandlers } from "./handlers/otter-account.js";
+import { registerProjectHandlers } from "./handlers/projects.js";
 import { registerSearchHandlers } from "./handlers/search.js";
 import { registerTranslationHandlers } from "./handlers/translation.js";
 import { registerSupportHandlers } from "./handlers/support.js";
@@ -43,6 +44,7 @@ export async function startCore(platform: Platform): Promise<void> {
   registerTranslationHandlers();
   registerAgentHandlers();
   registerSupportHandlers();
+  registerProjectHandlers();
   handle("keybindings:read", async () => readKeybindings());
   handle("preferences:getUi", async () => getUiPreferences());
   handle("preferences:setUi", async (params: unknown) => {

@@ -37,7 +37,7 @@ const STOPS: TourStop[] = [
   {
     target: "mailbox",
     title: "Your mailboxes",
-    body: "Your mailboxes, down the left edge: click one, or swipe the sidebar. With two or more, All mailboxes reads them as one. You and Settings are at the bottom.",
+    body: "Your mailboxes, down the left edge: click one, or hover it to peek at its sidebar. With two or more, All mailboxes reads them as one. You and Settings are at the bottom.",
     keys: [{ command: "mailbox.jump.1", label: "Jump to mailbox 1…9" }],
   },
   {
@@ -50,9 +50,9 @@ const STOPS: TourStop[] = [
     ],
   },
   {
-    target: "views",
-    title: "Views",
-    body: "A view is a saved set of rules that can span mailboxes: every newsletter, mail from your team, receipts from any account. Make one with +.",
+    target: "projects",
+    title: "Views and projects",
+    body: "Under your mailboxes: views, which + makes, each one list of what its filters find across them (every newsletter, receipts from any account), then Projects, which keep a piece of work's conversations, documents and notes together until it's settled. Hover one to peek at its sidebar.",
   },
   {
     target: "list",

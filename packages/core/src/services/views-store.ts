@@ -83,12 +83,21 @@ export async function saveView(input: {
   name: string;
   rules: ViewRule[];
   mailbox?: string;
+  /** Left as they are when absent. */
+  icon?: string | null;
+  color?: string | null;
 }): Promise<MailView> {
   const views = await readViews();
   if (input.id) {
     const index = views.findIndex((v) => v.id === input.id);
     if (index >= 0) {
-      views[index] = { ...views[index], name: input.name, rules: input.rules };
+      views[index] = {
+        ...views[index],
+        name: input.name,
+        rules: input.rules,
+        ...(input.icon !== undefined ? { icon: input.icon } : {}),
+        ...(input.color !== undefined ? { color: input.color } : {}),
+      };
       await writeViews(views);
       return views[index];
     }
@@ -98,6 +107,8 @@ export async function saveView(input: {
     name: input.name,
     kind: "custom",
     rules: input.rules,
+    icon: input.icon ?? null,
+    color: input.color ?? null,
     mailbox: input.mailbox ?? COMBINED_MAILBOX,
   };
   views.push(view);

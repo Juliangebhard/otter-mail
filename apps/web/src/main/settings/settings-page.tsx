@@ -11,7 +11,6 @@ import { AppearancePane } from "./appearance-pane";
 import { KeybindingsPane } from "./keybindings-pane";
 import { AccountsPane } from "./accounts-pane";
 import { OtterAccountPane } from "./otter-account-pane";
-import { ViewsPane } from "./views-pane";
 import { ProvidersPane } from "./providers-pane";
 import { TranslationSection } from "./translation-section";
 import { UpdatesSection } from "../updates";
@@ -27,14 +26,11 @@ import { features } from "../features";
 import { Btn } from "../gmail/ui";
 import { requestTour, startSetup } from "../onboarding/onboarding";
 import { requestProblemReport } from "../support/report-problem";
+import { useRailUnreadDots } from "../gmail/space-rail";
 
 /** Where the settings page is. */
 export type SettingsRoute = {
   pane: SettingsPane;
-  /** Views pane: a view id to edit, or "new" to create one. */
-  viewId: string | null;
-  /** For "new": which mailbox (account id or "__combined__") owns the view. */
-  mailbox: string | null;
   /** A settings-search result's anchor to scroll to, cleared once it's reached. */
   target?: string;
 };
@@ -73,6 +69,7 @@ function GeneralPane() {
   );
   const [launchAtLogin, setLaunchAtLogin] = useState(false);
   const [trayEnabled, setTrayEnabled] = useState(true);
+  const [railDots, setRailDots] = useRailUnreadDots();
   const [dockBadge, setDockBadge] = useState(false);
   const [mailApps, setMailApps] = useState<MailApp[]>([]);
   const [defaultMailBundleId, setDefaultMailBundleId] = useState<string | null>(null);
@@ -192,6 +189,15 @@ function GeneralPane() {
     void loadMailApps();
   };
 
+  // The rail's unread dots, next to the Dock badge in the Mac app; in Mail elsewhere.
+  const railDotsRow = (
+    <SettingsRow
+      {...searchableSetting("rail-unread-dots")}
+      description="A dot on each mailbox in the rail whose Inbox has unread mail, and each view with unread mail."
+      control={<Switch id="railUnreadDots" checked={railDots} onCheckedChange={setRailDots} />}
+    />
+  );
+
   return (
     <SettingsPageContainer title="General">
       {/* What only the Mac app has isn't shown elsewhere. */}
@@ -236,10 +242,12 @@ function GeneralPane() {
               }
             />
           ) : null}
+          {features.dockBadge ? railDotsRow : null}
         </SettingsSection>
       ) : null}
 
       <SettingsSection title="Mail">
+        {features.dockBadge ? null : railDotsRow}
         <SettingsRow
           {...searchableSetting("sync-interval")}
           description="Sync runs in the background at this cadence."
@@ -355,32 +363,16 @@ export function SettingsPage({
   );
   return (
     <SettingsSearchTargetProvider targetId={route.target ?? null} onTargetHandled={clearTarget}>
-      <SettingsPane route={route} onNavigate={onNavigate} />
+      <SettingsPane route={route} />
     </SettingsSearchTargetProvider>
   );
 }
 
-function SettingsPane({
-  route,
-  onNavigate,
-}: {
-  route: SettingsRoute;
-  onNavigate: (route: SettingsRoute) => void;
-}) {
+function SettingsPane({ route }: { route: SettingsRoute }) {
   if (route.pane === "appearance") return <AppearancePane />;
   if (route.pane === "keybindings") return <KeybindingsPane />;
   if (route.pane === "accounts") return <AccountsPane />;
   if (route.pane === "otter") return <OtterAccountPane />;
   if (route.pane === "agents") return <ProvidersPane />;
-  if (route.pane === "views") {
-    return (
-      <ViewsPane
-        editingId={route.viewId}
-        editingMailbox={route.mailbox}
-        onOpenView={(viewId, mailbox) => onNavigate({ pane: "views", viewId, mailbox })}
-        onDone={() => onNavigate({ pane: "views", viewId: null, mailbox: null })}
-      />
-    );
-  }
   return <GeneralPane />;
 }

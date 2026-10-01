@@ -45,7 +45,8 @@ when a feature lands or goes.
   bundles it as JSON.
 - `infra/relay`: https://relay.mail.otterware.app, a Cloudflare Worker (Hono, better-auth,
   Drizzle on D1, a Durable Object per user). Otter accounts, the Gmail accounts linked to them,
-  the account's preferences (core's `services/preferences.ts` syncs them), and realtime mail: Gmail → Pub/Sub → relay → WebSocket to each signed-in device. It never sees
+  the account's preferences (core's `services/preferences.ts` syncs them), its projects (core's
+  `services/projects.ts`; agents elsewhere reach them over the relay's MCP server), and realtime mail: Gmail → Pub/Sub → relay → WebSocket to each signed-in device. It never sees
   mail; the web app's Gmail tokens pass through it (never stored), the Mac app's never do. See its
   README.
 - `native/translator`: a Swift command-line helper for Apple's on-device Translation. It reads a

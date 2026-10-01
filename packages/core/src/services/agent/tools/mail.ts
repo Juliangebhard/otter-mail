@@ -64,12 +64,12 @@ const LABEL_ALIASES: Record<string, string> = {
   archive: ALL_MAIL_LABEL_ID,
 };
 
-function labelsOf(account: GmailAccount): Promise<GmailLabel[]> {
+export function labelsOf(account: GmailAccount): Promise<GmailLabel[]> {
   return invoke<GmailLabel[]>("gmail:listLabels", { accountId: account.id });
 }
 
 /** A label's id from its name, id or alias. */
-function labelId(account: GmailAccount, labels: GmailLabel[], ref: string): string {
+export function labelId(account: GmailAccount, labels: GmailLabel[], ref: string): string {
   const wanted = ref.trim().toLowerCase();
   if (LABEL_ALIASES[wanted]) return LABEL_ALIASES[wanted];
   const found = labels.find(

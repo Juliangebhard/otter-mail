@@ -25,7 +25,9 @@ to another app. This page is where they're compared.
 | Add an IMAP mailbox, servers discovered     | ✓                  | ✓ (no domain autoconfig file: CORS) | ✓                       |
 | IMAP through the relay tunnel               | — (direct)         | ✓ (TLS 1.3 servers only)            | — (direct)              |
 | Several mailboxes: on/off, reorder          | ✓                  | ✓                                   | ✓                       |
-| Mailbox rail: switch, unread dots, add      | ✓                  | ✓                                   | — (drawer)              |
+| Rail: switch, unread dots (a setting)       | ✓                  | ✓                                   | — (drawer)              |
+| Rail of spaces: mailboxes, views, Projects  | ✓                  | ✓                                   | —                       |
+| Sidebar collapsed: hover a space to peek    | ✓                  | ✓                                   | —                       |
 | Combined mailbox (all accounts)             | ✓                  | ✓                                   | ✓ ("All")               |
 | Rename and color a mailbox (synced)         | ✓                  | ✓                                   | ✓                       |
 | Google profile picture per mailbox          | ✓ (kept current)   | ✓ (kept current)                    | —                       |
@@ -70,6 +72,25 @@ to another app. This page is where they're compared.
 | Swipe actions                            | —                        | —            | ✓ (fixed)      |
 | After archive: next / previous           | ✓                        | ✓            | ✓              |
 | Snooze                                   | —                        | —            | —              |
+
+## Projects
+
+A project keeps the conversations, documents, links and notes of one piece of work (a contract,
+a deal) together until it's settled. Projects follow the Otter account; the relay keeps which
+conversations are in one, never their mail.
+
+| Feature                                                         | Mac                 | Web | iPhone |
+| --------------------------------------------------------------- | ------------------- | --- | ------ |
+| Projects in the rail: open ones in the sidebar, settled folded  | ✓                   | ✓   | —      |
+| All projects: their conversations in one list, an overview page | ✓                   | ✓   | —      |
+| Add conversations (menu, drag onto a project), remove them      | ✓                   | ✓   | —      |
+| Conversations from every mailbox in one list                    | ✓                   | ✓   | —      |
+| Notes, links                                                    | ✓                   | ✓   | —      |
+| Documents: its conversations' attachments, as versions          | ✓                   | ✓   | —      |
+| Settle, reopen                                                  | ✓                   | ✓   | —      |
+| ⌘K: go to a project, new project; Recently viewed               | ✓                   | ✓   | —      |
+| Synced through the Otter account                                | ✓ (offline: queued) | ✓   | —      |
+| Uploaded files                                                  | —                   | —   | —      |
 
 ## Composing & sending
 
@@ -145,7 +166,7 @@ to another app. This page is where they're compared.
 | Recently viewed, back and forward (Mac: title bar; web: browser's)    | ✓   | ✓   | —                                                                          |
 | Settings search (/ or ⌘F in Settings)                                 | ✓   | ✓   | —                                                                          |
 | Changelog (opens the site's, from ⌘K and Settings' ? menu)            | ✓   | ✓   | —                                                                          |
-| Custom views (rules across mailboxes)                                 | ✓   | ✓   | —                                                                          |
+| Views: filters across mailboxes, a space in the rail (icon or emoji)  | ✓   | ✓   | —                                                                          |
 | Preferences synced through the Otter account                          | ✓   | ✓   | ✓ (theme, advance, mailboxes, notifications, languages, agent, signatures) |
 
 ## Support
@@ -173,13 +194,18 @@ optional fix PRs. See [support.md](support.md).
 | Queued follow-ups                                  | ✓                           | ✓          | —                          |
 | Mail and calendar tools (Claude, Codex)            | ✓ (every mailbox)           | —          | —                          |
 | Theme tools: make, change and wear themes          | ✓                           | —          | —                          |
+| Project tools (Claude, Codex)                      | ✓                           | —          | —                          |
+| View tools: make, change and delete views          | ✓                           | —          | —                          |
+| Projects for agents elsewhere (relay MCP, token)   | ✓ (Hermes)                  | ✓ (Hermes) | ✓ (Hermes)                 |
 
 Claude and Codex get Otter Mail's own tools (an MCP server in the Mac app's backend), so they
 need no mail CLI: search, read and sort mail, download attachments, save drafts and send, in
 any mailbox (Gmail or IMAP), and list, add, change and answer events in Google Calendar. A tool
 that changes a mailbox asks first unless the chat has full access; drafts don't ask. They can
 also make a theme or change one of the user's own, and wear a theme; a built-in never changes
-(changing one makes a copy, worn in its place).
+(changing one makes a copy, worn in its place). They manage projects too (create, add
+conversations and links, keep the notes, settle); Hermes gets the project tools from the relay,
+with an agent token.
 
 ## Translation
 
@@ -226,7 +252,7 @@ profile`).
 - iPhone: sender photos (contacts, Gravatar, logos) instead of initials only.
 - iPhone: create, rename and delete labels; Empty Trash / Junk.
 - iPhone: multi-select, and undo after archive or trash.
-- iPhone: custom views.
+- iPhone: views.
 - iPhone: push notifications (APNs) when the app is closed.
 - iPhone: save or share an attachment from Quick Look.
 - Mac and web: Mark all as read (iPhone has it).

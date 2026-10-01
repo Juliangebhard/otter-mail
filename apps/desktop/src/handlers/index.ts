@@ -17,26 +17,21 @@ import { registerTrayPopoverHandlers } from "./tray-popover.js";
 import { registerSupportHandlers } from "./support.js";
 
 export function registerHandlers(): void {
-  // Settings live in the main window. Any window can deep-link into a pane
-  // (e.g. edit a view from the tray); the main window pulls the target on
-  // mount and whenever settings:open is broadcast.
+  // Settings live in the main window. Any window can deep-link into a pane;
+  // the main window pulls the target on mount and whenever settings:open is
+  // broadcast.
   ipcMain.handle("window:openSettings", async (_event, params: unknown) => {
-    const p = params as { pane?: unknown; viewId?: unknown; mailbox?: unknown } | undefined;
+    const p = params as { pane?: unknown } | undefined;
     const pane =
       p?.pane === "general" ||
       p?.pane === "appearance" ||
       p?.pane === "accounts" ||
-      p?.pane === "views" ||
       p?.pane === "keybindings" ||
       p?.pane === "agents" ||
       p?.pane === "otter"
         ? p.pane
         : "general";
-    setSettingsTarget({
-      pane,
-      viewId: typeof p?.viewId === "string" ? p.viewId : null,
-      mailbox: typeof p?.mailbox === "string" ? p.mailbox : null,
-    });
+    setSettingsTarget({ pane });
     await focusMainWindow();
     broadcast("settings:open");
   });

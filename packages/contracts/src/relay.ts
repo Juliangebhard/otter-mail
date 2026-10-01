@@ -174,4 +174,34 @@ export type RelayEvent =
   /** The linked accounts changed (another device linked, unlinked or edited one). */
   | { type: "accounts" }
   /** The preferences changed on another device. */
-  | { type: "preferences" };
+  | { type: "preferences" }
+  /** A project changed (on another device, or by an agent): see projects.ts. */
+  | { type: "projects" };
+
+/**
+ * Agent tokens: how an agent that runs elsewhere (Hermes) reaches the
+ * account's projects through the relay's MCP server, `POST /mcp` (Streamable
+ * HTTP, stateless) with `Authorization: Bearer <token>`. A token opens the
+ * project tools (project-tools.ts) and nothing else: no mail, no mailboxes,
+ * no preferences.
+ *
+ * - `GET /v1/agent-tokens` → `ListAgentTokensResponse`
+ * - `POST /v1/agent-tokens` with `{ name }` → `CreateAgentTokenResponse`: the
+ *   token is shown this once; the relay keeps only its hash.
+ * - `DELETE /v1/agent-tokens/:id` revokes it.
+ */
+export interface AgentToken {
+  id: string;
+  name: string;
+  createdAt: number;
+  lastUsedAt: number | null;
+}
+
+export interface ListAgentTokensResponse {
+  tokens: AgentToken[];
+}
+
+export interface CreateAgentTokenResponse {
+  token: string;
+  agentToken: AgentToken;
+}

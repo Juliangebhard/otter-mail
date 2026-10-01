@@ -13,6 +13,7 @@ import { ErrorBoundaryView } from "~/components/ui/error-boundary-view";
 import type { SettingsPane } from "./gmail/api";
 import { COMBINED_ACCOUNT_ID } from "./gmail/custom-views";
 import { SEARCH_MAILBOX } from "./gmail/gmail-query";
+import { PROJECTS_SPACE } from "./gmail/spaces";
 
 const rootRoute = createRootRouteWithContext<{
   queryClient: QueryClient;
@@ -52,13 +53,12 @@ const SETTINGS_PANES = new Set<string>([
   "appearance",
   "keybindings",
   "accounts",
-  "views",
   "agents",
   "otter",
 ]);
 
-/** `?view=` a view to edit ("new" to create one, for `?mailbox=`); `?target=` a setting to scroll to. */
-export type SettingsSearch = { view?: string; mailbox?: string; target?: string };
+/** `?target=` a setting to scroll to. */
+export type SettingsSearch = { target?: string };
 
 const settingsRoute = createRoute({
   getParentRoute: () => mailRoute,
@@ -71,19 +71,20 @@ const settingsRoute = createRoute({
     stringify: ({ pane }) => ({ pane }),
   },
   validateSearch: (search: Record<string, unknown>): SettingsSearch => ({
-    view: typeof search.view === "string" ? search.view : undefined,
-    mailbox: typeof search.mailbox === "string" ? search.mailbox : undefined,
     target: typeof search.target === "string" ? search.target : undefined,
   }),
   component: () => null,
 });
 
-// Mailboxes are account ids (their email addresses) or `all`, the combined
-// mailbox. Labels are Gmail's (or IMAP's) ids and views' ids, but the app's
-// own `__name__` ones read as `name`: the combined mailbox's built-in views
-// and Search.
-const toMailbox = (segment: string) => (segment === "all" ? COMBINED_ACCOUNT_ID : segment);
-const fromMailbox = (id: string) => (id === COMBINED_ACCOUNT_ID ? "all" : id);
+// Spaces are account ids (their email addresses), `all` (the combined
+// mailbox), a view's id (its one label is `all`), or `projects` (labels `all`
+// and project ids). Labels are Gmail's (or IMAP's) ids and views' ids, but
+// the app's own `__name__` ones read as `name`: the combined mailbox's
+// built-in views and Search.
+const toMailbox = (segment: string) =>
+  segment === "all" ? COMBINED_ACCOUNT_ID : segment === "projects" ? PROJECTS_SPACE : segment;
+const fromMailbox = (id: string) =>
+  id === COMBINED_ACCOUNT_ID ? "all" : id === PROJECTS_SPACE ? "projects" : id;
 const BUILT_IN_VIEWS = new Set([
   "inbox",
   "starred",

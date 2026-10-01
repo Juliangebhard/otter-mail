@@ -381,22 +381,24 @@ export type TranslationStatus =
   | "unsupported"
   | "unavailable";
 
-export type SaveViewParams = { id?: string; name: string; rules: ViewRule[]; mailbox?: string };
+export type SaveViewParams = {
+  id?: string;
+  name: string;
+  rules: ViewRule[];
+  mailbox?: string;
+  icon?: string | null;
+  color?: string | null;
+};
 
 export type SettingsPane =
   | "general"
   | "appearance"
   | "keybindings"
   | "accounts"
-  | "views"
   | "agents"
   /** The Otter account page, opened from the user button at the bottom of the nav. */
   | "otter";
-export type SettingsTarget = {
-  pane: SettingsPane;
-  viewId?: string | null;
-  mailbox?: string | null;
-};
+export type SettingsTarget = { pane: SettingsPane };
 
 export type AddImapAccountParams = {
   email: string;

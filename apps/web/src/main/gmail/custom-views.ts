@@ -186,7 +186,15 @@ export function useMailViews() {
       patchViews((views) =>
         input.id
           ? views.map((v) =>
-              v.id === input.id ? { ...v, name: input.name, rules: input.rules } : v,
+              v.id === input.id
+                ? {
+                    ...v,
+                    name: input.name,
+                    rules: input.rules,
+                    ...(input.icon !== undefined ? { icon: input.icon } : {}),
+                    ...(input.color !== undefined ? { color: input.color } : {}),
+                  }
+                : v,
             )
           : [
               ...views,
@@ -196,8 +204,18 @@ export function useMailViews() {
                 kind: "custom",
                 rules: input.rules,
                 mailbox: input.mailbox ?? COMBINED_ACCOUNT_ID,
+                icon: input.icon ?? null,
+                color: input.color ?? null,
               },
             ],
+      ),
+    // The saved view in place of its pending one at once, so whoever goes
+    // to it (a new view opens in its space) finds it before the refetch.
+    onSuccess: (saved) =>
+      qc.setQueryData<MailView[]>(VIEWS_QUERY_KEY, (views = DEFAULT_VIEWS) =>
+        views.some((v) => v.id === saved.id)
+          ? views.map((v) => (v.id === saved.id ? saved : v))
+          : views.map((v) => (v.id === `pending:${saved.name}` ? saved : v)),
       ),
     onError: (_err, _vars, context) => {
       rollback(context);
