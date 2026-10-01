@@ -50,9 +50,9 @@ const STOPS: TourStop[] = [
     ],
   },
   {
-    target: "views",
-    title: "Views",
-    body: "A view is a saved set of rules that can span mailboxes: every newsletter, mail from your team, receipts from any account. Make one with +.",
+    target: "projects",
+    title: "Custom mailboxes and projects",
+    body: "Under your mailboxes, make your own with +: filters that can span them, like every newsletter or receipts from any account. Projects keep one piece of work's conversations, documents and notes together until it's settled.",
   },
   {
     target: "list",

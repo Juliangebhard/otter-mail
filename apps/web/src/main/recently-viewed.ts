@@ -118,13 +118,7 @@ export function useRecordRecentlyViewed({
     inSettings ? null : messageId,
   ).data;
   const ownLabels = useLabels(
-    !inSettings &&
-      !messageId &&
-      mailbox &&
-      mailbox !== COMBINED_ACCOUNT_ID &&
-      mailbox !== PROJECTS_MAILBOX
-      ? mailbox
-      : null,
+    !inSettings && !messageId && mailbox && accounts.some((a) => a.id === mailbox) ? mailbox : null,
   ).data;
   const projects = useProjects().data;
 
@@ -161,7 +155,7 @@ export function useRecordRecentlyViewed({
         ? "All mailboxes"
         : account
           ? getAccountDisplayName(account)
-          : null;
+          : (views.find((v) => v.kind === "custom" && v.id === mailbox)?.name ?? null);
     const view = views.find((v) => v.id === label);
     const ownLabel = ownLabels?.find((l) => l.id === label);
     const title =

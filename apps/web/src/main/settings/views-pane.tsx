@@ -5,7 +5,6 @@ import {
   ChevronRightIcon,
   CopyIcon,
   EllipsisIcon,
-  LayersIcon,
   PencilIcon,
   PlusIcon,
   Trash2Icon,
@@ -25,13 +24,13 @@ import {
 } from "../gmail/menu";
 import type { GmailAccount, GmailLabel, MailView } from "../gmail/types";
 import { Btn, IconBtn } from "../gmail/ui";
-import { SettingsGroup, SettingsPageContainer, SettingsRow, SettingsSection } from "./settings-ui";
+import { SettingsGroup, SettingsPageContainer, SettingsRow } from "./settings-ui";
 import { searchableSetting } from "./settings-search";
 
 /**
- * Settings › Views: custom views grouped by the mailbox that owns them. Each
- * row says what it shows (label chips, accounts, live counts); editing opens
- * the rule editor in place.
+ * Settings › Custom mailboxes (custom views): mailboxes made of filters, in
+ * the rail after the real ones. Each row says what it shows (label chips,
+ * accounts, live counts); editing opens the rule editor in place.
  */
 
 const COMBINED_MAILBOX = "__combined__";
@@ -196,20 +195,15 @@ export function ViewsPane({
     }
     const editingView =
       editingId === "new" ? null : (views.find((v) => v.id === editingId) ?? null);
-    const mailbox = editingView
-      ? (editingView.mailbox ?? COMBINED_MAILBOX)
-      : (editingMailbox ?? COMBINED_MAILBOX);
-    // Account-owned views edit against that account's labels only.
-    const scopedAccounts =
-      mailbox === COMBINED_MAILBOX ? accounts : accounts.filter((a) => a.id === mailbox);
-    const owner = accounts.find((a) => a.id === mailbox);
+    // A custom mailbox can draw on every mailbox, whichever it was made in
+    // (views were once each mailbox's own).
+    const mailbox = editingView?.mailbox ?? editingMailbox ?? COMBINED_MAILBOX;
     return (
       <SettingsPageContainer>
         <ViewEditorForm
           key={editingId}
           view={editingView}
-          accounts={scopedAccounts}
-          mailboxName={owner ? getAccountDisplayName(owner) : "All mailboxes"}
+          accounts={accounts}
           onSave={(input) => saveView({ ...input, mailbox })}
           onDelete={deleteView}
           onReset={resetView}
@@ -223,109 +217,53 @@ export function ViewsPane({
     accountLabels.map((a) => [a.accountId, new Map(a.labels.map((l) => [l.id, l]))]),
   );
   const custom = views.filter((v) => v.kind === "custom");
-  const mailboxes = [
-    ...(accounts.length > 1
-      ? [{ id: COMBINED_MAILBOX, title: "All mailboxes", color: null as string | null }]
-      : []),
-    ...accounts.map((a) => ({
-      id: a.id,
-      title: getAccountDisplayName(a),
-      color: getAccountColor(a),
-    })),
-  ];
-  const ownerOf = (v: MailView) =>
-    v.mailbox ?? (accounts.length > 1 ? COMBINED_MAILBOX : (accounts[0]?.id ?? COMBINED_MAILBOX));
-  const sections = mailboxes
-    .map((m) => ({ ...m, views: custom.filter((v) => ownerOf(v) === m.id) }))
-    .filter((s) => s.views.length > 0);
-
-  const newViewMenu = (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Btn size="sm" variant="outline">
-          <PlusIcon className="size-3.5" />
-          New view
-        </Btn>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        {mailboxes.map((m, i) => (
-          <div key={m.id}>
-            {i === 1 && mailboxes[0].id === COMBINED_MAILBOX ? <DropdownMenuSeparator /> : null}
-            <DropdownMenuItem
-              icon={
-                m.color ? (
-                  <span className="flex size-4 items-center justify-center">
-                    <span className="size-2 rounded-full" style={{ backgroundColor: m.color }} />
-                  </span>
-                ) : (
-                  <LayersIcon />
-                )
-              }
-              onSelect={() => onOpenView("new", m.id)}
-            >
-              {m.id === COMBINED_MAILBOX ? "Across all mailboxes" : `In ${m.title}`}
-            </DropdownMenuItem>
-          </div>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
 
   return (
     <SettingsPageContainer
       searchId={searchableSetting("views").id}
-      title="Views"
-      description="Saved filters, shown in the sidebar of the mailbox they belong to."
-      action={newViewMenu}
+      title="Custom mailboxes"
+      description="Mailboxes made of filters, across your mailboxes, in the rail after them. Each has its own Inbox, Starred, Sent and All Mail."
+      action={
+        <Btn size="sm" variant="outline" onClick={() => onOpenView("new", COMBINED_MAILBOX)}>
+          <PlusIcon className="size-3.5" />
+          New custom mailbox
+        </Btn>
+      }
     >
-      {sections.length === 0 ? (
-        <SettingsGroup>
+      <SettingsGroup>
+        {custom.length === 0 ? (
           <SettingsRow
-            title="No views yet"
-            description="A view is a saved filter — like “01 Action” across every account — that shows up in the sidebar."
+            title="No custom mailboxes yet"
+            description="A custom mailbox is a saved filter, like “01 Action” across every account, or receipts from any of them."
           />
-        </SettingsGroup>
-      ) : (
-        sections.map((section) => (
-          <SettingsSection
-            key={section.id}
-            title={section.title}
-            icon={
-              section.color ? (
-                <span className="size-2 rounded-full" style={{ backgroundColor: section.color }} />
-              ) : (
-                <LayersIcon className="size-3.5 text-muted-foreground" />
-              )
-            }
-          >
-            {section.views.map((view) => (
-              <ViewRow
-                key={view.id}
-                view={view}
-                accounts={accounts}
-                lookup={lookup}
-                showAccounts={section.id === COMBINED_MAILBOX}
-                onEdit={() => onOpenView(view.id, section.id)}
-                onDuplicate={() =>
-                  void saveView({
-                    name: `${view.name} copy`,
-                    rules: view.rules ?? [],
-                    mailbox: view.mailbox,
-                  })
-                }
-                onDelete={() => setConfirmDelete(view)}
-              />
-            ))}
-          </SettingsSection>
-        ))
-      )}
+        ) : (
+          custom.map((view) => (
+            <ViewRow
+              key={view.id}
+              view={view}
+              accounts={accounts}
+              lookup={lookup}
+              showAccounts={accounts.length > 1}
+              onEdit={() => onOpenView(view.id, view.mailbox ?? COMBINED_MAILBOX)}
+              onDuplicate={() =>
+                void saveView({
+                  name: `${view.name} copy`,
+                  rules: view.rules ?? [],
+                  mailbox: view.mailbox,
+                })
+              }
+              onDelete={() => setConfirmDelete(view)}
+            />
+          ))
+        )}
+      </SettingsGroup>
       <Dialog
         open={confirmDelete !== null}
         onOpenChange={(o) => {
           if (!o) setConfirmDelete(null);
         }}
         title={`Delete “${confirmDelete?.name ?? ""}”?`}
-        confirmLabel="Delete view"
+        confirmLabel="Delete mailbox"
         confirmVariant="accent"
         onConfirm={() => {
           if (confirmDelete) void deleteView(confirmDelete.id);
@@ -333,7 +271,7 @@ export function ViewsPane({
         }}
       >
         <Text variant="small">
-          The view leaves the sidebar. Your mail and labels aren't touched.
+          The mailbox leaves the rail. Your mail and labels aren't touched.
         </Text>
       </Dialog>
     </SettingsPageContainer>

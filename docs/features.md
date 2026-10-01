@@ -164,7 +164,7 @@ conversations are in one, never their mail.
 | Recently viewed, back and forward (Mac: title bar; web: browser's)    | ✓   | ✓   | —                                                                          |
 | Settings search (/ or ⌘F in Settings)                                 | ✓   | ✓   | —                                                                          |
 | Changelog (opens the site's, from ⌘K and Settings' ? menu)            | ✓   | ✓   | —                                                                          |
-| Custom views (rules across mailboxes)                                 | ✓   | ✓   | —                                                                          |
+| Custom mailboxes (filters across mailboxes, in the rail)              | ✓   | ✓   | —                                                                          |
 | Preferences synced through the Otter account                          | ✓   | ✓   | ✓ (theme, advance, mailboxes, notifications, languages, agent, signatures) |
 
 ## Support
@@ -249,7 +249,7 @@ profile`).
 - iPhone: sender photos (contacts, Gravatar, logos) instead of initials only.
 - iPhone: create, rename and delete labels; Empty Trash / Junk.
 - iPhone: multi-select, and undo after archive or trash.
-- iPhone: custom views.
+- iPhone: custom mailboxes.
 - iPhone: push notifications (APNs) when the app is closed.
 - iPhone: save or share an attachment from Quick Look.
 - Mac and web: Mark all as read (iPhone has it).

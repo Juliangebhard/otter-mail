@@ -39,6 +39,7 @@ import {
   TagIcon,
   SearchIcon,
   SquarePenIcon,
+  PencilIcon,
 } from "lucide-react";
 import {
   useLabels,
@@ -51,7 +52,7 @@ import {
   useViewUnreadCounts,
 } from "./hooks";
 import type { GmailLabel, MailView } from "./types";
-import { COMBINED_ACCOUNT_ID, INBOX_VIEW_ID, useMailViews } from "./custom-views";
+import { COMBINED_ACCOUNT_ID, INBOX_VIEW_ID, customMailboxFolders } from "./custom-views";
 import { ALL_MAIL_LABEL_ID } from "./label-names";
 import { buildLabelTree, type LabelTreeNode } from "./label-tree";
 import {
@@ -65,7 +66,7 @@ import { labelMoveName } from "../keybindings/commands";
 import { renameLabelKeybindings, useKeybindingsState } from "../keybindings/store";
 import { formatShortcut, parseShortcut } from "../keybindings/keys";
 import { LabelShortcutDialog } from "../settings/keybindings-pane";
-import { UnreadPill, HintTooltip } from "./ui";
+import { UnreadPill, HintTooltip, IconBtn } from "./ui";
 import { SidebarTitle, useMailboxOptions } from "./top-bar";
 import { getAccountDisplayName } from "./account-style";
 import { useMailboxes } from "../mailboxes";
@@ -361,56 +362,6 @@ function AddRow({ label, ...props }: { label: string } & ComponentProps<"button"
   );
 }
 
-function ViewRow({
-  view,
-  selected,
-  unreadCount,
-  onSelect,
-  onEdit,
-  onDelete,
-  onReset,
-}: {
-  view: MailView;
-  selected: boolean;
-  unreadCount: number;
-  onSelect: () => void;
-  onEdit: () => void;
-  onDelete: () => void;
-  onReset: () => void;
-}): ReactNode {
-  return (
-    <ContextMenu>
-      <ContextMenuTrigger>
-        <SkRow
-          icon={viewIcon(view)}
-          title={view.name}
-          selected={selected}
-          badge={unreadCount}
-          onClick={() => {
-            console.log("[AccountsSidebar:selectView]", { viewId: view.id });
-            onSelect();
-          }}
-        />
-      </ContextMenuTrigger>
-      <ContextMenuContent>
-        <ContextMenuItem icon="pencil" onSelect={onEdit}>
-          Edit view…
-        </ContextMenuItem>
-        <ContextMenuSeparator />
-        {view.kind === "custom" ? (
-          <ContextMenuItem icon="trash" color="red" onSelect={onDelete}>
-            Delete view
-          </ContextMenuItem>
-        ) : (
-          <ContextMenuItem icon="arrow.counterclockwise" onSelect={onReset}>
-            Reset to default
-          </ContextMenuItem>
-        )}
-      </ContextMenuContent>
-    </ContextMenu>
-  );
-}
-
 function labelIcon(label?: GmailLabel): ReactNode {
   const color = label?.color?.backgroundColor;
   if (color) {
@@ -583,7 +534,7 @@ function LabelNode({
 }
 
 type AccountsSidebarProps = {
-  /** Opens Settings → Views on a view ("new" to create one) for a mailbox. */
+  /** Opens Settings → Custom mailboxes on one ("new" to create one). */
   onEditView: (viewId: string, mailbox: string | null) => void;
   selectedAccountId: string | null;
   onSelectAccount: (accountId: string) => void;
@@ -613,7 +564,11 @@ type AccountsSidebarProps = {
 export function AccountsSidebar(props: AccountsSidebarProps) {
   const { selectedAccountId, onSelectAccount } = props;
   const { accounts } = useMailboxes();
-  const mailboxIds = useMailboxOptions(accounts).map((o) => o.id);
+  // The rail's order: the mailboxes, then the custom ones.
+  const mailboxIds = [
+    ...useMailboxOptions(accounts).map((o) => o.id),
+    ...props.views.filter((v) => v.kind === "custom").map((v) => v.id),
+  ];
   const index = mailboxIds.indexOf(selectedAccountId ?? "");
   const pageIds = index < 0 ? [selectedAccountId ?? ""] : mailboxIds;
 
@@ -699,7 +654,9 @@ export function AccountsSidebar(props: AccountsSidebarProps) {
                   {...props}
                   active={false}
                   selectedAccountId={id}
-                  selectedLabelId={id === COMBINED_ACCOUNT_ID ? INBOX_VIEW_ID : "INBOX"}
+                  selectedLabelId={
+                    id.startsWith("__") || id.startsWith("v_") ? INBOX_VIEW_ID : "INBOX"
+                  }
                   searchSelected={false}
                   searchPending={false}
                   searches={[]}
@@ -715,7 +672,7 @@ export function AccountsSidebar(props: AccountsSidebarProps) {
   );
 }
 
-/** One mailbox's page of the sidebar: its heading, rows, views and labels. */
+/** One mailbox's page of the sidebar: its heading, rows and labels (a custom one's: its folders). */
 function SidebarPage({
   active,
   onEditView,
@@ -736,9 +693,11 @@ function SidebarPage({
   active: boolean;
 }) {
   const isCombined = selectedAccountId === COMBINED_ACCOUNT_ID;
+  const custom = views.find((v) => v.kind === "custom" && v.id === selectedAccountId) ?? null;
+  const ownAccountId = isCombined || custom ? null : selectedAccountId;
 
-  const labelsQuery = useLabels(isCombined ? null : selectedAccountId);
-  const capabilities = useCapabilities(isCombined ? null : selectedAccountId);
+  const labelsQuery = useLabels(ownAccountId);
+  const capabilities = useCapabilities(ownAccountId);
   // Mail in one folder at a time (IMAP): its labels are folders.
   const labelNoun = capabilities.multipleLabels ? "Label" : "Folder";
   const addAccount = useAddAccount();
@@ -767,20 +726,18 @@ function SidebarPage({
   const account = accounts.find((a) => a.id === selectedAccountId);
   const mailboxName = isCombined
     ? "All mailboxes"
-    : account
-      ? getAccountDisplayName(account)
-      : "Mailbox";
+    : custom
+      ? custom.name
+      : account
+        ? getAccountDisplayName(account)
+        : "Mailbox";
   const labels: GmailLabel[] = labelsQuery.data ?? [];
-  // Views belong to one mailbox; each mailbox (account or Combined) lists its own.
-  const countScope = isCombined ? accounts : accounts.filter((a) => a.id === selectedAccountId);
-  const viewUnreadCounts = useViewUnreadCounts(views, countScope, true);
-  const accountViews = isCombined
-    ? []
-    : views.filter((v) => v.kind === "custom" && v.mailbox === selectedAccountId);
-  const combinedViews = views.filter(
-    (v) => v.kind === "custom" && (v.mailbox ?? COMBINED_ACCOUNT_ID) === COMBINED_ACCOUNT_ID,
-  );
-  const { deleteView, resetView } = useMailViews();
+  // The combined mailbox's folders are its built-in views; a custom one's,
+  // its filters within each.
+  const folders = custom
+    ? customMailboxFolders(custom, accounts)
+    : views.filter((v) => v.kind !== "custom");
+  const viewUnreadCounts = useViewUnreadCounts(folders, accounts, isCombined || custom != null);
 
   // Same order as the Combined built-in views. All Mail isn't a Gmail label
   // (archived mail just lacks INBOX), so it's listed without one — and, like
@@ -924,12 +881,6 @@ function SidebarPage({
     },
   };
 
-  // Settings live in this window: open the view editor directly rather than
-  // round-tripping through the backend deep link.
-  const openViewEditor = (viewId: string) => {
-    onEditView(viewId, isCombined ? COMBINED_ACCOUNT_ID : selectedAccountId);
-  };
-
   /** Right-click on Junk/Trash (a mailbox's own, or Combined's) → Empty…. */
   const withEmptyMenu = (row: ReactNode, labelId: string, accountIds: string[]) => {
     if ((labelId !== "SPAM" && labelId !== "TRASH") || accountIds.length === 0) return row;
@@ -956,21 +907,6 @@ function SidebarPage({
       : accounts.map((a) => a.id),
   });
 
-  const viewRow = (view: MailView) => (
-    <Fragment key={view.id}>
-      <ViewRow
-        view={view}
-        selected={selectedLabelId === view.id}
-        unreadCount={viewUnreadCounts[view.id] ?? 0}
-        onSelect={() => onSelectLabel(view.id)}
-        onDelete={() => void deleteView(view.id)}
-        onReset={() => void resetView(view.id)}
-        onEdit={() => openViewEditor(view.id)}
-      />
-      <SearchRows parent={view.id} />
-    </Fragment>
-  );
-
   const renderSearchRows = (parent: string, depth: number) =>
     searches
       .filter((sr) => sr.parent === parent)
@@ -990,8 +926,19 @@ function SidebarPage({
         {/* The mailbox's name, the sidebar's heading (Codex's "Codex"), past
             the panel's rounded corner; the rail beside it switches. */}
         <div className="shrink-0 px-(--sidebar-content-inset) pb-2 pt-(--radius-xl)">
-          <h2 className="flex h-9 items-center px-(--sidebar-row-content-inset) text-base font-semibold tracking-tight text-sidebar-foreground">
-            <span className="truncate">{mailboxName}</span>
+          <h2 className="group flex h-9 items-center gap-1 px-(--sidebar-row-content-inset) text-base font-semibold tracking-tight text-sidebar-foreground">
+            <span className="min-w-0 flex-1 truncate">{mailboxName}</span>
+            {custom ? (
+              <HintTooltip label="Edit mailbox">
+                <IconBtn
+                  label="Edit mailbox"
+                  onClick={() => onEditView(custom.id, COMBINED_ACCOUNT_ID)}
+                  className="opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+                >
+                  <PencilIcon className="size-3.5" />
+                </IconBtn>
+              </HintTooltip>
+            ) : null}
           </h2>
         </div>
 
@@ -1021,37 +968,27 @@ function SidebarPage({
         </div>
 
         <div className="min-h-0 flex-1 scroll-fade-y overflow-y-auto px-(--sidebar-content-inset) pb-8 pt-3">
-          {isCombined ? (
+          {isCombined || custom ? (
             <>
-              {views
-                .filter((v) => v.kind !== "custom")
-                .map((view) => (
-                  <Fragment key={view.id}>
-                    {withEmptyMenu(
-                      <SkRow
-                        icon={viewIcon(view)}
-                        title={view.name}
-                        selected={selectedLabelId === view.id}
-                        badge={viewUnreadCounts[view.id] ?? 0}
-                        onClick={() => {
-                          console.log("[AccountsSidebar:selectView]", { viewId: view.id });
-                          onSelectLabel(view.id);
-                        }}
-                      />,
-                      viewFolder(view).labelId,
-                      viewFolder(view).accountIds,
-                    )}
-                    <SearchRows parent={view.id} />
-                  </Fragment>
-                ))}
-
-              <Section
-                title="Views"
-                tour={active ? "views" : undefined}
-                action={<SectionAddButton label="Add view" onClick={() => openViewEditor("new")} />}
-              >
-                {combinedViews.map(viewRow)}
-              </Section>
+              {folders.map((view) => (
+                <Fragment key={view.id}>
+                  {withEmptyMenu(
+                    <SkRow
+                      icon={viewIcon(view)}
+                      title={view.name}
+                      selected={selectedLabelId === view.id}
+                      badge={viewUnreadCounts[view.id] ?? 0}
+                      onClick={() => {
+                        console.log("[AccountsSidebar:selectView]", { viewId: view.id });
+                        onSelectLabel(view.id);
+                      }}
+                    />,
+                    custom ? "" : viewFolder(view).labelId,
+                    viewFolder(view).accountIds,
+                  )}
+                  <SearchRows parent={view.id} />
+                </Fragment>
+              ))}
             </>
           ) : (
             <>
@@ -1087,14 +1024,6 @@ function SidebarPage({
                   </Fragment>
                 );
               })}
-
-              <Section
-                title="Views"
-                tour={active ? "views" : undefined}
-                action={<SectionAddButton label="Add view" onClick={() => openViewEditor("new")} />}
-              >
-                {accountViews.map(viewRow)}
-              </Section>
 
               {selectedAccountId ? (
                 <Section

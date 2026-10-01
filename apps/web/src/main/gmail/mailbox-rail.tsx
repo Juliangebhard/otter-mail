@@ -19,9 +19,11 @@ import {
 import { HintTooltip, cn } from "./ui";
 import { AccountPicture } from "./account-picture";
 import { AddMailboxMenu, readableError } from "./add-mailbox";
-import { useAddAccount } from "./hooks";
+import { useAddAccount, useViewUnreadCounts } from "./hooks";
+import { customMailboxFolders } from "./custom-views";
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from "./menu";
 import { useInboxUnread, useMailboxOptions } from "./top-bar";
-import type { GmailAccount } from "./types";
+import type { GmailAccount, MailView } from "./types";
 import type { SettingsPane } from "./api";
 import { useOtterAccount } from "../otter-account";
 import { OtterAvatar } from "../settings/otter-account-pane";
@@ -34,13 +36,15 @@ const RAIL_BUTTON =
 const RAIL_BUTTON_SELECTED = "bg-sidebar-row-selected text-sidebar-foreground";
 
 /**
- * The rail down the window's left edge (ChatGPT's): the mailboxes, a dot on
- * those with unread mail in the Inbox, then Projects, then who you are at the
- * bottom, with the app's menu. It stays when the sidebar hides, so switching
+ * The rail down the window's left edge (ChatGPT's): the mailboxes, then the
+ * custom ones (filters across them), a dot on those with unread mail in the
+ * Inbox, then Projects, then who you are at the bottom, with the app's menu. It stays when the sidebar hides, so switching
  * mailboxes never needs the sidebar.
  */
 export function MailboxRail({
   accounts,
+  customMailboxes,
+  onEditCustomMailbox,
   selectedAccountId,
   onSelectAccount,
   settingsOpen,
@@ -49,6 +53,10 @@ export function MailboxRail({
   syncing,
 }: {
   accounts: GmailAccount[];
+  /** Custom views, as mailboxes of their own. */
+  customMailboxes: MailView[];
+  /** Settings' editor for one ("new" makes one). */
+  onEditCustomMailbox: (viewId: string) => void;
   /** The mailbox showing (or Projects, PROJECTS_MAILBOX); none is lit while Settings is. */
   selectedAccountId: string | null;
   /** A mailbox, or PROJECTS_MAILBOX. */
@@ -61,6 +69,11 @@ export function MailboxRail({
 }) {
   const options = useMailboxOptions(accounts);
   const unread = useInboxUnread(accounts);
+  // A custom mailbox's dot: unread in its Inbox.
+  const customUnread = useViewUnreadCounts(
+    customMailboxes.map((v) => ({ ...customMailboxFolders(v, accounts)[0], id: v.id })),
+    accounts,
+  );
   const projectsUnread = Object.values(useProjectUnreadCounts().data ?? {}).some((n) => n > 0);
   const projectsSelected = !settingsOpen && selectedAccountId === PROJECTS_MAILBOX;
   const addAccount = useAddAccount();
@@ -114,10 +127,47 @@ export function MailboxRail({
             </HintTooltip>
           );
         })}
+        {customMailboxes.length > 0 ? (
+          <span aria-hidden className="my-1 h-px w-5 bg-border" />
+        ) : null}
+        {customMailboxes.map((view) => {
+          const selected = !settingsOpen && view.id === selectedAccountId;
+          return (
+            <ContextMenu key={view.id}>
+              <ContextMenuTrigger>
+                <HintTooltip label={view.name} side="right">
+                  <button
+                    type="button"
+                    aria-label={view.name}
+                    aria-current={selected ? "page" : undefined}
+                    onClick={() => onSelectAccount(view.id)}
+                    className={cn(RAIL_BUTTON, selected && RAIL_BUTTON_SELECTED)}
+                  >
+                    <span className="flex size-6 items-center justify-center rounded-md border border-sidebar-muted-foreground/40 text-[11px] font-semibold uppercase leading-none">
+                      {view.name.trim()[0] ?? "?"}
+                    </span>
+                    {(customUnread[view.id] ?? 0) > 0 ? (
+                      <span
+                        aria-hidden
+                        className="absolute right-0.5 top-0.5 size-1.5 rounded-full bg-sidebar-foreground"
+                      />
+                    ) : null}
+                  </button>
+                </HintTooltip>
+              </ContextMenuTrigger>
+              <ContextMenuContent>
+                <ContextMenuItem onSelect={() => onEditCustomMailbox(view.id)}>
+                  Edit mailbox…
+                </ContextMenuItem>
+              </ContextMenuContent>
+            </ContextMenu>
+          );
+        })}
         <HintTooltip label="Add mailbox" side="right">
           <AddMailboxMenu
             onGmail={() => void handleAddGmail()}
             onAdded={(account) => onSelectAccount(account.id)}
+            onCustom={() => onEditCustomMailbox("new")}
           >
             <button type="button" aria-label="Add mailbox" className={RAIL_BUTTON}>
               <PlusIcon className="size-4.5" />
@@ -130,6 +180,7 @@ export function MailboxRail({
           <button
             type="button"
             aria-label="Projects"
+            data-tour="projects"
             aria-current={projectsSelected ? "page" : undefined}
             onClick={() => onSelectAccount(PROJECTS_MAILBOX)}
             className={cn(RAIL_BUTTON, projectsSelected && RAIL_BUTTON_SELECTED)}

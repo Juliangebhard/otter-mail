@@ -29,8 +29,6 @@ type ViewEditorFormProps = {
   /** The view being edited; null when creating a new custom view. */
   view: MailView | null;
   accounts: GmailAccount[];
-  /** The owning mailbox's name, for the header ("All mailboxes" or an account). */
-  mailboxName: string;
   onSave: (input: { id?: string; name: string; rules: ViewRule[] }) => Promise<unknown>;
   onDelete: (id: string) => Promise<unknown>;
   onReset: (id: string) => Promise<unknown>;
@@ -190,7 +188,6 @@ function ChipRow({
 export function ViewEditorForm({
   view,
   accounts,
-  mailboxName,
   onSave,
   onDelete,
   onReset,
@@ -229,8 +226,8 @@ export function ViewEditorForm({
 
   if (accounts.length === 0) {
     return (
-      <SettingsSection title="Views">
-        <SettingsRow title="No accounts" description="Connect an account to build views." />
+      <SettingsSection title="Custom mailboxes">
+        <SettingsRow title="No accounts" description="Connect an account to make one." />
       </SettingsSection>
     );
   }
@@ -255,15 +252,15 @@ export function ViewEditorForm({
           className="-ms-1 inline-flex cursor-pointer items-center gap-1 rounded-md px-1 text-[13px] text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-focus-ring"
         >
           <ChevronLeftIcon className="size-3.5" />
-          Views
+          Custom mailboxes
         </button>
         <h2 className="text-[26px] font-medium leading-8 tracking-[-0.01em] text-foreground">
-          {view ? `Edit “${view.name}”` : "New view"}
+          {view ? `Edit “${view.name}”` : "New custom mailbox"}
         </h2>
         <p className="text-[13px] text-muted-foreground">
-          {mailboxName === "All mailboxes"
-            ? "Shown under Views in All mailboxes."
-            : `Shown under Views in ${mailboxName}.`}
+          {isDefault
+            ? "A folder of All mailboxes."
+            : "In the rail, after your mailboxes, with its own Inbox, Starred, Sent and All Mail."}
         </p>
       </div>
 

@@ -11,7 +11,7 @@ import { RootView } from "./root-view";
 import { QueryClient } from "@tanstack/react-query";
 import { ErrorBoundaryView } from "~/components/ui/error-boundary-view";
 import type { SettingsPane } from "./gmail/api";
-import { COMBINED_ACCOUNT_ID } from "./gmail/custom-views";
+import { COMBINED_ACCOUNT_ID, isCustomMailboxId } from "./gmail/custom-views";
 import { SEARCH_MAILBOX } from "./gmail/gmail-query";
 import { PROJECTS_MAILBOX } from "./gmail/projects";
 
@@ -80,9 +80,10 @@ const settingsRoute = createRoute({
 });
 
 // Mailboxes are account ids (their email addresses), `all`, the combined
-// mailbox, or `projects` (its labels are `all` and project ids). Labels are
-// Gmail's (or IMAP's) ids and views' ids, but the app's own `__name__` ones
-// read as `name`: the combined mailbox's built-in views and Search.
+// mailbox, a custom mailbox (a view's id), or `projects` (its labels are
+// `all` and project ids). Labels are Gmail's (or IMAP's) ids and views' ids,
+// but the app's own `__name__` ones read as `name`: the built-in views (the
+// combined and custom mailboxes' folders) and Search.
 const toMailbox = (segment: string) =>
   segment === "all" ? COMBINED_ACCOUNT_ID : segment === "projects" ? PROJECTS_MAILBOX : segment;
 const fromMailbox = (id: string) =>
@@ -100,7 +101,7 @@ const BUILT_IN_VIEWS = new Set([
 const toLabel = (mailbox: string, segment: string) =>
   segment === "search"
     ? SEARCH_MAILBOX
-    : mailbox === COMBINED_ACCOUNT_ID && BUILT_IN_VIEWS.has(segment)
+    : (mailbox === COMBINED_ACCOUNT_ID || isCustomMailboxId(mailbox)) && BUILT_IN_VIEWS.has(segment)
       ? `__${segment}__`
       : segment;
 const fromLabel = (id: string) => /^__([a-z]+)__$/.exec(id)?.[1] ?? id;

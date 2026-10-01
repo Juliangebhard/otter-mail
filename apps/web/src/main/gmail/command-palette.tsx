@@ -24,6 +24,7 @@ import {
   FolderPlusIcon,
   InboxIcon,
   LayersIcon,
+  ListFilterIcon,
   ListChecksIcon,
   MonitorIcon,
   MoonIcon,
@@ -333,7 +334,13 @@ export function CommandPalette({
         keywords: "colors palette",
         submenu: "theme",
       },
-      { id: "new-view", icon: <PlusIcon className={ICON} />, title: "New view", run: onNewView },
+      {
+        id: "new-view",
+        icon: <PlusIcon className={ICON} />,
+        title: "New custom mailbox",
+        keywords: "view filter",
+        run: onNewView,
+      },
       {
         id: "new-project",
         icon: <FolderPlusIcon className={ICON} />,
@@ -414,13 +421,23 @@ export function CommandPalette({
         checked: selectedAccountId === account.id,
         run: () => onSelectAccount(account.id),
       })),
+      ...views
+        .filter((v) => v.kind === "custom")
+        .map((view) => ({
+          id: `mailbox:${view.id}`,
+          icon: <ListFilterIcon className={ICON} />,
+          title: view.name,
+          keywords: "custom mailbox view",
+          checked: selectedAccountId === view.id,
+          run: () => onSelectAccount(view.id),
+        })),
     ];
 
-    // Combined views are only offered when 2+ accounts are connected (matches the sidebar).
+    // All mailboxes' folders are only offered when 2+ accounts are connected (matches the sidebar).
     const viewItems: PaletteItem[] =
       accounts.length > 1
         ? views
-            .filter((v) => (v.mailbox ?? COMBINED_ACCOUNT_ID) === COMBINED_ACCOUNT_ID)
+            .filter((v) => v.kind !== "custom")
             .map((view) => ({
               id: `view:${view.id}`,
               icon: viewIcon(view),

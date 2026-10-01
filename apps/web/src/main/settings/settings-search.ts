@@ -35,7 +35,7 @@ export const SETTINGS_SECTION_LABELS: Readonly<Record<SettingsPane, string>> = {
   appearance: "Appearance",
   keybindings: "Keybindings",
   accounts: "Mailboxes",
-  views: "Views",
+  views: "Custom mailboxes",
   agents: "Agents",
 };
 
@@ -265,12 +265,12 @@ export const SETTINGS_SEARCH_ITEMS = [
     pane: "accounts",
     searchTerms: ["delete mailbox sign out"],
   },
-  // Views
+  // Custom mailboxes
   {
     id: "views",
-    title: "Views",
+    title: "Custom mailboxes",
     pane: "views",
-    searchTerms: ["saved filters searches sidebar new view"],
+    searchTerms: ["views saved filters searches rail new view custom mailbox"],
   },
   // Agents
   {

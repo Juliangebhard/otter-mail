@@ -70,6 +70,8 @@ import type { GmailAccount, GmailMessageSummary } from "./gmail/types";
 import {
   useMailViews,
   resolveRules,
+  customMailboxFolders,
+  isCustomMailboxId,
   loadLastLocation,
   saveLastLocation,
   COMBINED_ACCOUNT_ID,
@@ -145,7 +147,7 @@ function useRouteMailLoc(): MailLoc | null {
 }
 
 const inboxOf = (mailbox: string) =>
-  mailbox === COMBINED_ACCOUNT_ID
+  mailbox === COMBINED_ACCOUNT_ID || isCustomMailboxId(mailbox)
     ? INBOX_VIEW_ID
     : mailbox === PROJECTS_MAILBOX
       ? ALL_PROJECTS
@@ -161,12 +163,22 @@ function savedLoc(): MailLoc {
 /**
  * `loc` among the mailboxes there are: one turned off (or "All mailboxes"
  * off, or one not there at all) gives way to what's first now (Combined when
- * it's on, else the first account), at its inbox.
+ * it's on, else the first account), at its inbox. Custom mailboxes count as
+ * there until the views are known (`customIds` null).
  */
-function placeFor(loc: MailLoc, accounts: GmailAccount[], combined: boolean): MailLoc {
+function placeFor(
+  loc: MailLoc,
+  accounts: GmailAccount[],
+  combined: boolean,
+  customIds: string[] | null,
+): MailLoc {
   const there =
     loc.mailbox === PROJECTS_MAILBOX ||
-    (loc.mailbox === COMBINED_ACCOUNT_ID ? combined : accounts.some((a) => a.id === loc.mailbox));
+    (isCustomMailboxId(loc.mailbox)
+      ? !customIds || customIds.includes(loc.mailbox)
+      : loc.mailbox === COMBINED_ACCOUNT_ID
+        ? combined
+        : accounts.some((a) => a.id === loc.mailbox));
   if (there) return loc;
   const mailbox = combined ? COMBINED_ACCOUNT_ID : (accounts[0]?.id ?? loc.mailbox);
   return { mailbox, label: inboxOf(mailbox), messageId: null, account: null, focusId: null };
@@ -326,7 +338,15 @@ function MailHome() {
   // mailboxes are known, it's always one of theirs (effects below catch the
   // route up), so nothing shows a place only to leave it at once.
   const placed = routeLoc ?? lastMail;
-  const mailLoc = ready ? placeFor(placed ?? savedLoc(), accounts, mailboxes.combined) : placed;
+  const customMailboxes = views.filter((v) => v.kind === "custom");
+  const mailLoc = ready
+    ? placeFor(
+        placed ?? savedLoc(),
+        accounts,
+        mailboxes.combined,
+        viewsLoaded ? customMailboxes.map((v) => v.id) : null,
+      )
+    : placed;
   const initialized = ready && mailLoc !== null;
   const selectedAccountId = mailLoc?.mailbox ?? null;
   const selectedLabelId = mailLoc?.label ?? "INBOX";
@@ -456,7 +476,10 @@ function MailHome() {
   const isCombined = selectedAccountId === COMBINED_ACCOUNT_ID && mailboxes.combined;
   // Projects (the rail's), where the mail of every mailbox is too.
   const isProjects = selectedAccountId === PROJECTS_MAILBOX;
-  const spansMailboxes = isCombined || isProjects;
+  // A custom mailbox: filters across the mailboxes, with folders like the combined one's.
+  const customMailbox = customMailboxes.find((v) => v.id === selectedAccountId) ?? null;
+  const customFolders = customMailbox ? customMailboxFolders(customMailbox, accounts) : [];
+  const spansMailboxes = isCombined || isProjects || customMailbox != null;
   const selectedProject = useProject(isProjects ? selectedLabelId : null);
   const projectsQuery = useProjects();
   const projectsLoaded = projectsQuery.isSuccess;
@@ -695,7 +718,8 @@ function MailHome() {
     if (!mailbox) return;
     go({
       mailbox,
-      label: mailbox === COMBINED_ACCOUNT_ID ? combinedViewId : labelId,
+      label:
+        mailbox === COMBINED_ACCOUNT_ID || isCustomMailboxId(mailbox) ? combinedViewId : labelId,
       messageId: null,
     });
   };
@@ -819,9 +843,11 @@ function MailHome() {
     ? COMBINED_ACCOUNT_ID
     : isProjects
       ? PROJECTS_MAILBOX
-      : selectedAccountId && accounts.some((a) => a.id === selectedAccountId)
-        ? selectedAccountId
-        : firstRealAccountId;
+      : customMailbox
+        ? customMailbox.id
+        : selectedAccountId && accounts.some((a) => a.id === selectedAccountId)
+          ? selectedAccountId
+          : firstRealAccountId;
 
   // If the selected view disappears (deleted, or it has no rules for the
   // active account), fall back to Inbox.
@@ -833,13 +859,17 @@ function MailHome() {
         correct({ label: ALL_PROJECTS, messageId: null });
       return;
     }
-    if (isCombined) {
-      if (!views.some((v) => v.id === selectedLabelId)) correct({ label: INBOX_VIEW_ID });
+    if (customMailbox) {
+      if (!customFolders.some((f) => f.id === selectedLabelId)) correct({ label: INBOX_VIEW_ID });
       return;
     }
+    // A custom view as a label (views were once in each mailbox): its own mailbox.
     const view = views.find((v) => v.id === selectedLabelId);
-    if (!view) return; // plain label
-    if (view.mailbox !== effectiveAccountId) correct({ label: "INBOX" });
+    if (view?.kind === "custom") {
+      correct({ mailbox: view.id, label: INBOX_VIEW_ID });
+      return;
+    }
+    if (isCombined && !view) correct({ label: INBOX_VIEW_ID });
   }, [
     initialized,
     viewsLoaded,
@@ -850,6 +880,7 @@ function MailHome() {
     isProjects,
     projectsLoaded,
     selectedProject,
+    customMailbox,
   ]);
 
   // Local-first: keep the on-disk cache synced in the background. Combined mode
@@ -892,6 +923,14 @@ function MailHome() {
         rules: [],
       };
     }
+    if (customMailbox) {
+      const folder = customFolders.find((f) => f.id === selectedLabelId) ?? customFolders[0];
+      return {
+        viewId: `${customMailbox.id}:${folder.id}`,
+        name: folder.name,
+        rules: resolveRules(folder, accounts),
+      };
+    }
     if (isCombined) {
       const view = views.find((v) => v.id === selectedLabelId) ?? views[0];
       return {
@@ -900,13 +939,7 @@ function MailHome() {
         rules: view ? resolveRules(view, accounts) : [],
       };
     }
-    // Account mailboxes own their views outright — rules reference only the
-    // owning account, but prune defensively anyway.
-    const view = views.find((v) => v.id === selectedLabelId);
-    if (!view || !effectiveAccountId || view.mailbox !== effectiveAccountId) return null;
-    const rules = resolveRules(view, accounts).filter((r) => r.accountId === effectiveAccountId);
-    if (rules.length === 0) return null;
-    return { viewId: `${effectiveAccountId}:${view.id}`, name: view.name, rules };
+    return null;
   })();
 
   const handleSelectAccount = (accountId: string) => {
@@ -977,7 +1010,7 @@ function MailHome() {
     setSearchTabs((tabs) => tabs.map((t) => (t.id === id ? { ...t, ...patch } : t)));
   // Where a new search looks by default: the mailbox you started it from.
   const defaultScope = (): string[] =>
-    isCombined || isProjects || !effectiveAccountId
+    spansMailboxes || !effectiveAccountId
       ? combined && selectedLabelId !== SEARCH_MAILBOX
         ? [...new Set(combined.rules.map((r) => r.accountId))]
         : accountIds
@@ -1147,7 +1180,12 @@ function MailHome() {
   syncNowRef.current = syncNow;
   useEffect(() => window.desktopBridge.on("mail:syncNow", () => syncNowRef.current()), []);
 
-  const composeAccountId = spansMailboxes ? firstRealAccountId : effectiveAccountId;
+  // From a custom mailbox, the first of the mailboxes it draws on.
+  const composeAccountId = customMailbox
+    ? (combined?.rules[0]?.accountId ?? firstRealAccountId)
+    : spansMailboxes
+      ? firstRealAccountId
+      : effectiveAccountId;
   const readerAccount =
     readerAccountId ?? (spansMailboxes ? firstRealAccountId : effectiveAccountId);
   useRecordRecentlyViewed({
@@ -1203,6 +1241,10 @@ function MailHome() {
               the sidebar hides. */}
           <MailboxRail
             accounts={accounts}
+            customMailboxes={customMailboxes}
+            onEditCustomMailbox={(viewId) =>
+              openSettings({ pane: "views", viewId, mailbox: COMBINED_ACCOUNT_ID })
+            }
             selectedAccountId={effectiveAccountId}
             onSelectAccount={handleSelectAccount}
             settingsOpen={settingsRoute !== null}
