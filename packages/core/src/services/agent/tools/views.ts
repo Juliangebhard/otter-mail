@@ -191,6 +191,11 @@ export const viewTools: AgentTool[] = [
         ...(icon !== undefined ? { icon } : {}),
         ...(color !== undefined ? { color } : {}),
       });
+      ctx.changed?.({
+        action: existing ? "updated" : "created",
+        title: saved.name,
+        target: { kind: "view", id: saved.id },
+      });
       return describe(saved, await listMailboxes());
     },
   },
@@ -208,6 +213,11 @@ export const viewTools: AgentTool[] = [
       const view = await findView(str(args, "view"));
       await ctx.confirm(`Delete the view “${view.name}” (the mail and its labels stay)`);
       await invoke("gmail:deleteView", { viewId: view.id });
+      ctx.changed?.({
+        action: "deleted",
+        title: view.name,
+        target: { kind: "view", id: view.id },
+      });
       return { deleted: view.name };
     },
   },

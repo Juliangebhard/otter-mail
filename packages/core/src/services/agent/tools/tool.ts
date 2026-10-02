@@ -9,6 +9,7 @@
 import { registeredHandlers } from "../../../ipc.js";
 import { turnedOffMailboxes } from "../../mail-sync.js";
 import type { AgentAccess } from "@otter-mail/contracts/agent-tokens";
+import type { ChatChange } from "@otter-mail/contracts";
 
 import type { GmailAccount } from "../../../types.js";
 import type { Emit, RuntimeMode } from "../types.js";
@@ -34,6 +35,8 @@ export type ToolCaller = {
 
 export type ToolContext = {
   caller: ToolCaller;
+  /** Records a successful mutation, even if a later part of the tool fails. */
+  changed?(change: ChatChange): void;
   /**
    * Asks the user before a change (unless the chat has full access or they
    * allowed this tool for the chat); throws when they decline. `detail` is

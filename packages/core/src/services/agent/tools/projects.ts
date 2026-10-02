@@ -17,6 +17,15 @@ export const projectTools: AgentTool[] = tools(localBackend).map((tool) => ({
   readOnly: tool.readOnly,
   async run(args, ctx) {
     if (tool.describe) await ctx.confirm(await tool.describe(args));
-    return tool.run(args);
+    const result = await tool.run(args);
+    if (!tool.readOnly) {
+      const project = result as { id: string; name: string };
+      ctx.changed?.({
+        action: tool.name === "create_project" ? "created" : "updated",
+        title: project.name,
+        target: { kind: "project", id: project.id },
+      });
+    }
+    return result;
   },
 }));

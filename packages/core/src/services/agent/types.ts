@@ -172,6 +172,7 @@ export type ChatEvent =
   /** `id` pairs a step with its result. */
   | { requestId: string; type: "tool"; id?: string; step: ToolStep }
   | { requestId: string; type: "toolResult"; id?: string; output: string }
+  | { requestId: string; type: "change"; change: import("@otter-mail/contracts").ChatChange }
   | { requestId: string; type: "approval"; approval: ApprovalRequest }
   | { requestId: string; type: "approvalResolved"; approvalId: string }
   /** A steer the agent didn't get to before finishing: send it as the next message. */

@@ -211,7 +211,13 @@ export const calendarTools: AgentTool[] = [
         await ctx.confirm(
           `Add to ${account.email}'s calendar\n${describeInput(input)}${input.attendees?.length ? `\n${notifyNote(notify)}` : ""}`,
         );
-        return calendar.createEvent(account.id, input, notify);
+        const saved = await calendar.createEvent(account.id, input, notify);
+        ctx.changed?.({
+          action: "created",
+          title: saved.title,
+          target: { kind: "event", id: saved.id, accountId: account.id, url: saved.htmlLink },
+        });
+        return saved;
       });
     },
   },
@@ -236,7 +242,13 @@ export const calendarTools: AgentTool[] = [
         await ctx.confirm(
           `Change ${describeEvent(event)} in ${account.email}'s calendar\n${describeInput(input)}${event.attendees.length ? `\n${notifyNote(notify)}` : ""}`,
         );
-        return calendar.updateEvent(account.id, eventId, input, notify);
+        const saved = await calendar.updateEvent(account.id, eventId, input, notify);
+        ctx.changed?.({
+          action: "updated",
+          title: saved.title,
+          target: { kind: "event", id: saved.id, accountId: account.id, url: saved.htmlLink },
+        });
+        return saved;
       });
     },
   },
@@ -265,6 +277,11 @@ export const calendarTools: AgentTool[] = [
           `Delete ${describeEvent(event)} from ${account.email}'s calendar${event.attendees.length ? `\n${notifyNote(notify)}` : ""}`,
         );
         await calendar.deleteEvent(account.id, eventId, notify);
+        ctx.changed?.({
+          action: "deleted",
+          title: event.title,
+          target: { kind: "event", id: event.id, accountId: account.id, url: event.htmlLink },
+        });
         return { deleted: true };
       });
     },
@@ -292,7 +309,13 @@ export const calendarTools: AgentTool[] = [
       return calendarOf(account, async (calendar) => {
         const event = await calendar.getEvent(account.id, eventId);
         await ctx.confirm(`Answer ${describeEvent(event)} in ${account.email}: ${response}`);
-        return calendar.respondToEvent(account.id, eventId, response);
+        const saved = await calendar.respondToEvent(account.id, eventId, response);
+        ctx.changed?.({
+          action: "updated",
+          title: saved.title,
+          target: { kind: "event", id: saved.id, accountId: account.id, url: saved.htmlLink },
+        });
+        return saved;
       });
     },
   },
