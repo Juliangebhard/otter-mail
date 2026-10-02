@@ -195,6 +195,8 @@ optional fix PRs. See [support.md](support.md).
 | -------------------------------------------------- | --------------------------- | ---------- | -------------------------- |
 | Providers                                          | Claude, Codex, Hermes       | Hermes     | Hermes                     |
 | Chat, models, steer / stop, tool approval, history | ✓                           | ✓          | ✓                          |
+| Select and copy chat text                          | ✓                           | ✓          | —                          |
+| Changes after each agent turn, linking to results  | ✓ (Otter Mail tools)        | —          | —                          |
 | Turn an agent off                                  | ✓                           | ✓ (Hermes) | ✓ (Hermes; its buttons go) |
 | Chat about a conversation (pointers, not mail)     | ✓ (also selections, quotes) | ✓          | ✓ (a thread)               |
 | Attach images and files to a chat                  | ✓                           | ✓          | —                          |

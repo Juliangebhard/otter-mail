@@ -689,11 +689,18 @@ export const mailTools: AgentTool[] = [
         `${action[0].toUpperCase()}${action.slice(1)}: ${plural(ids.length, "conversation")} in ${account.email}\n${subjects(account, ids)}`,
       );
       for (const threadId of ids) {
+        const title =
+          mailStore.getThreadMessages(account.id, threadId)[0]?.subject || "(no subject)";
         await invoke("gmail:modifyThread", {
           accountId: account.id,
           threadId,
           addLabelIds: [...add],
           removeLabelIds: [...remove],
+        });
+        ctx.changed?.({
+          action: "updated",
+          title,
+          target: { kind: "thread", id: threadId, accountId: account.id },
         });
       }
       return { updated: ids.length };
@@ -715,8 +722,16 @@ export const mailTools: AgentTool[] = [
       await ctx.confirm(
         `Move ${plural(ids.length, "conversation")} in ${account.email} to the Trash\n${subjects(account, ids)}`,
       );
-      for (const threadId of ids)
+      for (const threadId of ids) {
+        const title =
+          mailStore.getThreadMessages(account.id, threadId)[0]?.subject || "(no subject)";
         await invoke("gmail:trashThread", { accountId: account.id, threadId });
+        ctx.changed?.({
+          action: "trashed",
+          title,
+          target: { kind: "thread", id: threadId, accountId: account.id },
+        });
+      }
       return { trashed: ids.length };
     },
   },
@@ -735,8 +750,16 @@ export const mailTools: AgentTool[] = [
       await ctx.confirm(
         `Restore ${plural(ids.length, "conversation")} in ${account.email} from the Trash\n${subjects(account, ids)}`,
       );
-      for (const threadId of ids)
+      for (const threadId of ids) {
+        const title =
+          mailStore.getThreadMessages(account.id, threadId)[0]?.subject || "(no subject)";
         await invoke("gmail:untrashThread", { accountId: account.id, threadId });
+        ctx.changed?.({
+          action: "restored",
+          title,
+          target: { kind: "thread", id: threadId, accountId: account.id },
+        });
+      }
       return { restored: ids.length };
     },
   },
@@ -754,6 +777,11 @@ export const mailTools: AgentTool[] = [
       const name = str(args, "name");
       await ctx.confirm(`Create the label “${name}” in ${account.email}`);
       const label = await invoke<GmailLabel>("gmail:createLabel", { accountId: account.id, name });
+      ctx.changed?.({
+        action: "created",
+        title: label.name,
+        target: { kind: "label", id: label.id, accountId: account.id },
+      });
       return { name: label.name };
     },
   },
@@ -786,6 +814,11 @@ export const mailTools: AgentTool[] = [
         threadId: mail.threadId,
         attachments: mail.attachments,
       });
+      ctx.changed?.({
+        action: optStr(args, "draftId") ? "updated" : "created",
+        title: mail.subject || "(no subject)",
+        target: { kind: "draft", id: saved.draftId, accountId: account.id },
+      });
       return { draftId: saved.draftId, threadId: saved.threadId };
     },
   },
@@ -804,6 +837,11 @@ export const mailTools: AgentTool[] = [
       const draftId = str(args, "draftId");
       await ctx.confirm(`Delete draft ${draftId} in ${account.email}`);
       await invoke("gmail:deleteDraft", { accountId: account.id, draftId });
+      ctx.changed?.({
+        action: "deleted",
+        title: "Draft",
+        target: { kind: "draft", id: draftId, accountId: account.id },
+      });
       return { deleted: true };
     },
   },
@@ -831,8 +869,17 @@ export const mailTools: AgentTool[] = [
         ...mail,
       });
       const draftId = optStr(args, "draftId");
-      if (draftId)
-        await invoke("gmail:deleteDraft", { accountId: account.id, draftId }).catch(() => {});
+      if (draftId) {
+        await invoke("gmail:deleteDraft", { accountId: account.id, draftId })
+          .then(() =>
+            ctx.changed?.({
+              action: "deleted",
+              title: mail.subject || "Draft",
+              target: { kind: "draft", id: draftId, accountId: account.id },
+            }),
+          )
+          .catch(() => {});
+      }
       return result.pending
         ? {
             sent: true,

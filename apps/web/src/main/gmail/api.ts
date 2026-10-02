@@ -1,4 +1,5 @@
 import type { ImapSettings } from "@otter-mail/contracts";
+export type { ChatChange } from "@otter-mail/contracts";
 import type { AgentAccess, AgentTokens, ConnectedAgent } from "@otter-mail/contracts/agent-tokens";
 import type {
   ComposeAttachment,
@@ -232,6 +233,7 @@ export type ChatEvent =
   | { requestId: string; type: "delta"; text: string }
   | { requestId: string; type: "tool"; id?: string; step: ToolStep }
   | { requestId: string; type: "toolResult"; id?: string; output: string }
+  | { requestId: string; type: "change"; change: import("@otter-mail/contracts").ChatChange }
   | { requestId: string; type: "approval"; approval: ApprovalRequest }
   | { requestId: string; type: "approvalResolved"; approvalId: string }
   | { requestId: string; type: "steerReturned"; text: string }

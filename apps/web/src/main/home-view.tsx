@@ -70,7 +70,7 @@ import {
   type UndoAction,
 } from "./gmail/undo";
 import { getAccountColor, getAccountContrastColor } from "./gmail/account-style";
-import { gmailApi, type MailtoTarget } from "./gmail/api";
+import { gmailApi, type ChatChange, type MailtoTarget } from "./gmail/api";
 import type { QuoteContext } from "./gmail/chat-context";
 import type { GmailAccount, GmailMessageSummary, MailView } from "./gmail/types";
 import {
@@ -1001,8 +1001,44 @@ function MailHome() {
     go({ messageId, account: accountId, focusId: focusId ?? null });
   };
 
-  // A send taken back with Undo reopens its draft here (the reader edits drafts).
   const queryClient = useQueryClient();
+  /** Agent results open in the app; draft ids resolve to their current message. */
+  const openChatChange = async ({ target }: ChatChange) => {
+    if (target.kind === "project") {
+      openProject(target.id);
+    } else if (target.kind === "view") {
+      goToSpace(target.id, VIEW_LIST);
+    } else if (target.kind === "theme") {
+      openSettings({ pane: "appearance" });
+    } else if (target.kind === "event") {
+      if (target.url) await window.desktopBridge.openExternal(target.url);
+    } else if (target.kind === "label") {
+      goToSpace(target.accountId, target.id);
+    } else {
+      let messageId: string;
+      if (target.kind === "draft") {
+        const version = await gmailApi.getDraftVersion(target.accountId, target.id);
+        if (!version.messageId) throw new Error("This draft was sent or deleted.");
+        await gmailApi.loadDraftVersion(target.accountId, target.id, version.messageId);
+        messageId = version.messageId;
+      } else {
+        const messages = await gmailApi.getThread(target.accountId, target.id);
+        const message = messages.at(-1);
+        if (!message) throw new Error("This conversation is no longer available.");
+        messageId = message.id;
+      }
+      void queryClient.invalidateQueries({ queryKey: ["gmail:messages", target.accountId] });
+      setComposeOpen(false);
+      go({
+        mailbox: target.accountId,
+        label: target.kind === "draft" ? "DRAFT" : ALL_MAIL_LABEL_ID,
+        messageId,
+        account: null,
+        focusId: null,
+      });
+    }
+  };
+  // A send taken back with Undo reopens its draft here (the reader edits drafts).
   const selectMessageRef = useRef(handleSelectMessage);
   selectMessageRef.current = handleSelectMessage;
   useEffect(
@@ -1595,6 +1631,7 @@ function MailHome() {
                     className={`${PANE_CHAT} shrink-0`}
                   >
                     <AgentChatPanel
+                      onOpenChange={openChatChange}
                       closeTabRef={closeChatTabRef}
                       onClosePanel={closeChat}
                       accountId={selectedMessageId ? readerAccount : null}

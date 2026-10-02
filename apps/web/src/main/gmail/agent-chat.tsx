@@ -21,6 +21,7 @@ import {
   SearchIcon,
   CornerUpRightIcon,
   ListPlusIcon,
+  CopyIcon,
 } from "lucide-react";
 import { IconBtn, HintTooltip, buttonClass, cn } from "./ui";
 import { COMPOSER_SURFACE } from "./composer-kit";
@@ -29,6 +30,7 @@ import { PanelControlSlot } from "./top-bar";
 import {
   gmailApi,
   type ChatEvent,
+  type ChatChange,
   type ChatSession,
   type ChatSessionMessage,
   type ApprovalDecision,
@@ -56,6 +58,7 @@ import {
   type QuoteContext,
 } from "./chat-context";
 import { ChatMarkdown } from "./chat-markdown";
+import { ChatChanges, mergeChatChanges } from "./chat-changes";
 import {
   AttachmentChip,
   ComposerAttachments,
@@ -114,6 +117,8 @@ type ChatTurn = {
   text: string;
   /** Agent turns: what the agent said and the steps it took, in order. */
   items?: TurnItem[];
+  /** Confirmed results of this turn, shown underneath its reply. */
+  changes?: ChatChange[];
   /** Agent turns stored before `items`: their tool rows. */
   tools?: { name: string; output?: string }[];
   /** Attached mail context, shown as a chip above the user's message. */
@@ -517,8 +522,33 @@ function ErrorRow({ message, providerName }: { message: string; providerName: st
           {providerName} error
         </span>
       </div>
-      <p className="ms-7 text-sm leading-relaxed text-foreground/80">{message}</p>
+      <p className="ms-7 select-text text-sm leading-relaxed text-foreground/80">{message}</p>
     </div>
+  );
+}
+
+function CopyMessageButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    if (!copied) return;
+    const timer = setTimeout(() => setCopied(false), 1500);
+    return () => clearTimeout(timer);
+  }, [copied]);
+  return (
+    <HintTooltip label={copied ? "Copied" : "Copy message"}>
+      <IconBtn
+        label={copied ? "Copied" : "Copy message"}
+        className="size-6 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+        onClick={() => {
+          void navigator.clipboard.writeText(text).then(
+            () => setCopied(true),
+            () => toast.error("Couldn't copy message"),
+          );
+        }}
+      >
+        {copied ? <CheckIcon className="size-3.5" /> : <CopyIcon className="size-3.5" />}
+      </IconBtn>
+    </HintTooltip>
   );
 }
 
@@ -788,6 +818,7 @@ export function AgentChatPanel({
   closeTabRef,
   onClosePanel,
   project,
+  onOpenChange,
 }: {
   /** The project on screen: attached along with (or without) a conversation. */
   project?: { id: string; name: string } | null;
@@ -803,6 +834,7 @@ export function AgentChatPanel({
   closeTabRef?: MutableRefObject<(() => boolean) | null>;
   /** Closing the last tab closes the panel. */
   onClosePanel?: () => void;
+  onOpenChange: (change: ChatChange) => Promise<void>;
 }) {
   const [store, setStore] = useState<Store>(() => loadStore());
   const { conversations, activeId } = store;
@@ -1030,7 +1062,9 @@ export function AgentChatPanel({
           const items = [...itemsOf(turn)];
           const updated: ChatTurn = { ...turn, items };
           const last = items[items.length - 1];
-          if (event.type === "delta") {
+          if (event.type === "change") {
+            updated.changes = mergeChatChanges([...(turn.changes ?? []), event.change]);
+          } else if (event.type === "delta") {
             // Text continues the text before it; after a step it starts anew.
             if (last?.kind === "text")
               items[items.length - 1] = { ...last, text: last.text + event.text };
@@ -1807,7 +1841,7 @@ export function AgentChatPanel({
                         <div className="group flex flex-col items-end gap-1 py-3">
                           {turn.intent ? <IntentMarker intent={turn.intent} /> : null}
                           {turn.context ? <ContextRecap context={turn.context} /> : null}
-                          <div className="relative max-w-[80%] whitespace-pre-wrap rounded-2xl bg-message px-4 py-2.5 text-sm leading-relaxed text-message-foreground">
+                          <div className="relative max-w-[80%] select-text whitespace-pre-wrap rounded-2xl bg-message px-4 py-2.5 text-sm leading-relaxed text-message-foreground">
                             {turn.skill ? (
                               <span className="mb-1 mr-1.5 inline-flex align-middle">
                                 <SkillBadge name={turn.skill} onAccent />
@@ -1818,6 +1852,7 @@ export function AgentChatPanel({
                             ) : null}
                             {turn.text}
                           </div>
+                          {turn.text ? <CopyMessageButton text={turn.text} /> : null}
                         </div>
                       </MessageScroller.Item>
                     );
@@ -1854,13 +1889,21 @@ export function AgentChatPanel({
                         ) : null}
                         {showWork ? <WorkLog items={work} /> : null}
                         {answer ? (
-                          <div className="min-w-0 px-1 py-2">
+                          <div className="group min-w-0 px-1 py-2">
                             <ChatMarkdown text={answer} />
+                            {!live ? (
+                              <div className="mt-1">
+                                <CopyMessageButton text={answer} />
+                              </div>
+                            ) : null}
                           </div>
                         ) : null}
                         {live ? <WorkingRow startedAt={turn.startedAt} /> : null}
                         {turn.error ? (
                           <ErrorRow message={turn.error} providerName={providerName} />
+                        ) : null}
+                        {!live && turn.changes?.length ? (
+                          <ChatChanges changes={turn.changes} onOpen={onOpenChange} />
                         ) : null}
                       </div>
                     </MessageScroller.Item>

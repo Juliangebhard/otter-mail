@@ -9,7 +9,7 @@ import remarkGfm from "remark-gfm";
  */
 export const ChatMarkdown = memo(function ChatMarkdown({ text }: { text: string }) {
   return (
-    <div className="flex flex-col gap-3 text-sm leading-relaxed text-foreground">
+    <div className="flex select-text flex-col gap-3 text-sm leading-relaxed text-foreground">
       <Markdown
         remarkPlugins={[remarkGfm]}
         components={{
