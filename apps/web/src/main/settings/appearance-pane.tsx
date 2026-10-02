@@ -491,6 +491,15 @@ function ThemeLibrary() {
       variant="plain"
       headerAction={
         <div className="flex items-center gap-2">
+          {choice.light !== INITIAL_THEME_ID || choice.dark !== INITIAL_THEME_ID ? (
+            <SettingResetButton
+              label="themes"
+              onClick={() => {
+                setThemeForAppearance("light", INITIAL_THEME_ID);
+                setThemeForAppearance("dark", INITIAL_THEME_ID);
+              }}
+            />
+          ) : null}
           <Button
             size="xs"
             variant="outline"
@@ -993,7 +1002,15 @@ export function AppearancePane() {
     <SettingsPageContainer title="Appearance">
       {/* The scheme and the themes it wears, together (Otter Code's). */}
       <div className="space-y-6">
-        <SettingsSection {...searchableSetting("color-scheme")} variant="plain">
+        <SettingsSection
+          {...searchableSetting("color-scheme")}
+          variant="plain"
+          headerAction={
+            scheme !== "system" ? (
+              <SettingResetButton label="color scheme" onClick={() => void setScheme("system")} />
+            ) : null
+          }
+        >
           <div className="grid grid-cols-3 gap-2">
             {(["system", "light", "dark"] as const).map((s) => (
               <SchemeCard
@@ -1018,6 +1035,16 @@ export function AppearancePane() {
       <SettingsSection title="Message list" description="These options apply to every mail layout.">
         <SettingsRow
           {...searchableSetting("group-messages-by-day")}
+          resetAction={
+            groupMessagesByDay !== GROUP_MESSAGES_BY_DAY.defaultValue ? (
+              <SettingResetButton
+                label="group messages by day"
+                onClick={() =>
+                  setInterfaceToggle(GROUP_MESSAGES_BY_DAY, GROUP_MESSAGES_BY_DAY.defaultValue)
+                }
+              />
+            ) : null
+          }
           description="Separate messages by day. Click a day heading to collapse or expand it."
           control={
             <Switch
@@ -1029,6 +1056,16 @@ export function AppearancePane() {
         />
         <SettingsRow
           {...searchableSetting("dim-read-messages")}
+          resetAction={
+            dimReadMessages !== DIM_READ_MESSAGES.defaultValue ? (
+              <SettingResetButton
+                label="dim read messages"
+                onClick={() =>
+                  setInterfaceToggle(DIM_READ_MESSAGES, DIM_READ_MESSAGES.defaultValue)
+                }
+              />
+            ) : null
+          }
           description="Give read messages a muted background so unread mail stands out."
           control={
             <Switch
@@ -1043,6 +1080,19 @@ export function AppearancePane() {
       <SettingsSection title="Reading">
         <SettingsRow
           {...searchableSetting("open-messages-with-arrows")}
+          resetAction={
+            openMessagesWithArrows !== OPEN_MESSAGES_WITH_ARROWS.defaultValue ? (
+              <SettingResetButton
+                label="open messages with arrow keys"
+                onClick={() =>
+                  setInterfaceToggle(
+                    OPEN_MESSAGES_WITH_ARROWS,
+                    OPEN_MESSAGES_WITH_ARROWS.defaultValue,
+                  )
+                }
+              />
+            ) : null
+          }
           description="When no email is open, arrows and J/K open messages as you browse. Turn off to highlight rows, then press Enter or click to open."
           control={
             <Switch

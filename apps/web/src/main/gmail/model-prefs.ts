@@ -76,3 +76,16 @@ export function toggleAllHidden(keys: string[]): void {
       : [...new Set([...snapshot.hidden, ...keys])],
   );
 }
+
+/** Restore this provider's models without changing other providers' preferences. */
+export function resetModelPrefs(kind: ProviderKind): void {
+  const prefix = `${kind}:`;
+  write(
+    "favorites",
+    snapshot.favorites.filter((key) => !key.startsWith(prefix)),
+  );
+  write(
+    "hidden",
+    snapshot.hidden.filter((key) => !key.startsWith(prefix)),
+  );
+}

@@ -1,3 +1,4 @@
+import { DEFAULT_SETTINGS } from "@otter-mail/contracts";
 import { useCallback, useEffect, useState } from "react";
 import { Switch } from "~/components/ui/switch";
 import { toast } from "../gmail/toast";
@@ -16,6 +17,7 @@ import { TranslationSection } from "./translation-section";
 import { UpdatesSection } from "../updates";
 import {
   RowSelect,
+  SettingResetButton,
   SettingsPageContainer,
   SettingsRow,
   SettingsSearchTargetProvider,
@@ -67,10 +69,10 @@ function GeneralPane() {
   const [advanceDirection, setAdvanceDirectionState] = useState<AdvanceDirection>(() =>
     getAdvanceDirection(),
   );
-  const [launchAtLogin, setLaunchAtLogin] = useState(false);
-  const [trayEnabled, setTrayEnabled] = useState(true);
+  const [launchAtLogin, setLaunchAtLogin] = useState(DEFAULT_SETTINGS.launchAtLogin);
+  const [trayEnabled, setTrayEnabled] = useState(DEFAULT_SETTINGS.trayEnabled);
   const [railDots, setRailDots] = useRailUnreadDots();
-  const [dockBadge, setDockBadge] = useState(false);
+  const [dockBadge, setDockBadge] = useState(DEFAULT_SETTINGS.dockBadgeEnabled);
   const [mailApps, setMailApps] = useState<MailApp[]>([]);
   const [defaultMailBundleId, setDefaultMailBundleId] = useState<string | null>(null);
 
@@ -193,6 +195,11 @@ function GeneralPane() {
   const railDotsRow = (
     <SettingsRow
       {...searchableSetting("rail-unread-dots")}
+      resetAction={
+        railDots ? (
+          <SettingResetButton label="mailbox unread dots" onClick={() => setRailDots(false)} />
+        ) : null
+      }
       description="A dot on each mailbox in the rail whose Inbox has unread mail, and each view with unread mail."
       control={<Switch id="railUnreadDots" checked={railDots} onCheckedChange={setRailDots} />}
     />
@@ -206,6 +213,14 @@ function GeneralPane() {
           {features.launchAtLogin ? (
             <SettingsRow
               {...searchableSetting("launch-at-login")}
+              resetAction={
+                launchAtLogin !== DEFAULT_SETTINGS.launchAtLogin ? (
+                  <SettingResetButton
+                    label="launch at login"
+                    onClick={() => void handleLaunchAtLoginChange(DEFAULT_SETTINGS.launchAtLogin)}
+                  />
+                ) : null
+              }
               description="Open Otter Mail automatically when you log in to your Mac."
               control={
                 <Switch
@@ -219,6 +234,14 @@ function GeneralPane() {
           {features.menuBar ? (
             <SettingsRow
               {...searchableSetting("menu-bar-icon")}
+              resetAction={
+                trayEnabled !== DEFAULT_SETTINGS.trayEnabled ? (
+                  <SettingResetButton
+                    label="menu bar icon"
+                    onClick={() => void handleTrayEnabledChange(DEFAULT_SETTINGS.trayEnabled)}
+                  />
+                ) : null
+              }
               description="An Otter Mail icon in the menu bar with a quick unread inbox view."
               control={
                 <Switch
@@ -232,6 +255,14 @@ function GeneralPane() {
           {features.dockBadge ? (
             <SettingsRow
               {...searchableSetting("dock-badge")}
+              resetAction={
+                dockBadge !== DEFAULT_SETTINGS.dockBadgeEnabled ? (
+                  <SettingResetButton
+                    label="dock badge"
+                    onClick={() => void handleDockBadgeChange(DEFAULT_SETTINGS.dockBadgeEnabled)}
+                  />
+                ) : null
+              }
               description="A badge with the number of unread messages in your inboxes."
               control={
                 <Switch
@@ -250,6 +281,16 @@ function GeneralPane() {
         {features.dockBadge ? null : railDotsRow}
         <SettingsRow
           {...searchableSetting("sync-interval")}
+          resetAction={
+            syncInterval != null && syncInterval !== DEFAULT_SETTINGS.syncIntervalSeconds ? (
+              <SettingResetButton
+                label="check for new mail"
+                onClick={() =>
+                  void handleSyncIntervalChange(String(DEFAULT_SETTINGS.syncIntervalSeconds))
+                }
+              />
+            ) : null
+          }
           description="Sync runs in the background at this cadence."
           control={
             <RowSelect
@@ -265,6 +306,17 @@ function GeneralPane() {
         />
         <SettingsRow
           {...searchableSetting("notifications")}
+          resetAction={
+            notificationsMode != null &&
+            notificationsMode !== DEFAULT_SETTINGS.notificationsMode ? (
+              <SettingResetButton
+                label="notifications"
+                onClick={() =>
+                  void handleNotificationsModeChange(DEFAULT_SETTINGS.notificationsMode)
+                }
+              />
+            ) : null
+          }
           description="Notify about new mail found by background sync."
           control={
             <RowSelect
@@ -277,6 +329,14 @@ function GeneralPane() {
         />
         <SettingsRow
           {...searchableSetting("advance-direction")}
+          resetAction={
+            advanceDirection !== "next" ? (
+              <SettingResetButton
+                label="after archive, delete, or move"
+                onClick={() => handleAdvanceDirectionChange("next")}
+              />
+            ) : null
+          }
           description="Which message to select next in the list."
           control={
             <RowSelect

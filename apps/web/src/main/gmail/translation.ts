@@ -58,7 +58,7 @@ export function sameLanguage(a: string, b: string): boolean {
 }
 
 /** The system's languages that the translator offers — the default reading list. */
-function systemReadLanguages(): string[] {
+export function systemReadLanguages(): string[] {
   const out: string[] = [];
   for (const tag of navigator.languages) {
     const match = TRANSLATION_LANGUAGES.find((code) =>
