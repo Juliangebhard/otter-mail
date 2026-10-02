@@ -23,6 +23,7 @@ export { GMAIL_SIGN_IN_CANCELLED as SIGN_IN_CANCELLED } from "@otter-mail/contra
 
 /** What the backend asks of the page, and what the page answers. */
 export type PageRequests = {
+  todoistSignIn: { params: { url?: string; close?: boolean }; result: string };
   pickFiles: { params: undefined; result: PickedFile[] };
   googleSignIn: { params: { loginHint?: string }; result: GoogleSignInResult };
   detectLanguage: { params: { text: string }; result: LanguageDetection };

@@ -25,6 +25,7 @@ export type PageHandlers = {
 
 /** The invoke a page request or effect belongs to: it goes to the tab that made it. */
 const ORIGIN_CHANNELS: Record<keyof PageRequests | "download" | "open", string[]> = {
+  todoistSignIn: ["todoist:signIn"],
   pickFiles: ["gmail:pickAttachments"],
   googleSignIn: ["gmail:addAccount"],
   download: ["gmail:getAttachment"],

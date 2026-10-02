@@ -75,21 +75,31 @@ to another app. This page is where they're compared.
 
 ## Todoist
 
-Connect with a personal API token in Settings → Integrations. The token stays on each device;
-Todoist data is fetched on demand and needs an internet connection. In `pnpm dev:demo`,
-connect with token `demo` for a pretend Todoist account (including a recurring task); no requests
-are sent to Todoist.
+Connect with Todoist in Settings → Integrations (browser consent with PKCE), or use a personal
+API token. Credentials stay on each device; OAuth tokens refresh automatically. Todoist data
+is fetched on demand and needs an internet connection. In `pnpm dev:demo`, Connect with Todoist
+opens a pretend account, or use token `demo`; no requests are sent to Todoist. Demo filters
+support search, today, overdue, 7 days, priorities and labels with `&` / `|`.
 
 | Feature                                                           | Mac          | Web | iPhone |
 | ----------------------------------------------------------------- | ------------ | --- | ------ |
-| Connect, replace token, disconnect                                | ✓            | ✓   | —      |
-| Create tasks from email (reader and list menus)                   | ✓            | ✓   | —      |
-| Task title, notes, project, natural-language due date, priority   | ✓            | ✓   | —      |
-| Link back to the email in Otter Mail                              | ✓ (web link) | ✓   | —      |
-| Browse active tasks, filter by project, load more, refresh        | ✓            | ✓   | —      |
+| Browser sign-in, API token, reconnect, disconnect                 | ✓            | ✓   | —      |
+| Create tasks from email (reader toolbar and reader/list menus)    | ✓            | ✓   | —      |
+| Title, notes, project, natural-language due date, priority        | ✓            | ✓   | —      |
+| Labels, project sections, shared-project assignees                | ✓            | ✓   | —      |
+| Edit tasks, move projects/sections, reschedule or clear due dates | ✓            | ✓   | —      |
+| Add/remove timed reminders from the task editor                   | ✓            | ✓   | —      |
+| Clickable link back to the email in Otter Mail                    | ✓ (web link) | ✓   | —      |
+| Browse active tasks by project, load more, refresh                | ✓            | ✓   | —      |
+| Today & overdue, Upcoming (7 days), search and Todoist filters    | ✓            | ✓   | —      |
 | Complete tasks (recurring tasks advance to their next occurrence) | ✓            | ✓   | —      |
 | Open task in Todoist, create a task without an email              | ✓            | ✓   | —      |
 | Command palette: Browse Todoist tasks                             | ✓            | ✓   | —      |
+
+Reminders are delivered by Todoist using the user's notification settings and account
+entitlements. Create the task first, then add a reminder in Edit. OAuth uses Todoist's public
+client registration, so no client secret is bundled. The web callback is shipped with the site;
+the Mac app receives its callback on a temporary localhost listener.
 
 ## Projects
 

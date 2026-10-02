@@ -1,3 +1,4 @@
+import { ListTodoIcon } from "lucide-react";
 import { addEmailToTodoist } from "./todoist";
 import {
   Fragment,
@@ -2658,6 +2659,16 @@ export function MessageReader({
             </>
           )}
 
+          <HintTooltip label="Add to Todoist" side="bottom">
+            <IconBtn
+              label="Add to Todoist"
+              onClick={() =>
+                addEmailToTodoist({ accountId, messageId: message.id, subject: message.subject })
+              }
+            >
+              <ListTodoIcon className="size-4" />
+            </IconBtn>
+          </HintTooltip>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <IconBtn label="More actions">

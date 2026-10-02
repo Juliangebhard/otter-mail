@@ -40,7 +40,7 @@ export function IntegrationsPane() {
               : !status.data
                 ? "Loading…"
                 : status.data.connected
-                  ? "Connected on this device. Add emails as tasks, browse projects and complete tasks."
+                  ? "Connected on this device. Create, edit and complete tasks, manage reminders and browse projects."
                   : "Turn emails into tasks and manage your Todoist tasks here."
           }
           control={
@@ -56,59 +56,90 @@ export function IntegrationsPane() {
           }
         />
         <SettingsRow
-          title="API token"
+          title="Connect with Todoist"
           description={
-            <span>
-              Get your token from{" "}
-              <a
-                href="https://app.todoist.com/app/settings/integrations/developer"
-                target="_blank"
-                rel="noreferrer"
-                className="underline"
-              >
-                Todoist’s developer settings
-              </a>
-              . Kept on this device only.{" "}
-              {__DEMO__ ? "In this demo, use the token demo for a pretend Todoist account." : ""}
-            </span>
+            __DEMO__
+              ? "Connect a pretend Todoist account to try every task feature."
+              : "Sign in securely in your browser. Your connection stays on this device."
           }
           control={
-            <Input
-              type="password"
-              autoComplete="off"
-              aria-label="Todoist API token"
-              placeholder={status.data?.connected ? "Replace token" : "API token"}
-              value={token}
-              onChange={(e) => setToken(e.target.value)}
+            <Btn
+              size="sm"
+              variant="primary"
               disabled={pending}
-            />
+              onClick={() =>
+                void change(
+                  __DEMO__ ? () => gmailApi.connectTodoist("demo") : gmailApi.signInTodoist,
+                )
+              }
+            >
+              {pending
+                ? "Connecting…"
+                : status.data?.connected
+                  ? "Reconnect with Todoist"
+                  : "Connect with Todoist"}
+            </Btn>
           }
         />
-        <SettingsRow
-          title={status.data?.connected ? "Connection" : "Connect Todoist"}
-          description="The token is verified before it is saved."
-          control={
-            <div className="flex gap-2">
-              <Btn
-                size="sm"
-                variant="primary"
-                disabled={pending || !token.trim() || !status.data}
-                onClick={() => void change(() => gmailApi.connectTodoist(token))}
-              >
-                {pending ? "Saving…" : status.data?.connected ? "Replace token" : "Connect"}
-              </Btn>
-              {status.data?.connected ? (
+        <details>
+          <summary className="cursor-pointer px-4 py-3 text-sm text-muted-foreground">
+            Connect using an API token
+          </summary>
+          <SettingsRow
+            title="API token"
+            description={
+              <span>
+                Get your token from{" "}
+                <a
+                  href="https://app.todoist.com/app/settings/integrations/developer"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="underline"
+                >
+                  Todoist’s developer settings
+                </a>
+                . Kept on this device only.{" "}
+                {__DEMO__ ? "In this demo, use the token demo for a pretend Todoist account." : ""}
+              </span>
+            }
+            control={
+              <Input
+                type="password"
+                autoComplete="off"
+                aria-label="Todoist API token"
+                placeholder={status.data?.connected ? "Replace token" : "API token"}
+                value={token}
+                onChange={(e) => setToken(e.target.value)}
+                disabled={pending}
+              />
+            }
+          />
+          <SettingsRow
+            title={status.data?.connected ? "Connection" : "Connect Todoist"}
+            description="The token is verified before it is saved."
+            control={
+              <div className="flex gap-2">
                 <Btn
                   size="sm"
-                  disabled={pending}
-                  onClick={() => void change(gmailApi.disconnectTodoist)}
+                  variant="primary"
+                  disabled={pending || !token.trim() || !status.data}
+                  onClick={() => void change(() => gmailApi.connectTodoist(token))}
                 >
-                  Disconnect
+                  {pending ? "Saving…" : status.data?.connected ? "Replace token" : "Connect"}
                 </Btn>
-              ) : null}
-            </div>
-          }
-        />
+                {status.data?.connected ? (
+                  <Btn
+                    size="sm"
+                    disabled={pending}
+                    onClick={() => void change(gmailApi.disconnectTodoist)}
+                  >
+                    Disconnect
+                  </Btn>
+                ) : null}
+              </div>
+            }
+          />
+        </details>
       </SettingsSection>
     </SettingsPageContainer>
   );

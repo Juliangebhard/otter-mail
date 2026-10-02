@@ -3,6 +3,11 @@ import { setPlatform, type Platform } from "../platform.js";
 import { registeredHandlers } from "../ipc.js";
 import { registerTodoistHandlers } from "../handlers/todoist.js";
 import {
+  updateTodoistTask,
+  addTodoistReminder,
+  deleteTodoistReminder,
+  todoistSections,
+  todoistCollaborators,
   completeTodoistTask,
   connectTodoist,
   createTodoistTask,
@@ -226,5 +231,104 @@ describe("Todoist projects and tasks", () => {
         result: { results: [], next_cursor: null },
       }),
     );
+  });
+});
+
+describe("Todoist task management", () => {
+  it("sends server-side filters and preserves them across pages", async () => {
+    await connect();
+    fetchMock.mockResolvedValueOnce(Response.json({ results: [], next_cursor: null }));
+    await todoistTasks(undefined, "a.b", "today | overdue");
+    const url = new URL(String(fetchMock.mock.calls[0]![0]));
+    expect(url.pathname).toBe("/api/v1/tasks/filter");
+    expect(url.searchParams.get("query")).toBe("today | overdue");
+    expect(url.searchParams.get("cursor")).toBe("a.b");
+  });
+  it("creates task labels, section and assignee using Sync field names", async () => {
+    await connect();
+    fetchMock.mockResolvedValueOnce(success());
+    await createTodoistTask({
+      content: "Task",
+      projectId: "work",
+      sectionId: "planning",
+      assigneeId: "sam",
+      labels: ["followup"],
+      requestId,
+    });
+    expect(body().args).toMatchObject({
+      section_id: "planning",
+      responsible_uid: "sam",
+      labels: ["followup"],
+    });
+  });
+  it("edits without moving subtasks and leaves an unchanged due date alone", async () => {
+    await connect();
+    fetchMock.mockResolvedValueOnce(success());
+    await updateTodoistTask({
+      id: "child",
+      content: "Edited",
+      labels: [],
+      assigneeId: null,
+      requestId,
+      moveRequestId: crypto.randomUUID(),
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(body().type).toBe("item_update");
+    expect(body().args).toEqual({
+      id: "child",
+      content: "Edited",
+      labels: [],
+      responsible_uid: null,
+    });
+  });
+  it("can clear the due date and resume a failed save after moving", async () => {
+    await connect();
+    const moveRequestId = crypto.randomUUID();
+    fetchMock.mockImplementation(async (_url, options) => {
+      const c = JSON.parse((options!.body as URLSearchParams).get("commands")!)[0];
+      return Response.json({ sync_status: { [c.uuid]: "ok" } });
+    });
+    const input = {
+      id: "one",
+      projectId: "work",
+      sectionId: "planning",
+      due: "",
+      requestId,
+      moveRequestId,
+    };
+    await updateTodoistTask(input);
+    const first = JSON.parse(
+      (fetchMock.mock.calls[0]![1]!.body as URLSearchParams).get("commands")!,
+    )[0];
+    expect(first).toEqual({
+      type: "item_move",
+      uuid: moveRequestId,
+      args: { id: "one", section_id: "planning" },
+    });
+    expect(body().args.due).toBeNull();
+    await updateTodoistTask(input);
+    expect(
+      JSON.parse((fetchMock.mock.calls[2]![1]!.body as URLSearchParams).get("commands")!)[0],
+    ).toEqual(first);
+  });
+  it("adds a timed reminder for the item, then removes it", async () => {
+    await connect();
+    fetchMock.mockImplementation(async () => success());
+    await addTodoistReminder({ itemId: "one", due: "tomorrow at 9am", requestId });
+    expect(body()).toMatchObject({
+      type: "reminder_add",
+      temp_id: requestId,
+      args: { item_id: "one", type: "absolute", due: { string: "tomorrow at 9am" } },
+    });
+    await deleteTodoistReminder("reminder", requestId);
+    expect(body()).toEqual({ type: "reminder_delete", uuid: requestId, args: { id: "reminder" } });
+  });
+  it("loads project-specific sections and collaborators", async () => {
+    await connect();
+    fetchMock.mockImplementation(async () => Response.json({ results: [], next_cursor: null }));
+    await todoistSections("work");
+    await todoistCollaborators("a/b");
+    expect(String(fetchMock.mock.calls[0]![0])).toContain("project_id=work");
+    expect(String(fetchMock.mock.calls[1]![0])).toContain("projects/a%2Fb/collaborators");
   });
 });
