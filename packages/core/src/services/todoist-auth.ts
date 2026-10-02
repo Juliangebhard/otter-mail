@@ -52,6 +52,8 @@ async function exchange(
   );
   if (!result.access_token || (params.grant_type === "refresh_token" && !result.refresh_token)) {
     // A grace-window retry cannot recover the rotated refresh token: reconnect rather than replaying it.
+    if (generation === currentGeneration && params.grant_type === "refresh_token")
+      await clearTodoistOAuth();
     throw new Error("Please reconnect Todoist to renew your sign-in.");
   }
   if (generation !== currentGeneration)

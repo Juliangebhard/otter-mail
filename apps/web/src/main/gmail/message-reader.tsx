@@ -1,5 +1,5 @@
 import { ListTodoIcon } from "lucide-react";
-import { addEmailToTodoist } from "./todoist";
+import { addEmailToTodoist } from "../integrations/todoist";
 import {
   Fragment,
   useCallback,

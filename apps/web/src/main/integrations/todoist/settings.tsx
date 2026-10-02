@@ -1,14 +1,14 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { gmailApi } from "../gmail/api";
-import { browseTodoist, useTodoistStatus } from "../gmail/todoist";
-import { Btn } from "../gmail/ui";
+import { todoistApi } from "./api";
+import { browseTodoist, useTodoistStatus } from "./dialogs";
+import { Btn } from "../../gmail/ui";
 import { Input } from "~/components/ui/input";
-import { toast } from "../gmail/toast";
-import { SettingsPageContainer, SettingsRow, SettingsSection } from "./settings-ui";
-import { searchableSetting } from "./settings-search";
+import { toast } from "../../gmail/toast";
+import { SettingsPageContainer, SettingsRow, SettingsSection } from "../../settings/settings-ui";
+import { searchableSetting } from "../../settings/settings-search";
 
-export function IntegrationsPane() {
+export function TodoistSettingsPane() {
   const status = useTodoistStatus();
   const qc = useQueryClient();
   const [token, setToken] = useState("");
@@ -69,7 +69,7 @@ export function IntegrationsPane() {
               disabled={pending}
               onClick={() =>
                 void change(
-                  __DEMO__ ? () => gmailApi.connectTodoist("demo") : gmailApi.signInTodoist,
+                  __DEMO__ ? () => todoistApi.connectTodoist("demo") : todoistApi.signInTodoist,
                 )
               }
             >
@@ -123,7 +123,7 @@ export function IntegrationsPane() {
                   size="sm"
                   variant="primary"
                   disabled={pending || !token.trim() || !status.data}
-                  onClick={() => void change(() => gmailApi.connectTodoist(token))}
+                  onClick={() => void change(() => todoistApi.connectTodoist(token))}
                 >
                   {pending ? "Saving…" : status.data?.connected ? "Replace token" : "Connect"}
                 </Btn>
@@ -131,7 +131,7 @@ export function IntegrationsPane() {
                   <Btn
                     size="sm"
                     disabled={pending}
-                    onClick={() => void change(gmailApi.disconnectTodoist)}
+                    onClick={() => void change(todoistApi.disconnectTodoist)}
                   >
                     Disconnect
                   </Btn>

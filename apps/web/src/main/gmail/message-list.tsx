@@ -1,4 +1,4 @@
-import { addEmailToTodoist } from "./todoist";
+import { addEmailToTodoist } from "../integrations/todoist";
 import type React from "react";
 import type { ReactNode } from "react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";

@@ -75,6 +75,8 @@ to another app. This page is where they're compared.
 
 ## Todoist
 
+Implementation boundaries and removal steps: [Todoist feature guide](integrations/todoist.md).
+
 Connect with Todoist in Settings → Integrations (browser consent with PKCE), or use a personal
 API token. Credentials stay on each device; OAuth tokens refresh automatically. Todoist data
 is fetched on demand and needs an internet connection. In `pnpm dev:demo`, Connect with Todoist

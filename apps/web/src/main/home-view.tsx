@@ -1,4 +1,4 @@
-import { TodoistDialogs } from "./gmail/todoist";
+import { TodoistDialogs } from "./integrations/todoist";
 import {
   useCallback,
   useEffect,

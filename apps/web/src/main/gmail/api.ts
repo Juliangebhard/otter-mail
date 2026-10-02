@@ -1,13 +1,4 @@
-import type {
-  TodoistPage,
-  TodoistProject,
-  TodoistTaskInput,
-  TodoistTaskUpdate,
-  TodoistSection,
-  TodoistCollaborator,
-  TodoistReminder,
-  TodoistReminderInput,
-} from "@otter-mail/contracts/todoist";
+import { ipc, task } from "~/lib/ipc";
 import type { ImapSettings } from "@otter-mail/contracts";
 export type { ChatChange } from "@otter-mail/contracts";
 import type { AgentAccess, AgentTokens, ConnectedAgent } from "@otter-mail/contracts/agent-tokens";
@@ -22,30 +13,6 @@ import type {
   SyncStatus,
   ViewRule,
 } from "./types";
-
-const ipc = <T = unknown>(channel: string, params?: unknown): Promise<T> =>
-  window.desktopBridge.invoke<T>(channel, params);
-
-/**
- * For calls that can outlast the 5s IPC timeout (file dialogs, big downloads):
- * the backend acknowledges at once and reports the outcome as a `task:done`
- * notification carrying our task id (see `runAsTask` in the gmail handlers).
- */
-const task = <T>(channel: string, params: Record<string, unknown>): Promise<T> =>
-  new Promise<T>((resolve, reject) => {
-    const taskId = crypto.randomUUID();
-    const off = window.desktopBridge.on("task:done", (payload: unknown) => {
-      const p = payload as { taskId?: string; result?: T; error?: string } | undefined;
-      if (p?.taskId !== taskId) return;
-      off();
-      if (p.error) reject(new Error(p.error));
-      else resolve(p.result as T);
-    });
-    ipc(channel, { ...params, taskId }).catch((err: unknown) => {
-      off();
-      reject(err);
-    });
-  });
 
 export type ListMessagesParams = {
   accountId: string;
@@ -422,29 +389,6 @@ export type AddImapAccountParams = {
 };
 
 export const gmailApi = {
-  todoistStatus: (): Promise<{ connected: boolean }> => ipc("todoist:status"),
-  signInTodoist: (): Promise<void> => task("todoist:signIn", {}),
-  connectTodoist: (token: string): Promise<void> => task("todoist:connect", { token }),
-  disconnectTodoist: (): Promise<void> => ipc("todoist:disconnect"),
-  todoistProjects: (): Promise<TodoistProject[]> => task("todoist:projects", {}),
-  todoistTasks: (projectId?: string, cursor?: string, filter?: string): Promise<TodoistPage> =>
-    task("todoist:tasks", { projectId, cursor, filter }),
-  createTodoistTask: (input: TodoistTaskInput): Promise<void> =>
-    task("todoist:create", { ...input }),
-  updateTodoistTask: (input: TodoistTaskUpdate): Promise<void> =>
-    task("todoist:update", { ...input }),
-  todoistLabels: (): Promise<{ id: string; name: string }[]> => task("todoist:labels", {}),
-  todoistSections: (projectId: string): Promise<TodoistSection[]> =>
-    task("todoist:sections", { projectId }),
-  todoistCollaborators: (projectId: string): Promise<TodoistCollaborator[]> =>
-    task("todoist:collaborators", { projectId }),
-  todoistReminders: (id: string): Promise<TodoistReminder[]> => task("todoist:reminders", { id }),
-  addTodoistReminder: (input: TodoistReminderInput): Promise<void> =>
-    task("todoist:addReminder", { ...input }),
-  deleteTodoistReminder: (id: string, requestId: string): Promise<void> =>
-    task("todoist:deleteReminder", { id, requestId }),
-  completeTodoistTask: (id: string, requestId: string): Promise<void> =>
-    task("todoist:complete", { id, requestId }),
   saveSupportReport: (contents: string, filename?: "Otter Mail diagnostics.json") =>
     task<boolean>("support:saveReport", { contents, filename }),
   listAccounts: (): Promise<GmailAccount[]> => ipc("gmail:listAccounts"),

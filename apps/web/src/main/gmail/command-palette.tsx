@@ -1,4 +1,4 @@
-import { browseTodoist } from "./todoist";
+import { browseTodoist } from "../integrations/todoist";
 import {
   useEffect,
   useLayoutEffect,

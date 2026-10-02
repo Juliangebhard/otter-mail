@@ -11,19 +11,19 @@ import { CheckIcon, ExternalLinkIcon, RefreshCwIcon, PencilIcon, Trash2Icon } fr
 import { Dialog } from "~/components/ui/dialog";
 import { Field } from "~/components/ui/field";
 import { Input } from "~/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./select";
-import { gmailApi } from "./api";
-import { Btn, IconBtn } from "./ui";
-import { toast } from "./toast";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../gmail/select";
+import { todoistApi } from "./api";
+import { Btn, IconBtn } from "../../gmail/ui";
+import { toast } from "../../gmail/toast";
 
 export function useTodoistStatus() {
-  return useQuery({ queryKey: ["todoist", "status"], queryFn: gmailApi.todoistStatus });
+  return useQuery({ queryKey: ["todoist", "status"], queryFn: todoistApi.todoistStatus });
 }
 
 function useTodoistProjects(enabled: boolean) {
   return useQuery({
     queryKey: ["todoist", "projects"],
-    queryFn: gmailApi.todoistProjects,
+    queryFn: todoistApi.todoistProjects,
     enabled,
     retry: false,
   });
@@ -117,11 +117,13 @@ function ProjectSelect({
   onChange,
   projects,
   all = false,
+  defaultInbox = true,
 }: {
   value: string;
   onChange: (value: string) => void;
   projects: { id: string; name: string }[];
   all?: boolean;
+  defaultInbox?: boolean;
 }) {
   return (
     <Select
@@ -132,7 +134,9 @@ function ProjectSelect({
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
-        <SelectItem value="__default__">{all ? "All projects" : "Inbox (default)"}</SelectItem>
+        {all || defaultInbox ? (
+          <SelectItem value="__default__">{all ? "All projects" : "Inbox (default)"}</SelectItem>
+        ) : null}
         {projects.map((p) => (
           <SelectItem key={p.id} value={p.id}>
             {p.name}
@@ -166,17 +170,17 @@ function TodoistCreate({
   const [labels, setLabels] = useState((task?.labels ?? []).join(", "));
   const labelOptions = useQuery({
     queryKey: ["todoist", "labels"],
-    queryFn: gmailApi.todoistLabels,
+    queryFn: todoistApi.todoistLabels,
     enabled: status.data?.connected === true,
   });
   const sections = useQuery({
     queryKey: ["todoist", "sections", project],
-    queryFn: () => gmailApi.todoistSections(project),
+    queryFn: () => todoistApi.todoistSections(project),
     enabled: !!project,
   });
   const collaborators = useQuery({
     queryKey: ["todoist", "collaborators", project],
-    queryFn: () => gmailApi.todoistCollaborators(project),
+    queryFn: () => todoistApi.todoistCollaborators(project),
     enabled: !!project,
   });
   const [pending, setPending] = useState(false);
@@ -225,7 +229,7 @@ function TodoistCreate({
         setPending(true);
         try {
           if (task) {
-            await gmailApi.updateTodoistTask({
+            await todoistApi.updateTodoistTask({
               ...input,
               id: task.id,
               requestId: attempt.current.id,
@@ -241,7 +245,7 @@ function TodoistCreate({
                   : undefined,
               due: due === (task.due?.string || task.due?.date || "") ? undefined : due.trim(),
             });
-          } else await gmailApi.createTodoistTask({ ...input, requestId: attempt.current.id });
+          } else await todoistApi.createTodoistTask({ ...input, requestId: attempt.current.id });
           toast.success(task ? "Task updated in Todoist" : "Task created in Todoist", {
             action: { label: "View tasks", onClick: browseTodoist },
           });
@@ -281,6 +285,7 @@ function TodoistCreate({
         <Field label="Project" orientation="vertical">
           <ProjectSelect
             value={project}
+            defaultInbox={!task}
             onChange={(value) => {
               setProject(value);
               setSection("");
@@ -421,7 +426,7 @@ function TodoistBrowser({
   const tasks = useInfiniteQuery({
     queryKey: ["todoist", "tasks", view === "all" ? project : "", filter],
     queryFn: ({ pageParam }) =>
-      gmailApi.todoistTasks(
+      todoistApi.todoistTasks(
         view === "all" ? project || undefined : undefined,
         pageParam,
         filter || undefined,
@@ -543,7 +548,7 @@ function TodoistBrowser({
                 setCompleting(task.id);
                 const id = requestIds.current.get(task.id) ?? crypto.randomUUID();
                 requestIds.current.set(task.id, id);
-                void gmailApi
+                void todoistApi
                   .completeTodoistTask(task.id, id)
                   .then(() => {
                     requestIds.current.delete(task.id);
@@ -671,7 +676,7 @@ function Reminders({
 }) {
   const reminders = useQuery({
     queryKey: ["todoist", "reminders", taskId],
-    queryFn: () => gmailApi.todoistReminders(taskId),
+    queryFn: () => todoistApi.todoistReminders(taskId),
     retry: false,
   });
   const [due, setDue] = useState("");
@@ -710,7 +715,7 @@ function Reminders({
               const id = deletes.current.get(r.id) ?? crypto.randomUUID();
               deletes.current.set(r.id, id);
               setPending(true);
-              void gmailApi
+              void todoistApi
                 .deleteTodoistReminder(r.id, id)
                 .then(() => reminders.refetch())
                 .catch((e) => toast.error(errorText(e)))
@@ -734,7 +739,7 @@ function Reminders({
           onClick={() => {
             if (attempt.current?.due !== due) attempt.current = { due, id: crypto.randomUUID() };
             setPending(true);
-            void gmailApi
+            void todoistApi
               .addTodoistReminder({ itemId: taskId, due, requestId: attempt.current.id })
               .then(async () => {
                 setDue("");

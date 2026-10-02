@@ -98,3 +98,11 @@ it("does not reconnect after the user disconnects during consent", async () => {
   await expect(signInTodoist()).rejects.toThrow("connection changed");
   expect(secrets.has("todoist-oauth")).toBe(false);
 });
+it("discards a consumed refresh token when its replacement cannot be recovered", async () => {
+  ready();
+  await signInTodoist();
+  fetchMock.mockResolvedValueOnce(Response.json({ access_token: "replacement", expires_in: 3600 }));
+  await expect(todoistAccessToken("access")).rejects.toThrow("reconnect");
+  expect(await todoistAccessToken()).toBeNull();
+  expect(fetchMock).toHaveBeenCalledTimes(3);
+});
