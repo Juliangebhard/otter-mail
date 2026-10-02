@@ -415,6 +415,8 @@ final class ImapProvider: MailProvider {
 
         var headers: [String: String] = [:]
         if let messageID { headers["Message-ID"] = messageID }
+        let bcc = imapAddresses(field(7))
+        if !bcc.isEmpty { headers["Bcc"] = bcc.map(Draft.format).joined(separator: ", ") }
         for name in ["References", "List-Unsubscribe", "List-Unsubscribe-Post"] {
             if let value = MailDecoding.header(name, in: block) { headers[name] = value }
         }

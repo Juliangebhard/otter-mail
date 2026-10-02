@@ -285,7 +285,9 @@ final class MailSync {
         let email = thread.mailbox
         Task {
             do {
-                try await run(email) { provider, state, _ in try await provider.apply(change, to: thread, &state) }
+                try await run(email) { provider, state, known in
+                    try await provider.apply(change, to: known.first(where: { $0.id == thread.id }) ?? thread, &state)
+                }
             } catch {
                 _ = try? await run(email) { provider, state, known in try await provider.refresh(thread, &state, known: known) }
             }
@@ -294,15 +296,25 @@ final class MailSync {
 
     /** Sends (or keeps in Drafts) a message the store already shows, then shows the server's copy of its thread. */
     func write(_ draft: Draft, asDraft: Bool) async throws {
-        guard let mailbox = store.mailbox(draft.from) else { return }
+        guard let mailbox = store.mailbox(draft.from), !mailbox.signedOut else { throw Draft.Failure.mailboxUnavailable }
         let replyTo = draft.threadID.flatMap(store.thread)
         // The message replied to (not the copy the store shows of this one, which has no Message-ID yet).
         let quoted = replyTo?.sent.last { $0.headers["Message-ID"] != nil }
-        let to = Draft.people(draft.to), cc = Draft.people(draft.cc)
+        let to = Draft.people(draft.to), cc = Draft.people(draft.cc), bcc = Draft.people(draft.bcc)
+        var files: [MIME.File] = []
+        var size = 0
+        for file in draft.files {
+            let data = try await store.fileData(file, from: draft.from)
+            size += data.count
+            guard size <= DraftFile.limit else { throw DraftFile.Failure.tooLarge }
+            files.append(MIME.File(filename: file.filename, mimeType: file.mimeType, data: data))
+        }
         let raw = MIME.message(
             from: mailbox.me,
             to: to,
             cc: cc,
+            bcc: asDraft || mailbox.imap == nil ? bcc : [],
+            files: files,
             subject: draft.subject,
             text: draft.body,
             html: Compose.html(draft.body, signature: mailbox.signature),
@@ -311,7 +323,7 @@ final class MailSync {
             // Gmail stamps its own; an IMAP server keeps the message as written.
             stamped: mailbox.imap != nil
         )
-        let message = Outgoing(raw: raw, from: mailbox.email, recipients: (to + cc).map(\.email), threadID: draft.threadID, draft: draft.messageID)
+        let message = Outgoing(raw: raw, from: mailbox.email, recipients: (to + cc + bcc).map(\.email), threadID: draft.threadID, draft: draft.messageID)
         try await run(mailbox.email) { provider, state, known in
             asDraft
                 ? try await provider.saveDraft(message, &state, known: known)
@@ -345,7 +357,7 @@ final class MailSync {
         let data = try await provider(email).attachment(attachment, of: message)
         let folder = URL.temporaryDirectory.appending(path: message.id.replacingOccurrences(of: "/", with: "_"), directoryHint: .isDirectory)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        let url = folder.appending(path: attachment.filename.isEmpty ? "attachment" : attachment.filename)
+        let url = folder.appending(path: attachment.filename.isEmpty ? "attachment" : URL(fileURLWithPath: attachment.filename).lastPathComponent)
         try data.write(to: url)
         return url
     }

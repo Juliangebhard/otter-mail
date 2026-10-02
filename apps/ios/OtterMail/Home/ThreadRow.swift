@@ -3,11 +3,11 @@ import SwiftUI
 /**
  * One thread, three lines, as the desktop lists them: who (the unread dot
  * before, the mailbox's dot in all mailboxes) and when, the subject, then a
- * line of the latest message. No avatars, no dividers; read mail recedes.
+ * line of the latest message. List styling and read backgrounds live in ThreadListView.
  */
 struct ThreadRow: View {
     @Environment(\.palette) private var palette
-    @Environment(\.colorScheme) private var colorScheme
+    @Environment(Preferences.self) private var preferences
     let thread: MailThread
     /** Set in all mailboxes: whose mail it is. */
     let mailbox: Mailbox?
@@ -17,12 +17,12 @@ struct ThreadRow: View {
         let unread = thread.unread
         VStack(alignment: .leading, spacing: 2) {
             HStack(spacing: 6) {
-                if unread {
+                if unread && !preferences.dimReadMessages {
                     Circle().fill(palette.action).frame(width: 7, height: 7)
                 }
                 Text(senders)
-                    .font(.subheadline.weight(unread ? .medium : .regular))
-                    .foregroundStyle(palette.text)
+                    .font(.subheadline)
+                    .foregroundStyle(palette.text.opacity(0.72))
                     .lineLimit(1)
                 Spacer(minLength: 8)
                 if thread.starred {
@@ -54,17 +54,15 @@ struct ThreadRow: View {
             }
 
             Text(thread.subject)
-                .font(.subheadline)
-                .foregroundStyle(unread ? palette.text : palette.muted)
+                .font(.subheadline.weight(unread ? .semibold : .medium))
+                .foregroundStyle(palette.text)
                 .lineLimit(1)
 
             Text(thread.isDraft ? "Draft · \(latest.snippet)" : latest.snippet)
                 .font(.subheadline)
-                .foregroundStyle(palette.muted.opacity(0.8))
+                .foregroundStyle(palette.muted.opacity(preferences.messageListStyle == .dividers ? 1 : 0.8))
                 .lineLimit(1)
         }
-        // Read mail recedes, as on the desktop.
-        .opacity(unread || thread.isDraft ? 1 : colorScheme == .dark ? 0.75 : 0.85)
         .contentShape(.rect)
         .accessibilityElement(children: .combine)
     }
@@ -137,5 +135,28 @@ enum RelativeTime {
             return date.formatted(.dateTime.day().month(.abbreviated))
         }
         return date.formatted(date: .numeric, time: .omitted)
+    }
+}
+
+/** Local calendar days, newest first, shared by inbox and search results. */
+struct ThreadDay: Identifiable {
+    let id: Date
+    let threads: [MailThread]
+    var unread: Int { threads.filter(\.unread).count }
+
+    var title: String {
+        let calendar = Calendar.current
+        if calendar.isDateInToday(id) { return "Today" }
+        if calendar.isDateInYesterday(id) { return "Yesterday" }
+        if calendar.isDate(id, equalTo: .now, toGranularity: .year) {
+            return id.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day())
+        }
+        return id.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day().year())
+    }
+
+    static func group(_ threads: [MailThread], calendar: Calendar = .current) -> [ThreadDay] {
+        Dictionary(grouping: threads) { calendar.startOfDay(for: $0.latest.date) }
+            .map { ThreadDay(id: $0.key, threads: $0.value) }
+            .sorted { $0.id > $1.id }
     }
 }

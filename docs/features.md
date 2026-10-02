@@ -37,41 +37,41 @@ to another app. This page is where they're compared.
 
 ## Reading
 
-| Feature                                                                 | Mac                                                           | Web                                          | iPhone                       |
-| ----------------------------------------------------------------------- | ------------------------------------------------------------- | -------------------------------------------- | ---------------------------- |
-| Conversations, earlier messages collapsed                               | ✓                                                             | ✓                                            | ✓                            |
-| A link for each mailbox, conversation and Settings page; Back / Forward | ✓ (⌘[ ⌘], mouse buttons)                                      | ✓ (the browser's; a reload keeps your place) | —                            |
-| HTML mail, inline (cid) images                                          | ✓                                                             | ✓                                            | ✓                            |
-| Remote images                                                           | load; broken ones proxied by backend                          | load; proxy only where CORS lets             | load                         |
-| Remote-image blocking                                                   | —                                                             | —                                            | —                            |
-| Quoted text collapsed                                                   | ✓ (HTML and plain text)                                       | ✓                                            | plain text only              |
-| Attachments                                                             | preview in app, save, open in default app, drag out to Finder | preview in app, save                         | Quick Look (no save / share) |
-| Unsubscribe (one-click, web, mailto)                                    | ✓                                                             | ✓                                            | ✓                            |
-| Conversation summary (people, files, list)                              | ✓                                                             | ✓                                            | —                            |
-| Sender hover card (write, search, ask)                                  | ✓                                                             | ✓                                            | —                            |
-| Gmail category chips                                                    | Gmail                                                         | Gmail                                        | —                            |
-| Folders: Inbox, Starred, Sent, Drafts, Important, All, Junk, Trash      | ✓ (Important: Gmail)                                          | ✓                                            | ✓ (Important: Gmail)         |
-| Print, show original                                                    | —                                                             | —                                            | —                            |
+| Feature                                                                 | Mac                                                           | Web                                          | iPhone                   |
+| ----------------------------------------------------------------------- | ------------------------------------------------------------- | -------------------------------------------- | ------------------------ |
+| Conversations, earlier messages collapsed                               | ✓                                                             | ✓                                            | ✓                        |
+| A link for each mailbox, conversation and Settings page; Back / Forward | ✓ (⌘[ ⌘], mouse buttons)                                      | ✓ (the browser's; a reload keeps your place) | —                        |
+| HTML mail, inline (cid) images                                          | ✓                                                             | ✓                                            | ✓                        |
+| Remote images                                                           | load; broken ones proxied by backend                          | load; proxy only where CORS lets             | load                     |
+| Remote-image blocking                                                   | —                                                             | —                                            | —                        |
+| Quoted text collapsed                                                   | ✓ (HTML and plain text)                                       | ✓                                            | plain text only          |
+| Attachments                                                             | preview in app, save, open in default app, drag out to Finder | preview in app, save                         | Quick Look, save / share |
+| Unsubscribe (one-click, web, mailto)                                    | ✓                                                             | ✓                                            | ✓                        |
+| Conversation summary (people, files, list)                              | ✓                                                             | ✓                                            | —                        |
+| Sender hover card (write, search, ask)                                  | ✓                                                             | ✓                                            | —                        |
+| Gmail category chips                                                    | Gmail                                                         | Gmail                                        | —                        |
+| Folders: Inbox, Starred, Sent, Drafts, Important, All, Junk, Trash      | ✓ (Important: Gmail)                                          | ✓                                            | ✓ (Important: Gmail)     |
+| Print, show original                                                    | —                                                             | —                                            | —                        |
 
 ## Organizing
 
-| Feature                                  | Mac                      | Web          | iPhone         |
-| ---------------------------------------- | ------------------------ | ------------ | -------------- |
-| Archive, trash, restore, junk / not junk | ✓                        | ✓            | ✓              |
-| Delete forever                           | ✓                        | ✓            | ✓              |
-| Empty Trash / Empty Junk                 | ✓                        | ✓            | —              |
-| Star (flag), read / unread               | ✓                        | ✓            | ✓              |
-| Mark all as read                         | —                        | —            | ✓              |
-| Multi-select and bulk actions            | ✓ (⌘/⇧-click)            | ✓            | —              |
-| Undo and redo (z ⌘Z, ⇧Z ⇧⌘Z)             | ✓                        | ✓            | —              |
-| Apply / remove labels                    | ✓ (IMAP: move to folder) | ✓            | ✓ (IMAP: move) |
-| Create, rename, delete labels            | ✓ (IMAP: folders)        | ✓            | —              |
-| Label colors                             | edit (Gmail)             | edit (Gmail) | shown (Gmail)  |
-| Nested labels                            | ✓                        | ✓            | —              |
-| Drag conversations onto labels           | ✓                        | ✓            | —              |
-| Swipe actions                            | —                        | —            | ✓ (fixed)      |
-| After archive: next / previous           | ✓                        | ✓            | ✓              |
-| Snooze                                   | —                        | —            | —              |
+| Feature                                  | Mac                      | Web          | iPhone                                   |
+| ---------------------------------------- | ------------------------ | ------------ | ---------------------------------------- |
+| Archive, trash, restore, junk / not junk | ✓                        | ✓            | ✓                                        |
+| Delete forever                           | ✓                        | ✓            | ✓                                        |
+| Empty Trash / Empty Junk                 | ✓                        | ✓            | —                                        |
+| Star (flag), read / unread               | ✓                        | ✓            | ✓                                        |
+| Mark all as read                         | —                        | —            | ✓                                        |
+| Multi-select and bulk actions            | ✓ (⌘/⇧-click)            | ✓            | ✓ (archive, trash, read, labels/folders) |
+| Undo and redo (z ⌘Z, ⇧Z ⇧⌘Z)             | ✓                        | ✓            | Undo archive/trash (6 seconds)           |
+| Apply / remove labels                    | ✓ (IMAP: move to folder) | ✓            | ✓ (IMAP: move)                           |
+| Create, rename, delete labels            | ✓ (IMAP: folders)        | ✓            | —                                        |
+| Label colors                             | edit (Gmail)             | edit (Gmail) | shown (Gmail)                            |
+| Nested labels                            | ✓                        | ✓            | —                                        |
+| Drag conversations onto labels           | ✓                        | ✓            | —                                        |
+| Swipe actions                            | —                        | —            | ✓ (fixed)                                |
+| After archive: next / previous           | ✓                        | ✓            | ✓                                        |
+| Snooze                                   | —                        | —            | —                                        |
 
 ## Projects
 
@@ -94,20 +94,20 @@ conversations are in one, never their mail.
 
 ## Composing & sending
 
-| Feature                                | Mac                                            | Web | iPhone                   |
-| -------------------------------------- | ---------------------------------------------- | --- | ------------------------ |
-| New, reply, reply all                  | ✓                                              | ✓   | ✓                        |
-| Forward                                | ✓ (with attachments)                           | ✓   | last message's text only |
-| Cc / Bcc                               | ✓ / ✓                                          | ✓   | ✓ / —                    |
-| From: pick the mailbox                 | ✓                                              | ✓   | ✓                        |
-| Contact suggestions (from cached mail) | ✓                                              | ✓   | —                        |
-| Attachments (25 MB)                    | ✓                                              | ✓   | —                        |
-| Rich text (bold, lists, links, quotes) | ✓                                              | ✓   | —                        |
-| Drafts                                 | autosaved, conflict-aware                      | ✓   | saved on close           |
-| Undo send (10 s)                       | ✓                                              | ✓   | —                        |
-| Send later                             | —                                              | —   | —                        |
-| Signatures                             | Gmail: saved in Gmail; IMAP: synced preference | ✓   | ✓ (same)                 |
-| Handles mailto: links                  | ✓ (default mail app)                           | —   | —                        |
+| Feature                                | Mac                                            | Web | iPhone                                         |
+| -------------------------------------- | ---------------------------------------------- | --- | ---------------------------------------------- |
+| New, reply, reply all                  | ✓                                              | ✓   | ✓                                              |
+| Forward                                | ✓ (with attachments)                           | ✓   | last message, with attachments                 |
+| Cc / Bcc                               | ✓ / ✓                                          | ✓   | ✓ / ✓                                          |
+| From: pick the mailbox                 | ✓                                              | ✓   | ✓                                              |
+| Contact suggestions (from cached mail) | ✓                                              | ✓   | ✓ (recipient chips)                            |
+| Attachments (25 MB)                    | ✓                                              | ✓   | ✓ (Photos / Files)                             |
+| Rich text (bold, lists, links, quotes) | ✓                                              | ✓   | —                                              |
+| Drafts                                 | autosaved, conflict-aware                      | ✓   | local autosave/recovery; mailbox save on close |
+| Undo send (10 s)                       | ✓                                              | ✓   | —                                              |
+| Send later                             | —                                              | —   | —                                              |
+| Signatures                             | Gmail: saved in Gmail; IMAP: synced preference | ✓   | ✓ (same)                                       |
+| Handles mailto: links                  | ✓ (default mail app)                           | —   | —                                              |
 
 ## Search
 
@@ -152,6 +152,8 @@ conversations are in one, never their mail.
 | New mail during a long sync           | ✓                                  | ✓                      | —                                    |
 | Changes applied at once, synced after | ✓                                  | ✓                      | ✓ (no outbox)                        |
 
+On iPhone, conversations zoom from their list rows (respecting Reduce Motion), the navigation bar minimizes while scrolling, and selection morphs the glass buttons into bulk actions.
+
 ## Settings & customization
 
 | Feature                                                                                                          | Mac | Web | iPhone                                                                     |
@@ -160,9 +162,9 @@ conversations are in one, never their mail.
 | Your own themes (Otter Code's editor): duplicate, edit, import/export                                            | ✓   | ✓   | ✓ (worn and picked; made on the Mac or the web)                            |
 | Panel animations                                                                                                 | ✓   | ✓   | —                                                                          |
 | Contrast, glass opacity, font size, reading width                                                                | ✓   | ✓   | —                                                                          |
-| Message list styles: Classic, With dividers                                                                      | ✓   | ✓   | —                                                                          |
-| Collapsible day separators, on by default in every mail layout                                                   | ✓   | ✓   | —                                                                          |
-| Dim read message backgrounds, on by default in every mail layout                                                 | ✓   | ✓   | —                                                                          |
+| Message list styles: Classic, With dividers                                                                      | ✓   | ✓   | ✓                                                                          |
+| Collapsible day separators, on by default in every mail layout                                                   | ✓   | ✓   | ✓                                                                          |
+| Dim read message backgrounds, on by default in every mail layout                                                 | ✓   | ✓   | ✓                                                                          |
 | Keyboard navigation highlights rows; Enter opens (optional open with arrows)                                     | ✓   | ✓   | —                                                                          |
 | Configurable delay before keyboard previews are marked read (2 seconds by default); clicks mark read immediately | ✓   | ✓   | —                                                                          |
 | Mail layouts: Split view, Full inbox, Floating                                                                   | ✓   | ✓   | —                                                                          |
@@ -264,15 +266,13 @@ profile`).
 ## Gaps worth closing
 
 - iPhone: calendar invitations (card and RSVP).
-- iPhone: attachments, rich text, Bcc and contact suggestions in the composer.
-- iPhone: forward with attachments and the original HTML.
-- iPhone: draft autosave and undo send.
+- iPhone: rich text in the composer.
+- iPhone: forward with the original HTML.
+- iPhone: synced draft autosave and undo send.
 - iPhone: sender photos (contacts, Gravatar, logos) instead of initials only.
 - iPhone: create, rename and delete labels; Empty Trash / Junk.
-- iPhone: multi-select, and undo after archive or trash.
 - iPhone: views.
 - iPhone: push notifications (APNs) when the app is closed.
-- iPhone: save or share an attachment from Quick Look.
 - Mac and web: Mark all as read (iPhone has it).
 - Web: translation outside Chrome.
 - Web: offline bodies (the Mac downloads them).

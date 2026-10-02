@@ -17,6 +17,8 @@ struct HomeView: View {
     @Environment(Session.self) private var session
     @Environment(\.palette) private var palette
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Namespace private var messageTransition
 
     @State private var place = Place()
     @State private var path: [String] = []
@@ -44,6 +46,7 @@ struct HomeView: View {
                 NavigationStack(path: $path) {
                     ThreadListView(
                         place: place,
+                        messageTransition: messageTransition,
                         onDrawer: { setDrawer(open: true) },
                         onAgent: { agentOpen = true },
                         onCompose: { compose() },
@@ -51,7 +54,28 @@ struct HomeView: View {
                         onResume: { draft = $0 }
                     )
                     .navigationDestination(for: String.self) { id in
-                        ThreadView(threadID: id, place: place, path: $path, draft: $draft)
+                        let reader = ThreadView(threadID: id, place: place, path: $path, draft: $draft)
+                        if reduceMotion {
+                            reader
+                        } else {
+                            reader.navigationTransition(.zoom(sourceID: id, in: messageTransition))
+                        }
+                    }
+                }
+                .safeAreaInset(edge: .bottom, spacing: 8) {
+                    if let action = store.undoAction {
+                        HStack {
+                            Text(action.title).font(.subheadline).lineLimit(2)
+                            Spacer(minLength: 12)
+                            Button("Undo") { store.undo() }.fontWeight(.semibold)
+                                .accessibilityHint("Restores the conversations to their previous folders")
+                        }
+                        .foregroundStyle(palette.text)
+                        .padding(16)
+                        .background(palette.raised, in: .rect(cornerRadius: 18))
+                        .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(palette.border))
+                        .padding(.horizontal, 16)
+                        .id(action.id)
                     }
                 }
                 .clipShape(.rect(cornerRadius: offset > 0 ? 44 : 0))
@@ -100,7 +124,7 @@ struct HomeView: View {
             path = [thread]
         }
         .sheet(item: $draft) { draft in
-            ComposeView(draft: draft)
+            ComposeView(draft: store.recover(draft))
         }
         .sheet(isPresented: $agentOpen) {
             NavigationStack {
@@ -137,7 +161,9 @@ struct HomeView: View {
 
     /** Horizontal drags slide the drawer, following the finger and settling by where and how fast it let go. */
     private func drawerGesture(width: CGFloat) -> some Gesture {
-        DragGesture(minimumDistance: 8)
+        // The closing gesture sits on the moving mail panel. Measure in screen
+        // coordinates so moving that panel doesn't change the drag's translation.
+        DragGesture(minimumDistance: 8, coordinateSpace: .global)
             .onChanged { value in drag = value.translation.width }
             .onEnded { value in settle(width: width, predicted: value.predictedEndTranslation.width) }
     }
@@ -148,6 +174,18 @@ struct HomeView: View {
         withAnimation(.interpolatingSpring(duration: 0.35, bounce: 0, initialVelocity: 0)) {
             drawerOpen = open
             drag = 0
+        }
+    }
+}
+
+/** iOS 27 lets navigation give space back to the mail while scrolling. */
+extension View {
+    @ViewBuilder
+    func minimizingNavigationBar(enabled: Bool = true) -> some View {
+        if #available(iOS 27.0, *) {
+            toolbarMinimizationBehavior(enabled ? .onScrollDown : .never, for: .navigationBar)
+        } else {
+            self
         }
     }
 }

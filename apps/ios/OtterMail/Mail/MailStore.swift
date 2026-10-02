@@ -13,6 +13,17 @@ final class MailStore {
     private(set) var mailboxes: [Mailbox]
     private(set) var threads: [MailThread]
     let preferences: Preferences
+    private(set) var recoveredDrafts: [RecoveredDraft] = []
+    @ObservationIgnored private var recoveryDirectory: URL?
+    private(set) var undoAction: PendingAction?
+    @ObservationIgnored private var undoTask: Task<Void, Never>?
+
+    struct PendingAction {
+        let id = UUID()
+        let trash: Bool
+        let threads: [MailThread]
+        var title: String { "\(threads.count == 1 ? "Conversation" : "\(threads.count) conversations") \(trash ? "trashed" : "archived")" }
+    }
     /** Gmail, for signed-in mailboxes; nil in the demo. */
     @ObservationIgnored var sync: MailSync?
 
@@ -24,7 +35,9 @@ final class MailStore {
 
     static func demo(preferences: Preferences) -> MailStore {
         let demo = DemoMail.load()
-        return MailStore(preferences: preferences, mailboxes: demo.mailboxes, threads: demo.threads)
+        let store = MailStore(preferences: preferences, mailboxes: demo.mailboxes, threads: demo.threads)
+        store.configureRecovery(namespace: "demo")
+        return store
     }
 
     var isDemo: Bool { sync == nil }
@@ -60,6 +73,8 @@ final class MailStore {
 
     /** Removes the mailbox and its mail from this device; nothing is deleted from Gmail. */
     func remove(mailbox email: String) {
+        commitPendingAction()
+        for recovery in recoveredDrafts where recovery.draft.from == email { removeRecovery(recovery.draft, deletingFiles: true) }
         mailboxes.removeAll { $0.email == email }
         threads.removeAll { $0.mailbox == email }
         preferences.arrangement.order.removeAll { $0 == email }
@@ -98,9 +113,16 @@ final class MailStore {
     /** A folder's count in the sidebar, as on the desktop: its unread mail, but every draft in Drafts and none on All Mail. */
     func badge(in folder: Folder, scope: String?) -> Int {
         switch folder {
-        case .allMail: 0
-        case .drafts: inScope(scope).filter { matches($0, .drafts) }.reduce(0) { $0 + $1.messages.filter(\.draft).count }
-        default: unreadCount(in: folder, scope: scope)
+        case .allMail: return 0
+        case .drafts:
+            let saved = inScope(scope).filter { matches($0, .drafts) }.flatMap(\.messages).filter(\.draft)
+            let shown = Set(shownMailboxes.map(\.email))
+            let local = recoveredDrafts.filter { entry in
+                (scope.map { entry.draft.from == $0 } ?? shown.contains(entry.draft.from))
+                    && !saved.contains(where: { $0.id == entry.draft.messageID })
+            }
+            return saved.count + local.count
+        default: return unreadCount(in: folder, scope: scope)
         }
     }
 
@@ -168,7 +190,11 @@ final class MailStore {
     func upsert(threads fresh: [MailThread]) {
         guard !fresh.isEmpty else { return }
         var index = Dictionary(uniqueKeysWithValues: threads.enumerated().map { ($1.id, $0) })
-        for thread in fresh {
+        for var thread in fresh {
+            if let pending = undoAction, pending.threads.contains(where: { $0.id == thread.id }) {
+                if pending.trash { thread.labels.subtract(["INBOX", "SPAM"]); thread.labels.insert("TRASH") }
+                else { thread.labels.remove("INBOX") }
+            }
             if let i = index[thread.id] {
                 if threads[i] != thread { threads[i] = thread }
             } else {
@@ -200,6 +226,7 @@ final class MailStore {
     }
 
     private func edit(_ id: String, _ changes: [Change], _ change: (inout MailThread) -> Void) {
+        commitPendingAction()
         guard let i = threads.firstIndex(where: { $0.id == id }) else { return }
         change(&threads[i])
         let thread = threads[i]
@@ -220,14 +247,45 @@ final class MailStore {
         }
     }
 
-    func archive(_ id: String) {
-        edit(id, [.modify(add: [], remove: ["INBOX"])]) { $0.labels.remove("INBOX") }
+    func archive(_ id: String) { archive([id]) }
+    func trash(_ id: String) { trash([id]) }
+    func archive(_ ids: Set<String>) { stage(ids, trash: false) }
+    func trash(_ ids: Set<String>) { stage(ids, trash: true) }
+
+    private func stage(_ ids: Set<String>, trash: Bool) {
+        commitPendingAction()
+        let originals = threads.filter { ids.contains($0.id) && (trash ? !$0.labels.contains("TRASH") : $0.labels.contains("INBOX")) }
+        guard !originals.isEmpty else { return }
+        undoAction = PendingAction(trash: trash, threads: originals)
+        for i in threads.indices where originals.contains(where: { $0.id == threads[i].id }) {
+            if trash { threads[i].labels.subtract(["INBOX", "SPAM"]); threads[i].labels.insert("TRASH") }
+            else { threads[i].labels.remove("INBOX") }
+        }
+        undoTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(6))
+            guard !Task.isCancelled else { return }
+            self?.commitPendingAction()
+        }
     }
 
-    func trash(_ id: String) {
-        edit(id, [.trash]) { t in
-            t.labels.subtract(["INBOX", "SPAM"])
-            t.labels.insert("TRASH")
+    func undo() {
+        guard let action = undoAction else { return }
+        undoTask?.cancel()
+        undoAction = nil
+        let affected: Set<String> = action.trash ? ["INBOX", "SPAM", "TRASH"] : ["INBOX"]
+        for original in action.threads {
+            guard let i = threads.firstIndex(where: { $0.id == original.id }) else { continue }
+            threads[i].labels.subtract(affected)
+            threads[i].labels.formUnion(original.labels.intersection(affected))
+        }
+    }
+
+    func commitPendingAction() {
+        undoTask?.cancel()
+        guard let action = undoAction else { return }
+        undoAction = nil
+        for original in action.threads {
+            sync?.apply(action.trash ? .trash : .modify(add: [], remove: ["INBOX"]), to: thread(original.id) ?? original)
         }
     }
 
@@ -251,6 +309,7 @@ final class MailStore {
     }
 
     func deleteForever(_ id: String) {
+        commitPendingAction()
         guard let thread = thread(id) else { return }
         threads.removeAll { $0.id == id }
         sync?.apply(.delete, to: thread)
@@ -264,20 +323,100 @@ final class MailStore {
         }
     }
 
+    /** Suggestions from this mailbox's cached correspondence, most recently seen first. */
+    func contacts(matching query: String, from email: String, excluding: Set<String>) -> [Person] {
+        let query = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return [] }
+        var seen = excluding
+        seen.insert(email.lowercased())
+        var matches: [Person] = []
+        for thread in allThreads(of: email).sorted(by: { $0.latest.date > $1.latest.date }) {
+            for message in thread.messages.reversed() {
+                for person in [message.from] + message.to + message.cc {
+                    let key = person.email.lowercased()
+                    guard !seen.contains(key), Draft.validRecipient(person.email),
+                          person.name.localizedStandardContains(query) || person.email.localizedStandardContains(query) else { continue }
+                    seen.insert(key)
+                    matches.append(person)
+                    if matches.count == 6 { return matches }
+                }
+            }
+        }
+        return matches
+    }
+
+    func configureRecovery(namespace: String) {
+        recoveryDirectory = URL.applicationSupportDirectory.appending(path: "draft-recovery").appending(path: namespace)
+        guard let directory = recoveryDirectory else { return }
+        recoveredDrafts = ((try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)) ?? [])
+            .compactMap { try? JSONDecoder().decode(RecoveredDraft.self, from: Data(contentsOf: $0)) }
+            .sorted { $0.updated > $1.updated }
+    }
+
+    func recover(_ draft: Draft) -> Draft {
+        recoveredDrafts.first { $0.draft.id == draft.id || (draft.messageID != nil && $0.draft.messageID == draft.messageID && $0.draft.from == draft.from) }?.draft ?? draft
+    }
+
+    func saveRecovery(_ draft: Draft) throws {
+        guard let directory = recoveryDirectory else { throw Draft.Failure.recoveryUnavailable }
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let entry = RecoveredDraft(draft: draft)
+        try JSONEncoder().encode(entry).write(to: directory.appending(path: "\(draft.id).json"), options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+        recoveredDrafts.removeAll { $0.id == draft.id }
+        recoveredDrafts.insert(entry, at: 0)
+    }
+
+    func removeRecovery(_ draft: Draft, deletingFiles: Bool = false) {
+        if deletingFiles {
+            for file in draft.files {
+                if let url = file.url { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+            }
+        }
+        if let directory = recoveryDirectory { try? FileManager.default.removeItem(at: directory.appending(path: "\(draft.id).json")) }
+        recoveredDrafts.removeAll { $0.id == draft.id }
+    }
+
+    func clearRecovery() {
+        for entry in recoveredDrafts { removeRecovery(entry.draft, deletingFiles: true) }
+    }
+
+    func attachmentURL(_ attachment: Attachment, of message: Message, in email: String) async throws -> URL {
+        if let id = attachment.id, id.hasPrefix("local:") {
+            let file = String(id.dropFirst(6))
+            guard UUID(uuidString: file) != nil else { throw DraftFile.Failure.unavailable }
+            let url = DraftFile.directory.appending(path: file).appending(path: URL(fileURLWithPath: attachment.filename).lastPathComponent)
+            guard FileManager.default.fileExists(atPath: url.path) else { throw DraftFile.Failure.unavailable }
+            return url
+        }
+        guard let sync else { throw DraftFile.Failure.unavailable }
+        return try await sync.attachment(attachment, of: message, in: email)
+    }
+
+    func fileData(_ file: DraftFile, from email: String) async throws -> Data {
+        if let url = file.url { return try Data(contentsOf: url) }
+        let source = file.sourceMailbox ?? email
+        guard let original = file.original, let message = allThreads(of: source).flatMap(\.messages).first(where: { $0.id == file.messageID }) else { throw DraftFile.Failure.unavailable }
+        return try Data(contentsOf: await attachmentURL(original, of: message, in: source))
+    }
+
     // ── Writing ──────────────────────────────────────────────────────────────
 
     /** Sends `draft`: into its thread when it's a reply, or as a new one. */
     func send(_ draft: Draft) async throws {
+        guard draft.canSend else { throw Draft.Failure.invalidRecipients }
         try await write(draft, asDraft: false)
+        removeRecovery(draft, deletingFiles: !isDemo)
     }
 
     /** Keeps `draft` in Drafts (only when there's something in it). */
     func save(_ draft: Draft) async throws {
         guard !draft.isEmpty else { return await discard(draft) }
         try await write(draft, asDraft: true)
+        removeRecovery(draft, deletingFiles: !isDemo)
     }
 
     func discard(_ draft: Draft) async {
+        removeRecovery(draft, deletingFiles: true)
         guard let messageID = draft.messageID else { return }
         remove(messageID: messageID)
         await sync?.discard(draft)
@@ -285,7 +424,8 @@ final class MailStore {
 
     /** Shows the message at once, then hands it to Gmail (which answers with its own copy). */
     private func write(_ draft: Draft, asDraft: Bool) async throws {
-        guard let mailbox = mailbox(draft.from) else { return }
+        guard let mailbox = mailbox(draft.from), !mailbox.signedOut else { throw Draft.Failure.mailboxUnavailable }
+        guard draft.files.reduce(0, { $0 + $1.size }) <= DraftFile.limit else { throw DraftFile.Failure.tooLarge }
         let localID = UUID().uuidString
         let message = Message(
             id: localID,
@@ -295,17 +435,14 @@ final class MailStore {
             date: .now,
             text: draft.body,
             html: nil,
-            attachments: [],
+            attachments: draft.files.map(\.attachment),
             unread: false,
             starred: false,
             draft: asDraft,
-            headers: [:]
+            headers: draft.bcc.isEmpty ? [:] : ["Bcc": draft.bcc]
         )
         // A draft picked back up is replaced by what it becomes.
         let threadID = draft.threadID ?? draft.messageID.flatMap { id in threads.first { $0.messages.contains { $0.id == id } }?.id }
-        if let previous = draft.messageID {
-            for i in threads.indices { threads[i].messages.removeAll { $0.id == previous } }
-        }
         if let threadID, let i = threads.firstIndex(where: { $0.id == threadID }) {
             threads[i].messages.append(message)
             if !asDraft { threads[i].labels.insert("SENT") }
@@ -319,7 +456,10 @@ final class MailStore {
             ))
         }
         threads.removeAll { $0.messages.isEmpty }
-        guard let sync else { return }
+        guard let sync else {
+            if let previous = draft.messageID { remove(messageID: previous) }
+            return
+        }
         do {
             try await sync.write(draft, asDraft: asDraft)
         } catch {

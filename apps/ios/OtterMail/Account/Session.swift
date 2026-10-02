@@ -87,6 +87,7 @@ final class Session {
     }
 
     private func startLive() {
+        if let user { store.configureRecovery(namespace: Data(user.id.utf8).base64EncodedString().replacingOccurrences(of: "/", with: "_")) }
         let sync = MailSync(store: store, google: google)
         self.sync = sync
         store.sync = sync
@@ -129,6 +130,7 @@ final class Session {
 
     /** The app went to the background: the relay's events and IMAP's IDLE stop. */
     func disconnect() {
+        store.commitPendingAction()
         relay.disconnect()
         sync?.stopWatching()
     }
@@ -410,6 +412,8 @@ final class Session {
 
     /** Back to the welcome screen, with nothing of the account left here. */
     private func endSession() {
+        store.commitPendingAction()
+        store.clearRecovery()
         let mailboxes = store.mailboxes
         relay.disconnect()
         sync?.forgetAll()
@@ -427,6 +431,8 @@ final class Session {
 
     /** The demo ends the same way. */
     func leaveDemo() {
+        store.commitPendingAction()
+        store.clearRecovery()
         UserDefaults.standard.set(false, forKey: Self.demoKey)
         store = MailStore(preferences: preferences)
         state = .welcome

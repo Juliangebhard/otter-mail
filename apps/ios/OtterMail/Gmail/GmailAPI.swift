@@ -334,7 +334,7 @@ nonisolated private struct GmailMessage: Decodable {
             }
         let labels = Set(labelIds ?? [])
         var headers: [String: String] = [:]
-        for name in ["Message-ID", "References", "List-Unsubscribe", "List-Unsubscribe-Post"] {
+        for name in ["Message-ID", "References", "List-Unsubscribe", "List-Unsubscribe-Post", "Bcc"] {
             if let value = payload.header(name) { headers[name] = value }
         }
         return Message(
