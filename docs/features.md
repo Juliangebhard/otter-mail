@@ -152,6 +152,8 @@ conversations are in one, never their mail.
 | New mail during a long sync           | ✓                                  | ✓                      | —                                    |
 | Changes applied at once, synced after | ✓                                  | ✓                      | ✓ (no outbox)                        |
 
+On iPhone, conversations zoom from their list rows (respecting Reduce Motion), the navigation bar minimizes while scrolling, and selection morphs the glass buttons into bulk actions.
+
 ## Settings & customization
 
 | Feature                                                                                                          | Mac | Web | iPhone                                                                     |

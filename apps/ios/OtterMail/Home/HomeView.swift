@@ -177,3 +177,15 @@ struct HomeView: View {
         }
     }
 }
+
+/** iOS 27 lets navigation give space back to the mail while scrolling. */
+extension View {
+    @ViewBuilder
+    func minimizingNavigationBar(enabled: Bool = true) -> some View {
+        if #available(iOS 27.0, *) {
+            toolbarMinimizationBehavior(enabled ? .onScrollDown : .never, for: .navigationBar)
+        } else {
+            self
+        }
+    }
+}

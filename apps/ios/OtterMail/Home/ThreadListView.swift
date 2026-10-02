@@ -10,6 +10,7 @@ struct ThreadListView: View {
     @Environment(Preferences.self) private var preferences
     @Environment(Session.self) private var session
     @Environment(\.palette) private var palette
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     let place: Place
     let messageTransition: Namespace.ID
@@ -119,10 +120,10 @@ struct ThreadListView: View {
             .sharedBackgroundVisibility(.hidden)
             ToolbarItem(placement: .topBarTrailing) {
                 if selecting {
-                    Button("Done") { selecting = false; selected.removeAll() }
+                    Button("Done", action: endSelection)
                 } else {
                     Menu("More", systemImage: "ellipsis") {
-                        Button("Select messages", systemImage: "checkmark.circle") { selecting = true }
+                        Button("Select messages", systemImage: "checkmark.circle") { withAnimation(selectionAnimation) { selecting = true } }
                             .disabled(threads.isEmpty)
                         Button("Mark all as read", systemImage: "envelope.open") {
                             for thread in threads where thread.unread { store.setRead(true, thread.id) }
@@ -133,21 +134,38 @@ struct ThreadListView: View {
                 }
             }
             if selecting {
-                ToolbarItemGroup(placement: .bottomBar) {
-                    Button(selected.count == threads.count ? "Deselect all" : "Select all") {
-                        selected = selected.count == threads.count ? [] : Set(threads.map(\.id))
-                    }
-                    Spacer()
+                ToolbarItem(placement: .bottomBar) {
                     Menu("\(selected.count) selected") {
-                        if selected.compactMap(store.thread).contains(where: { $0.labels.contains("INBOX") }) {
-                            Button("Archive", systemImage: "archivebox") { store.archive(selected); endSelection() }
+                        Button(selected.count == threads.count ? "Deselect all" : "Select all") {
+                            selected = selected.count == threads.count ? [] : Set(threads.map(\.id))
                         }
-                        if place.folder != .trash {
-                            Button("Move to Trash", systemImage: "trash", role: .destructive) { store.trash(selected); endSelection() }
-                        }
+                    }
+                }
+                ToolbarSpacer(.flexible, placement: .bottomBar)
+            } else {
+                DefaultToolbarItem(kind: .search, placement: .bottomBar)
+                ToolbarSpacer(.fixed, placement: .bottomBar)
+            }
+            if selecting || session.agent.isOn {
+                ToolbarItem(id: "secondary-action", placement: .bottomBar) {
+                    if selecting {
                         if place.folder == .trash || place.folder == .junk {
-                            Button("Move to Inbox", systemImage: "tray.and.arrow.down") { for id in selected { store.moveToInbox(id) }; endSelection() }
+                            Button("Move to Inbox", systemImage: "tray.and.arrow.down") {
+                                for id in selected { store.moveToInbox(id) }
+                                endSelection()
+                            }.disabled(selected.isEmpty)
+                        } else {
+                            Button("Archive", systemImage: "archivebox") { store.archive(selected); endSelection() }
+                                .disabled(!selected.compactMap(store.thread).contains { $0.labels.contains("INBOX") })
                         }
+                    } else {
+                        Button(action: onAgent) { Label("Agent", image: "AgentCursor") }
+                    }
+                }
+            }
+            if selecting {
+                ToolbarItem(id: "message-actions", placement: .bottomBar) {
+                    Menu("Message actions", systemImage: "tag") {
                         Button("Mark as read", systemImage: "envelope.open") { for id in selected { store.setRead(true, id) }; endSelection() }
                         Button("Mark as unread", systemImage: "envelope.badge") { for id in selected { store.setRead(false, id) }; endSelection() }
                         if selected.compactMap(store.thread).contains(where: { !(store.mailbox($0.mailbox)?.labels.isEmpty ?? true) }) {
@@ -155,23 +173,24 @@ struct ThreadListView: View {
                         }
                     }.disabled(selected.isEmpty)
                 }
-            } else {
-                DefaultToolbarItem(kind: .search, placement: .bottomBar)
+            } else if session.agent.isOn {
                 ToolbarSpacer(.fixed, placement: .bottomBar)
-                if session.agent.isOn {
-                    ToolbarItem(placement: .bottomBar) {
-                        Button(action: onAgent) { Label("Agent", image: "AgentCursor") }
+            }
+            if !selecting || place.folder != .trash {
+                ToolbarItem(id: "primary-action", placement: .bottomBar) {
+                    if selecting {
+                        Button("Move to Trash", systemImage: "trash", role: .destructive) { store.trash(selected); endSelection() }
+                            .disabled(selected.isEmpty)
+                    } else {
+                        Button("New message", systemImage: "square.and.pencil", action: onCompose)
                     }
-                    ToolbarSpacer(.fixed, placement: .bottomBar)
-                }
-                ToolbarItem(placement: .bottomBar) {
-                    Button("New message", systemImage: "square.and.pencil", action: onCompose)
                 }
             }
         }
         .onChange(of: threads.map(\.id)) { _, ids in selected.formIntersection(ids) }
         .onChange(of: query) { _, _ in selected.removeAll() }
         .toolbarTitleDisplayMode(.inline)
+        .minimizingNavigationBar(enabled: !selecting && !searching)
     }
 
     /** The folder's threads, down to where its pages reached (so the next page adds to the bottom). */
@@ -197,7 +216,11 @@ struct ThreadListView: View {
         }
     }
 
-    private func endSelection() { selected.removeAll(); selecting = false }
+    private var selectionAnimation: Animation? { reduceMotion ? nil : .smooth(duration: 0.3) }
+
+    private func endSelection() {
+        withAnimation(selectionAnimation) { selected.removeAll(); selecting = false }
+    }
 
     private var bulkLabels: some View {
         Menu("Labels / folders", systemImage: "tag") {
@@ -330,6 +353,7 @@ struct ThreadListView: View {
     /** "Inbox Personal": the folder, then where it is, quieter (Otter Code's wordmark). */
     private struct Header: View {
         @Environment(\.palette) private var palette
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
         let title: String
         let scope: String
 

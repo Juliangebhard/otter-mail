@@ -58,6 +58,7 @@ struct ThreadView: View {
             .padding(.horizontal, 20)
             .padding(.top, 8)
         }
+        .minimizingNavigationBar()
         .scrollContentBackground(.hidden)
         .background(palette.canvas)
         .contentMargins(.bottom, 24, for: .scrollContent)
