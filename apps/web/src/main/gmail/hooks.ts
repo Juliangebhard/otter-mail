@@ -718,12 +718,12 @@ function removeMessagesFromInfiniteData(
  * added label joins the thread's union; a removed one may still be on sibling
  * messages, so the union keeps it until the server refresh).
  */
-function applyLabelPatch(
-  m: GmailMessageSummary,
+function applyLabelPatch<T extends GmailMessageSummary>(
+  m: T,
   addLabelIds: string[],
   removeLabelIds: string[],
   scope: "thread" | "message" = "message",
-): GmailMessageSummary {
+): T {
   const patch = (ids: string[], removals: string[]) => {
     const set = new Set(ids);
     for (const lid of removals) set.delete(lid);
@@ -1120,11 +1120,16 @@ export function useModifyThread() {
       }
       const threadKey = queryKeys.thread(accountId, threadId);
       const labelsKey = queryKeys.labels(accountId);
+      const messagesKey = ["gmail:message", accountId];
+      const inThread = (m: GmailMessageSummary) =>
+        (m.threadId || m.id) === threadId && (m.accountId ?? accountId) === accountId;
 
       await Promise.all([
         qc.cancelQueries({ queryKey: ["gmail:messages", accountId] }),
         qc.cancelQueries({ queryKey: ["gmail:combinedMessages"] }),
         qc.cancelQueries({ queryKey: ["gmail:searchMessages"] }),
+        qc.cancelQueries({ queryKey: ["gmail-search"] }),
+        qc.cancelQueries({ queryKey: messagesKey }),
         qc.cancelQueries({ queryKey: threadKey }),
         qc.cancelQueries({ queryKey: labelsKey }),
       ]);
@@ -1138,13 +1143,22 @@ export function useModifyThread() {
       const prevSearchQueries = qc.getQueriesData<InfiniteData<ListMessagesResult>>({
         queryKey: ["gmail:searchMessages"],
       });
+      const prevGmailSearchQueries = qc.getQueriesData<InfiniteData<ListMessagesResult>>({
+        queryKey: ["gmail-search"],
+      });
+      const prevMessageQueries = qc
+        .getQueriesData<GmailMessageDetail>({ queryKey: messagesKey })
+        .filter(([, message]) => message && inThread(message));
       const prevThread = qc.getQueryData<GmailMessageSummary[]>(threadKey);
       const prevLabels = qc.getQueryData<GmailLabel[]>(labelsKey);
 
-      const inThread = (m: GmailMessageSummary) =>
-        (m.threadId || m.id) === threadId && (m.accountId ?? accountId) === accountId;
       const applyPatch = (m: GmailMessageSummary) =>
         applyLabelPatch(m, addLabelIds, removeLabelIds, "thread");
+
+      for (const [key, message] of prevMessageQueries) {
+        if (message)
+          qc.setQueryData(key, applyLabelPatch(message, addLabelIds, removeLabelIds, "thread"));
+      }
 
       qc.setQueriesData(
         { queryKey: ["gmail:messages", accountId] },
@@ -1230,6 +1244,8 @@ export function useModifyThread() {
         prevMessagesQueries,
         prevCombinedQueries,
         prevSearchQueries,
+        prevGmailSearchQueries,
+        prevMessageQueries,
         prevThread,
         prevLabels,
       };
@@ -1245,6 +1261,8 @@ export function useModifyThread() {
       for (const [key, data] of context.prevMessagesQueries) qc.setQueryData(key, data);
       for (const [key, data] of context.prevCombinedQueries) qc.setQueryData(key, data);
       for (const [key, data] of context.prevSearchQueries) qc.setQueryData(key, data);
+      for (const [key, data] of context.prevGmailSearchQueries) qc.setQueryData(key, data);
+      for (const [key, data] of context.prevMessageQueries) qc.setQueryData(key, data);
       if (context.prevThread) qc.setQueryData(context.threadKey, context.prevThread);
       if (context.prevLabels) qc.setQueryData(context.labelsKey, context.prevLabels);
     },

@@ -149,7 +149,7 @@ function KeyControl({
         type="button"
         onClick={() => onRecordingChange(true)}
         aria-label="Change shortcut"
-        className="-me-2.5 inline-flex h-7 cursor-pointer items-center rounded-full px-2.5 outline-none transition-colors hover:bg-accent-surface focus-visible:ring-2 focus-visible:ring-focus-ring"
+        className="-me-2.5 inline-flex h-7 cursor-pointer items-center rounded-full px-2.5 outline-none hover:bg-accent-surface focus-visible:ring-2 focus-visible:ring-focus-ring"
       >
         {value ? (
           <KeyChips value={value} />
@@ -241,7 +241,7 @@ function WhenControl({ value, onChange }: { value: string; onChange: (when: stri
           <button
             type="button"
             className={cn(
-              "inline-flex h-6 min-w-0 shrink cursor-pointer items-center gap-1 rounded-lg px-1.5 text-xs outline-none transition-colors hover:bg-accent-surface focus-visible:ring-2 focus-visible:ring-focus-ring",
+              "inline-flex h-6 min-w-0 shrink cursor-pointer items-center gap-1 rounded-lg px-1.5 text-xs outline-none hover:bg-accent-surface focus-visible:ring-2 focus-visible:ring-focus-ring",
               value ? "text-foreground" : "text-muted-foreground",
             )}
           >
@@ -307,7 +307,7 @@ function WhenControl({ value, onChange }: { value: string; onChange: (when: stri
                   key={name}
                   type="button"
                   onClick={() => insertVariable(name)}
-                  className="inline-flex h-6 cursor-pointer items-center rounded-lg border border-border/70 px-1.5 font-mono text-2xs text-muted-foreground transition-colors hover:bg-accent-surface hover:text-foreground"
+                  className="inline-flex h-6 cursor-pointer items-center rounded-lg border border-border/70 px-1.5 font-mono text-2xs text-muted-foreground hover:bg-accent-surface hover:text-foreground"
                 >
                   {name}
                 </button>
@@ -402,7 +402,7 @@ function KeybindingRow({ row, rows, searchId }: { row: Row; rows: Row[]; searchI
             <DropdownMenuTrigger asChild>
               <IconBtn
                 label="More"
-                className="size-6 opacity-0 transition-opacity group-focus-within/row:opacity-100 group-hover/row:opacity-100 data-[state=open]:opacity-100"
+                className="size-6 opacity-0 group-focus-within/row:opacity-100 group-hover/row:opacity-100 data-[state=open]:opacity-100"
               >
                 <EllipsisIcon className="size-3.5" />
               </IconBtn>

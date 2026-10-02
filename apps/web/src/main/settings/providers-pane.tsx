@@ -107,13 +107,13 @@ function ProviderListRow({
     <div
       data-slot="settings-row"
       className={cn(
-        "group flex min-h-[60px] items-center gap-3 px-4 py-2.5 transition-colors",
+        "group flex min-h-[60px] items-center gap-3 px-4 py-2.5",
         selected ? "bg-foreground/[0.04]" : "hover:bg-foreground/[0.03]",
       )}
     >
       <div
         className={cn(
-          "pointer-events-none relative flex min-w-0 flex-1 items-start gap-3 rounded-md text-left transition-opacity",
+          "pointer-events-none relative flex min-w-0 flex-1 items-start gap-3 rounded-md text-left",
           !provider.enabled && !selected && "opacity-60 group-hover:opacity-100",
         )}
       >
@@ -297,7 +297,7 @@ function ModelsSection({
                 <div
                   data-model-slug={m.slug}
                   className={cn(
-                    "grid h-8 grid-cols-[1.5rem_minmax(0,1fr)_auto_auto] items-center gap-2 rounded-lg px-2 transition-colors hover:bg-foreground/[0.04]",
+                    "grid h-8 grid-cols-[1.5rem_minmax(0,1fr)_auto_auto] items-center gap-2 rounded-lg px-2 hover:bg-foreground/[0.04]",
                     isHidden && "opacity-50",
                   )}
                 >

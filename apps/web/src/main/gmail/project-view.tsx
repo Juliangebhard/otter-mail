@@ -58,7 +58,7 @@ function Heading({ children, trailing }: { children: ReactNode; trailing?: React
 /** A card of rows, like the reader's attachments. */
 const CARD = "overflow-hidden rounded-2xl border border-border/60 bg-card";
 const ROW =
-  "group flex w-full cursor-pointer items-center gap-3 px-4 py-2 text-left outline-none transition-colors hover:bg-accent-surface/60 focus-visible:bg-accent-surface/60";
+  "group flex w-full cursor-pointer items-center gap-3 px-4 py-2 text-left outline-none hover:bg-accent-surface/60 focus-visible:bg-accent-surface/60";
 
 /** The name, edited in place. */
 function ProjectName({ project }: { project: Project }) {

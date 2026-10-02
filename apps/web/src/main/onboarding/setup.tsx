@@ -204,7 +204,7 @@ function Progress({ step }: { step: Step }) {
             <span
               aria-current={current ? "step" : undefined}
               className={cn(
-                "flex h-7 items-center gap-1.5 rounded-full px-2.5 text-[13px] transition-colors",
+                "flex h-7 items-center gap-1.5 rounded-full px-2.5 text-[13px]",
                 current
                   ? "bg-accent-surface text-foreground"
                   : done
@@ -276,7 +276,7 @@ function ChoiceCard({
       disabled={disabled}
       onClick={onClick}
       className={cn(
-        "flex cursor-pointer flex-col items-start gap-3 rounded-xl border bg-card p-4 text-left outline-none transition-[border-color,background-color,box-shadow] focus-visible:ring-2 focus-visible:ring-focus-ring disabled:cursor-default",
+        "flex cursor-pointer flex-col items-start gap-3 rounded-xl border bg-card p-4 text-left outline-none focus-visible:ring-2 focus-visible:ring-focus-ring disabled:cursor-default",
         selected
           ? "border-focus-ring ring-1 ring-focus-ring"
           : "border-border/60 hover:border-input enabled:hover:bg-accent-surface/40",
@@ -849,7 +849,7 @@ function AgentStep({ firstRun }: { firstRun: boolean }) {
                   <div
                     key={p.kind}
                     className={cn(
-                      "rounded-xl border bg-card transition-colors",
+                      "rounded-xl border bg-card",
                       selected
                         ? "border-focus-ring ring-1 ring-focus-ring"
                         : usable || connectable

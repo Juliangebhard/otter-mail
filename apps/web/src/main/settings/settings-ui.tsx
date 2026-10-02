@@ -310,7 +310,7 @@ export function SettingResetButton({ label, onClick }: { label: string; onClick:
           event.stopPropagation();
           onClick();
         }}
-        className="inline-flex size-5 cursor-pointer items-center justify-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-accent-surface hover:text-foreground focus-visible:ring-2 focus-visible:ring-focus-ring"
+        className="inline-flex size-5 cursor-pointer items-center justify-center rounded-md text-muted-foreground outline-none hover:bg-accent-surface hover:text-foreground focus-visible:ring-2 focus-visible:ring-focus-ring"
       >
         <Undo2Icon className="size-3" />
       </button>

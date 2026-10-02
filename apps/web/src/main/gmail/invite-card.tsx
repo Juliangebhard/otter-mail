@@ -176,7 +176,7 @@ export function InviteCard({ accountId, messageId }: { accountId: string; messag
                   aria-pressed={active}
                   onClick={() => !active && respond.mutate(choice.value)}
                   className={cn(
-                    "inline-flex h-7 cursor-pointer items-center gap-1 px-3 text-[13px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus-ring disabled:opacity-60",
+                    "inline-flex h-7 cursor-pointer items-center gap-1 px-3 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus-ring disabled:opacity-60",
                     i > 0 && "border-l border-border/60",
                     active
                       ? "bg-primary text-primary-foreground"

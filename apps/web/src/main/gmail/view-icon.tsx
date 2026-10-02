@@ -178,7 +178,7 @@ export function ViewMark({ view, className }: { view: Mark; className?: string }
 }
 
 const CELL =
-  "flex size-8 items-center justify-center rounded-lg outline-none transition-colors hover:bg-accent-surface focus-visible:ring-2 focus-visible:ring-focus-ring";
+  "flex size-8 items-center justify-center rounded-lg outline-none hover:bg-accent-surface focus-visible:ring-2 focus-visible:ring-focus-ring";
 
 /** Emoji or icon, then (for an icon) its color; Remove goes back to the initial. */
 export function ViewIconPicker({

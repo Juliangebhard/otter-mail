@@ -60,7 +60,7 @@ const SETTINGS_SECTIONS = (Object.keys(SETTINGS_SECTION_LABELS) as SettingsPane[
 
 /** The mail sidebar's row (Codex): 14px regular text, muted icon, rounded pill. */
 const ROW =
-  "flex h-8 w-full cursor-pointer items-center gap-2.5 rounded-lg px-(--sidebar-row-content-inset) text-left text-sm font-normal outline-none transition-[background-color,color] focus-visible:ring-2 focus-visible:ring-focus-ring active:bg-sidebar-row-active [&>svg]:size-4 [&>svg]:shrink-0";
+  "flex h-8 w-full cursor-pointer items-center gap-2.5 rounded-lg px-(--sidebar-row-content-inset) text-left text-sm font-normal outline-none focus-visible:ring-2 focus-visible:ring-focus-ring active:bg-sidebar-row-active [&>svg]:size-4 [&>svg]:shrink-0";
 
 const ROW_IDLE =
   "text-sidebar-foreground/90 hover:bg-sidebar-row-hover hover:text-sidebar-foreground [&>svg]:text-sidebar-muted-foreground hover:[&>svg]:text-sidebar-foreground";
@@ -171,7 +171,7 @@ export function SettingsNav({
                 clearSearch();
                 searchInputRef.current?.focus();
               }}
-              className="flex size-4 shrink-0 cursor-pointer items-center justify-center rounded-full bg-sidebar-muted-foreground text-canvas outline-none transition-colors hover:bg-sidebar-foreground focus-visible:ring-2 focus-visible:ring-focus-ring"
+              className="flex size-4 shrink-0 cursor-pointer items-center justify-center rounded-full bg-sidebar-muted-foreground text-canvas outline-none hover:bg-sidebar-foreground focus-visible:ring-2 focus-visible:ring-focus-ring"
             >
               <XIcon className="size-2.5" strokeWidth={3} />
             </button>

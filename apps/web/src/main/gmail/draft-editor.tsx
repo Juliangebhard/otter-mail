@@ -49,15 +49,19 @@ export function DraftEditor({
   accountId,
   detail,
   threadMessages,
+  autoFocus = true,
   onDone,
   titleTrailing,
+  titleLeading,
 }: {
   accountId: string;
   detail: GmailMessageDetail;
   threadMessages: GmailMessageSummary[];
+  autoFocus?: boolean;
   onDone: () => void;
   /** Right end of the window's title band (panel toggle). */
   titleTrailing?: ReactNode;
+  titleLeading?: ReactNode;
 }) {
   const [to, setTo] = useState(detail.to ?? "");
   const [cc, setCc] = useState(detail.cc ?? "");
@@ -322,7 +326,7 @@ export function DraftEditor({
       placeholder="Write your message…"
       ariaLabel="Message"
       onTextChange={setText}
-      autoFocus
+      autoFocus={autoFocus}
       showToolbar={formatting}
       minHeightClass={inThread ? "min-h-[140px]" : "min-h-[40vh]"}
       maxHeightClass={inThread ? "max-h-[45vh]" : "max-h-none"}
@@ -369,12 +373,13 @@ export function DraftEditor({
   );
 
   return (
-    <div className="relative flex h-full min-w-0 flex-col" {...dropProps}>
+    <div className="relative flex h-full min-h-0 min-w-0 flex-col" {...dropProps}>
       <ComposeDropOverlay visible={isDragging} />
       <div
         data-toolbar=""
         className="drag-region flex h-(--workspace-topbar-height) shrink-0 items-center gap-2 px-4"
       >
+        {titleLeading}
         <div className="min-w-0 flex-1 truncate text-sm text-muted-foreground">Draft</div>
         <HintTooltip label="Close (keeps the draft)" hint="Esc" side="bottom">
           <IconBtn label="Close" onClick={onDone}>

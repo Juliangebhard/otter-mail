@@ -433,6 +433,176 @@ html[data-platform="web"] {
   }
 }
 
+/* Conversation boundaries and spacing, shared with Appearance's previews. */
+.message-list-group {
+  padding: 1px 0.25rem;
+  /* Long lists skip off-screen layout; auto remembers each group's real height. */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 84px;
+}
+
+.message-list-row {
+  border-radius: 0.5rem;
+  padding-block: 0.625rem;
+}
+
+.message-list-row-content {
+  gap: 0.125rem;
+}
+
+.message-list-flag {
+  position: absolute;
+  z-index: 1;
+  inset-inline-end: 0.75rem;
+  top: 0.75rem;
+}
+
+.message-list-group .message-list-row[data-flagged] {
+  padding-inline-end: 2.5rem;
+}
+
+.message-list-scroll {
+  container: message-list / inline-size;
+}
+
+[data-group-messages-by-day="true"] {
+  padding-top: 0;
+  scrollbar-gutter: auto;
+}
+
+[data-group-messages-by-day="true"] :is(.message-list-row, .message-list-thread-row) {
+  scroll-margin-top: 2rem;
+}
+
+[data-dim-read-messages="true"] [data-read]:not([data-selected], [data-checked], :hover) {
+  background-color: color-mix(in srgb, var(--canvas) 96%, var(--foreground));
+}
+
+/* The wide layouts use the extra width for a denser row. A narrow workspace
+   (for example, with the agent panel open) keeps the stacked text. */
+@container message-list (min-width: 44rem) {
+  :is([data-mail-layout="full"], [data-mail-layout="floating"])
+    .message-list-scroll
+    .message-list-row {
+    align-items: center;
+    padding-block: 0.75rem;
+    padding-inline-end: 2.5rem;
+  }
+
+  :is([data-mail-layout="full"], [data-mail-layout="floating"]) .message-list-flag {
+    position: absolute;
+    inset-inline-end: 1rem;
+    top: 0.875rem;
+    margin: 0;
+  }
+
+  :is([data-mail-layout="full"], [data-mail-layout="floating"]) .message-list-row-content {
+    display: grid;
+    grid-template-columns: minmax(8rem, 12rem) minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: 1rem;
+  }
+
+  :is([data-mail-layout="full"], [data-mail-layout="floating"]) .message-list-row-header {
+    display: contents;
+  }
+
+  :is([data-mail-layout="full"], [data-mail-layout="floating"]) .message-list-sender {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  :is([data-mail-layout="full"], [data-mail-layout="floating"]) .message-list-meta {
+    grid-column: 3;
+    grid-row: 1;
+    justify-self: end;
+  }
+
+  :is([data-mail-layout="full"], [data-mail-layout="floating"]) .message-list-preview {
+    grid-column: 2;
+    grid-row: 1;
+    flex-direction: row;
+    align-items: baseline;
+    gap: 0.5rem;
+  }
+
+  :is([data-mail-layout="full"], [data-mail-layout="floating"]) .message-list-subject {
+    flex: 0 1 auto;
+    max-width: 60%;
+  }
+
+  :is([data-mail-layout="full"], [data-mail-layout="floating"])
+    .message-list-preview
+    .message-list-snippet {
+    flex: 1;
+    min-width: 0;
+  }
+
+  :is([data-mail-layout="full"], [data-mail-layout="floating"])
+    .message-list-preview
+    .message-list-snippet::before {
+    content: "— ";
+  }
+
+  :is([data-mail-layout="full"], [data-mail-layout="floating"]) .message-list-labels {
+    grid-column: 2;
+  }
+
+  :is([data-mail-layout="full"], [data-mail-layout="floating"]) .message-list-skeleton {
+    flex-direction: row;
+    align-items: center;
+    gap: 1rem;
+    padding-block: 0.125rem;
+  }
+}
+
+/* Compose-style mail window, docked above the inbox. */
+.floating-reader {
+  background: var(--canvas);
+  border-color: var(--border);
+  box-shadow: 0 24px 80px -16px rgb(0 0 0 / 40%);
+}
+
+.floating-reader [data-toolbar] {
+  border-bottom: 1px solid var(--border);
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
+[data-message-list-style="dividers"] {
+  scrollbar-gutter: auto;
+  padding-top: 0;
+}
+
+[data-message-list-style="dividers"] .message-list-group {
+  padding: 0;
+}
+
+[data-message-list-style="dividers"] .message-list-group + .message-list-group {
+  border-top: 1px solid var(--contrast-sidebar-line);
+}
+
+[data-message-list-style="dividers"] .message-list-row {
+  border-radius: 0;
+  padding-inline: 1rem;
+}
+
+[data-message-list-style="dividers"] .message-list-snippet {
+  color: var(--contrast-muted-foreground);
+}
+
+[data-message-list-style="dividers"] .message-list-thread-messages {
+  margin-inline: 0.75rem;
+  padding: 0 0 0.375rem 0.5rem;
+  border-inline-start: 1px solid var(--contrast-sidebar-line);
+  gap: 0.125rem;
+}
+
+[data-message-list-style="dividers"] .message-list-thread-row {
+  border-radius: 0;
+  padding-inline-start: 0.75rem;
+}
+
 /* Frosted surfaces (popovers, menus, floating bars, dialogs). */
 @utility surface-glass {
   background: color-mix(in srgb, var(--canvas) var(--glass-opacity), transparent);

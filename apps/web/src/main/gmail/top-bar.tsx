@@ -391,7 +391,7 @@ export function MailboxSwitcher({
           type="button"
           aria-label="Switch mailbox"
           className={cn(
-            "group/switcher flex h-9 w-full min-w-0 cursor-pointer items-center gap-2 rounded-lg px-(--sidebar-row-content-inset) text-left text-sidebar-foreground outline-none transition-colors hover:bg-sidebar-row-hover focus-visible:ring-2 focus-visible:ring-focus-ring data-[state=open]:bg-sidebar-row-hover",
+            "group/switcher flex h-9 w-full min-w-0 cursor-pointer items-center gap-2 rounded-lg px-(--sidebar-row-content-inset) text-left text-sidebar-foreground outline-none hover:bg-sidebar-row-hover focus-visible:ring-2 focus-visible:ring-focus-ring data-[state=open]:bg-sidebar-row-hover",
             className,
           )}
         >

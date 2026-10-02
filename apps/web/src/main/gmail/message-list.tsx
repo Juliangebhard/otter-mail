@@ -1,6 +1,13 @@
 import type React from "react";
 import type { ReactNode } from "react";
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
+import {
+  DIM_READ_MESSAGES,
+  OPEN_MESSAGES_WITH_ARROWS,
+  GROUP_MESSAGES_BY_DAY,
+  useInterfaceToggle,
+  useMessageListStyle,
+} from "../theme/interface-settings";
 import { Dialog } from "~/components/ui/dialog";
 import { EmptyState } from "~/components/ui/empty-state";
 import { Text } from "~/components/ui/text";
@@ -30,6 +37,8 @@ import {
   Trash2Icon,
   XIcon,
   CircleChevronDownIcon,
+  ChevronUpIcon,
+  ChevronDownIcon,
   PaperclipIcon,
   FolderIcon,
   SquarePenIcon,
@@ -86,6 +95,10 @@ export type CombinedList = { viewId: string; name: string; rules: ViewRule[] };
 type CombinedMeta = { mailbox: string | null; accountName: string; accountColor: string };
 
 type MessageListProps = {
+  /** Room for the panel toggle when the list fills the workspace. */
+  headerTrailing?: ReactNode;
+  /** The floating reader shares this list's conversation navigation. */
+  renderFloatingReader?: (navigation: ReactNode, title: string) => ReactNode;
   /** Rendered at the start of the title band (window title when the sidebar is hidden). */
   headerLeading?: ReactNode;
   /** A view's space has no sidebar: the list names it, and New message and Edit are here. */
@@ -104,7 +117,12 @@ type MessageListProps = {
   focusedMessageId: string | null;
   /** Selects a row; `focusId` picks one message of its conversation instead
       of the whole conversation. */
-  onSelectMessage: (messageId: string, accountId: string, focusId?: string) => void;
+  onSelectMessage: (
+    messageId: string,
+    accountId: string,
+    focusId?: string,
+    options?: { autoFocusDraft?: boolean },
+  ) => void;
   /** Clears the selection (mark-unread returns to the list, Gmail-style). */
   onDeselect: () => void;
   /** Reader actions (archive/trash) advance through here; false = no next row. */
@@ -222,6 +240,81 @@ function formatRelativeDate(timestamp: number): string {
   } else {
     return date.toLocaleDateString([], { month: "short", day: "numeric" });
   }
+}
+
+type MessageDay = { day: number; messages: GmailMessageSummary[] };
+
+function groupMessagesByDay(messages: GmailMessageSummary[]): MessageDay[] {
+  const days = new Map<number, MessageDay>();
+  for (const message of messages) {
+    const day = new Date(message.date).setHours(0, 0, 0, 0);
+    let group = days.get(day);
+    if (!group) {
+      group = { day, messages: [] };
+      days.set(day, group);
+    }
+    group.messages.push(message);
+  }
+  return [...days.values()].sort((a, b) => b.day - a.day);
+}
+
+function MessageDayGroup({
+  group,
+  collapsed,
+  onToggle,
+  children,
+}: {
+  group: MessageDay;
+  collapsed: boolean;
+  onToggle: () => void;
+  children: ReactNode;
+}) {
+  const bodyId = useId();
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const date = new Date(group.day);
+  const label =
+    group.day === today.getTime()
+      ? "Today"
+      : group.day === yesterday.getTime()
+        ? "Yesterday"
+        : date.toLocaleDateString([], {
+            weekday: "short",
+            month: "short",
+            day: "numeric",
+            ...(date.getFullYear() !== today.getFullYear() ? { year: "numeric" } : {}),
+          });
+  const unread = group.messages.filter((message) => message.threadUnread ?? message.unread).length;
+  return (
+    <section data-message-day={group.day}>
+      <h3 className="sticky top-0 z-10 bg-(--sidebar-panel-surface)">
+        <button
+          type="button"
+          data-message-day-header=""
+          aria-label={`${label}, ${group.messages.length} conversation${group.messages.length === 1 ? "" : "s"}${unread > 0 ? `, ${unread} unread` : ""}`}
+          aria-expanded={!collapsed}
+          aria-controls={bodyId}
+          onClick={onToggle}
+          className="flex h-8 w-full cursor-pointer items-center gap-1.5 border-y border-border/60 px-4 text-left text-xs outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus-ring"
+        >
+          <ChevronDownIcon
+            aria-hidden
+            className={cn("size-3.5 shrink-0 text-muted-foreground", collapsed && "-rotate-90")}
+          />
+          <span className="min-w-0 flex-1 truncate font-medium text-foreground">{label}</span>
+          <span className="shrink-0 tabular-nums text-muted-foreground">
+            {group.messages.length}
+          </span>
+          {unread > 0 ? <span className="shrink-0 text-primary">· {unread} unread</span> : null}
+        </button>
+      </h3>
+      <div id={bodyId} hidden={collapsed}>
+        {children}
+      </div>
+    </section>
+  );
 }
 
 type MessageRowProps = {
@@ -375,7 +468,9 @@ function MessageRow({
   // continue after the key is released.
   const rowRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
-    if (selected) rowRef.current?.scrollIntoView({ block: "nearest", behavior: "instant" });
+    const row = rowRef.current;
+    if (selected && row && !row.closest("[inert]"))
+      row.scrollIntoView({ block: "nearest", behavior: "instant" });
   }, [selected]);
 
   const unread = message.threadUnread ?? message.unread;
@@ -393,9 +488,7 @@ function MessageRow({
     : "";
 
   return (
-    // Off-screen rows skip layout/paint (long scrolls load thousands of rows);
-    // `auto` remembers each row's real height once it has rendered.
-    <div className="px-1 py-px [contain-intrinsic-size:auto_84px] [content-visibility:auto]">
+    <div className="relative">
       <ContextMenu>
         <ContextMenuTrigger asChild>
           <button
@@ -403,7 +496,11 @@ function MessageRow({
             type="button"
             data-message-row=""
             data-draft={isDraft || undefined}
+            data-flagged={message.starred || undefined}
             data-unread={unread || undefined}
+            data-read={(!unread && !isDraft) || undefined}
+            data-selected={selected || undefined}
+            data-checked={checked || undefined}
             onClick={onRowClick}
             draggable
             onDragStart={onDragStart}
@@ -412,7 +509,7 @@ function MessageRow({
               if (e.shiftKey) e.preventDefault();
             }}
             className={[
-              "group relative flex w-full cursor-pointer select-none items-start gap-2.5 overflow-hidden rounded-lg px-3 py-2.5 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-focus-ring",
+              "message-list-row group relative flex w-full cursor-pointer select-none items-start gap-2.5 overflow-hidden px-3 text-left outline-none focus-visible:ring-2 focus-visible:ring-focus-ring",
               selected
                 ? "bg-sidebar-row-active"
                 : checked
@@ -422,17 +519,9 @@ function MessageRow({
               checked ? "ring-1 ring-inset ring-primary/70" : "",
             ].join(" ")}
           >
-            <div
-              className={[
-                "flex min-w-0 flex-1 flex-col gap-0.5 transition-opacity",
-                // Read mail recedes; hover or selection brings it back.
-                !unread && !selected && !isDraft
-                  ? "opacity-80 group-hover:opacity-100 dark:opacity-70"
-                  : "",
-              ].join(" ")}
-            >
-              <div className="flex items-center justify-between gap-2">
-                <span className="flex min-w-0 flex-1 items-center gap-1.5">
+            <div className="message-list-row-content flex min-w-0 flex-1 flex-col">
+              <div className="message-list-row-header flex items-center justify-between gap-2">
+                <span className="message-list-sender flex min-w-0 flex-1 items-center gap-1.5">
                   {unread && !selected ? (
                     <span className="size-1.5 shrink-0 rounded-full bg-primary" aria-hidden />
                   ) : null}
@@ -444,7 +533,7 @@ function MessageRow({
                   ) : null}
                   <span
                     className={[
-                      "min-w-0 truncate text-sm leading-snug",
+                      "message-list-sender-name min-w-0 truncate text-sm leading-snug",
                       isDraft
                         ? "text-muted-foreground"
                         : unread
@@ -459,7 +548,7 @@ function MessageRow({
                       : senderLabel(message.fromName, message.fromEmail, ownerAccountId)}
                   </span>
                 </span>
-                <div className="flex shrink-0 items-center gap-1.5">
+                <div className="message-list-meta flex shrink-0 items-center gap-1.5">
                   {threadCount > 1 ? (
                     // Count + chevron: lists the conversation's messages
                     // under the row (Apple Mail). A span, since the row is
@@ -498,20 +587,17 @@ function MessageRow({
                   </span>
                 </div>
               </div>
-              <span
-                className={[
-                  "truncate text-[13px] leading-snug",
-                  unread ? "text-foreground/90" : "text-muted-foreground",
-                ].join(" ")}
-              >
-                {message.subject || "(no subject)"}
-              </span>
-              <span className="truncate text-[13px] leading-snug text-muted-foreground/75">
-                {decodeEntities(message.snippet) || " "}
-              </span>
+              <div className="message-list-preview flex min-w-0 flex-col gap-0.5">
+                <span className="message-list-subject truncate text-[13px] leading-snug text-foreground/90">
+                  {message.subject || "(no subject)"}
+                </span>
+                <span className="message-list-snippet truncate text-[13px] leading-snug text-muted-foreground/75">
+                  {decodeEntities(message.snippet) || " "}
+                </span>
+              </div>
               {/* Chips only when they add something beyond the current view. */}
               {(showInboxChip && labelIds.includes("INBOX")) || shownLabels.length > 0 ? (
-                <div className="mt-1 flex h-5 items-center gap-1 overflow-hidden">
+                <div className="message-list-labels mt-1 flex h-5 items-center gap-1 overflow-hidden">
                   {showInboxChip && labelIds.includes("INBOX") ? (
                     <InboxChip selected={selected} />
                   ) : null}
@@ -526,19 +612,18 @@ function MessageRow({
                 </div>
               ) : null}
             </div>
-
-            {message.starred ? (
-              <button
-                type="button"
-                onClick={handleStarToggle}
-                className="mt-0.5 shrink-0"
-                aria-label="Unflag"
-              >
-                <FlagIcon className="size-4 fill-current text-(--red)" />
-              </button>
-            ) : null}
           </button>
         </ContextMenuTrigger>
+        {message.starred ? (
+          <button
+            type="button"
+            onClick={handleStarToggle}
+            className="message-list-flag"
+            aria-label="Unflag"
+          >
+            <FlagIcon className="size-4 fill-current text-(--red)" />
+          </button>
+        ) : null}
         <ContextMenuContent>
           <ContextMenuItem
             icon={unread ? "envelope.open" : "envelope.badge"}
@@ -626,7 +711,9 @@ function ThreadMessageRow({
 }) {
   const ref = useRef<HTMLButtonElement>(null);
   useEffect(() => {
-    if (selected) ref.current?.scrollIntoView({ block: "nearest", behavior: "instant" });
+    const row = ref.current;
+    if (selected && row && !row.closest("[inert]"))
+      row.scrollIntoView({ block: "nearest", behavior: "instant" });
   }, [selected]);
   const isDraft = message.labelIds.includes("DRAFT");
   return (
@@ -634,8 +721,10 @@ function ThreadMessageRow({
       ref={ref}
       type="button"
       onClick={onClick}
+      data-read={(!message.unread && !isDraft) || undefined}
+      data-selected={selected || undefined}
       className={cn(
-        "group flex w-full cursor-pointer select-none flex-col gap-0.5 rounded-lg py-2 pr-3 pl-6 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-focus-ring",
+        "message-list-thread-row group flex w-full cursor-pointer select-none flex-col gap-0.5 rounded-lg py-2 pr-3 pl-6 text-left outline-none focus-visible:ring-2 focus-visible:ring-focus-ring",
         selected ? "bg-sidebar-row-active" : "hover:bg-sidebar-row-hover",
       )}
     >
@@ -651,8 +740,8 @@ function ThreadMessageRow({
           ) : null}
           <span
             className={cn(
-              "min-w-0 truncate text-[13px]",
-              message.unread ? "font-medium text-foreground" : "text-foreground/85",
+              "message-list-sender-name min-w-0 truncate text-[13px] text-foreground",
+              message.unread && "font-medium",
             )}
           >
             {senderLabel(message.fromName, message.fromEmail, message.accountId)}
@@ -663,7 +752,7 @@ function ThreadMessageRow({
         </span>
       </span>
       <span className="flex items-center gap-1.5">
-        <span className="min-w-0 flex-1 truncate text-[13px] text-muted-foreground/75">
+        <span className="message-list-snippet min-w-0 flex-1 truncate text-[13px] text-muted-foreground/75">
           {decodeEntities(message.snippet) || " "}
         </span>
         {message.hasAttachments ? (
@@ -715,14 +804,16 @@ function formatMailboxSummary(total: number, unread: number): string {
 
 export function MessageList({
   headerLeading,
+  headerTrailing,
+  renderFloatingReader,
   space,
   accountId,
   labelId,
   combined,
   accountIds,
   accounts,
-  selectedMessageId,
-  focusedMessageId,
+  selectedMessageId: openMessageId,
+  focusedMessageId: openFocusedMessageId,
   onSelectMessage,
   onDeselect,
   advanceRef,
@@ -733,6 +824,14 @@ export function MessageList({
   search,
   project,
 }: MessageListProps) {
+  const messageListStyle = useMessageListStyle();
+  const groupByDay = useInterfaceToggle(GROUP_MESSAGES_BY_DAY);
+  const dimReadMessages = useInterfaceToggle(DIM_READ_MESSAGES);
+  const openMessagesWithArrows = useInterfaceToggle(OPEN_MESSAGES_WITH_ARROWS);
+  const [cursor, setCursor] = useState<{ messageId: string; focusId?: string } | null>(null);
+  const selectedMessageId = openMessageId ?? cursor?.messageId ?? null;
+  const focusedMessageId = openMessageId ? openFocusedMessageId : (cursor?.focusId ?? null);
+  const [collapsedDays, setCollapsedDays] = useState<ReadonlySet<number>>(new Set());
   const isCombined = combined != null;
   // This device isn't signed in to the mailbox (e.g. it was added on another device).
   const signedOutAccount = useAccounts().data?.find(
@@ -822,9 +921,13 @@ export function MessageList({
   // would normally drop it from this filter instantly. Keep the currently
   // selected row pinned in place — Gmail-style — so it only disappears once the
   // selection moves to another message.
-  const visibleMessages = unreadOnly
-    ? allMessages.filter((m) => (m.threadUnread ?? m.unread) || m.id === selectedMessageId)
+  const filteredMessages = unreadOnly
+    ? allMessages.filter((m) => (m.threadUnread ?? m.unread) || m.id === openMessageId)
     : allMessages;
+  const dayGroups = groupByDay ? groupMessagesByDay(filteredMessages) : [];
+  const visibleMessages = groupByDay
+    ? dayGroups.flatMap((group) => (collapsedDays.has(group.day) ? [] : group.messages))
+    : filteredMessages;
   const hasNextPage = messagesQuery.hasNextPage;
   const isFetchingNextPage = messagesQuery.isFetchingNextPage;
 
@@ -840,7 +943,14 @@ export function MessageList({
   const listTrashMessage = useTrashMessage();
   const listUntrashMessage = useUntrashMessage();
 
-  const selectedRow = visibleMessages.find((m) => m.id === selectedMessageId) ?? null;
+  const selectForNavigation = (row: GmailMessageSummary, focusId?: string) => {
+    setCursor({ messageId: row.id, focusId });
+    if (openMessageId || openMessagesWithArrows) {
+      onSelectMessage(row.id, row.accountId ?? accountId, focusId, { autoFocusDraft: false });
+    }
+  };
+
+  const selectedRow = filteredMessages.find((m) => m.id === selectedMessageId) ?? null;
   const selectedOwner = selectedRow ? (selectedRow.accountId ?? accountId) : null;
   const selectedCapabilities = useCapabilities(selectedOwner);
   const { multipleLabels } = useCapabilities(accountId);
@@ -878,7 +988,7 @@ export function MessageList({
       siblings,
       siblings.findIndex((m) => m.id === focus.id),
     );
-    onSelectMessage(row.id, row.accountId ?? accountId, next?.id);
+    selectForNavigation(row, next?.id);
   };
 
   const setThreadExpanded = (row: GmailMessageSummary, open: boolean) => {
@@ -894,7 +1004,9 @@ export function MessageList({
     // Collapsing the conversation a message is open from falls back to the
     // whole conversation.
     if (!open && row.id === selectedMessageId && focusedMessageId) {
-      onSelectMessage(row.id, row.accountId ?? accountId);
+      setCursor({ messageId: row.id });
+      if (openMessageId)
+        onSelectMessage(row.id, row.accountId ?? accountId, undefined, { autoFocusDraft: false });
     }
   };
 
@@ -923,10 +1035,27 @@ export function MessageList({
     setChecked(new Set());
     anchorRef.current = null;
   };
+  const toggleDay = (group: MessageDay) => {
+    const collapsing = !collapsedDays.has(group.day);
+    setCollapsedDays((prev) => {
+      const next = new Set(prev);
+      if (collapsing) next.add(group.day);
+      else next.delete(group.day);
+      return next;
+    });
+    if (collapsing) {
+      const hiddenIds = new Set(group.messages.map((message) => message.id));
+      setChecked((prev) => new Set([...prev].filter((id) => !hiddenIds.has(id))));
+      if (cursor && hiddenIds.has(cursor.messageId)) setCursor(null);
+      if (anchorRef.current && hiddenIds.has(anchorRef.current)) anchorRef.current = null;
+    }
+  };
   useEffect(() => {
     clearChecked();
     setExpanded(new Set());
-  }, [labelId, combined?.viewId, searching, unreadOnly]);
+    setCollapsedDays(new Set());
+    setCursor(null);
+  }, [accountId, labelId, combined?.viewId, searching, search?.id, searchQuery, unreadOnly]);
 
   const checkedRef = useRef(checked);
   checkedRef.current = checked;
@@ -971,6 +1100,28 @@ export function MessageList({
     });
   };
 
+  const openMessage = (row: GmailMessageSummary, focus?: GmailMessageSummary) => {
+    const owner = row.accountId ?? accountId;
+    // Clicks read the conversation immediately; keyboard browsing stays debounced in the reader.
+    if (focus ? focus.unread : (row.threadUnread ?? row.unread)) {
+      if (focus) {
+        listModifyMessage.mutate({
+          accountId: owner,
+          messageId: focus.id,
+          removeLabelIds: ["UNREAD"],
+        });
+      } else {
+        listModifyThread.mutate({
+          accountId: owner,
+          threadId: row.threadId || row.id,
+          removeLabelIds: ["UNREAD"],
+        });
+      }
+    }
+    setCursor({ messageId: row.id, focusId: focus?.id });
+    onSelectMessage(row.id, owner, focus?.id);
+  };
+
   const handleRowClick = (e: React.MouseEvent, message: GmailMessageSummary) => {
     // Cmd+click (or Option+click) adds/removes one row, Finder-style. The
     // open message counts as already selected, so the first Cmd+click keeps
@@ -994,7 +1145,7 @@ export function MessageList({
     clearChecked();
     anchorRef.current = message.id;
     console.log("[MessageList:selectMessage]", { messageId: message.id });
-    onSelectMessage(message.id, message.accountId ?? accountId);
+    openMessage(message);
   };
 
   const checkedRows = visibleMessages.filter((m) => checked.has(m.id));
@@ -1136,7 +1287,7 @@ export function MessageList({
   const advanceFrom = (rowId: string) => {
     const idx = visibleMessages.findIndex((m) => m.id === rowId);
     const next = pickAdvanceTarget(visibleMessages, idx);
-    if (next) onSelectMessage(next.id, next.accountId ?? accountId);
+    if (next) selectForNavigation(next);
     else onDeselect();
   };
   advanceRef.current = (fromMessageId: string) => {
@@ -1149,7 +1300,7 @@ export function MessageList({
     if (idx === -1) return false;
     const next = pickAdvanceTarget(visibleMessages, idx);
     if (!next) return false;
-    onSelectMessage(next.id, next.accountId ?? accountId);
+    selectForNavigation(next);
     return true;
   };
 
@@ -1196,6 +1347,7 @@ export function MessageList({
 
   const shortcutState = useRef({
     visibleMessages,
+    selectedRow,
     selectedMessageId,
     accountId,
     moveContextLabelId,
@@ -1205,6 +1357,7 @@ export function MessageList({
   });
   shortcutState.current = {
     visibleMessages,
+    selectedRow,
     selectedMessageId,
     accountId,
     moveContextLabelId,
@@ -1238,15 +1391,15 @@ export function MessageList({
       if (e.repeat && performance.now() - e.timeStamp > 80) return;
       const {
         visibleMessages: rows,
+        selectedRow: openRow,
         selectedMessageId: selId,
         accountId: fallbackAccount,
         focusedMessage: focus,
       } = shortcutState.current;
-      if (rows.length === 0) return false;
+      if (rows.length === 0 && !openRow) return false;
       const idx = rows.findIndex((m) => m.id === selId);
-      const row = idx >= 0 ? rows[idx] : undefined;
-      const select = (m: GmailMessageSummary) =>
-        onSelectMessage(m.id, m.accountId ?? fallbackAccount);
+      const row = idx >= 0 ? rows[idx] : (openRow ?? undefined);
+      const select = (m: GmailMessageSummary) => selectForNavigation(m);
       return fn({
         rows,
         idx,
@@ -1280,12 +1433,15 @@ export function MessageList({
     // Handled even at the ends of the list — arrows must never scroll it.
     const target = idx === -1 ? nav[0] : nav[idx + step];
     if (!target) return;
-    const owner = target.row.accountId ?? shortcutState.current.accountId;
-    onSelectMessage(target.row.id, owner, target.focus?.id);
+    selectForNavigation(target.row, target.focus?.id);
   };
   useCommandHandlers({
     "list.next": navCommand(1),
     "list.previous": navCommand(-1),
+    "list.open": rowCommand(({ row, focus }) => {
+      if (!row) return false;
+      openMessage(row, focus ?? undefined);
+    }),
     "list.expandThread": rowCommand(({ row }) => {
       if (!row || (row.threadCount ?? 1) <= 1) return false;
       setThreadExpanded(row, true);
@@ -1451,7 +1607,7 @@ export function MessageList({
       if (!multi && moves[0].leavesView) {
         const idx = rows.findIndex((m) => m.id === moves[0].m.id);
         const next = pickAdvanceTarget(rows, idx);
-        if (next) onSelectMessage(next.id, next.accountId ?? fallbackAccount);
+        if (next) selectForNavigation(next);
         else onDeselect();
       }
       if (multi) beginUndoGroup(moves.length);
@@ -1474,7 +1630,8 @@ export function MessageList({
   const scrollRef = useRef<HTMLDivElement>(null);
   const maybeLoadMore = () => {
     const el = scrollRef.current;
-    if (!el || !hasNextPage || isFetchingNextPage) return;
+    if (!el || el.closest("[inert]") || el.clientHeight === 0 || !hasNextPage || isFetchingNextPage)
+      return;
     if (el.scrollHeight - el.scrollTop - el.clientHeight < 600) {
       console.log("[MessageList:autoLoadMore]");
       // The scroll handler and the effect can both fire before a re-render:
@@ -1504,6 +1661,37 @@ export function MessageList({
   };
 
   const firstSearchPage = globalSearching ? gmailSearch.data?.pages[0] : undefined;
+  const selectedIndex = visibleMessages.findIndex((message) => message.id === selectedMessageId);
+  const selectNeighbor = (step: -1 | 1) => {
+    const message = visibleMessages[selectedIndex + step];
+    if (message) selectForNavigation(message);
+  };
+  const floatingReader =
+    openMessageId && renderFloatingReader
+      ? renderFloatingReader(
+          <>
+            <HintTooltip label="Previous conversation" shortcut="list.previous">
+              <IconBtn
+                label="Previous conversation"
+                disabled={selectedIndex <= 0}
+                onClick={() => selectNeighbor(-1)}
+              >
+                <ChevronUpIcon className="size-4" />
+              </IconBtn>
+            </HintTooltip>
+            <HintTooltip label="Next conversation" shortcut="list.next">
+              <IconBtn
+                label="Next conversation"
+                disabled={selectedIndex >= visibleMessages.length - 1}
+                onClick={() => selectNeighbor(1)}
+              >
+                <ChevronDownIcon className="size-4" />
+              </IconBtn>
+            </HintTooltip>
+          </>,
+          selectedRow?.subject || "Conversation",
+        )
+      : null;
 
   // Dragging a row onto a sidebar label: the whole multi-selection when the
   // row is part of it, else just that row.
@@ -1528,8 +1716,51 @@ export function MessageList({
     );
   };
 
+  const renderMessage = (message: GmailMessageSummary) => (
+    <div className="message-list-group" key={`${message.accountId ?? accountId}:${message.id}`}>
+      <MessageRow
+        viewLabelIds={viewLabelIdsFor(message.accountId ?? accountId)}
+        message={message}
+        selected={selectedMessageId === message.id && !focusedMessageId}
+        checked={checked.has(message.id)}
+        expanded={expanded.has(threadKey(message))}
+        onToggleExpanded={() => setThreadExpanded(message, !expanded.has(threadKey(message)))}
+        onDragStart={(e) => handleRowDragStart(e, message)}
+        onRowClick={(e) => handleRowClick(e, message)}
+        accountId={accountId}
+        resolveLabel={resolveLabel}
+        combinedMeta={resolveCombinedMeta(message, combined, accounts, resolveLabel)}
+        showInboxChip={!inInboxContext}
+        onDeleteForever={() => setConfirmDeleteRows([message])}
+        onDeselect={onDeselect}
+        onChatAgent={() => {
+          // Open this conversation in the reader so it becomes the
+          // chat panel's attached context, then reveal the panel.
+          openMessage(message);
+          onOpenChat?.();
+        }}
+      />
+      {threadMessagesOf(message).length > 0 ? (
+        <div className="message-list-thread-messages flex flex-col px-2 pb-1">
+          {threadMessagesOf(message).map((m) => (
+            <ThreadMessageRow
+              key={m.id}
+              message={m}
+              selected={selectedMessageId === message.id && focusedMessageId === m.id}
+              onClick={() => {
+                clearChecked();
+                console.log("[MessageList:selectThreadMessage]", { messageId: m.id });
+                openMessage(message, m);
+              }}
+            />
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+
   return (
-    <div className="relative flex h-full min-w-0 flex-col">
+    <div data-mail-list-pane="" className="relative flex h-full min-w-0 flex-col">
       {search ? (
         <SearchHeader
           key={search.id}
@@ -1538,7 +1769,7 @@ export function MessageList({
           onClear={search.onClear}
           onSearch={search.onSearch}
           onExit={search.onExit}
-          onOpenMessage={(m) => onSelectMessage(m.id, m.accountId ?? accountId)}
+          onOpenMessage={openMessage}
           accounts={accounts}
           scope={search.accountIds}
           onScope={search.onScope}
@@ -1549,6 +1780,8 @@ export function MessageList({
           draft={search.draft}
           onDraftChange={search.onDraftChange}
           messageOpen={search.messageOpen}
+          headerLeading={headerLeading}
+          headerTrailing={headerTrailing}
         />
       ) : null}
       {/* Header */}
@@ -1600,17 +1833,21 @@ export function MessageList({
             />
           </IconBtn>
         </HintTooltip>
+        {headerTrailing}
       </div>
 
       <div
         ref={scrollRef}
+        data-message-list-style={messageListStyle}
+        data-group-messages-by-day={groupByDay || undefined}
+        data-dim-read-messages={dimReadMessages || undefined}
         onScroll={maybeLoadMore}
         className={[
-          "min-h-0 flex-1 overflow-y-auto pb-1 pt-[9px] [scrollbar-gutter:stable_both-edges]",
+          "message-list-scroll min-h-0 flex-1 overflow-y-auto pb-1 pt-[9px] [scrollbar-gutter:stable_both-edges]",
           checked.size > 0 ? "pb-16" : "",
         ].join(" ")}
       >
-        {project && !search && !isLoading && visibleMessages.length === 0 ? (
+        {project && !search && !isLoading && filteredMessages.length === 0 ? (
           <EmptyState
             className="px-6 pt-10"
             media={<FolderIcon className="size-10 stroke-[1.25] text-muted-foreground" />}
@@ -1621,21 +1858,23 @@ export function MessageList({
                 : "Drag conversations onto a project in the sidebar, or add them from a conversation's menu."
             }
           />
-        ) : signedOutAccount && !isCombined && !search && visibleMessages.length === 0 ? (
+        ) : signedOutAccount && !isCombined && !search && filteredMessages.length === 0 ? (
           <SignedOutMailbox account={signedOutAccount} />
         ) : isLoading ? (
           <div className="flex flex-col gap-0">
             {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="flex w-full items-start gap-3 px-5 py-3">
-                <div className="flex min-w-0 flex-1 flex-col gap-2">
-                  <div className="h-3.5 w-32 animate-skeleton rounded-full bg-secondary" />
-                  <div className="h-3 w-48 animate-skeleton rounded-full bg-accent-surface" />
-                  <div className="h-3 w-40 animate-skeleton rounded-full bg-accent-surface" />
+              <div key={i} className="message-list-group">
+                <div className="message-list-row px-3">
+                  <div className="message-list-skeleton flex min-w-0 flex-1 flex-col gap-2">
+                    <div className="h-3.5 w-32 animate-skeleton rounded-full bg-secondary" />
+                    <div className="h-3 w-48 animate-skeleton rounded-full bg-accent-surface" />
+                    <div className="h-3 w-40 animate-skeleton rounded-full bg-accent-surface" />
+                  </div>
                 </div>
               </div>
             ))}
           </div>
-        ) : visibleMessages.length === 0 && (hasNextPage || isFetchingNextPage) ? (
+        ) : filteredMessages.length === 0 && (hasNextPage || isFetchingNextPage) ? (
           // Nothing to show yet, but more is coming (big mailboxes still syncing).
           <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
             <RotateCwIcon className="size-4 animate-spin text-muted-foreground" />
@@ -1648,7 +1887,7 @@ export function MessageList({
             title="Search your mail"
             description={SEARCH_HINT}
           />
-        ) : search && visibleMessages.length === 0 ? (
+        ) : search && filteredMessages.length === 0 ? (
           <EmptyState
             className="h-full px-8"
             media={<SearchXIcon className="size-10 stroke-[1.25] text-muted-foreground" />}
@@ -1659,7 +1898,7 @@ export function MessageList({
                 : "Try different words, or use Advanced search."
             }
           />
-        ) : visibleMessages.length === 0 ? (
+        ) : filteredMessages.length === 0 ? (
           <EmptyState
             className="h-full px-6"
             media={<InboxIcon className="size-10 stroke-[1.25] text-muted-foreground" />}
@@ -1676,50 +1915,18 @@ export function MessageList({
           />
         ) : (
           <>
-            {visibleMessages.map((message) => (
-              <Fragment key={`${message.accountId ?? accountId}:${message.id}`}>
-                <MessageRow
-                  viewLabelIds={viewLabelIdsFor(message.accountId ?? accountId)}
-                  message={message}
-                  selected={selectedMessageId === message.id && !focusedMessageId}
-                  checked={checked.has(message.id)}
-                  expanded={expanded.has(threadKey(message))}
-                  onToggleExpanded={() =>
-                    setThreadExpanded(message, !expanded.has(threadKey(message)))
-                  }
-                  onDragStart={(e) => handleRowDragStart(e, message)}
-                  onRowClick={(e) => handleRowClick(e, message)}
-                  accountId={accountId}
-                  resolveLabel={resolveLabel}
-                  combinedMeta={resolveCombinedMeta(message, combined, accounts, resolveLabel)}
-                  showInboxChip={!inInboxContext}
-                  onDeleteForever={() => setConfirmDeleteRows([message])}
-                  onDeselect={onDeselect}
-                  onChatAgent={() => {
-                    // Open this conversation in the reader so it becomes the
-                    // chat panel's attached context, then reveal the panel.
-                    onSelectMessage(message.id, message.accountId ?? accountId);
-                    onOpenChat?.();
-                  }}
-                />
-                {threadMessagesOf(message).length > 0 ? (
-                  <div className="flex flex-col px-2 pb-1">
-                    {threadMessagesOf(message).map((m) => (
-                      <ThreadMessageRow
-                        key={m.id}
-                        message={m}
-                        selected={selectedMessageId === message.id && focusedMessageId === m.id}
-                        onClick={() => {
-                          clearChecked();
-                          console.log("[MessageList:selectThreadMessage]", { messageId: m.id });
-                          onSelectMessage(message.id, message.accountId ?? accountId, m.id);
-                        }}
-                      />
-                    ))}
-                  </div>
-                ) : null}
-              </Fragment>
-            ))}
+            {groupByDay
+              ? dayGroups.map((group) => (
+                  <MessageDayGroup
+                    key={group.day}
+                    group={group}
+                    collapsed={collapsedDays.has(group.day)}
+                    onToggle={() => toggleDay(group)}
+                  >
+                    {collapsedDays.has(group.day) ? null : group.messages.map(renderMessage)}
+                  </MessageDayGroup>
+                ))
+              : visibleMessages.map(renderMessage)}
             {isFetchingNextPage ? (
               <div className="flex items-center justify-center gap-1.5 py-3">
                 <span
@@ -1826,6 +2033,7 @@ export function MessageList({
         </div>
       ) : null}
 
+      {floatingReader}
       <Dialog
         open={confirmDeleteRows != null}
         onOpenChange={(o) => {

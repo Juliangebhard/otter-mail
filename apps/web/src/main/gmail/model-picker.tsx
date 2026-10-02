@@ -46,7 +46,7 @@ import { shortcutLabelFor, useKeybindingsState } from "../keybindings/store";
 
 // Codex's composer controls: quiet, muted text pills that brighten on hover.
 export const COMPOSER_CONTROL =
-  "relative inline-flex shrink-0 cursor-pointer items-center justify-center whitespace-nowrap rounded-full border border-transparent outline-none transition-colors hover:bg-accent-surface data-[state=open]:bg-accent-surface focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-1 focus-visible:ring-offset-canvas disabled:pointer-events-none disabled:opacity-64 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg]:-mx-0.5 [&_svg[data-composer-control-icon]]:mx-0 h-7 gap-1.5 px-2.5 text-sm font-normal text-muted-foreground [&_svg:not([class*='text-'])]:text-muted-foreground hover:text-foreground [&_svg:not([class*='size-'])]:size-4";
+  "relative inline-flex shrink-0 cursor-pointer items-center justify-center whitespace-nowrap rounded-full border border-transparent outline-none hover:bg-accent-surface data-[state=open]:bg-accent-surface focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-1 focus-visible:ring-offset-canvas disabled:pointer-events-none disabled:opacity-64 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg]:-mx-0.5 [&_svg[data-composer-control-icon]]:mx-0 h-7 gap-1.5 px-2.5 text-sm font-normal text-muted-foreground [&_svg:not([class*='text-'])]:text-muted-foreground hover:text-foreground [&_svg:not([class*='size-'])]:size-4";
 
 export function ComposerControlChevron() {
   return (
@@ -127,7 +127,7 @@ function searchScore(item: PickerItem, query: string, favorite: boolean): number
 // ---------------------------------------------------------------------------
 
 const RAIL_BUTTON =
-  "relative isolate flex aspect-square w-full cursor-pointer items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-foreground/[0.06] hover:text-foreground focus-visible:bg-foreground/10 focus-visible:outline-none aria-pressed:bg-foreground/10 aria-pressed:text-foreground";
+  "relative isolate flex aspect-square w-full cursor-pointer items-center justify-center rounded-lg text-muted-foreground hover:bg-foreground/[0.06] hover:text-foreground focus-visible:bg-foreground/10 focus-visible:outline-none aria-pressed:bg-foreground/10 aria-pressed:text-foreground";
 
 function describeProvider(p: ProviderSnapshot): string {
   if (isProviderUsable(p)) return p.displayName;

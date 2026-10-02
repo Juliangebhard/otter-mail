@@ -208,10 +208,49 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: ["text size bigger smaller zoom scale typography accessibility"],
   },
   {
+    id: "mail-layout",
+    title: "Mail layout",
+    pane: "appearance",
+    searchTerms: [
+      "split view full inbox floating",
+      "reading pane columns wide list layout floating window popup bottom right panel",
+    ],
+  },
+  {
+    id: "message-list-style",
+    title: "Message list style",
+    pane: "appearance",
+    searchTerms: ["classic with dividers", "rows spacing separation density inbox accessibility"],
+  },
+  {
     id: "reading-width",
     title: "Reading width",
     pane: "appearance",
     searchTerms: ["email thread message reader wide narrow full column space"],
+  },
+  {
+    id: "group-messages-by-day",
+    title: "Group messages by day",
+    pane: "appearance",
+    searchTerms: ["date separators today yesterday collapse expand sections inbox"],
+  },
+  {
+    id: "dim-read-messages",
+    title: "Dim read messages",
+    pane: "appearance",
+    searchTerms: ["gray grey muted background unread message list inbox"],
+  },
+  {
+    id: "open-messages-with-arrows",
+    title: "Open messages with arrow keys",
+    pane: "appearance",
+    searchTerms: ["keyboard navigation j k highlight selection enter reading pane preview"],
+  },
+  {
+    id: "mark-read-delay",
+    title: "Mark as read delay",
+    pane: "appearance",
+    searchTerms: ["unread read timer seconds keyboard arrows preview browsing"],
   },
   {
     id: "panel-animations",

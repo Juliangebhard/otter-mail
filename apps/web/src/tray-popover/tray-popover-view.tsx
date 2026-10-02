@@ -65,7 +65,7 @@ function InboxRow({
             onOpen();
           }
         }}
-        className="group relative flex w-full cursor-pointer select-none flex-col gap-px rounded-lg px-(--sidebar-row-content-inset) py-2 text-left outline-none transition-colors hover:bg-sidebar-row-hover focus-visible:ring-2 focus-visible:ring-focus-ring"
+        className="group relative flex w-full cursor-pointer select-none flex-col gap-px rounded-lg px-(--sidebar-row-content-inset) py-2 text-left outline-none hover:bg-sidebar-row-hover focus-visible:ring-2 focus-visible:ring-focus-ring"
       >
         <div className="flex h-5 min-w-0 items-center gap-1.5">
           {unread ? (

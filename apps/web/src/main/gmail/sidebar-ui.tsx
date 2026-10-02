@@ -25,7 +25,7 @@ export type RowDragProps = {
 
 /** A sidebar row's box (Settings' nav mirrors it). */
 export const SIDEBAR_ROW =
-  "group flex h-8 w-full cursor-pointer items-center gap-2.5 rounded-lg text-left text-sm font-normal outline-none transition-[background-color,color] focus-visible:ring-2 focus-visible:ring-focus-ring active:bg-sidebar-row-active";
+  "group flex h-8 w-full cursor-pointer items-center gap-2.5 rounded-lg text-left text-sm font-normal outline-none focus-visible:ring-2 focus-visible:ring-focus-ring active:bg-sidebar-row-active";
 
 /** A space's New row (ChatGPT's "New chat"): the first thing under the heading. */
 export function NewRow({
