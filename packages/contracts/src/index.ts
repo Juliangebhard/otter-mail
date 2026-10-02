@@ -6,6 +6,7 @@
  */
 
 export * from "./mail.js";
+export * from "./settings.js";
 
 export type ThemeSource = "system" | "light" | "dark";
 

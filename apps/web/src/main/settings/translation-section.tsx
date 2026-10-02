@@ -1,3 +1,4 @@
+import { DEFAULT_SETTINGS } from "@otter-mail/contracts";
 import { Switch } from "~/components/ui/switch";
 import { toast } from "../gmail/toast";
 import { useQueryClient } from "@tanstack/react-query";
@@ -9,10 +10,15 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "../gmail/menu";
-import { languageName, TRANSLATION_LANGUAGES, useTranslationSettings } from "../gmail/translation";
+import {
+  systemReadLanguages,
+  languageName,
+  TRANSLATION_LANGUAGES,
+  useTranslationSettings,
+} from "../gmail/translation";
 import { features } from "../features";
 import { Btn, HintTooltip, IconBtn } from "../gmail/ui";
-import { SettingsRow, SettingsSection } from "./settings-ui";
+import { SettingResetButton, SettingsRow, SettingsSection } from "./settings-ui";
 import { searchableSetting } from "./settings-search";
 
 /** Languages the user reads (mail in others offers a translation) + auto-translate. */
@@ -42,6 +48,14 @@ export function TranslationSection() {
     <SettingsSection title="Translation">
       <SettingsRow
         {...searchableSetting("read-languages")}
+        resetAction={
+          JSON.stringify(readLanguages) !== JSON.stringify(systemReadLanguages()) ? (
+            <SettingResetButton
+              label="reading languages"
+              onClick={() => setLanguages(DEFAULT_SETTINGS.readLanguages)}
+            />
+          ) : null
+        }
         description="Mail in any other language offers a translation into your starred language. The translator runs on this device, so nothing is sent anywhere."
         control={
           <DropdownMenu>
@@ -105,6 +119,14 @@ export function TranslationSection() {
       </SettingsRow>
       <SettingsRow
         {...searchableSetting("auto-translate")}
+        resetAction={
+          autoTranslate !== DEFAULT_SETTINGS.autoTranslate ? (
+            <SettingResetButton
+              label="auto translate"
+              onClick={() => void save({ autoTranslate: DEFAULT_SETTINGS.autoTranslate })}
+            />
+          ) : null
+        }
         description="Show mail in other languages already translated, without asking."
         control={
           <Switch

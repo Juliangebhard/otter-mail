@@ -28,6 +28,7 @@ import type { GmailAccount, SyncStatus } from "../gmail/types";
 import { Btn, HintTooltip, cn, restoreFocusForKeyboardOnly } from "../gmail/ui";
 import {
   DraftInput,
+  SettingResetButton,
   SettingsGroup,
   SettingsPageContainer,
   SettingsRow,
@@ -492,6 +493,16 @@ function AccountEditor({ account }: { account: GmailAccount }) {
         />
         <SettingsRow
           {...searchableSetting("mailbox-display-name")}
+          resetAction={
+            account.displayName ? (
+              <SettingResetButton
+                label="mailbox display name"
+                onClick={() =>
+                  void updateAccount.mutateAsync({ accountId: account.id, displayName: "" })
+                }
+              />
+            ) : null
+          }
           description="Shown in the sidebar and account switcher. Only used in Otter Mail."
           control={
             <DraftInput
@@ -508,6 +519,19 @@ function AccountEditor({ account }: { account: GmailAccount }) {
         />
         <SettingsRow
           id={searchableSetting("mailbox-color").id}
+          resetAction={
+            getAccountColor(account) !== getAccountColor({ id: account.id }) ? (
+              <SettingResetButton
+                label="mailbox color"
+                onClick={() =>
+                  void updateAccount.mutateAsync({
+                    accountId: account.id,
+                    color: "",
+                  })
+                }
+              />
+            ) : null
+          }
           title="Color"
           description="Marks this account's mail in combined mailboxes."
           control={

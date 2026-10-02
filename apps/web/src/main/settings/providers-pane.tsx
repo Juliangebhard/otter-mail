@@ -35,6 +35,7 @@ import { Btn, cn } from "../gmail/ui";
 import {
   DraftInput,
   RowSelect,
+  SettingResetButton,
   SettingsPageContainer,
   SettingsRow,
   SettingsSection,
@@ -46,6 +47,7 @@ import { features } from "../features";
 import { RUNTIME_MODE_OPTIONS } from "../gmail/model-picker";
 import {
   modelKey,
+  resetModelPrefs,
   setHidden,
   toggleAllHidden,
   toggleFavorite,
@@ -151,7 +153,13 @@ function ProviderListRow({
           </span>
         </span>
       </div>
-      <span className="flex h-5 shrink-0 items-center">
+      <span className="flex h-5 shrink-0 items-center gap-2">
+        {!provider.enabled ? (
+          <SettingResetButton
+            label={`${provider.displayName} enabled`}
+            onClick={() => onToggle(true)}
+          />
+        ) : null}
         <Switch
           checked={provider.enabled}
           onCheckedChange={(checked: boolean) => onToggle(Boolean(checked))}
@@ -201,8 +209,10 @@ function capabilityLabels(model: ProviderModel): string[] {
 function ModelsSection({
   provider,
   onPick,
+  selectedModel,
 }: {
   provider: ProviderSnapshot;
+  selectedModel: string;
   onPick?: (slug: string) => void;
 }) {
   const { favorites, hidden } = useModelPrefs();
@@ -238,6 +248,19 @@ function ModelsSection({
   return (
     <SettingsSection
       {...searchableSetting("agent-models")}
+      headerAction={
+        selectedModel ||
+        favorites.some((key) => key.startsWith(`${provider.kind}:`)) ||
+        hidden.some((key) => key.startsWith(`${provider.kind}:`)) ? (
+          <SettingResetButton
+            label={`${provider.displayName} models`}
+            onClick={() => {
+              onPick?.("");
+              resetModelPrefs(provider.kind);
+            }}
+          />
+        ) : null
+      }
       description={`Favorites and visibility are saved on this device.${
         onPick ? " Click a model to make it the default for new chats." : ""
       }`}
@@ -500,7 +523,8 @@ function HermesEditor({
       </SettingsSection>
       <ModelsSection
         provider={provider}
-        onPick={provider.models.length > 1 ? (model) => update({ hermes: { model } }) : undefined}
+        selectedModel={state.settings.hermes.model}
+        onPick={(model) => update({ hermes: { model } })}
       />
     </>
   );
@@ -549,6 +573,14 @@ function AgentEditor({
       <SettingsSection title="Runtime">
         <SettingsRow
           {...searchableSetting("agent-binary-path")}
+          resetAction={
+            settings.binaryPath ? (
+              <SettingResetButton
+                label={`${meta.name} binary path`}
+                onClick={() => set({ binaryPath: "" })}
+              />
+            ) : null
+          }
           description={`Path to the ${meta.name} binary. Empty uses \`${meta.binary}\` from your shell's PATH.`}
           control={
             <DraftInput
@@ -562,6 +594,11 @@ function AgentEditor({
         />
         <SettingsRow
           title={meta.home.title}
+          resetAction={
+            settings.homePath ? (
+              <SettingResetButton label={meta.home.title} onClick={() => set({ homePath: "" })} />
+            ) : null
+          }
           description={meta.home.description}
           control={
             <DraftInput
@@ -576,6 +613,14 @@ function AgentEditor({
         {meta.launchArgs && kind === "codex" ? (
           <SettingsRow
             title="Launch arguments"
+            resetAction={
+              state.settings.codex.launchArgs ? (
+                <SettingResetButton
+                  label="launch arguments"
+                  onClick={() => set({ launchArgs: "" })}
+                />
+              ) : null
+            }
             description={meta.launchArgs}
             control={
               <DraftInput
@@ -590,6 +635,14 @@ function AgentEditor({
         ) : null}
         <SettingsRow
           {...searchableSetting("agent-access")}
+          resetAction={
+            settings.runtimeMode !== "full-access" ? (
+              <SettingResetButton
+                label={`${meta.name} access`}
+                onClick={() => set({ runtimeMode: "full-access" })}
+              />
+            ) : null
+          }
           description="Default for new turns; also switchable from the composer (⇧⌘A)."
           control={
             <Select
@@ -610,7 +663,11 @@ function AgentEditor({
           }
         />
       </SettingsSection>
-      <ModelsSection provider={provider} onPick={(model) => set({ model })} />
+      <ModelsSection
+        provider={provider}
+        selectedModel={settings.model}
+        onPick={(model) => set({ model })}
+      />
     </>
   );
 }
@@ -689,7 +746,17 @@ export function ProvidersPane() {
         </Btn>
       }
     >
-      <SettingsSection {...searchableSetting("agent-providers")}>
+      <SettingsSection
+        {...searchableSetting("agent-providers")}
+        headerAction={
+          state.selected !== "hermes" ? (
+            <SettingResetButton
+              label="default agent"
+              onClick={() => update({ selected: "hermes" })}
+            />
+          ) : null
+        }
+      >
         {providers.map((p) => (
           <ProviderListRow
             key={p.kind}
@@ -724,6 +791,14 @@ function FollowUpSection() {
     <SettingsSection title="Chat">
       <SettingsRow
         {...searchableSetting("follow-up-behavior")}
+        resetAction={
+          behavior !== "queue" ? (
+            <SettingResetButton
+              label="follow-up behavior"
+              onClick={() => setFollowUpBehavior("queue")}
+            />
+          ) : null
+        }
         description="Queue follow-ups while the agent runs or steer the current run. Press ⌘ + Enter to do the opposite for one message."
         control={
           <Select

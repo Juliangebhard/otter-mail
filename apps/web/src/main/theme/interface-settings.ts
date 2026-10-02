@@ -26,12 +26,12 @@ export type InterfaceToggle = Readonly<{
 
 export const GROUP_MESSAGES_BY_DAY: InterfaceToggle = {
   key: "otter:group-messages-by-day",
-  defaultValue: false,
+  defaultValue: true,
 };
 
 export const DIM_READ_MESSAGES: InterfaceToggle = {
   key: "otter:dim-read-messages",
-  defaultValue: false,
+  defaultValue: true,
 };
 
 export const OPEN_MESSAGES_WITH_ARROWS: InterfaceToggle = {
