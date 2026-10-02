@@ -1,3 +1,4 @@
+import { browseTodoist } from "./todoist";
 import {
   useEffect,
   useLayoutEffect,
@@ -298,6 +299,13 @@ export function CommandPalette({
     }
 
     const actions: PaletteItem[] = [
+      {
+        id: "todoist",
+        icon: <CheckIcon className={ICON} />,
+        title: "Browse Todoist tasks",
+        keywords: "tasks projects complete todo",
+        run: browseTodoist,
+      },
       {
         id: "compose",
         icon: <SquarePenIcon className={ICON} />,

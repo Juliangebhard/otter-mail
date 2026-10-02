@@ -1,3 +1,4 @@
+import type { TodoistPage, TodoistProject, TodoistTaskInput } from "@otter-mail/contracts/todoist";
 import type { ImapSettings } from "@otter-mail/contracts";
 export type { ChatChange } from "@otter-mail/contracts";
 import type { AgentAccess, AgentTokens, ConnectedAgent } from "@otter-mail/contracts/agent-tokens";
@@ -399,6 +400,7 @@ export type SettingsPane =
   | "keybindings"
   | "accounts"
   | "agents"
+  | "integrations"
   /** The Otter account page, opened from the user button at the bottom of the nav. */
   | "otter";
 export type SettingsTarget = { pane: SettingsPane };
@@ -411,6 +413,16 @@ export type AddImapAccountParams = {
 };
 
 export const gmailApi = {
+  todoistStatus: (): Promise<{ connected: boolean }> => ipc("todoist:status"),
+  connectTodoist: (token: string): Promise<void> => task("todoist:connect", { token }),
+  disconnectTodoist: (): Promise<void> => ipc("todoist:disconnect"),
+  todoistProjects: (): Promise<TodoistProject[]> => task("todoist:projects", {}),
+  todoistTasks: (projectId?: string, cursor?: string): Promise<TodoistPage> =>
+    task("todoist:tasks", { projectId, cursor }),
+  createTodoistTask: (input: TodoistTaskInput): Promise<void> =>
+    task("todoist:create", { ...input }),
+  completeTodoistTask: (id: string, requestId: string): Promise<void> =>
+    task("todoist:complete", { id, requestId }),
   saveSupportReport: (contents: string, filename?: "Otter Mail diagnostics.json") =>
     task<boolean>("support:saveReport", { contents, filename }),
   listAccounts: (): Promise<GmailAccount[]> => ipc("gmail:listAccounts"),

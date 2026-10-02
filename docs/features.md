@@ -73,6 +73,24 @@ to another app. This page is where they're compared.
 | After archive: next / previous           | ✓                        | ✓            | ✓              |
 | Snooze                                   | —                        | —            | —              |
 
+## Todoist
+
+Connect with a personal API token in Settings → Integrations. The token stays on each device;
+Todoist data is fetched on demand and needs an internet connection. In `pnpm dev:demo`,
+connect with token `demo` for a pretend Todoist account (including a recurring task); no requests
+are sent to Todoist.
+
+| Feature                                                           | Mac          | Web | iPhone |
+| ----------------------------------------------------------------- | ------------ | --- | ------ |
+| Connect, replace token, disconnect                                | ✓            | ✓   | —      |
+| Create tasks from email (reader and list menus)                   | ✓            | ✓   | —      |
+| Task title, notes, project, natural-language due date, priority   | ✓            | ✓   | —      |
+| Link back to the email in Otter Mail                              | ✓ (web link) | ✓   | —      |
+| Browse active tasks, filter by project, load more, refresh        | ✓            | ✓   | —      |
+| Complete tasks (recurring tasks advance to their next occurrence) | ✓            | ✓   | —      |
+| Open task in Todoist, create a task without an email              | ✓            | ✓   | —      |
+| Command palette: Browse Todoist tasks                             | ✓            | ✓   | —      |
+
 ## Projects
 
 A project keeps the conversations, documents, links and notes of one piece of work (a contract,

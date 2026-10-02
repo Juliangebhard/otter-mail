@@ -9,7 +9,8 @@
     "./agent-tokens": "./src/agent-tokens.ts",
     "./mail": "./src/mail.ts",
     "./projects": "./src/projects.ts",
-    "./project-tools": "./src/project-tools.ts"
+    "./project-tools": "./src/project-tools.ts",
+    "./todoist": "./src/todoist.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"

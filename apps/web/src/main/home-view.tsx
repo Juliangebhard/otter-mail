@@ -1,3 +1,4 @@
+import { TodoistDialogs } from "./gmail/todoist";
 import {
   useCallback,
   useEffect,
@@ -1686,6 +1687,7 @@ function MailHome() {
         />
       ) : null}
 
+      <TodoistDialogs />
       <NewProjectDialog onOpenProject={openProject} />
       <ViewEditorDialog
         key={viewEditor ?? "closed"}

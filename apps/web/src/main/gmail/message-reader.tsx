@@ -1,3 +1,4 @@
+import { addEmailToTodoist } from "./todoist";
 import {
   Fragment,
   useCallback,
@@ -2733,6 +2734,13 @@ export function MessageReader({
               <DropdownMenuSeparator />
               <DropdownMenuItem icon={<MousePointer2Icon />} onSelect={() => onOpenChat?.()}>
                 Chat about this with the agent
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onSelect={() =>
+                  addEmailToTodoist({ accountId, messageId: message.id, subject: message.subject })
+                }
+              >
+                Add to Todoist…
               </DropdownMenuItem>
               <DropdownMenuSub label="Add to project">
                 <AddToProjectItems

@@ -4,6 +4,7 @@
  * Platform (platform.ts) and serves `registeredHandlers()` to the renderer.
  */
 
+import { registerTodoistHandlers } from "./handlers/todoist.js";
 import { registerAgentHandlers } from "./handlers/agent.js";
 import { registerCalendarHandlers } from "./handlers/calendar.js";
 import { registerGmailHandlers } from "./handlers/gmail.js";
@@ -45,6 +46,7 @@ export async function startCore(platform: Platform): Promise<void> {
   registerAgentHandlers();
   registerSupportHandlers();
   registerProjectHandlers();
+  registerTodoistHandlers();
   handle("keybindings:read", async () => readKeybindings());
   handle("preferences:getUi", async () => getUiPreferences());
   handle("preferences:setUi", async (params: unknown) => {
