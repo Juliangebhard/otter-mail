@@ -17,6 +17,8 @@ struct HomeView: View {
     @Environment(Session.self) private var session
     @Environment(\.palette) private var palette
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Namespace private var messageTransition
 
     @State private var place = Place()
     @State private var path: [String] = []
@@ -44,6 +46,7 @@ struct HomeView: View {
                 NavigationStack(path: $path) {
                     ThreadListView(
                         place: place,
+                        messageTransition: messageTransition,
                         onDrawer: { setDrawer(open: true) },
                         onAgent: { agentOpen = true },
                         onCompose: { compose() },
@@ -51,7 +54,12 @@ struct HomeView: View {
                         onResume: { draft = $0 }
                     )
                     .navigationDestination(for: String.self) { id in
-                        ThreadView(threadID: id, place: place, path: $path, draft: $draft)
+                        let reader = ThreadView(threadID: id, place: place, path: $path, draft: $draft)
+                        if reduceMotion {
+                            reader
+                        } else {
+                            reader.navigationTransition(.zoom(sourceID: id, in: messageTransition))
+                        }
                     }
                 }
                 .safeAreaInset(edge: .bottom, spacing: 8) {

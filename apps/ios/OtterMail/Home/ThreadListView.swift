@@ -12,6 +12,7 @@ struct ThreadListView: View {
     @Environment(\.palette) private var palette
 
     let place: Place
+    let messageTransition: Namespace.ID
     let onDrawer: () -> Void
     let onAgent: () -> Void
     let onCompose: () -> Void
@@ -279,6 +280,7 @@ struct ThreadListView: View {
             } else {
                 NavigationLink(value: thread.id) { content }
                     .navigationLinkIndicatorVisibility(.hidden)
+                    .matchedTransitionSource(id: thread.id, in: messageTransition)
             }
         }
         .listRowBackground(
