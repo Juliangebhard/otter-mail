@@ -30,9 +30,12 @@ export function restoreFocusForKeyboardOnly(event: Event): void {
 
 export { cn };
 
-/** Shared control chrome: rounded, focus ring, disabled fade. No pressed scale: a Mac button stays put. */
+/**
+ * Shared control chrome: rounded, focus ring, disabled fade, instant hover feedback.
+ * No pressed scale: a Mac button stays put.
+ */
 const CONTROL =
-  "relative inline-flex shrink-0 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border font-normal outline-none transition-[box-shadow,background-color,color] focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-1 focus-visible:ring-offset-canvas disabled:pointer-events-none disabled:opacity-64 [&_svg]:pointer-events-none [&_svg]:shrink-0";
+  "relative inline-flex shrink-0 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border font-normal outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-1 focus-visible:ring-offset-canvas disabled:pointer-events-none disabled:opacity-64 [&_svg]:pointer-events-none [&_svg]:shrink-0";
 
 export const BUTTON_VARIANTS = {
   /** Solid call to action (send, confirm), flat in the theme's primary. */

@@ -501,7 +501,7 @@ function WorkFoldRow({
         type="button"
         aria-expanded={expanded}
         onClick={onToggle}
-        className="flex cursor-pointer select-none items-center gap-1 rounded-md px-1 text-sm leading-relaxed text-muted-foreground tabular-nums transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus-ring/70"
+        className="flex cursor-pointer select-none items-center gap-1 rounded-md px-1 text-sm leading-relaxed text-muted-foreground tabular-nums hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus-ring/70"
       >
         <span>{label}</span>
         <Icon className="size-3.5 opacity-70" />
@@ -768,7 +768,7 @@ function ChatTabs({
               }
             }}
             className={cn(
-              "group/tab flex h-7 max-w-44 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg pl-2.5 pr-1 text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-focus-ring",
+              "group/tab flex h-7 max-w-44 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg pl-2.5 pr-1 text-sm outline-none focus-visible:ring-2 focus-visible:ring-focus-ring",
               selected
                 ? "bg-foreground/10 text-foreground"
                 : "text-muted-foreground hover:bg-foreground/[0.06] hover:text-foreground",
@@ -2124,7 +2124,7 @@ export function AgentChatPanel({
                     {/* Codex's "Model Effort ⌄": the model reads as plain text,
                         the traits follow it muted and carry the chevron, and
                         one pill wraps both, as a single control. */}
-                    <div className="ms-auto flex min-w-0 shrink items-center rounded-full transition-colors hover:bg-accent-surface has-[[data-state=open]]:bg-accent-surface">
+                    <div className="ms-auto flex min-w-0 shrink items-center rounded-full hover:bg-accent-surface has-[[data-state=open]]:bg-accent-surface">
                       <ProviderModelPicker
                         providers={providersState?.providers ?? []}
                         activeKind={providerKind}
@@ -2158,7 +2158,7 @@ export function AgentChatPanel({
                             type="button"
                             onClick={stop}
                             aria-label="Stop generation"
-                            className="flex size-8 cursor-pointer items-center justify-center rounded-full bg-destructive/90 text-white shadow-xs shadow-destructive/24 inset-shadow-2xs inset-shadow-white/16 transition-all duration-150 hover:scale-105 hover:bg-destructive active:shadow-none active:inset-shadow-black/8"
+                            className="flex size-8 cursor-pointer items-center justify-center rounded-full bg-destructive/90 text-white shadow-xs shadow-destructive/24 inset-shadow-2xs inset-shadow-white/16 transition-transform duration-150 hover:scale-105 hover:bg-destructive active:shadow-none active:inset-shadow-black/8"
                           >
                             <svg
                               width="12"
@@ -2178,7 +2178,7 @@ export function AgentChatPanel({
                             onClick={(e) => send(e.metaKey || e.ctrlKey)}
                             disabled={!hasDraft}
                             aria-label={submitLabel}
-                            className="relative isolate flex size-8 items-center justify-center overflow-hidden rounded-full bg-primary text-primary-foreground shadow-xs transition-all duration-150 enabled:cursor-pointer enabled:shadow-primary/24 enabled:inset-shadow-2xs enabled:inset-shadow-white/16 hover:scale-105 hover:bg-primary/90 active:shadow-none active:inset-shadow-black/8 disabled:pointer-events-none disabled:opacity-30 disabled:shadow-none"
+                            className="relative isolate flex size-8 items-center justify-center overflow-hidden rounded-full bg-primary text-primary-foreground shadow-xs transition-transform duration-150 enabled:cursor-pointer enabled:shadow-primary/24 enabled:inset-shadow-2xs enabled:inset-shadow-white/16 hover:scale-105 hover:bg-primary/90 active:shadow-none active:inset-shadow-black/8 disabled:pointer-events-none disabled:opacity-30 disabled:shadow-none"
                           >
                             {editing ? (
                               <CheckIcon className="size-4" aria-hidden />

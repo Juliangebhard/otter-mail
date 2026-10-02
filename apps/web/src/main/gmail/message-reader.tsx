@@ -46,7 +46,11 @@ import {
   useIsForeignMessage,
   useMessageTranslation,
 } from "./translate-banner";
-import { INTERFACE_FONT_SIZE, useInterfaceSetting } from "../theme/interface-settings";
+import {
+  INTERFACE_FONT_SIZE,
+  MARK_READ_DELAY,
+  useInterfaceSetting,
+} from "../theme/interface-settings";
 import { useTranslationSettings } from "./translation";
 import { InviteCard, requestRsvp, rsvpFromGoogleLink } from "./invite-card";
 import type { RsvpResponse } from "./api";
@@ -131,6 +135,8 @@ import { AttachmentPreview, attachmentPreview, type PreviewFile } from "./attach
 type MessageReaderProps = {
   accountId: string;
   messageId: string | null;
+  /** Browsing the list previews drafts without taking focus from navigation. */
+  autoFocusDraft?: boolean;
   /** Show only this message, not its whole conversation (picked from an
       expanded conversation in the list); actions then apply to it alone. */
   single?: boolean;
@@ -149,6 +155,8 @@ type MessageReaderProps = {
   onSearchSender?: (email: string) => void;
   /** Right end of the window's title band (panel toggle), drawn in this header. */
   titleTrailing?: ReactNode;
+  /** Navigation at the start of the title band (full inbox layout). */
+  titleLeading?: ReactNode;
   /** Opens a project the conversation is in (its chip). */
   onOpenProject?: (projectId: string) => void;
 };
@@ -513,7 +521,7 @@ function QuoteToggle({ open, onToggle }: { open: boolean; onToggle: () => void }
         aria-expanded={open}
         aria-label={open ? "Hide quoted text" : "Show quoted text"}
         onClick={onToggle}
-        className="mt-2 inline-flex h-5 cursor-pointer items-center rounded-full bg-accent-surface px-2 text-muted-foreground outline-none transition-colors hover:bg-input hover:text-foreground focus-visible:ring-2 focus-visible:ring-focus-ring"
+        className="mt-2 inline-flex h-5 cursor-pointer items-center rounded-full bg-accent-surface px-2 text-muted-foreground outline-none hover:bg-input hover:text-foreground focus-visible:ring-2 focus-visible:ring-focus-ring"
       >
         <EllipsisIcon className="size-4" />
       </button>
@@ -1142,7 +1150,7 @@ function FileAttachmentRow({
           aria-label={`Open ${attachment.filename}`}
           onClick={handleOpen}
           {...dragProps}
-          className={`flex cursor-pointer select-none items-center gap-3 px-4 py-2 transition-colors hover:bg-accent-surface/60${opening ? " opacity-60" : ""}`}
+          className={`flex cursor-pointer select-none items-center gap-3 px-4 py-2 hover:bg-accent-surface/60${opening ? " opacity-60" : ""}`}
         >
           <span className="min-w-0 flex-1 truncate text-sm text-foreground">
             {attachment.filename}
@@ -1268,7 +1276,7 @@ export function CollapsedRow({
         type="button"
         onClick={onExpand}
         aria-label="Expand message"
-        className="flex w-full cursor-pointer items-start gap-3 rounded-xl px-3 py-2.5 text-left outline-none transition-colors hover:bg-accent-surface/60 focus-visible:ring-2 focus-visible:ring-focus-ring"
+        className="flex w-full cursor-pointer items-start gap-3 rounded-xl px-3 py-2.5 text-left outline-none hover:bg-accent-surface/60 focus-visible:ring-2 focus-visible:ring-focus-ring"
       >
         <SenderAvatar
           name={summary.fromName}
@@ -1309,7 +1317,7 @@ function FoldRow({ count, onUnfold }: { count: number; onUnfold: () => void }) {
       <button
         type="button"
         onClick={onUnfold}
-        className="flex w-full cursor-pointer items-center gap-3 rounded-xl px-3 py-1.5 text-left text-sm text-muted-foreground outline-none transition-colors hover:bg-accent-surface/60 hover:text-foreground focus-visible:ring-2 focus-visible:ring-focus-ring"
+        className="flex w-full cursor-pointer items-center gap-3 rounded-xl px-3 py-1.5 text-left text-sm text-muted-foreground outline-none hover:bg-accent-surface/60 hover:text-foreground focus-visible:ring-2 focus-visible:ring-focus-ring"
       >
         <span className="flex size-9 shrink-0 items-center justify-center">
           <span className="flex size-7 items-center justify-center rounded-full border border-border/60 text-xs tabular-nums">
@@ -1345,13 +1353,14 @@ export function ExpandedRow({
   const modifyMessageRef = useRef(modifyMessage);
   modifyMessageRef.current = modifyMessage;
   const markedRead = useRef(false);
+  const markReadDelayMs = useInterfaceSetting(MARK_READ_DELAY);
 
   // Reading a message marks it read — debounced so j/k scrubbing through the
   // list (which mounts and unmounts expanded rows) doesn't fire per row.
   // The mutation is read through a ref (not a dependency): react-query
   // returns a new `modifyMessage` object on every render, which was
   // resetting this timer on any incidental re-render (e.g. a window-focus
-  // refetch) and could push the 300ms mark past the window closing.
+  // refetch) and could push marking read past the window closing.
   useEffect(() => {
     if (markedRead.current || !summary.unread) return;
     const timer = setTimeout(() => {
@@ -1362,9 +1371,9 @@ export function ExpandedRow({
         messageId: summary.id,
         removeLabelIds: ["UNREAD"],
       });
-    }, 300);
+    }, markReadDelayMs);
     return () => clearTimeout(timer);
-  }, [summary.unread, summary.id, accountId]);
+  }, [summary.unread, summary.id, accountId, markReadDelayMs]);
 
   const detail = detailQuery.data;
   const inlineImages = useMemo(
@@ -1988,14 +1997,24 @@ function InlineComposer({
   );
 }
 
-function ReaderShell({ children, trailing }: { children: ReactNode; trailing?: ReactNode }) {
+function ReaderShell({
+  children,
+  leading,
+  trailing,
+}: {
+  children: ReactNode;
+  leading?: ReactNode;
+  trailing?: ReactNode;
+}) {
   return (
     <div className="flex h-full min-w-0 flex-col">
-      {trailing ? (
+      {leading || trailing ? (
         <div
           data-toolbar=""
-          className="drag-region flex h-(--workspace-topbar-height) shrink-0 items-center justify-end gap-1 px-4"
+          className="drag-region flex h-(--workspace-topbar-height) shrink-0 items-center gap-1 px-4"
         >
+          {leading}
+          <span className="min-w-0 flex-1" />
           {trailing}
         </div>
       ) : null}
@@ -2007,6 +2026,7 @@ function ReaderShell({ children, trailing }: { children: ReactNode; trailing?: R
 export function MessageReader({
   accountId,
   messageId,
+  autoFocusDraft = true,
   single = false,
   onShowConversation,
   onDeselect,
@@ -2016,6 +2036,7 @@ export function MessageReader({
   onComposeTo,
   onSearchSender,
   titleTrailing,
+  titleLeading,
   onOpenProject,
 }: MessageReaderProps) {
   // Reply/reply-all/forward handlers exist only when a message is open; the
@@ -2189,7 +2210,7 @@ export function MessageReader({
 
   if (messageQuery.isLoading || threadQuery.isLoading) {
     return (
-      <ReaderShell trailing={titleTrailing}>
+      <ReaderShell leading={titleLeading} trailing={titleTrailing}>
         <div className="mx-auto flex w-full max-w-(--reading-width) flex-col gap-3 px-6 py-5">
           <div className="h-5 w-64 animate-skeleton rounded-full bg-secondary" />
           <div className="h-4 w-48 animate-skeleton rounded-full bg-accent-surface" />
@@ -2201,7 +2222,7 @@ export function MessageReader({
 
   if (!message) {
     return (
-      <ReaderShell trailing={titleTrailing}>
+      <ReaderShell leading={titleLeading} trailing={titleTrailing}>
         <EmptyState
           className="flex-1"
           media={<MailWarningIcon className="size-10 stroke-[1.25] text-muted-foreground" />}
@@ -2219,9 +2240,11 @@ export function MessageReader({
         key={`${accountId}:${message.id}`}
         accountId={accountId}
         detail={message}
+        autoFocus={autoFocusDraft}
         threadMessages={threadMessages}
         onDone={onDeselect ?? (() => {})}
         titleTrailing={titleTrailing}
+        titleLeading={titleLeading}
       />
     );
   }
@@ -2527,13 +2550,14 @@ export function MessageReader({
 
   return (
     <ConversationTranslationContext.Provider value={conversationTranslation}>
-      <div ref={readerRef} className="relative flex h-full min-w-0 flex-col">
+      <div ref={readerRef} className="relative flex h-full min-h-0 min-w-0 flex-col">
         {/* Conversation header = the title band: subject + labels, the
             everyday actions, a "more" menu, then the window's panel toggle. */}
         <div
           data-toolbar=""
           className="drag-region flex h-(--workspace-topbar-height) shrink-0 items-center gap-1 px-4"
         >
+          {titleLeading}
           {/* Wide: subject + labels live in the band. Narrow: they move to a
               heading under it (see below) so the actions keep their room. */}
           {compactTitle ? (

@@ -78,7 +78,7 @@ function ProjectRow({
             addDropped(payload.threads);
           }}
           className={cn(
-            "flex w-full flex-col rounded-lg px-(--sidebar-row-content-inset) py-1.5 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-focus-ring",
+            "flex w-full flex-col rounded-lg px-(--sidebar-row-content-inset) py-1.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-focus-ring",
             selected
               ? "bg-sidebar-row-selected text-sidebar-foreground"
               : "text-sidebar-foreground/90 hover:bg-sidebar-row-hover hover:text-sidebar-foreground",

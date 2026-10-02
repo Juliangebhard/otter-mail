@@ -6,10 +6,10 @@ import { cn } from "~/lib/utils";
 /**
  * Push button in the app's control style (adapted from Otter Code's
  * components/ui/button.tsx): rounded pill, faint border, one flat solid
- * primary. `accent` is the solid call to action.
+ * primary. `accent` is the solid call to action. Hover feedback is instant.
  */
 const buttonVariants = cva(
-  "relative inline-flex shrink-0 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border font-normal outline-none transition-[box-shadow,background-color] focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-1 focus-visible:ring-offset-canvas disabled:pointer-events-none disabled:opacity-64 [&_svg]:pointer-events-none [&_svg]:shrink-0",
+  "relative inline-flex shrink-0 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border font-normal outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-1 focus-visible:ring-offset-canvas disabled:pointer-events-none disabled:opacity-64 [&_svg]:pointer-events-none [&_svg]:shrink-0",
   {
     defaultVariants: { size: "default", variant: "outline" },
     variants: {

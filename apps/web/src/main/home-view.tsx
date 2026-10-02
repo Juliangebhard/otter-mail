@@ -5,9 +5,11 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type ReactNode,
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import { useMatch, useNavigate, useRouter } from "@tanstack/react-router";
+import { ArrowLeftIcon } from "lucide-react";
 import { EmptyState } from "~/components/ui/empty-state";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast, type ToastId } from "./gmail/toast";
@@ -34,7 +36,9 @@ import {
 import { SettingsPage, type SettingsRoute } from "./settings/settings-page";
 import { SettingsNav } from "./settings/settings-nav";
 import { isTypingTarget } from "./gmail/keyboard";
-import { cn } from "./gmail/ui";
+import { cn, HintTooltip, IconBtn } from "./gmail/ui";
+import { useMailLayout } from "./theme/interface-settings";
+import { FloatingReader } from "./gmail/floating-reader";
 import { usePanelAnimationSettings, usePanelPresence } from "./panel-animations";
 import {
   keybindingContext,
@@ -264,7 +268,7 @@ function PaneResizer({ onPointerDown }: { onPointerDown: (e: ReactPointerEvent) 
         onPointerDown={onPointerDown}
         className="no-drag group absolute inset-y-0 -left-[3px] flex w-1.5 cursor-col-resize justify-center"
       >
-        <div className="w-px transition-colors group-hover:bg-input" />
+        <div className="w-px group-hover:bg-input" />
       </div>
     </div>
   );
@@ -346,6 +350,8 @@ function MailHome() {
   // One message picked from an expanded conversation in the list: the reader
   // shows just that message.
   const focusedMessageId = mailLoc?.focusId ?? null;
+  // Browsing past a draft keeps mail navigation active until it is opened to edit.
+  const [autoFocusDraft, setAutoFocusDraft] = useState(true);
   // Open searches, each a sidebar row: the top Search row (all mail) and one
   // per view it was started from (⌘F there). They keep their query and any
   // unrun text while you visit other mailboxes; × or Escape closes them.
@@ -408,8 +414,14 @@ function MailHome() {
     if (!mailLoc) return;
     const next = { ...mailLoc, ...to };
     const params = { mailbox: next.mailbox, label: next.label };
+    // Opening and closing a floating reader keeps the inbox at its current scroll offset.
+    const resetScroll =
+      !floatingLayout ||
+      !!settingsRoute ||
+      next.mailbox !== mailLoc.mailbox ||
+      next.label !== mailLoc.label;
     if (!next.messageId) {
-      void navigate({ to: "/$mailbox/$label", params, replace });
+      void navigate({ to: "/$mailbox/$label", params, replace, resetScroll });
       return;
     }
     void navigate({
@@ -420,6 +432,7 @@ function MailHome() {
         message: next.focusId ?? undefined,
       },
       replace,
+      resetScroll,
     });
   };
   const closeMessage = () => go({ messageId: null });
@@ -459,6 +472,12 @@ function MailHome() {
     : null;
   const isCombined = space?.kind === "combined";
   const isProjects = space?.kind === "projects";
+  const mailLayout = useMailLayout();
+  // Projects keep their overview beside the conversation list.
+  const fullInbox = mailLayout === "full" && !isProjects;
+  const floatingLayout = mailLayout === "floating" && !isProjects;
+  const wideInbox = fullInbox || floatingLayout;
+  const [mailWorkspace, setMailWorkspace] = useState<HTMLDivElement | null>(null);
   // A view's space: its list, with no sidebar.
   const viewSpace = space?.kind === "view" ? space.view : null;
   const spansMailboxes = spanning(space);
@@ -483,7 +502,7 @@ function MailHome() {
       window.innerWidth -
       RAIL_WIDTH -
       (sidebarOpen ? sidebarPane.width : 0) -
-      listPane.width -
+      (wideInbox ? 0 : listPane.width) -
       READER_MIN_WIDTH,
   );
   const [chatOpen, setChatOpen] = useState(() => localStorage.getItem("gmail:chat-open") === "1");
@@ -970,8 +989,14 @@ function MailHome() {
     go({ mailbox: PROJECTS_SPACE, label: id, messageId: null, account: null, focusId: null });
   };
 
-  const handleSelectMessage = (messageId: string, accountId: string, focusId?: string) => {
+  const handleSelectMessage = (
+    messageId: string,
+    accountId: string,
+    focusId?: string,
+    options?: { autoFocusDraft?: boolean },
+  ) => {
     console.log("[HomeView:selectMessage]", { messageId, accountId, focusId });
+    setAutoFocusDraft(options?.autoFocusDraft !== false);
     setComposeOpen(false);
     go({ messageId, account: accountId, focusId: focusId ?? null });
   };
@@ -1161,6 +1186,7 @@ function MailHome() {
   /** Opens a message of `owner`'s where it is: Combined stays put, another account's inbox opens. */
   const openMessage = (owner: string, messageId: string) => {
     const switching = !spansMailboxes && owner !== effectiveAccountId;
+    setAutoFocusDraft(true);
     go({
       ...(switching ? { mailbox: owner, label: "INBOX" } : {}),
       messageId,
@@ -1233,6 +1259,13 @@ function MailHome() {
   // Without a project yet, Projects is only its overview (which says how to start one).
   const hasListTarget =
     (isCombined || effectiveAccountId != null) && !(isProjects && projectsQuery.data?.length === 0);
+  const showMain =
+    !!settingsRoute ||
+    !wideInbox ||
+    !hasListTarget ||
+    (fullInbox && !!selectedMessageId) ||
+    composeOpen;
+  const listVisible = hasListTarget && !settingsRoute && (!wideInbox || !showMain);
 
   // Full-height columns: each pane owns its slice of the title band (on the
   // chrome); the content panel is painted behind them from under that band.
@@ -1241,10 +1274,47 @@ function MailHome() {
   const readerOwnsBand =
     !settingsRoute && !(composeOpen && composeAccountId) && !!readerAccount && !!selectedMessageId;
   const titleTrailing = <TitleTrailing showPanelToggle={!chatOpen && !settingsRoute} />;
+  const readerLeading = fullInbox ? (
+    <>
+      {sidebarOpen ? null : <TitlebarInset />}
+      <HintTooltip label="Back to message list" shortcut="message.close">
+        <IconBtn label="Back to message list" onClick={closeMessage}>
+          <ArrowLeftIcon className="size-4" />
+        </IconBtn>
+      </HintTooltip>
+    </>
+  ) : undefined;
+  const renderReader = (
+    leading: ReactNode = readerLeading,
+    trailing: ReactNode = titleTrailing,
+  ) => (
+    <MessageReader
+      titleLeading={leading}
+      titleTrailing={trailing}
+      accountId={readerAccount ?? ""}
+      messageId={focusedMessageId ?? selectedMessageId}
+      autoFocusDraft={autoFocusDraft}
+      single={focusedMessageId != null}
+      onShowConversation={() => go({ focusId: null })}
+      onDeselect={closeMessage}
+      onAdvance={handleReaderAdvance}
+      onOpenChat={openChat}
+      onQuote={(q) => {
+        if (chatOpen) setPendingQuote(q);
+      }}
+      onComposeTo={(email) => {
+        setMailtoPrefill({ to: email, cc: "", subject: "", body: "" });
+        setMailtoSeq((n) => n + 1);
+        setComposeOpen(true);
+      }}
+      onSearchSender={(email) => handleSearchChange(`from:${email}`)}
+      onOpenProject={openProject}
+    />
+  );
   // With the sidebar hidden and no list pane, this band is the first after the
   // rail: it needs the traffic-light clearance and the toggle to bring the
   // sidebar (and Settings' Back button) back.
-  const mainIsLeftmost = !sidebarOpen && !(hasListTarget && !settingsRoute);
+  const mainIsLeftmost = !sidebarOpen && !listVisible;
   const titleControls = (
     <TitleControls
       leading={mainIsLeftmost ? <TitlebarInset /> : null}
@@ -1265,6 +1335,7 @@ function MailHome() {
           features.trafficLights ? "bg-sidebar-surface/(--frame-opacity)" : "bg-sidebar-surface",
         )}
         data-panel-animations={panelAnimationsActive ? "true" : "false"}
+        data-mail-layout={isProjects ? "split" : mailLayout}
         style={{ "--panel-animation-duration": `${panelAnimationDurationMs}ms` } as CSSProperties}
       >
         <div className="contents">
@@ -1291,237 +1362,254 @@ function MailHome() {
               aria-hidden
               className="pointer-events-none absolute bottom-1 left-0 right-1 top-(--workspace-topbar-height) -z-10 rounded-xl border border-(--panel-edge) bg-canvas"
             />
-            {peekSpace ? (
-              <SpacePeekCard
-                key={peekSpace}
-                width={sidebarPane.width}
-                onHover={(inside) => spacePeek.hover(inside ? peekSpace : null)}
-              >
-                {peekSpace === PROJECTS_SPACE ? (
-                  <ProjectsSidebar
-                    selectedLabelId={isProjects ? selectedLabelId : ""}
-                    onSelectLabel={(label) => goToSpace(PROJECTS_SPACE, label)}
-                    searchSelected={false}
-                    searchPending={false}
-                    onOpenSearch={() => goToSpace(PROJECTS_SPACE)}
-                  />
-                ) : (
-                  <MailboxSidebarPage
-                    selectedAccountId={peekSpace}
-                    onSelectAccount={(id) => goToSpace(id)}
-                    selectedLabelId={peekSpace === effectiveAccountId ? selectedLabelId : ""}
-                    onSelectLabel={(label) => goToSpace(peekSpace, label)}
-                    views={views}
-                    onCompose={() => {
-                      spacePeek.close();
-                      setComposeOpen(true);
-                    }}
-                    searchSelected={false}
-                    searchPending={false}
-                    onOpenSearch={() => goToSpace(peekSpace)}
-                    searches={[]}
-                    onSelectSearch={() => {}}
-                    onCloseSearch={() => {}}
-                  />
-                )}
-              </SpacePeekCard>
-            ) : null}
-            {sidebarPresent ? (
-              <>
-                <div
-                  ref={sidebarPane.frameRef}
-                  style={{ width: sidebarOpen ? sidebarPane.width : 0 }}
-                  className={cn(
-                    PANE_FRAME,
-                    // Anchored left: the sidebar stays put while the columns
-                    // after it slide over it, and back out.
-                    sidebarOpen && "[[data-panel-animations=true]_&]:starting:w-0!",
-                    !sidebarOpen && "pointer-events-none",
-                  )}
+            <div
+              ref={setMailWorkspace}
+              data-mail-workspace=""
+              className="relative flex min-h-0 min-w-0 flex-1"
+            >
+              {peekSpace ? (
+                <SpacePeekCard
+                  key={peekSpace}
+                  width={sidebarPane.width}
+                  onHover={(inside) => spacePeek.hover(inside ? peekSpace : null)}
                 >
+                  {peekSpace === PROJECTS_SPACE ? (
+                    <ProjectsSidebar
+                      selectedLabelId={isProjects ? selectedLabelId : ""}
+                      onSelectLabel={(label) => goToSpace(PROJECTS_SPACE, label)}
+                      searchSelected={false}
+                      searchPending={false}
+                      onOpenSearch={() => goToSpace(PROJECTS_SPACE)}
+                    />
+                  ) : (
+                    <MailboxSidebarPage
+                      selectedAccountId={peekSpace}
+                      onSelectAccount={(id) => goToSpace(id)}
+                      selectedLabelId={peekSpace === effectiveAccountId ? selectedLabelId : ""}
+                      onSelectLabel={(label) => goToSpace(peekSpace, label)}
+                      views={views}
+                      onCompose={() => {
+                        spacePeek.close();
+                        setComposeOpen(true);
+                      }}
+                      searchSelected={false}
+                      searchPending={false}
+                      onOpenSearch={() => goToSpace(peekSpace)}
+                      searches={[]}
+                      onSelectSearch={() => {}}
+                      onCloseSearch={() => {}}
+                    />
+                  )}
+                </SpacePeekCard>
+              ) : null}
+              {sidebarPresent ? (
+                <>
                   <div
-                    ref={sidebarPane.paneRef}
-                    style={{ width: sidebarPane.width }}
-                    className={`${PANE_SIDEBAR} flex shrink-0 flex-col`}
-                    data-app-sidebar=""
+                    ref={sidebarPane.frameRef}
+                    style={{ width: sidebarOpen ? sidebarPane.width : 0 }}
+                    className={cn(
+                      PANE_FRAME,
+                      // Anchored left: the sidebar stays put while the columns
+                      // after it slide over it, and back out.
+                      sidebarOpen && "[[data-panel-animations=true]_&]:starting:w-0!",
+                      !sidebarOpen && "pointer-events-none",
+                    )}
                   >
-                    {settingsRoute ? (
-                      <>
-                        <SidebarTitle />
-                        <SettingsNav
-                          pane={settingsRoute.pane}
-                          onSelect={(pane, target) => openSettings({ pane, target })}
-                          onBack={leaveSettings}
-                        />
-                      </>
-                    ) : isProjects ? (
-                      <>
-                        <SidebarTitle />
-                        <ProjectsSidebar
+                    <div
+                      ref={sidebarPane.paneRef}
+                      style={{ width: sidebarPane.width }}
+                      className={`${PANE_SIDEBAR} flex shrink-0 flex-col`}
+                      data-app-sidebar=""
+                    >
+                      {settingsRoute ? (
+                        <>
+                          <SidebarTitle />
+                          <SettingsNav
+                            pane={settingsRoute.pane}
+                            onSelect={(pane, target) => openSettings({ pane, target })}
+                            onBack={leaveSettings}
+                          />
+                        </>
+                      ) : isProjects ? (
+                        <>
+                          <SidebarTitle />
+                          <ProjectsSidebar
+                            selectedLabelId={selectedLabelId}
+                            onSelectLabel={handleSelectLabel}
+                            searchSelected={activeSearch?.id === topSearchId}
+                            searchPending={Boolean(
+                              searchTabs.find((t) => t.id === topSearchId)?.draft.trim(),
+                            )}
+                            onOpenSearch={() => openSearch()}
+                          />
+                          <UpdateCard />
+                        </>
+                      ) : viewSpace ? null : (
+                        <AccountsSidebar
+                          selectedAccountId={effectiveAccountId}
+                          onSelectAccount={handleSelectAccount}
                           selectedLabelId={selectedLabelId}
                           onSelectLabel={handleSelectLabel}
+                          views={views}
+                          onCompose={() => setComposeOpen(true)}
                           searchSelected={activeSearch?.id === topSearchId}
                           searchPending={Boolean(
                             searchTabs.find((t) => t.id === topSearchId)?.draft.trim(),
                           )}
+                          searches={searchTabs
+                            .filter((t) => t.mailbox === searchMailbox && t.parent)
+                            .map((t) => ({
+                              id: t.id,
+                              parent: t.parent!,
+                              title: searchTitle(t),
+                              selected: activeSearch?.id === t.id,
+                            }))}
+                          onSelectSearch={(id) => {
+                            showSearch(id);
+                            focusSearchEnd();
+                          }}
+                          onCloseSearch={closeSearch}
                           onOpenSearch={() => openSearch()}
                         />
-                        <UpdateCard />
-                      </>
-                    ) : viewSpace ? null : (
-                      <AccountsSidebar
-                        selectedAccountId={effectiveAccountId}
-                        onSelectAccount={handleSelectAccount}
-                        selectedLabelId={selectedLabelId}
-                        onSelectLabel={handleSelectLabel}
-                        views={views}
-                        onCompose={() => setComposeOpen(true)}
-                        searchSelected={activeSearch?.id === topSearchId}
-                        searchPending={Boolean(
-                          searchTabs.find((t) => t.id === topSearchId)?.draft.trim(),
-                        )}
-                        searches={searchTabs
-                          .filter((t) => t.mailbox === searchMailbox && t.parent)
-                          .map((t) => ({
-                            id: t.id,
-                            parent: t.parent!,
-                            title: searchTitle(t),
-                            selected: activeSearch?.id === t.id,
-                          }))}
-                        onSelectSearch={(id) => {
-                          showSearch(id);
-                          focusSearchEnd();
-                        }}
-                        onCloseSearch={closeSearch}
-                        onOpenSearch={() => openSearch()}
+                      )}
+                    </div>
+                  </div>
+                  {sidebarOpen ? <PaneResizer onPointerDown={sidebarPane.start} /> : null}
+                </>
+              ) : null}
+              <div className="relative flex min-h-0 min-w-0 flex-1">
+                {hasListTarget && !settingsRoute ? (
+                  <>
+                    {/* Keep the list mounted while reading in Full inbox: its
+                    scroll position, selection and next-message shortcuts stay. */}
+                    <div
+                      ref={listPane.paneRef}
+                      style={{ width: wideInbox ? undefined : listPane.width }}
+                      className={cn(
+                        wideInbox ? `${PANE} min-w-0 flex-1` : `${PANE_LIST} shrink-0`,
+                        !listVisible && "invisible absolute inset-0",
+                      )}
+                      inert={!listVisible}
+                      data-tour="list"
+                    >
+                      <MessageList
+                        headerLeading={sidebarOpen ? null : <TitlebarInset />}
+                        headerTrailing={wideInbox ? titleTrailing : undefined}
+                        renderFloatingReader={
+                          floatingLayout && !composeOpen
+                            ? (navigation, title) => (
+                                <FloatingReader
+                                  container={mailWorkspace}
+                                  messageId={selectedMessageId ?? ""}
+                                  title={title}
+                                  navigation={navigation}
+                                  onClose={closeMessage}
+                                >
+                                  {renderReader(null, null)}
+                                </FloatingReader>
+                              )
+                            : undefined
+                        }
+                        accountId={(spansMailboxes ? firstRealAccountId : effectiveAccountId) ?? ""}
+                        labelId={selectedLabelId}
+                        combined={combined}
+                        accountIds={accountIds}
+                        accounts={accounts}
+                        selectedMessageId={selectedMessageId}
+                        focusedMessageId={focusedMessageId}
+                        onSelectMessage={handleSelectMessage}
+                        onDeselect={closeMessage}
+                        advanceRef={advanceRef}
+                        onSelectionChange={setChatSelection}
+                        onOpenChat={openChat}
+                        onSearchView={searchFromView}
+                        viewQueryRef={viewQueryRef}
+                        space={
+                          viewSpace
+                            ? {
+                                name: viewSpace.name,
+                                onCompose: () => setComposeOpen(true),
+                                onEdit: () => openViewEditor(viewSpace.id),
+                              }
+                            : undefined
+                        }
+                        project={isProjects && !activeSearch ? { id: selectedLabelId } : undefined}
+                        search={
+                          activeSearch
+                            ? {
+                                id: activeSearch.id,
+                                query: activeSearch.query,
+                                base: activeSearch.base,
+                                accountIds: activeSearch.scope,
+                                onSearch: runSearch,
+                                onClear: () => {
+                                  const base = activeSearch.base ? `${activeSearch.base} ` : "";
+                                  patchSearch(activeSearch.id, { query: "", draft: base });
+                                  focusSearchEnd();
+                                },
+                                onExit: () => closeSearch(activeSearch.id),
+                                onScope: (scope) => patchSearch(activeSearch.id, { scope }),
+                                focusRef: searchRef,
+                                draft: activeSearch.draft,
+                                onDraftChange: (draft) => patchSearch(activeSearch.id, { draft }),
+                                messageOpen: selectedMessageId !== null,
+                              }
+                            : undefined
+                        }
                       />
+                    </div>
+                    {wideInbox ? null : <PaneResizer onPointerDown={listPane.start} />}
+                  </>
+                ) : null}
+                <div
+                  className={cn(
+                    `${PANE_MAIN} min-w-0 flex-1 flex-col`,
+                    showMain ? "flex" : "hidden",
+                  )}
+                  data-tour={showMain ? "reader" : undefined}
+                >
+                  {readerOwnsBand ? null : titleControls}
+                  <div className="flex min-h-0 flex-1 flex-col">
+                    {settingsRoute ? (
+                      <SettingsPage route={settingsRoute} onNavigate={openSettings} />
+                    ) : composeOpen && composeAccountId ? (
+                      <NewMessageView
+                        key={mailtoSeq}
+                        accounts={accounts}
+                        defaultAccountId={composeAccountId}
+                        onClose={() => {
+                          setComposeOpen(false);
+                          setMailtoPrefill(null);
+                        }}
+                        prefill={mailtoPrefill ?? undefined}
+                      />
+                    ) : isProjects && !selectedMessageId && !searchActive ? (
+                      selectedProject ? (
+                        <ProjectView
+                          project={selectedProject}
+                          onOpenMessage={(accountId, messageId) =>
+                            handleSelectMessage(messageId, accountId)
+                          }
+                          onAskAgent={openChat}
+                          onDeleted={() => handleSelectLabel(ALL_PROJECTS)}
+                        />
+                      ) : (
+                        <ProjectsOverview onOpenProject={openProject} />
+                      )
+                    ) : readerAccount ? (
+                      showMain ? (
+                        renderReader()
+                      ) : null
+                    ) : (
+                      <div className="flex h-full items-center justify-center">
+                        <EmptyState
+                          title="No account selected"
+                          description="Select a mailbox from the sidebar."
+                        />
+                      </div>
                     )}
                   </div>
                 </div>
-                {sidebarOpen ? <PaneResizer onPointerDown={sidebarPane.start} /> : null}
-              </>
-            ) : null}
-            {hasListTarget && !settingsRoute ? (
-              <>
-                <div
-                  ref={listPane.paneRef}
-                  style={{ width: listPane.width }}
-                  className={`${PANE_LIST} shrink-0`}
-                  data-tour="list"
-                >
-                  <MessageList
-                    headerLeading={sidebarOpen ? null : <TitlebarInset />}
-                    accountId={(spansMailboxes ? firstRealAccountId : effectiveAccountId) ?? ""}
-                    labelId={selectedLabelId}
-                    combined={combined}
-                    accountIds={accountIds}
-                    accounts={accounts}
-                    selectedMessageId={selectedMessageId}
-                    focusedMessageId={focusedMessageId}
-                    onSelectMessage={handleSelectMessage}
-                    onDeselect={closeMessage}
-                    advanceRef={advanceRef}
-                    onSelectionChange={setChatSelection}
-                    onOpenChat={openChat}
-                    onSearchView={searchFromView}
-                    viewQueryRef={viewQueryRef}
-                    space={
-                      viewSpace
-                        ? {
-                            name: viewSpace.name,
-                            onCompose: () => setComposeOpen(true),
-                            onEdit: () => openViewEditor(viewSpace.id),
-                          }
-                        : undefined
-                    }
-                    project={isProjects && !activeSearch ? { id: selectedLabelId } : undefined}
-                    search={
-                      activeSearch
-                        ? {
-                            id: activeSearch.id,
-                            query: activeSearch.query,
-                            base: activeSearch.base,
-                            accountIds: activeSearch.scope,
-                            onSearch: runSearch,
-                            onClear: () => {
-                              const base = activeSearch.base ? `${activeSearch.base} ` : "";
-                              patchSearch(activeSearch.id, { query: "", draft: base });
-                              focusSearchEnd();
-                            },
-                            onExit: () => closeSearch(activeSearch.id),
-                            onScope: (scope) => patchSearch(activeSearch.id, { scope }),
-                            focusRef: searchRef,
-                            draft: activeSearch.draft,
-                            onDraftChange: (draft) => patchSearch(activeSearch.id, { draft }),
-                            messageOpen: selectedMessageId !== null,
-                          }
-                        : undefined
-                    }
-                  />
-                </div>
-                <PaneResizer onPointerDown={listPane.start} />
-              </>
-            ) : null}
-            <div className={`${PANE_MAIN} flex min-w-0 flex-1 flex-col`} data-tour="reader">
-              {readerOwnsBand ? null : titleControls}
-              <div className="flex min-h-0 flex-1 flex-col">
-                {settingsRoute ? (
-                  <SettingsPage route={settingsRoute} onNavigate={openSettings} />
-                ) : composeOpen && composeAccountId ? (
-                  <NewMessageView
-                    key={mailtoSeq}
-                    accounts={accounts}
-                    defaultAccountId={composeAccountId}
-                    onClose={() => {
-                      setComposeOpen(false);
-                      setMailtoPrefill(null);
-                    }}
-                    prefill={mailtoPrefill ?? undefined}
-                  />
-                ) : isProjects && !selectedMessageId && !searchActive ? (
-                  selectedProject ? (
-                    <ProjectView
-                      project={selectedProject}
-                      onOpenMessage={(accountId, messageId) =>
-                        handleSelectMessage(messageId, accountId)
-                      }
-                      onAskAgent={openChat}
-                      onDeleted={() => handleSelectLabel(ALL_PROJECTS)}
-                    />
-                  ) : (
-                    <ProjectsOverview onOpenProject={openProject} />
-                  )
-                ) : readerAccount ? (
-                  <MessageReader
-                    titleTrailing={titleTrailing}
-                    accountId={readerAccount}
-                    messageId={focusedMessageId ?? selectedMessageId}
-                    single={focusedMessageId != null}
-                    onShowConversation={() => go({ focusId: null })}
-                    onDeselect={closeMessage}
-                    onAdvance={handleReaderAdvance}
-                    onOpenChat={openChat}
-                    onQuote={(q) => {
-                      // Only reflect selections while the panel is open, so normal
-                      // reading/copying is never hijacked.
-                      if (chatOpen) setPendingQuote(q);
-                    }}
-                    onComposeTo={(email) => {
-                      setMailtoPrefill({ to: email, cc: "", subject: "", body: "" });
-                      setMailtoSeq((n) => n + 1);
-                      setComposeOpen(true);
-                    }}
-                    onSearchSender={(email) => handleSearchChange(`from:${email}`)}
-                    onOpenProject={openProject}
-                  />
-                ) : (
-                  <div className="flex h-full items-center justify-center">
-                    <EmptyState
-                      title="No account selected"
-                      description="Select a mailbox from the sidebar."
-                    />
-                  </div>
-                )}
               </div>
             </div>
             {chatPresent ? (

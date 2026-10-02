@@ -53,7 +53,7 @@ const FIELD =
   "h-7.5 w-full min-w-0 rounded-lg border border-input bg-canvas px-2.5 text-sm text-foreground shadow-xs/5 outline-none placeholder:text-placeholder focus-visible:border-focus-ring focus-visible:ring-[3px] focus-visible:ring-focus-ring/24 dark:bg-input/32";
 
 const CHIP =
-  "inline-flex h-7 shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-full border px-3 text-[13px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-focus-ring";
+  "inline-flex h-7 shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-full border px-3 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-focus-ring";
 
 function chipClass(active: boolean) {
   return cn(
@@ -589,6 +589,8 @@ function ScopeChip({
 // ---------------------------------------------------------------------------
 
 export function SearchHeader({
+  headerLeading,
+  headerTrailing,
   query,
   onSearch,
   onExit,
@@ -606,6 +608,8 @@ export function SearchHeader({
   onDraftChange,
   messageOpen,
 }: {
+  headerLeading?: ReactNode;
+  headerTrailing?: ReactNode;
   /** The query that ran (the results on screen). */
   query: string;
   onSearch: (q: string) => void;
@@ -722,6 +726,7 @@ export function SearchHeader({
   return (
     <div ref={boxRef} className="relative shrink-0">
       <div className="drag-region flex h-(--workspace-topbar-height) items-center gap-2 px-3">
+        {headerLeading}
         <div className="no-drag relative flex h-8 min-w-0 flex-1 items-center gap-2 rounded-full bg-accent-surface px-3 transition-colors focus-within:bg-secondary">
           <SearchIcon className="size-4 shrink-0 text-muted-foreground" />
           <input
@@ -784,6 +789,7 @@ export function SearchHeader({
             </IconBtn>
           </HintTooltip>
         </div>
+        {headerTrailing}
       </div>
 
       {showSuggestions ? (

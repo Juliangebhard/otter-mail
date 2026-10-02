@@ -74,7 +74,7 @@ function ToolBtn({
       onMouseDown={(e) => e.preventDefault()}
       onClick={onClick}
       className={[
-        "flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-lg transition-colors",
+        "flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-lg",
         active
           ? "bg-accent-surface text-foreground"
           : "text-muted-foreground hover:bg-accent-surface hover:text-foreground",

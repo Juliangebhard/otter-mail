@@ -35,6 +35,7 @@ import {
 } from "@otter-mail/shared/themes";
 import { getThemeModes, removeCustomTheme, serializeThemeFile } from "../theme/themePalette";
 import { Button } from "~/components/ui/button";
+import { Switch } from "~/components/ui/switch";
 import { Dialog } from "~/components/ui/dialog";
 import { Tooltip, TooltipPopup, TooltipProvider, TooltipTrigger } from "~/components/ui/tooltip";
 import { ThemeImportDialog } from "./theme/ThemeImportDialog";
@@ -51,14 +52,30 @@ import {
   CONTRAST,
   GLASS_OPACITY,
   DEFAULT_READING_WIDTH,
+  DEFAULT_MESSAGE_LIST_STYLE,
+  DEFAULT_MAIL_LAYOUT,
   INTERFACE_FONT_SIZE,
+  GROUP_MESSAGES_BY_DAY,
+  DIM_READ_MESSAGES,
+  OPEN_MESSAGES_WITH_ARROWS,
+  MARK_READ_DELAY,
+  MESSAGE_LIST_STYLES,
+  MAIL_LAYOUTS,
   READING_WIDTHS,
   setInterfaceSetting,
+  setInterfaceToggle,
   setReadingWidth,
+  setMessageListStyle,
+  setMailLayout,
   useInterfaceSetting,
+  useInterfaceToggle,
   useReadingWidth,
+  useMessageListStyle,
+  useMailLayout,
   type InterfaceSetting,
   type ReadingWidth,
+  type MessageListStyle,
+  type MailLayout,
 } from "../theme/interface-settings";
 import {
   RowSelect,
@@ -149,7 +166,7 @@ export function SchemeCard({
       aria-pressed={selected}
       onClick={onSelect}
       className={cn(
-        "flex cursor-pointer flex-col items-center gap-2 rounded-xl border bg-card p-2 pb-2.5 text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-focus-ring",
+        "flex cursor-pointer flex-col items-center gap-2 rounded-xl border bg-card p-2 pb-2.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-focus-ring",
         compact && "items-stretch gap-1.5 p-1.5 pb-2",
         selected
           ? "border-focus-ring text-foreground ring-1 ring-focus-ring"
@@ -234,7 +251,7 @@ function ThemeHalf({
         <span
           aria-hidden
           className={cn(
-            "pointer-events-none absolute inset-0 rounded-[inherit] transition-shadow",
+            "pointer-events-none absolute inset-0 rounded-[inherit]",
             picked
               ? "shadow-[inset_0_0_0_2px_var(--ring)]"
               : "group-hover/half:shadow-[inset_0_0_0_2px_color-mix(in_srgb,var(--ring)_45%,transparent)]",
@@ -279,7 +296,7 @@ export function ThemeCard({
         }
       }}
       className={cn(
-        "group/theme flex cursor-pointer flex-col gap-1.5 rounded-xl border bg-card p-1.5 pb-2 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-focus-ring",
+        "group/theme flex cursor-pointer flex-col gap-1.5 rounded-xl border bg-card p-1.5 pb-2 outline-none focus-visible:ring-2 focus-visible:ring-focus-ring",
         active ? "border-foreground/25" : "border-border/60 hover:border-input",
       )}
     >
@@ -299,7 +316,7 @@ export function ThemeCard({
         <span className="min-w-0 flex-1 truncate text-sm text-foreground">{theme.label}</span>
         {actions ? (
           <span
-            className="-me-1.5 flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-focus-within/theme:opacity-100 group-hover/theme:opacity-100 has-[[data-state=open]]:opacity-100"
+            className="-me-1.5 flex shrink-0 items-center gap-0.5 opacity-0 group-focus-within/theme:opacity-100 group-hover/theme:opacity-100 has-[[data-state=open]]:opacity-100"
             onClick={(e) => e.stopPropagation()}
             onKeyDown={(e) => e.stopPropagation()}
           >
@@ -716,6 +733,216 @@ export function ReadingWidthRow({ id }: { id?: string }) {
   );
 }
 
+function MailLayoutPicker() {
+  const selectedLayout = useMailLayout();
+  return (
+    <SettingsSection
+      {...searchableSetting("mail-layout")}
+      description="Choose how you browse and read your mail."
+      variant="plain"
+      headerAction={
+        selectedLayout !== DEFAULT_MAIL_LAYOUT ? (
+          <SettingResetButton
+            label="mail layout"
+            onClick={() => setMailLayout(DEFAULT_MAIL_LAYOUT)}
+          />
+        ) : null
+      }
+    >
+      <div className="@container">
+        <div className="grid grid-cols-1 gap-2 @min-[24rem]:grid-cols-3">
+          {Object.entries(MAIL_LAYOUTS).map(([value, { label, description }]) => (
+            <button
+              key={value}
+              type="button"
+              aria-label={label}
+              aria-pressed={selectedLayout === value}
+              aria-describedby={`mail-layout-${value}-description`}
+              onClick={() => setMailLayout(value as MailLayout)}
+              className={cn(
+                "flex cursor-pointer flex-col rounded-xl border bg-card p-1.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-focus-ring",
+                selectedLayout === value
+                  ? "border-focus-ring ring-1 ring-focus-ring"
+                  : "border-border/60 hover:border-input",
+              )}
+            >
+              <span
+                aria-hidden="true"
+                className="relative flex h-32 w-full overflow-hidden rounded-lg border border-border/60 bg-canvas"
+              >
+                <span className="flex w-1/5 shrink-0 flex-col gap-2 border-r border-border/70 bg-sidebar-surface p-2 pt-4">
+                  <span className="h-2 rounded-sm bg-sidebar-row-active" />
+                  <span className="h-1 w-4/5 rounded-full bg-muted-foreground/25" />
+                  <span className="h-1 w-3/5 rounded-full bg-muted-foreground/25" />
+                  <span className="h-1 w-4/5 rounded-full bg-muted-foreground/25" />
+                </span>
+                <span
+                  className={cn(
+                    "flex flex-col",
+                    value === "split" ? "w-1/3 border-r border-border/70" : "flex-1",
+                  )}
+                >
+                  <span className="flex h-6 shrink-0 items-center border-b border-border/60 px-2">
+                    <span className="h-1 w-8 rounded-full bg-muted-foreground/40" />
+                  </span>
+                  {[0, 1, 2, 3].map((row) => (
+                    <span
+                      key={row}
+                      className={cn(
+                        "flex gap-1.5 border-b border-border/40 px-2 py-2",
+                        value === "split" ? "flex-col" : "items-center",
+                        row === 0 && value === "split" && "bg-sidebar-row-active",
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          "h-1 rounded-full bg-foreground/40",
+                          value === "split" ? "w-3/5" : "w-1/5",
+                        )}
+                      />
+                      <span
+                        className={cn(
+                          "h-1 rounded-full bg-muted-foreground/25",
+                          value === "split" ? "w-4/5" : "flex-1",
+                        )}
+                      />
+                      {value !== "split" ? (
+                        <span className="h-1 w-3 rounded-full bg-muted-foreground/25" />
+                      ) : null}
+                    </span>
+                  ))}
+                </span>
+                {value === "split" ? (
+                  <span className="flex min-w-0 flex-1 flex-col gap-2 p-2 pt-4">
+                    <span className="h-1.5 w-4/5 rounded-full bg-foreground/50" />
+                    <span className="mt-2 h-1 w-3/5 rounded-full bg-muted-foreground/30" />
+                    <span className="h-1 w-full rounded-full bg-muted-foreground/20" />
+                    <span className="h-1 w-4/5 rounded-full bg-muted-foreground/20" />
+                    <span className="h-1 w-full rounded-full bg-muted-foreground/20" />
+                  </span>
+                ) : null}
+                {value === "floating" ? (
+                  <span className="absolute inset-0 flex items-end justify-end p-1.5">
+                    <span className="flex h-20 w-2/3 flex-col overflow-hidden rounded-md border border-border bg-canvas shadow-lg">
+                      <span className="flex h-6 shrink-0 items-center justify-between border-b border-border/60 px-2">
+                        <span className="h-1 w-2/5 rounded-full bg-foreground/50" />
+                        <span className="text-[10px] leading-none text-muted-foreground">×</span>
+                      </span>
+                      <span className="flex flex-col gap-1.5 p-2">
+                        <span className="h-1 w-2/5 rounded-full bg-foreground/40" />
+                        <span className="mt-1 h-1 w-full rounded-full bg-muted-foreground/25" />
+                        <span className="h-1 w-4/5 rounded-full bg-muted-foreground/25" />
+                        <span className="h-1 w-3/5 rounded-full bg-muted-foreground/25" />
+                      </span>
+                    </span>
+                  </span>
+                ) : null}
+              </span>
+              <span className="mt-2 px-2.5 text-sm font-medium text-foreground">{label}</span>
+              <span
+                id={`mail-layout-${value}-description`}
+                className="mt-1 mb-1 px-2.5 text-xs leading-relaxed text-muted-foreground"
+              >
+                {description}
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </SettingsSection>
+  );
+}
+
+function MessageListStylePicker() {
+  const selectedStyle = useMessageListStyle();
+  return (
+    <SettingsSection
+      {...searchableSetting("message-list-style")}
+      description="Choose how conversations are separated in the message list."
+      variant="plain"
+      headerAction={
+        selectedStyle !== DEFAULT_MESSAGE_LIST_STYLE ? (
+          <SettingResetButton
+            label="message list style"
+            onClick={() => setMessageListStyle(DEFAULT_MESSAGE_LIST_STYLE)}
+          />
+        ) : null
+      }
+    >
+      <div className="@container">
+        <div className="grid grid-cols-1 gap-2 @min-[24rem]:grid-cols-2">
+          {Object.entries(MESSAGE_LIST_STYLES).map(([value, { label, description }]) => {
+            const selected = selectedStyle === value;
+            return (
+              <button
+                key={value}
+                type="button"
+                aria-label={label}
+                aria-pressed={selected}
+                aria-describedby={`message-list-style-${value}-description`}
+                onClick={() => setMessageListStyle(value as MessageListStyle)}
+                className={cn(
+                  "flex cursor-pointer flex-col rounded-xl border bg-card p-1.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-focus-ring",
+                  selected
+                    ? "border-focus-ring ring-1 ring-focus-ring"
+                    : "border-border/60 hover:border-input",
+                )}
+              >
+                <span
+                  aria-hidden="true"
+                  data-message-list-style={value}
+                  className="block h-40 w-full overflow-hidden rounded-lg border border-border/60 bg-sidebar-surface"
+                >
+                  <span
+                    className={cn("block", value === "classic" && "pt-2")}
+                    style={{ zoom: 0.75 }}
+                  >
+                    {[
+                      {
+                        sender: "Alex Morgan",
+                        subject: "Weekend plans",
+                        snippet: "How about Saturday?",
+                      },
+                      {
+                        sender: "Jamie Lee",
+                        subject: "A little update",
+                        snippet: "Here's what I've been working on.",
+                      },
+                    ].map(({ sender, subject, snippet }) => (
+                      <span key={sender} className="message-list-group block">
+                        <span className="message-list-row block px-3">
+                          <span className="message-list-row-content flex min-w-0 flex-col">
+                            <span className="truncate text-sm font-medium leading-snug text-foreground">
+                              {sender}
+                            </span>
+                            <span className="truncate text-[13px] leading-snug text-foreground/90">
+                              {subject}
+                            </span>
+                            <span className="message-list-snippet truncate text-[13px] leading-snug text-muted-foreground/75">
+                              {snippet}
+                            </span>
+                          </span>
+                        </span>
+                      </span>
+                    ))}
+                  </span>
+                </span>
+                <span className="mt-2 px-2.5 text-sm font-medium text-foreground">{label}</span>
+                <span
+                  id={`message-list-style-${value}-description`}
+                  className="mt-1 mb-1 px-2.5 text-xs leading-relaxed text-muted-foreground"
+                >
+                  {description}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </SettingsSection>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Pane
 // ---------------------------------------------------------------------------
@@ -752,6 +979,10 @@ export function useColorScheme(): [ColorScheme, (next: ColorScheme) => Promise<v
 export function AppearancePane() {
   const choice = useThemeChoice();
   const [scheme, setScheme] = useColorScheme();
+  const groupMessagesByDay = useInterfaceToggle(GROUP_MESSAGES_BY_DAY);
+  const dimReadMessages = useInterfaceToggle(DIM_READ_MESSAGES);
+  const openMessagesWithArrows = useInterfaceToggle(OPEN_MESSAGES_WITH_ARROWS);
+  const markReadDelay = useInterfaceSetting(MARK_READ_DELAY);
 
   const panelAnimationDurationMs = usePanelAnimationDurationMs();
 
@@ -780,6 +1011,74 @@ export function AppearancePane() {
 
         <ThemeLibrary />
       </div>
+
+      <MailLayoutPicker />
+      <MessageListStylePicker />
+
+      <SettingsSection title="Message list" description="These options apply to every mail layout.">
+        <SettingsRow
+          {...searchableSetting("group-messages-by-day")}
+          description="Separate messages by day. Click a day heading to collapse or expand it."
+          control={
+            <Switch
+              aria-label="Group messages by day"
+              checked={groupMessagesByDay}
+              onCheckedChange={(value) => setInterfaceToggle(GROUP_MESSAGES_BY_DAY, value)}
+            />
+          }
+        />
+        <SettingsRow
+          {...searchableSetting("dim-read-messages")}
+          description="Give read messages a muted background so unread mail stands out."
+          control={
+            <Switch
+              aria-label="Dim read messages"
+              checked={dimReadMessages}
+              onCheckedChange={(value) => setInterfaceToggle(DIM_READ_MESSAGES, value)}
+            />
+          }
+        />
+      </SettingsSection>
+
+      <SettingsSection title="Reading">
+        <SettingsRow
+          {...searchableSetting("open-messages-with-arrows")}
+          description="When no email is open, arrows and J/K open messages as you browse. Turn off to highlight rows, then press Enter or click to open."
+          control={
+            <Switch
+              aria-label="Open messages with arrow keys"
+              checked={openMessagesWithArrows}
+              onCheckedChange={(value) => setInterfaceToggle(OPEN_MESSAGES_WITH_ARROWS, value)}
+            />
+          }
+        />
+        <SettingsRow
+          {...searchableSetting("mark-read-delay")}
+          description="How long to wait before marking an email read when browsing with the keyboard. Clicking or pressing Enter marks it read immediately."
+          control={
+            <div className="w-full sm:w-52">
+              <SettingSlider
+                id="mark-read-delay-slider"
+                label="Mark as read delay"
+                value={markReadDelay}
+                valueLabel={`${markReadDelay / 1000} s`}
+                min={MARK_READ_DELAY.min}
+                max={MARK_READ_DELAY.max}
+                step={MARK_READ_DELAY.step}
+                onChange={(value) => setInterfaceSetting(MARK_READ_DELAY, value)}
+              />
+            </div>
+          }
+          resetAction={
+            markReadDelay !== MARK_READ_DELAY.defaultValue ? (
+              <SettingResetButton
+                label="mark as read delay"
+                onClick={() => setInterfaceSetting(MARK_READ_DELAY, MARK_READ_DELAY.defaultValue)}
+              />
+            ) : null
+          }
+        />
+      </SettingsSection>
 
       <SettingsSection title="Interface">
         <PercentSettingRow

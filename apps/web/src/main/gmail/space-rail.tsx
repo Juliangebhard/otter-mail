@@ -35,7 +35,7 @@ import { ViewMark } from "./view-icon";
 
 /** A rail button: a square that lights up on hover, and stays lit where you are. */
 const RAIL_BUTTON =
-  "relative flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-lg text-sidebar-muted-foreground outline-none transition-colors hover:bg-sidebar-row-hover hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-focus-ring data-[state=open]:bg-sidebar-row-hover";
+  "relative flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-lg text-sidebar-muted-foreground outline-none hover:bg-sidebar-row-hover hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-focus-ring data-[state=open]:bg-sidebar-row-hover";
 const RAIL_BUTTON_SELECTED = "bg-sidebar-row-selected text-sidebar-foreground";
 
 const UNREAD_DOTS = "gmail:rail-unread-dots";

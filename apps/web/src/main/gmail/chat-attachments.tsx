@@ -303,7 +303,7 @@ export function AttachmentChip({
           type="button"
           onClick={onRemove}
           aria-label={`Remove ${name}`}
-          className="absolute -right-1.5 -top-1.5 z-20 flex size-4.5 cursor-pointer items-center justify-center rounded-full border border-foreground/10 bg-popover text-muted-foreground opacity-0 shadow-sm transition-opacity hover:text-foreground group-hover/attachment:opacity-100 focus-visible:opacity-100"
+          className="absolute -right-1.5 -top-1.5 z-20 flex size-4.5 cursor-pointer items-center justify-center rounded-full border border-foreground/10 bg-popover text-muted-foreground opacity-0 shadow-sm hover:text-foreground group-hover/attachment:opacity-100 focus-visible:opacity-100"
         >
           <XIcon className="size-2.5" />
         </button>

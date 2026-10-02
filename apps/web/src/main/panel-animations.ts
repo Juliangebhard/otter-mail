@@ -1,6 +1,6 @@
 /**
  * Panel animation duration (ported from Otter Code's panelAnimations): how
- * long the sidebar and agent panel take to open and close. 0 turns the
+ * long the sidebar, agent panel and floating reader take to open and close. 0 turns the
  * motion off. Lives in localStorage like the other per-device UI choices.
  */
 

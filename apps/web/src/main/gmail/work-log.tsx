@@ -119,7 +119,7 @@ function RowHead({
       </span>
       <span
         className={cn(
-          "min-w-0 truncate text-sm leading-relaxed text-secondary-label transition-colors",
+          "min-w-0 truncate text-sm leading-relaxed text-secondary-label",
           expandable && "group-hover/step:text-foreground",
           open && "text-foreground",
           pending && "animate-status-pulse",
@@ -130,7 +130,7 @@ function RowHead({
       {expandable ? (
         <Chevron
           className={cn(
-            "size-3.5 shrink-0 text-icon-muted transition-opacity",
+            "size-3.5 shrink-0 text-icon-muted",
             !open && "opacity-0 group-hover/step:opacity-70",
           )}
           aria-hidden

@@ -73,7 +73,7 @@ function ProjectRow({
     <button
       type="button"
       onClick={onOpen}
-      className="group flex w-full items-start gap-3 px-4 py-3 text-left outline-none transition-colors hover:bg-accent-surface/60 focus-visible:bg-accent-surface/60"
+      className="group flex w-full items-start gap-3 px-4 py-3 text-left outline-none hover:bg-accent-surface/60 focus-visible:bg-accent-surface/60"
     >
       <span className="mt-0.5 shrink-0 text-muted-foreground">
         {settled ? <CircleCheckIcon className="size-4" /> : <FolderIcon className="size-4" />}
@@ -149,7 +149,7 @@ export function ProjectsOverview({ onOpenProject }: { onOpenProject: (id: string
                 key={starter.name}
                 type="button"
                 onClick={() => requestNewProject({ open: true, name: starter.name })}
-                className="flex items-start gap-3.5 rounded-2xl border border-dashed border-border px-5 py-4 text-left outline-none transition-colors hover:bg-accent-surface/60 focus-visible:ring-2 focus-visible:ring-focus-ring"
+                className="flex items-start gap-3.5 rounded-2xl border border-dashed border-border px-5 py-4 text-left outline-none hover:bg-accent-surface/60 focus-visible:ring-2 focus-visible:ring-focus-ring"
               >
                 <span aria-hidden className="text-2xl leading-none">
                   {starter.emoji}
@@ -184,7 +184,7 @@ export function ProjectsOverview({ onOpenProject }: { onOpenProject: (id: string
           <button
             type="button"
             onClick={() => requestNewProject({ open: true })}
-            className="h-10 shrink-0 rounded-full bg-foreground px-4 text-sm font-medium text-background outline-none transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-focus-ring"
+            className="h-10 shrink-0 rounded-full bg-foreground px-4 text-sm font-medium text-background outline-none hover:opacity-90 focus-visible:ring-2 focus-visible:ring-focus-ring"
           >
             New project
           </button>
@@ -203,7 +203,7 @@ export function ProjectsOverview({ onOpenProject }: { onOpenProject: (id: string
               aria-selected={tab === id}
               onClick={() => setTab(id)}
               className={cn(
-                "h-9 rounded-full px-4 text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-focus-ring",
+                "h-9 rounded-full px-4 text-sm outline-none focus-visible:ring-2 focus-visible:ring-focus-ring",
                 tab === id
                   ? "bg-accent-surface text-foreground"
                   : "text-muted-foreground hover:text-foreground",

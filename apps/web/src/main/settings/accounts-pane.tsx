@@ -105,7 +105,7 @@ function ColorPicker({
           <button
             type="button"
             aria-label={label}
-            className="flex size-7 cursor-pointer items-center justify-center rounded-lg outline-none transition-colors hover:bg-accent-surface focus-visible:ring-2 focus-visible:ring-focus-ring"
+            className="flex size-7 cursor-pointer items-center justify-center rounded-lg outline-none hover:bg-accent-surface focus-visible:ring-2 focus-visible:ring-focus-ring"
           >
             <span
               className="size-3.5 rounded-full ring-1 ring-inset ring-black/10"
@@ -309,7 +309,7 @@ function AccountListRow({
       }}
       onDragEnd={onDragEnd}
       className={cn(
-        "group/row relative flex min-h-[60px] items-center gap-3 px-4 py-2.5 transition-colors",
+        "group/row relative flex min-h-[60px] items-center gap-3 px-4 py-2.5",
         selected ? "bg-foreground/[0.04]" : "hover:bg-foreground/[0.03]",
         dragging && "opacity-40",
       )}
@@ -333,7 +333,7 @@ function AccountListRow({
       {/* In the row's left padding, so the avatars line up with the text of every other row. */}
       <GripVerticalIcon
         aria-hidden
-        className="pointer-events-none absolute left-0.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground/0 transition-colors group-hover/row:text-muted-foreground/70"
+        className="pointer-events-none absolute left-0.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground/0 group-hover/row:text-muted-foreground/70"
       />
       <span className={cn("pointer-events-none contents", !on && "[&>*]:opacity-50")}>
         <AccountAvatar account={account} size="medium" />
