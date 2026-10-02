@@ -102,6 +102,14 @@ struct SettingsView: View {
                     }
                 }
 
+                Section("Message list") {
+                    Picker("Style", selection: $preferences.messageListStyle) {
+                        ForEach(Preferences.MessageListStyle.allCases) { Text($0.title).tag($0) }
+                    }
+                    Toggle("Group by day", isOn: $preferences.groupMessagesByDay)
+                    Toggle("Dim read messages", isOn: $preferences.dimReadMessages)
+                }
+
                 Section("Account") {
                     if session.user != nil {
                         NavigationLink {

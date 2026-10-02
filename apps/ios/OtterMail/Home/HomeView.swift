@@ -54,6 +54,22 @@ struct HomeView: View {
                         ThreadView(threadID: id, place: place, path: $path, draft: $draft)
                     }
                 }
+                .safeAreaInset(edge: .bottom, spacing: 8) {
+                    if let action = store.undoAction {
+                        HStack {
+                            Text(action.title).font(.subheadline).lineLimit(2)
+                            Spacer(minLength: 12)
+                            Button("Undo") { store.undo() }.fontWeight(.semibold)
+                                .accessibilityHint("Restores the conversations to their previous folders")
+                        }
+                        .foregroundStyle(palette.text)
+                        .padding(16)
+                        .background(palette.raised, in: .rect(cornerRadius: 18))
+                        .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(palette.border))
+                        .padding(.horizontal, 16)
+                        .id(action.id)
+                    }
+                }
                 .clipShape(.rect(cornerRadius: offset > 0 ? 44 : 0))
                 .overlay {
                     // Open, the list dims; a tap or a drag closes the drawer.
@@ -100,7 +116,7 @@ struct HomeView: View {
             path = [thread]
         }
         .sheet(item: $draft) { draft in
-            ComposeView(draft: draft)
+            ComposeView(draft: store.recover(draft))
         }
         .sheet(isPresented: $agentOpen) {
             NavigationStack {
@@ -137,7 +153,9 @@ struct HomeView: View {
 
     /** Horizontal drags slide the drawer, following the finger and settling by where and how fast it let go. */
     private func drawerGesture(width: CGFloat) -> some Gesture {
-        DragGesture(minimumDistance: 8)
+        // The closing gesture sits on the moving mail panel. Measure in screen
+        // coordinates so moving that panel doesn't change the drag's translation.
+        DragGesture(minimumDistance: 8, coordinateSpace: .global)
             .onChanged { value in drag = value.translation.width }
             .onEnded { value in settle(width: width, predicted: value.predictedEndTranslation.width) }
     }

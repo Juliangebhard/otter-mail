@@ -1,12 +1,14 @@
 import Foundation
 
 /** A message being written: a new one, a reply, or a draft picked back up. */
-struct Draft: Identifiable, Hashable {
-    let id = UUID()
+nonisolated struct Draft: Identifiable, Hashable, Codable {
+    var id = UUID()
     /** The mailbox it's sent from. */
     var from: String
     var to = ""
     var cc = ""
+    var bcc = ""
+    var files: [DraftFile] = []
     var subject = ""
     var body = ""
     /** Set for a reply: the thread it goes into. */
@@ -15,18 +17,59 @@ struct Draft: Identifiable, Hashable {
     var messageID: String?
 
     var isEmpty: Bool {
-        [to, cc, subject, body].allSatisfy { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        files.isEmpty && [to, cc, bcc, subject, body].allSatisfy { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
     }
 
-    var canSend: Bool { !Self.people(to).isEmpty }
+    enum Failure: LocalizedError {
+        case mailboxUnavailable, recoveryUnavailable, invalidRecipients
+        var errorDescription: String? {
+            switch self {
+            case .mailboxUnavailable: "This mailbox is no longer available. Sign in to it again before saving or sending."
+            case .recoveryUnavailable: "Draft recovery isn't available yet. Please keep this message open."
+            case .invalidRecipients: "Check the recipients before sending."
+            }
+        }
+    }
+
+    var canSend: Bool {
+        let recipients = [to, cc, bcc].flatMap(Self.tokens)
+        return !recipients.isEmpty && recipients.allSatisfy { Self.validRecipient($0) }
+    }
+
+    static func tokens(_ raw: String) -> [String] {
+        var tokens: [String] = [], token = ""
+        var quoted = false, escaped = false, angle = false
+        for character in raw {
+            if escaped { token.append(character); escaped = false; continue }
+            if character == "\\", quoted { token.append(character); escaped = true; continue }
+            if character == "\"" { quoted.toggle() }
+            if !quoted {
+                if character == "<" { angle = true }
+                if character == ">" { angle = false }
+            }
+            if !quoted && !angle && (character == "," || character == ";" || character == "\n") {
+                if !token.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { tokens.append(token.trimmingCharacters(in: .whitespacesAndNewlines)) }
+                token = ""
+            } else { token.append(character) }
+        }
+        if !token.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { tokens.append(token.trimmingCharacters(in: .whitespacesAndNewlines)) }
+        return tokens
+    }
+
+    static func validRecipient(_ token: String) -> Bool {
+        guard let person = people(token).first, people(token).count == 1 else { return false }
+        let parts = person.email.split(separator: "@", omittingEmptySubsequences: false)
+        return parts.count == 2 && !parts[0].isEmpty && !parts[1].isEmpty
+            && !person.email.contains(where: { $0.isWhitespace || "<>,;\"".contains($0) })
+    }
 
     /** A new message from `mailbox`, with its signature. */
-    static func new(from mailbox: Mailbox, to: String = "") -> Draft {
+    @MainActor static func new(from mailbox: Mailbox, to: String = "") -> Draft {
         Draft(from: mailbox.email, to: to, body: signatureBlock(mailbox))
     }
 
     /** A reply to the thread's latest message (to everyone on it, for reply all). */
-    static func reply(to thread: MailThread, in mailbox: Mailbox, all: Bool) -> Draft {
+    @MainActor static func reply(to thread: MailThread, in mailbox: Mailbox, all: Bool) -> Draft {
         let last = thread.sent.last ?? thread.latest
         let mine = last.from.isAddress(mailbox.email)
         var to = mine ? last.to : [last.from]
@@ -45,7 +88,7 @@ struct Draft: Identifiable, Hashable {
         )
     }
 
-    static func forward(_ thread: MailThread, in mailbox: Mailbox) -> Draft {
+    @MainActor static func forward(_ thread: MailThread, in mailbox: Mailbox) -> Draft {
         let last = thread.sent.last ?? thread.latest
         let header = """
             ---------- Forwarded message ---------
@@ -55,6 +98,7 @@ struct Draft: Identifiable, Hashable {
             """
         return Draft(
             from: mailbox.email,
+            files: last.attachments.map { DraftFile(filename: $0.filename, mimeType: $0.mimeType, size: $0.size, original: $0, messageID: last.id, sourceMailbox: thread.mailbox) },
             subject: thread.subject.hasPrefix("Fwd:") ? thread.subject : "Fwd: \(thread.subject)",
             body: signatureBlock(mailbox) + "\n\n\(header)\n\n\(last.text)"
         )
@@ -66,6 +110,8 @@ struct Draft: Identifiable, Hashable {
             from: thread.mailbox,
             to: message.to.map(format).joined(separator: ", "),
             cc: message.cc.map(format).joined(separator: ", "),
+            bcc: message.headers["Bcc"] ?? "",
+            files: message.attachments.map { DraftFile(filename: $0.filename, mimeType: $0.mimeType, size: $0.size, original: $0, messageID: message.id, sourceMailbox: thread.mailbox) },
             subject: thread.isDraft ? thread.subject : "",
             body: message.text,
             threadID: thread.isDraft ? nil : thread.id,
@@ -74,23 +120,17 @@ struct Draft: Identifiable, Hashable {
     }
 
     static func format(_ person: Person) -> String {
-        person.name.isEmpty ? person.email : "\(person.name) <\(person.email)>"
+        guard !person.name.isEmpty else { return person.email }
+        let name = person.name.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"")
+        return "\"\(name)\" <\(person.email)>"
     }
 
     /** "Ana <ana@x.com>, bo@y.com" → people (entries without an address are dropped). */
     static func people(_ list: String) -> [Person] {
-        list.split(separator: ",").compactMap { entry in
-            let entry = entry.trimmingCharacters(in: .whitespaces)
-            if let open = entry.lastIndex(of: "<"), let close = entry.lastIndex(of: ">"), open < close {
-                let email = String(entry[entry.index(after: open)..<close])
-                let name = entry[..<open].trimmingCharacters(in: .whitespaces.union(["\""]))
-                return email.contains("@") ? Person(name: name, email: email) : nil
-            }
-            return entry.contains("@") ? Person(name: "", email: entry) : nil
-        }
+        tokens(list).flatMap { Addresses.parse($0) }
     }
 
-    private static func signatureBlock(_ mailbox: Mailbox) -> String {
+    @MainActor private static func signatureBlock(_ mailbox: Mailbox) -> String {
         let signature = Signature.plainText(mailbox.signature)
         return signature.isEmpty ? "" : "\n\n\(signature)"
     }

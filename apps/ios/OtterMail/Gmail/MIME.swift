@@ -6,10 +6,18 @@ import Foundation
  * Gmail would add itself (an IMAP copy keeps the message as written).
  */
 nonisolated enum MIME {
+    struct File {
+        var filename: String
+        var mimeType: String
+        var data: Data
+    }
+
     static func message(
         from: Person,
         to: [Person],
         cc: [Person],
+        bcc: [Person] = [],
+        files: [File] = [],
         subject: String,
         text: String,
         html: String,
@@ -23,6 +31,7 @@ nonisolated enum MIME {
             "To: \(to.map(address).joined(separator: ", "))",
         ]
         if !cc.isEmpty { headers.append("Cc: \(cc.map(address).joined(separator: ", "))") }
+        if !bcc.isEmpty { headers.append("Bcc: \(bcc.map(address).joined(separator: ", "))") }
         if stamped {
             headers.append("Date: \(rfc5322Date.string(from: .now))")
             let domain = from.email.split(separator: "@").last.map(String.init) ?? "otterware.app"
@@ -47,8 +56,20 @@ nonisolated enum MIME {
                 "",
             ].joined(separator: "\r\n")
         }
-        let message = headers.joined(separator: "\r\n") + "\r\n\r\n"
-            + part("text/plain", text) + part("text/html", html) + "--\(boundary)--\r\n"
+        let body = part("text/plain", text) + part("text/html", html) + "--\(boundary)--\r\n"
+        guard !files.isEmpty else { return Data((headers.joined(separator: "\r\n") + "\r\n\r\n" + body).utf8) }
+        let mixed = "otter-mixed-\(UUID().uuidString)"
+        headers[headers.count - 1] = "Content-Type: multipart/mixed; boundary=\"\(mixed)\""
+        var message = headers.joined(separator: "\r\n") + "\r\n\r\n--\(mixed)\r\n"
+            + "Content-Type: multipart/alternative; boundary=\"\(boundary)\"\r\n\r\n" + body
+        for file in files {
+            let filename = file.filename.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? "attachment"
+            let type = file.mimeType.contains(where: { $0.isWhitespace }) ? "application/octet-stream" : file.mimeType
+            message += "--\(mixed)\r\nContent-Type: \(type)\r\n"
+                + "Content-Disposition: attachment; filename*=UTF-8''\(filename)\r\nContent-Transfer-Encoding: base64\r\n\r\n"
+                + file.data.base64EncodedString(options: [.lineLength76Characters, .endLineWithCarriageReturn, .endLineWithLineFeed]) + "\r\n"
+        }
+        message += "--\(mixed)--\r\n"
         return Data(message.utf8)
     }
 
@@ -60,11 +81,13 @@ nonisolated enum MIME {
     }()
 
     private static func address(_ person: Person) -> String {
-        person.name.isEmpty ? person.email : "\(encoded(person.name, quoted: true)) <\(person.email)>"
+        let email = person.email.replacingOccurrences(of: "\r", with: "").replacingOccurrences(of: "\n", with: "")
+        return person.name.isEmpty ? email : "\(encoded(person.name, quoted: true)) <\(email)>"
     }
 
     /** RFC 2047 for anything not plain ASCII. */
     private static func encoded(_ text: String, quoted: Bool = false) -> String {
+        let text = text.replacingOccurrences(of: "\r", with: " ").replacingOccurrences(of: "\n", with: " ")
         if text.allSatisfy({ $0.isASCII }) {
             return quoted && text.contains(where: { ",;:<>@\"".contains($0) })
                 ? "\"\(text.replacingOccurrences(of: "\"", with: "\\\""))\"" : text

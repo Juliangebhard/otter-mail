@@ -26,6 +26,8 @@ struct MessageView: View {
     @State private var preview: URL?
     @State private var showQuote = false
     @State private var opening: String?
+    @State private var sharing: SharedFile?
+    @State private var attachmentError: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -65,12 +67,15 @@ struct MessageView: View {
                 if !message.attachments.isEmpty {
                     ScrollView(.horizontal) {
                         HStack(spacing: 8) {
-                            ForEach(message.attachments, id: \.filename) { attachment in
+                            ForEach(Array(message.attachments.enumerated()), id: \.offset) { _, attachment in
                                 Button { open(attachment) } label: {
                                     AttachmentChip(attachment: attachment, loading: opening == attachment.filename)
                                 }
                                 .buttonStyle(.plain)
-                                .disabled(attachment.id == nil)
+                                .disabled(attachment.id == nil || opening != nil)
+                                .contextMenu {
+                                    Button("Share or Save", systemImage: "square.and.arrow.up") { open(attachment, share: true) }
+                                }
                             }
                         }
                     }
@@ -79,6 +84,10 @@ struct MessageView: View {
             }
         }
         .quickLookPreview($preview)
+        .sheet(item: $sharing) { file in FileShare(url: file.url) }
+        .alert("Couldn't open attachment", isPresented: Binding(get: { attachmentError != nil }, set: { if !$0 { attachmentError = nil } })) {
+            Button("OK") { attachmentError = nil }
+        } message: { Text(attachmentError ?? "") }
         .translationPresentation(isPresented: $showTranslation, text: message.text)
         .translationTask(translation) { session in
             translated = try? await session.translate(message.text).targetText
@@ -99,11 +108,14 @@ struct MessageView: View {
     }
 
     /** Downloads the file from Gmail and shows it in Quick Look. */
-    private func open(_ attachment: Attachment) {
-        guard let sync = store.sync, opening == nil else { return }
+    private func open(_ attachment: Attachment, share: Bool = false) {
+        guard opening == nil else { return }
         opening = attachment.filename
         Task {
-            preview = try? await sync.attachment(attachment, of: message, in: mailbox.email)
+            do {
+                let url = try await store.attachmentURL(attachment, of: message, in: mailbox.email)
+                if share { sharing = SharedFile(url: url) } else { preview = url }
+            } catch { attachmentError = error.localizedDescription }
             opening = nil
         }
     }
@@ -193,4 +205,18 @@ private extension Text {
             .textSelection(.enabled)
             .frame(maxWidth: .infinity, alignment: .leading)
     }
+}
+
+private struct SharedFile: Identifiable {
+    let id = UUID()
+    let url: URL
+}
+
+/** The native share sheet includes Save to Files, AirDrop, and installed destinations. */
+private struct FileShare: UIViewControllerRepresentable {
+    let url: URL
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: [url], applicationActivities: nil)
+    }
+    func updateUIViewController(_ controller: UIActivityViewController, context: Context) {}
 }
