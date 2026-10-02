@@ -253,6 +253,11 @@ export const themeTools: AgentTool[] = [
         );
         const next = own.map((t) => (t.id === existing.id ? stored(t.id, label, modes) : t));
         await setUiPreference(LIBRARY, JSON.stringify(next));
+        ctx.changed?.({
+          action: "updated",
+          title: label,
+          target: { kind: "theme", id: existing.id },
+        });
         return { id: existing.id, name: label, appearances: MODES.filter((m) => modes[m]) };
       }
 
@@ -285,6 +290,7 @@ export const themeTools: AgentTool[] = [
         ].join("\n"),
       );
       await setUiPreference(LIBRARY, JSON.stringify([...own, stored(id, label, modes)]));
+      ctx.changed?.({ action: "created", title: label, target: { kind: "theme", id } });
       for (const mode of wear) await setUiPreference(WORN[mode], id);
       return { id, name: label, appearances: MODES.filter((m) => modes[m]), wearing: await worn() };
     },
@@ -312,7 +318,10 @@ export const themeTools: AgentTool[] = [
       if (!modes.length) throw new Error(`"${id}" has no ${only} palette.`);
       const name = builtIn(id)?.label ?? (await library()).find((t) => t.id === id)?.label ?? id;
       await ctx.confirm(`Wear the theme “${name}” (${modes.join(" and ")})`);
-      for (const mode of modes) await setUiPreference(WORN[mode], id);
+      for (const mode of modes) {
+        await setUiPreference(WORN[mode], id);
+        ctx.changed?.({ action: "updated", title: name, target: { kind: "theme", id } });
+      }
       return { wearing: await worn() };
     },
   },

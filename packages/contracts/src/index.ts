@@ -147,3 +147,17 @@ export const GMAIL_SCOPES = [
   // can read them but not save them; re-adding the account upgrades it.
   "https://www.googleapis.com/auth/gmail.settings.basic",
 ];
+
+/** A confirmed agent change, kept with the chat so its result can be reopened. */
+export type ChatChange = {
+  title: string;
+  action: "created" | "updated" | "deleted" | "trashed" | "restored";
+  target:
+    | { kind: "draft"; id: string; accountId: string }
+    | { kind: "thread"; id: string; accountId: string }
+    | { kind: "label"; id: string; accountId: string }
+    | { kind: "project"; id: string }
+    | { kind: "view"; id: string }
+    | { kind: "theme"; id: string }
+    | { kind: "event"; id: string; accountId: string; url: string | null };
+};

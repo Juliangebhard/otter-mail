@@ -128,10 +128,14 @@ async function run(
 ): Promise<{ text: string; isError: boolean }> {
   const name = tool.name;
   logger.info("agent", "tool", { tool: name });
+  const turn = caller.turn();
   try {
     const result = await tool.run(args, {
       caller,
       confirm: (detail) => confirm(tool, caller, detail, signal),
+      changed: (change) => {
+        if (turn) turn.emit({ requestId: turn.requestId, type: "change", change });
+      },
     });
     return { text: JSON.stringify(result ?? { ok: true }), isError: false };
   } catch (error) {
