@@ -14,6 +14,7 @@ import {
   CircleUserRoundIcon,
   KeyboardIcon,
   PaletteIcon,
+  PlugIcon,
   Settings2Icon,
   MailIcon,
   MailCheckIcon,
@@ -50,6 +51,7 @@ const SETTINGS_SECTION_ICONS: Readonly<
   keybindings: KeyboardIcon,
   accounts: MailIcon,
   agents: MousePointer2Icon,
+  integrations: PlugIcon,
 };
 
 const SETTINGS_SECTIONS = (Object.keys(SETTINGS_SECTION_LABELS) as SettingsPane[]).map((id) => ({

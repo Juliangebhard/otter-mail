@@ -127,6 +127,8 @@ export interface Platform {
   };
 
   google: GoogleAuth;
+  /** Opens browser consent and returns its callback URL; the backend builds the PKCE URL. */
+  todoistSignIn?: (authorize: (redirectUri: string) => Promise<string>) => Promise<string>;
   /**
    * Opens a connection to a mail server: TLS from the first byte with
    * `tls: true`, plain (to be upgraded with `startTls`) otherwise. Certificates

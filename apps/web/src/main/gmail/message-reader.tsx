@@ -1,3 +1,5 @@
+import { ListTodoIcon } from "lucide-react";
+import { addEmailToTodoist } from "../integrations/todoist";
 import {
   Fragment,
   useCallback,
@@ -2657,6 +2659,16 @@ export function MessageReader({
             </>
           )}
 
+          <HintTooltip label="Add to Todoist" side="bottom">
+            <IconBtn
+              label="Add to Todoist"
+              onClick={() =>
+                addEmailToTodoist({ accountId, messageId: message.id, subject: message.subject })
+              }
+            >
+              <ListTodoIcon className="size-4" />
+            </IconBtn>
+          </HintTooltip>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <IconBtn label="More actions">
@@ -2733,6 +2745,13 @@ export function MessageReader({
               <DropdownMenuSeparator />
               <DropdownMenuItem icon={<MousePointer2Icon />} onSelect={() => onOpenChat?.()}>
                 Chat about this with the agent
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onSelect={() =>
+                  addEmailToTodoist({ accountId, messageId: message.id, subject: message.subject })
+                }
+              >
+                Add to Todoist…
               </DropdownMenuItem>
               <DropdownMenuSub label="Add to project">
                 <AddToProjectItems

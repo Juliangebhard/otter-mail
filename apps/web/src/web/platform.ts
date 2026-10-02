@@ -143,6 +143,14 @@ export async function webPlatform(page: Page): Promise<Platform> {
       pick: () => page.request("pickFiles", undefined),
     },
 
+    todoistSignIn: async (authorize) => {
+      try {
+        const url = await authorize(`${self.location.origin}/todoist-callback/`);
+        return await page.request("todoistSignIn", { url });
+      } finally {
+        await page.request("todoistSignIn", { close: true });
+      }
+    },
     google: demo ? demo.demoGoogleAuth() : webGoogleAuth({ relayUrl, page, files }),
     relayUrl,
     relaySession: "cookie",

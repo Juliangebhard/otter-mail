@@ -36,6 +36,7 @@ export const SETTINGS_SECTION_LABELS: Readonly<Record<SettingsPane, string>> = {
   keybindings: "Keybindings",
   accounts: "Mailboxes",
   agents: "Agents",
+  integrations: "Integrations",
 };
 
 /** Anchor id of the first row bound to `command` on the Keybindings pane. */
@@ -66,6 +67,12 @@ const KEYBINDING_SEARCH_ITEMS: ReadonlyArray<SettingsSearchItem> = KEYBINDING_CO
  * render their id and title via `searchableSetting`.
  */
 export const SETTINGS_SEARCH_ITEMS = [
+  {
+    id: "todoist",
+    title: "Todoist",
+    pane: "integrations",
+    searchTerms: ["tasks projects due date priority API token connect disconnect"],
+  },
   // General
   {
     id: "launch-at-login",

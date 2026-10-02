@@ -1,4 +1,5 @@
 import { DEFAULT_SETTINGS } from "@otter-mail/contracts";
+import { TodoistSettingsPane } from "../integrations/todoist";
 import { useCallback, useEffect, useState } from "react";
 import { Switch } from "~/components/ui/switch";
 import { toast } from "../gmail/toast";
@@ -431,6 +432,7 @@ export function SettingsPage({
 function SettingsPane({ route }: { route: SettingsRoute }) {
   if (route.pane === "appearance") return <AppearancePane />;
   if (route.pane === "keybindings") return <KeybindingsPane />;
+  if (route.pane === "integrations") return <TodoistSettingsPane />;
   if (route.pane === "accounts") return <AccountsPane />;
   if (route.pane === "otter") return <OtterAccountPane />;
   if (route.pane === "agents") return <ProvidersPane />;

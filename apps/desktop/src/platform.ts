@@ -1,3 +1,4 @@
+import { todoistSignIn } from "./services/todoist-oauth.js";
 /**
  * The desktop's Platform for @otter-mail/core, in the mail backend's utility
  * process (backend.ts): its data in the state directory (paths.ts), SQLite
@@ -121,6 +122,7 @@ export function desktopPlatform(): Platform {
     },
 
     google: googleAuth,
+    todoistSignIn,
     relayUrl: process.env.OTTER_MAIL_RELAY_URL?.trim() || "https://relay.mail.otterware.app",
     relaySession: "bearer",
     deviceName: computerName(),

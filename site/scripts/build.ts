@@ -23,6 +23,9 @@ for (const name of NodeFS.readdirSync(dist, { recursive: true, encoding: "utf8" 
   NodeFS.writeFileSync(page, withSiteLayout(NodeFS.readFileSync(page, "utf8")));
 }
 NodeFS.cpSync(NodePath.join(web, "assets"), NodePath.join(dist, "assets"), { recursive: true });
+NodeFS.cpSync(NodePath.join(web, "todoist-callback"), NodePath.join(dist, "todoist-callback"), {
+  recursive: true,
+});
 NodeFS.copyFileSync(NodePath.join(web, "index.html"), NodePath.join(dist, "app.html"));
 // Released notes only: the version main last released (the Release workflow records it).
 const released = JSON.parse(

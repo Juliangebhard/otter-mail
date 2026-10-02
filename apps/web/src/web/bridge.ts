@@ -1,3 +1,4 @@
+import { prepareTodoistPopup, closeTodoistPopup, authorizeTodoistPopup } from "./todoist-auth";
 /**
  * `window.desktopBridge` in a browser: the same API the desktop's preload
  * gives the renderer, backed by the mail backend (backend.ts: a Web Worker
@@ -174,6 +175,14 @@ function applyEffect(effect: PageEffect): void {
 const backend = connectBackend({
   onEvent: emit,
   async onRequest(kind, params) {
+    if (kind === "todoistSignIn") {
+      const p = params as PageRequests["todoistSignIn"]["params"];
+      if (p.close) {
+        closeTodoistPopup();
+        return "" as never;
+      }
+      return authorizeTodoistPopup(p.url!) as never;
+    }
     if (kind === "detectLanguage") {
       return detectLanguage((params as PageRequests["detectLanguage"]["params"]).text) as never;
     }
@@ -223,6 +232,7 @@ async function invoke<T>(channel: string, params?: unknown): Promise<T> {
   if (local) return (await local(params)) as T;
 
   // Start what needs the click now, while it counts as the user's.
+  if (channel === "todoist:signIn") prepareTodoistPopup();
   if (channel === "gmail:pickAttachments") started.pickFiles = pickFiles();
   if (channel === "gmail:addAccount" && !__DEMO__) {
     started.googleSignIn = googleSignIn((params as { email?: string } | undefined)?.email);
@@ -238,7 +248,13 @@ async function invoke<T>(channel: string, params?: unknown): Promise<T> {
     if (result?.redirectTo) location.assign(result.redirectTo);
     return result as T;
   }
-  const result = await backend.invoke<T>(channel, params);
+  let result: T;
+  try {
+    result = await backend.invoke<T>(channel, params);
+  } catch (error) {
+    if (channel === "todoist:signIn") closeTodoistPopup();
+    throw error;
+  }
   // Signed out (or the account deleted): back to the landing page.
   if (channel === "otter:signOut" || channel === "otter:deleteAccount") location.assign("/");
   return result;

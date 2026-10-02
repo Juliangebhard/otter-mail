@@ -1,3 +1,4 @@
+import { fakeTodoist } from "./todoist";
 /**
  * Demo mode (`pnpm dev:demo`, built with VITE_DEMO=1): a pretend Gmail in the
  * backend's Worker, so the web app runs with no Google or Otter account.
@@ -856,10 +857,12 @@ function answer(url: URL, method: string, headers: Headers, rawBody: unknown): R
 export async function installFakeGmail(demoFiles: Platform["files"]): Promise<void> {
   files = demoFiles;
   await loadState();
+  const todoist = await fakeTodoist(demoFiles);
   const realFetch = globalThis.fetch.bind(globalThis);
   globalThis.fetch = async (input, init) => {
     const request = input instanceof Request ? input : null;
     const url = new URL(request ? request.url : String(input));
+    if (url.origin === "https://api.todoist.com") return todoist(url, init);
     const response = answer(
       url,
       (init?.method ?? request?.method ?? "GET").toUpperCase(),
