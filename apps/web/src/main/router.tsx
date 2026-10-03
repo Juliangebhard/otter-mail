@@ -54,6 +54,8 @@ const SETTINGS_PANES = new Set<string>([
   "keybindings",
   "accounts",
   "agents",
+  "browser",
+  "extensions",
   "integrations",
   "otter",
 ]);

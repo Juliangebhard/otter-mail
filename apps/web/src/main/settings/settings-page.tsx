@@ -14,6 +14,8 @@ import { KeybindingsPane } from "./keybindings-pane";
 import { AccountsPane } from "./accounts-pane";
 import { OtterAccountPane } from "./otter-account-pane";
 import { ProvidersPane } from "./providers-pane";
+import { BrowserSettingsPane } from "../browser/browser-settings";
+import { ExtensionsPane } from "../browser/extensions-pane";
 import { TranslationSection } from "./translation-section";
 import { UpdatesSection } from "../updates";
 import {
@@ -436,5 +438,7 @@ function SettingsPane({ route }: { route: SettingsRoute }) {
   if (route.pane === "accounts") return <AccountsPane />;
   if (route.pane === "otter") return <OtterAccountPane />;
   if (route.pane === "agents") return <ProvidersPane />;
+  if (route.pane === "browser" && features.browser) return <BrowserSettingsPane />;
+  if (route.pane === "extensions" && features.browser) return <ExtensionsPane />;
   return <GeneralPane />;
 }
