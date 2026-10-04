@@ -407,7 +407,7 @@ function MailboxStep({ accounts }: { accounts: GmailAccount[] }) {
     <>
       <StepHeader
         title={accounts.length > 0 ? "Your mail is connected" : "Connect your mail"}
-        description="Otter Mail talks to your mail provider directly and keeps a copy on this device. Your mail never passes through our servers."
+        description="Otter Mail talks to your mail provider directly and keeps a copy on this device. If you use an agent, the mail and calendar data its tools return are shared with that agent."
       />
       <div className="grid grid-cols-2 gap-3">
         <ChoiceCard

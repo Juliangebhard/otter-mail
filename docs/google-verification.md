@@ -29,18 +29,22 @@ does the job; justifications below.
 
 ### Sensitive scopes (calendar.events.owned, contacts.readonly, contacts.other.readonly)
 
-> Otter Mail is a desktop email client for macOS (https://otterware.app/mail/).
+> Otter Mail is an email client for macOS and the web (https://otterware.app/mail/).
 > calendar.events.owned: when a user receives a calendar invitation by email, Otter Mail shows the
 > event and lets the user Accept, Decline or reply Maybe from the message; the reply is written to
 > that event on the user's own primary calendar (events.list by the invitation's iCalUID, then
 > events.patch of the user's attendee response). Read-only calendar scopes cannot record an RSVP;
-> we ask only for events on calendars the user owns, not all their calendars, and we only touch
-> events the user acts on. contacts.readonly and contacts.other.readonly: Otter Mail shows the
+> the optional agent also lists, reads, creates, updates and deletes primary-calendar events
+> when the user asks it to. Write tools request approval in the default supervised mode.
+> All Mail calendar calls target the user's own primary calendar; read-only scopes cannot
+> support event changes. contacts.readonly and contacts.other.readonly: Otter Mail shows the
 > names and profile photos of the people the user corresponds with next to their messages, and
 > suggests recipients while the user types an address. Both are read-only; we never modify
-> contacts. All data is used only to show these features to the user in the app on their own
-> Mac. It is stored locally on the device, never sent to our servers, never shared, and never
-> used for advertising or AI training.
+> contacts. Calendar/Contacts are fetched directly by the device. When the user invokes an agent,
+> relevant tool results are sent to their configured provider. With OpenRouter, our Cloudflare
+> server processes and stores chat history/tool results and sends the conversation to OpenRouter
+> and the selected model provider. History remains until the chat or Otter account is deleted.
+> We do not sell Google data, use it for advertising or train AI models on it.
 
 ### Restricted scope (gmail.settings.basic)
 
@@ -61,8 +65,8 @@ Features: **Email client**.
 > choose Delete Forever. Narrower scopes are not sufficient: gmail.modify cannot permanently
 > delete messages (users.messages.delete / batchDelete require https://mail.google.com/), and
 > gmail.readonly/send/compose each cover only part of what an email client does. Mail is fetched
-> directly from the Gmail API to the user's own Mac, cached locally for speed and offline reading,
-> and never sent to our servers. In the web app (https://mail.otterware.app), mail is likewise
+> directly from the Gmail API to the user's own Mac and cached locally for speed and offline reading.
+> In the web app (https://mail.otterware.app), mail is likewise
 > fetched by the user's browser directly from the Gmail API and cached in the browser; because a
 > browser can't hold a lasting Google sign-in, our relay performs the OAuth code exchange and
 > token refreshes for the web client: tokens pass through it but are not stored (the refresh token
@@ -70,8 +74,13 @@ Features: **Email client**.
 > Otter account (optional in the Mac app, required for the web app), Gmail push
 > notifications (users.watch, delivered through Google Cloud Pub/Sub) reach our relay: they carry
 > only the mailbox address and a history id, which the relay forwards to the user's devices so
-> they sync at once. The relay stores no Gmail data. We do not sell data, use it for ads, or train AI
-> models on it. Our use of Google data follows the Google API Services User Data Policy,
+> they sync at once. Separately, users can invoke optional agents to work with mail and calendar
+> through tools. For OpenRouter, our Cloudflare server receives prompts and relevant tool results,
+> including mail content/attachments, stores chat history until the chat or Otter account is deleted,
+> and sends the conversation to OpenRouter and the selected model provider. Google tokens are not
+> sent to the agent server. Local agents use the user's configured provider directly. Write tools
+> request approval in the default supervised mode. We do not sell data, use it for ads, or train AI
+> models on it. Our use and transfer of Google data follows the Google API Services User Data Policy,
 > including the Limited Use requirements.
 
 ### Demo video (unlisted YouTube, English, 2–4 minutes)
@@ -86,6 +95,14 @@ Record the installed app, signed in with a test account, narrating or captioning
    move a message to Trash, then empty Trash (permanent delete).
 4. Calendar: open an invitation email and click Accept; show the event updated in Google Calendar.
 5. Contacts: a sender's photo next to their message, and recipient suggestions while composing.
+6. Settings: change the demo mailbox's signature and show the same signature in Gmail.
+7. Agent: show the data-sharing notice and supervised approvals, ask the OpenRouter agent to
+   summarize a demo message and create/update/delete a primary-calendar event, and verify the
+   changes in Google Calendar. Use only synthetic reviewer-account content.
+
+For a web recording, show its actual Web client ID instead of the Mac ID. Include a separate
+Calendar recording of its actual consent, calendar selection and event editing once that app's
+integration is ready. Do not present Mail's calendar tools as a demonstration of the Calendar app.
 
 ### After submitting
 
