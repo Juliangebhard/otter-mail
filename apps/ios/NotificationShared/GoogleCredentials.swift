@@ -40,7 +40,10 @@ nonisolated enum GoogleCredentials {
 
     static func save(_ email: String, credential: Credential) -> Bool {
         guard let data = try? JSONEncoder().encode(credential), let value = String(data: data, encoding: .utf8) else { return false }
-        return Keychain.set(refreshKey(email), value)
+        guard Keychain.set(refreshKey(email), value) else { return false }
+        // A new grant must not reuse an access token issued to the previous client.
+        Keychain.set(accessKey(email), nil)
+        return true
     }
 
     static func pushTopic(_ email: String, fallback: String) -> String {

@@ -20,7 +20,10 @@ nonisolated struct NotificationTests: Sendable {
     @Test func newGoogleGrantRecordsItsClientAndSelectsTheNewTopic() throws {
         let email = "current-grant-test@otter.example"
         defer { GoogleCredentials.forget(email) }
+        let accessKey = "google-access-token:\(email)"
+        try #require(Keychain.set(accessKey, "fake-previous-client-access"))
         try #require(GoogleCredentials.save(email, credential: .init(refreshToken: "fake-current-refresh", clientID: GoogleCredentials.clientID)))
+        #expect(Keychain.get(accessKey) == nil)
         let credential = try #require(GoogleCredentials.credential(email))
         #expect(credential.refreshToken == "fake-current-refresh")
         #expect(credential.clientID == GoogleCredentials.clientID)
