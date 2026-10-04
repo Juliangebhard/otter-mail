@@ -31,23 +31,23 @@ nonisolated enum GoogleCredentials {
     static func refreshKey(_ email: String) -> String { "google-refresh-token:\(email.lowercased())" }
     private static func accessKey(_ email: String) -> String { "google-access-token:\(email.lowercased())" }
 
-    static func credential(_ email: String) -> Credential? {
-        guard let saved = Keychain.get(refreshKey(email)) else { return nil }
+    static func credential(_ email: String, read: (String) -> String? = Keychain.get) -> Credential? {
+        guard let saved = read(refreshKey(email)) else { return nil }
         if let data = saved.data(using: .utf8), let value = try? JSONDecoder().decode(Credential.self, from: data) { return value }
         // Existing phones stored a bare refresh token from the original Google project.
         return Credential(refreshToken: saved, clientID: legacyClientID)
     }
 
-    static func save(_ email: String, credential: Credential) -> Bool {
+    static func save(_ email: String, credential: Credential, write: (String, String?) -> Bool = { Keychain.set($0, $1) }) -> Bool {
         guard let data = try? JSONEncoder().encode(credential), let value = String(data: data, encoding: .utf8) else { return false }
-        guard Keychain.set(refreshKey(email), value) else { return false }
+        guard write(refreshKey(email), value) else { return false }
         // A new grant must not reuse an access token issued to the previous client.
-        Keychain.set(accessKey(email), nil)
+        _ = write(accessKey(email), nil)
         return true
     }
 
-    static func pushTopic(_ email: String, fallback: String) -> String {
-        guard clientID != legacyClientID, credential(email)?.clientID == clientID else { return fallback }
+    static func pushTopic(_ email: String, fallback: String, read: (String) -> String? = Keychain.get) -> String {
+        guard clientID != legacyClientID, credential(email, read: read)?.clientID == clientID else { return fallback }
         return Bundle.main.object(forInfoDictionaryKey: "GooglePushTopic") as? String ?? fallback
     }
 

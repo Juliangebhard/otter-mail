@@ -7,27 +7,26 @@ nonisolated struct NotificationTests: Sendable {
 
     @Test func existingGoogleGrantKeepsItsOriginalClientAndTopic() throws {
         let email = "legacy-grant-test@otter.example"
-        defer { GoogleCredentials.forget(email) }
-        try #require(Keychain.set(GoogleCredentials.refreshKey(email), "fake-original-refresh"))
-        let credential = try #require(GoogleCredentials.credential(email))
+        // The unsigned CI simulator has no shared-Keychain entitlement.
+        var saved = [GoogleCredentials.refreshKey(email): "fake-original-refresh"]
+        let credential = try #require(GoogleCredentials.credential(email, read: { saved[$0] }))
         #expect(credential.refreshToken == "fake-original-refresh")
         #expect(credential.clientID == GoogleCredentials.legacyClientID)
-        #expect(GoogleCredentials.pushTopic(email, fallback: "legacy-topic") == "legacy-topic")
-        try #require(GoogleCredentials.save(email, credential: credential))
-        #expect(GoogleCredentials.credential(email)?.clientID == GoogleCredentials.legacyClientID)
+        #expect(GoogleCredentials.pushTopic(email, fallback: "legacy-topic", read: { saved[$0] }) == "legacy-topic")
+        try #require(GoogleCredentials.save(email, credential: credential, write: { saved[$0] = $1; return true }))
+        #expect(GoogleCredentials.credential(email, read: { saved[$0] })?.clientID == GoogleCredentials.legacyClientID)
     }
 
     @Test func newGoogleGrantRecordsItsClientAndSelectsTheNewTopic() throws {
         let email = "current-grant-test@otter.example"
-        defer { GoogleCredentials.forget(email) }
         let accessKey = "google-access-token:\(email)"
-        try #require(Keychain.set(accessKey, "fake-previous-client-access"))
-        try #require(GoogleCredentials.save(email, credential: .init(refreshToken: "fake-current-refresh", clientID: GoogleCredentials.clientID)))
-        #expect(Keychain.get(accessKey) == nil)
-        let credential = try #require(GoogleCredentials.credential(email))
+        var saved = [accessKey: "fake-previous-client-access"]
+        try #require(GoogleCredentials.save(email, credential: .init(refreshToken: "fake-current-refresh", clientID: GoogleCredentials.clientID), write: { saved[$0] = $1; return true }))
+        #expect(saved[accessKey] == nil)
+        let credential = try #require(GoogleCredentials.credential(email, read: { saved[$0] }))
         #expect(credential.refreshToken == "fake-current-refresh")
         #expect(credential.clientID == GoogleCredentials.clientID)
-        #expect(GoogleCredentials.pushTopic(email, fallback: "legacy-topic") == "projects/otterware/topics/gmail-push")
+        #expect(GoogleCredentials.pushTopic(email, fallback: "legacy-topic", read: { saved[$0] }) == "projects/otterware/topics/gmail-push")
     }
 
 
