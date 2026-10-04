@@ -102,8 +102,9 @@ it; the web app needs it (the relay keeps its Gmail sign-ins alive).
 - For real Gmail, Google OAuth, Contacts or Calendar demos and integration checks, use the
   dedicated `otterware.demo@gmail.com` Google account. Its credentials are
   `OTTER_MAIL_GMAIL_DEMO_EMAIL` / `OTTER_MAIL_GMAIL_DEMO_PASSWORD` in the main checkout's ignored
-  `.env`, shared with new T3 worktrees by symlink. If the link is missing, find the main checkout
-  as the parent of `git rev-parse --path-format=absolute --git-common-dir` and read its `.env`.
+  `.env.local`, shared with new T3 worktrees by symlink. If the link is missing, find the main
+  checkout as the parent of `git rev-parse --path-format=absolute --git-common-dir` and read its
+  `.env.local`.
   Sign in through Google in the regular app; `pnpm dev:demo` uses fake Gmail and `pnpm dev:mail`
   is for IMAP tests. Preserve the demo fixtures and send test mail only to the demo account
   itself. Keep credentials out of logs, commits, screenshots and app bundles. See
