@@ -4,10 +4,16 @@ Otter applications use the `otterware` Google Cloud project (number `99732785864
 owned by chris.kafrouni@gmail.com). Laurin has Editor access. The consent screen is
 published for external users; Google's branding and data-access verification are separate
 from deployment. Until data access is verified, Gmail/Calendar sign-in shows the unverified
-app warning and has Google's 100-user cap. The Mail project's existing review has an [unlisted demo](https://youtu.be/BDEHA3mwF9Y);
-Google's 30 September reply requests clearer Calendar/Contacts demonstrations and exact scope
-matching. That video demonstrates the original project IDs. Completing the Otterware review
-needs updated consent evidence for the new IDs and Calendar's additional scopes/client.
+app warning and has Google's 100-user cap. The new [Mail Web demo](https://youtu.be/SLIFzRJg594)
+shows the Otterware Web client, expanded consent permissions, both Contacts sources, Gmail
+signature and deletion, invitation RSVP, and supervised OpenRouter calendar tools. Its link
+and scope explanations are saved in the project's Data access form. Google's form requires
+footage for every assigned OAuth client: native Mail consent flows and the actual Calendar
+application's additional scopes/client still need demonstrations before submitting.
+The original project's [older demo](https://youtu.be/BDEHA3mwF9Y) shows the previous IDs;
+Google's 30 September reply requested clearer Calendar/Contacts demonstrations and exact scope
+matching. Private reviewer credentials and login instructions are supplied separately, never
+committed to the repository or included in the public video.
 Branding ownership is verified via the project owner's Search Console properties.
 
 The original `otter-mail` project remains active for existing grants and installed apps.
@@ -112,7 +118,7 @@ renewed yearly; follow the instructions in that email.
 
 ## Clients
 
-Five OAuth clients in `otterware` (Google Auth Platform → Clients). All request identity
+Configured OAuth clients in `otterware` (Google Auth Platform → Clients). All request identity
 scopes as well. Secrets live in Cloudflare or GitHub settings, never this repository.
 
 | Client                          | Client ID                                                                  | Used by                                                                                      |
