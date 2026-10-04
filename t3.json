@@ -4,7 +4,7 @@
   "scripts": [
     {
       "name": "Setup Worktree",
-      "command": "pnpm install && ln -sf \"$T3CODE_PROJECT_ROOT/.env.local\" .env.local && ln -sf \"$T3CODE_PROJECT_ROOT/infra/relay/.dev.vars\" infra/relay/.dev.vars",
+      "command": "pnpm install && ln -sf \"$T3CODE_PROJECT_ROOT/.env\" .env && ln -sf \"$T3CODE_PROJECT_ROOT/.env.local\" .env.local && ln -sf \"$T3CODE_PROJECT_ROOT/infra/relay/.dev.vars\" infra/relay/.dev.vars",
       "icon": "configure",
       "runOnWorktreeCreate": true
     },

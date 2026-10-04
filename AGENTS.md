@@ -99,6 +99,15 @@ it; the web app needs it (the relay keeps its Gmail sign-ins alive).
 - `pnpm dev:demo`: the web app on a seeded demo mailbox (a pretend Gmail, no Google or Otter
   account, no relay). Build and test against it rather than the user's real accounts; see the
   `test-otter-mail` skill (`.agents/skills`).
+- For real Gmail, Google OAuth, Contacts or Calendar demos and integration checks, use the
+  dedicated `otterware.demo@gmail.com` Google account. Its credentials are
+  `OTTER_MAIL_GMAIL_DEMO_EMAIL` / `OTTER_MAIL_GMAIL_DEMO_PASSWORD` in the main checkout's ignored
+  `.env`, shared with new T3 worktrees by symlink. If the link is missing, find the main checkout
+  as the parent of `git rev-parse --path-format=absolute --git-common-dir` and read its `.env`.
+  Sign in through Google in the regular app; `pnpm dev:demo` uses fake Gmail and `pnpm dev:mail`
+  is for IMAP tests. Preserve the demo fixtures and send test mail only to the demo account
+  itself. Keep credentials out of logs, commits, screenshots and app bundles. See
+  [Google demo account](docs/development.md#google-demo-account).
 - `pnpm start` runs the built app unpackaged; `pnpm dist:desktop:dmg` builds a DMG in `release/`.
 - Data homes (`apps/desktop/src/paths.ts`, as in T3 Code): the installed app uses
   `~/.otter-mail/userdata`; dev runs use `~/.otter-mail/dev`, or `<worktree>/.otter-mail` in a
