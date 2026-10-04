@@ -92,9 +92,11 @@ const socket = () => FakeSocket.all.at(-1)!;
 
 // ── The relay's HTTP API and Gmail ──────────────────────────────────────────
 
-type Call = { method: string; host: string; path: string; account: string | null };
+type Call = { method: string; host: string; path: string; account: string | null; body?: unknown };
 
 let calls: Call[];
+let googleClientId: string | undefined;
+let pushTopics: Record<string, string> | undefined;
 let relayAccounts: RelayAccount[];
 /** A Gmail history call waits on this while it's set (a sync still running). */
 let historyGate: Promise<void> | null;
@@ -107,7 +109,13 @@ async function fakeFetch(input: string | URL | Request, init?: RequestInit): Pro
   const method = init?.method ?? "GET";
   const auth = new Headers(init?.headers).get("authorization") ?? "";
   const account = auth.startsWith("Bearer gmail:") ? auth.slice("Bearer gmail:".length) : null;
-  calls.push({ method, host: url.host, path: url.pathname, account });
+  calls.push({
+    method,
+    host: url.host,
+    path: url.pathname,
+    account,
+    body: init?.body ? JSON.parse(String(init.body)) : undefined,
+  });
 
   if (url.origin === RELAY) {
     const route = `${method} ${url.pathname}`;
@@ -115,6 +123,7 @@ async function fakeFetch(input: string | URL | Request, init?: RequestInit): Pro
       return json({
         user: { id: "u1", email: "me@otter.test", name: null, picture: null },
         pushTopic: TOPIC,
+        pushTopics,
       });
     }
     if (route === "GET /v1/accounts") return json({ accounts: relayAccounts });
@@ -235,6 +244,7 @@ async function boot() {
       isSignedIn: (accountId) => accountId === gmail.id,
       getAccessToken: async (accountId) => `gmail:${accountId}`,
       getIdToken: unused,
+      getClientId: async () => googleClientId,
       removeTokens: async () => {},
     },
     connect: unused,
@@ -288,6 +298,8 @@ async function goLive(): Promise<void> {
 
 beforeEach(() => {
   calls = [];
+  googleClientId = undefined;
+  pushTopics = undefined;
   broadcasts = [];
   imapWatch = null;
   imapSyncs = [];
@@ -338,6 +350,18 @@ describe("Gmail realtime", () => {
     socket().event({ type: "accounts" });
     await until(() => gmailCalls("/watch").length === 2, "the renewal");
     expect(gmailCalls("/watch").map((c) => c.account)).toEqual([gmail.id, gmail.id]);
+  });
+
+  it.each([
+    ["new-project-client.apps.googleusercontent.com", "projects/new/topics/gmail-push"],
+    ["old-project-client.apps.googleusercontent.com", TOPIC],
+    [undefined, TOPIC],
+  ])("watches the topic belonging to Google client %s", async (clientId, expectedTopic) => {
+    googleClientId = clientId;
+    pushTopics = { new: "projects/new/topics/gmail-push", old: TOPIC };
+    await boot();
+    await goLive();
+    expect(gmailCalls("/watch")[0]!.body).toMatchObject({ topicName: expectedTopic });
   });
 
   it("syncs the account a mail event names, at once, as a push", async () => {

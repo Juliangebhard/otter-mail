@@ -12,7 +12,7 @@ import Foundation
 @MainActor
 final class GoogleAuth {
     /**
-     * The otter-mail project's "iOS" client for this build's bundle ID (not a
+     * The primary Google project's "iOS" client for this build's bundle ID (not a
      * secret; the relay lists it too), from Info.plist's GoogleClientID.
      */
     static let clientID = Bundle.main.object(forInfoDictionaryKey: "GoogleClientID") as? String ?? ""
@@ -102,7 +102,7 @@ final class GoogleAuth {
         let tokens = response.tokens
         let profile = try await Self.profile(accessToken: tokens.accessToken)
         try await PushState.locked("oauth:" + profile.email) {
-            guard Keychain.set(Self.refreshKey(profile.email), refreshToken) else { throw Failure.google("Couldn't save the Google sign-in on this iPhone.") }
+            guard GoogleCredentials.save(profile.email, credential: .init(refreshToken: refreshToken, clientID: Self.clientID)) else { throw Failure.google("Couldn't save the Google sign-in on this iPhone.") }
             credentialVersions[profile.email.lowercased()] = UUID()
         }
         self.tokens[profile.email.lowercased()] = tokens
@@ -133,7 +133,7 @@ final class GoogleAuth {
         return Task {
             try? await PushState.locked("oauth:" + email) {
                 guard credentialVersions[key] == version else { return nil as String? }
-                let refreshToken = Keychain.get(Self.refreshKey(email))
+                let refreshToken = GoogleCredentials.credential(email)?.refreshToken
                 GoogleCredentials.forget(email)
                 return refreshToken
             }

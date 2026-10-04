@@ -40,7 +40,7 @@ jobs:
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v3
         with:
-          workload_identity_provider: projects/187875144740/locations/global/workloadIdentityPools/github/providers/otter-mail
+          workload_identity_provider: projects/997327858649/locations/global/workloadIdentityPools/github/providers/otter-mail
 
       - name: Setup gcloud
         uses: google-github-actions/setup-gcloud@v3

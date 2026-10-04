@@ -1,7 +1,7 @@
 /**
  * credentials-store.ts
  *
- * The Google OAuth client (a "Desktop app" client in the otter-mail Google
+ * The Google OAuth client (a "Desktop app" client in the otterware Google
  * Cloud project), shared by every install so users don't need their own
  * project. Sign-in uses PKCE and a loopback redirect (see gmail-oauth.ts).
  *
@@ -15,13 +15,15 @@
 
 declare const __GOOGLE_CLIENT_ID__: string;
 declare const __GOOGLE_CLIENT_SECRET__: string;
+declare const __GOOGLE_LEGACY_CLIENT_ID__: string;
+declare const __GOOGLE_LEGACY_CLIENT_SECRET__: string;
 
 export interface GoogleCredentials {
   clientId: string;
   clientSecret: string;
 }
 
-export async function getCredentials(): Promise<GoogleCredentials> {
+export async function getCredentials(issuedTo?: string | null): Promise<GoogleCredentials> {
   const clientId = process.env.OTTER_MAIL_GOOGLE_CLIENT_ID?.trim() || __GOOGLE_CLIENT_ID__;
   const clientSecret =
     process.env.OTTER_MAIL_GOOGLE_CLIENT_SECRET?.trim() || __GOOGLE_CLIENT_SECRET__;
@@ -30,5 +32,13 @@ export async function getCredentials(): Promise<GoogleCredentials> {
       "This build has no Google OAuth client. Set OTTER_MAIL_GOOGLE_CLIENT_ID and OTTER_MAIL_GOOGLE_CLIENT_SECRET (see .env.example).",
     );
   }
-  return { clientId, clientSecret };
+  if (issuedTo === undefined || issuedTo === clientId) return { clientId, clientSecret };
+  const legacyId =
+    process.env.OTTER_MAIL_GOOGLE_LEGACY_CLIENT_ID?.trim() || __GOOGLE_LEGACY_CLIENT_ID__;
+  const legacySecret =
+    process.env.OTTER_MAIL_GOOGLE_LEGACY_CLIENT_SECRET?.trim() || __GOOGLE_LEGACY_CLIENT_SECRET__;
+  if (legacyId && legacySecret && (issuedTo === null || issuedTo === legacyId))
+    return { clientId: legacyId, clientSecret: legacySecret };
+  if (issuedTo === null) return { clientId, clientSecret };
+  throw new Error("This build cannot refresh this Google sign-in. Sign in to this account again.");
 }

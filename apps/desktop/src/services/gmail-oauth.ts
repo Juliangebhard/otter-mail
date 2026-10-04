@@ -80,22 +80,20 @@ function loadStore(): Promise<Map<string, StoredTokens>> {
 
 async function readStore(): Promise<Map<string, StoredTokens>> {
   const store = new Map<string, StoredTokens>();
-  const { clientId } = await getCredentials();
   try {
     const file = JSON.parse(await fs.readFile(tokenFilePath(), "utf-8")) as TokenFile;
     for (const [accountId, sealed] of Object.entries(file.accounts ?? {})) {
       try {
         const plain = await requestMain("unseal", { sealed });
         const tokens = JSON.parse(plain) as StoredTokens;
-        // Issued for another OAuth client (the app switched clients): useless
-        // here, so the account reads as signed out and offers to sign in again.
-        if (tokens.clientId !== clientId) {
-          logger.info("oauth", "Dropping a sign-in from another OAuth client", { accountId });
-          continue;
-        }
+        // Refresh old grants with their original client during the project migration.
+        await getCredentials(tokens.clientId ?? null);
         store.set(accountId, tokens);
       } catch (err) {
-        logger.warn("oauth", "Couldn't decrypt stored tokens", { accountId, error: String(err) });
+        logger.warn("oauth", "Couldn't load stored Google sign-in", {
+          accountId,
+          error: String(err),
+        });
       }
     }
   } catch {
@@ -142,8 +140,11 @@ type TokenResponse = {
   error_description?: string;
 };
 
-async function tokenRequest(params: Record<string, string>): Promise<TokenResponse> {
-  const { clientId, clientSecret } = await getCredentials();
+async function tokenRequest(
+  params: Record<string, string>,
+  issuedTo?: string | null,
+): Promise<TokenResponse> {
+  const { clientId, clientSecret } = await getCredentials(issuedTo);
   const response = await fetch(TOKEN_URL, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -399,10 +400,10 @@ async function refreshTokens(accountId: string): Promise<TokenResponse> {
   if (!stored) throw new Error(SIGNED_OUT_MESSAGE);
   let response: TokenResponse;
   try {
-    response = await tokenRequest({
-      grant_type: "refresh_token",
-      refresh_token: stored.refreshToken,
-    });
+    response = await tokenRequest(
+      { grant_type: "refresh_token", refresh_token: stored.refreshToken },
+      stored.clientId ?? null,
+    );
   } catch (err) {
     if (err instanceof SignInExpiredError) {
       logger.warn("oauth", "Google revoked this account's sign-in", { accountId });
@@ -412,7 +413,11 @@ async function refreshTokens(accountId: string): Promise<TokenResponse> {
     }
     throw err;
   }
-  const refreshed = toStored((await getCredentials()).clientId, response, stored.refreshToken);
+  const refreshed = toStored(
+    (await getCredentials(stored.clientId ?? null)).clientId,
+    response,
+    stored.refreshToken,
+  );
   // The account may have been removed while the refresh was in flight.
   if (store.has(accountId)) {
     store.set(accountId, refreshed);
@@ -483,6 +488,10 @@ export const googleAuth: GoogleAuth = {
   isSignedIn,
   getAccessToken,
   getIdToken,
+  async getClientId(accountId) {
+    const tokens = (await loadStore()).get(accountId);
+    return tokens ? (await getCredentials(tokens.clientId ?? null)).clientId : undefined;
+  },
   removeTokens: removeAccountTokens,
   signInForIdToken,
 };

@@ -50,6 +50,8 @@ export interface MeResponse {
   user: RelayUser;
   /** The Pub/Sub topic to pass to Gmail's `users.watch`. */
   pushTopic: string;
+  /** Topics keyed by the Google project number in a mailbox's OAuth client ID. */
+  pushTopics?: Record<string, string>;
 }
 
 /** `PUT /v1/push/device`: replaces this authenticated session's iPhone registration.

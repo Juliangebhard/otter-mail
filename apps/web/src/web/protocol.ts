@@ -16,6 +16,7 @@ export type GoogleSignInResult = {
   sealed: string;
   accessToken: string;
   expiresIn: number;
+  clientId?: string;
 };
 
 /** The page's answer to `googleSignIn` when the user closes the popup or declines. */

@@ -25,7 +25,7 @@ their code.
 Like the Mac app, the phone signs in to Google itself and talks to Gmail directly, and to IMAP and
 SMTP servers directly too (`docs/imap.md`); the relay never sees its mail, tokens or passwords.
 
-- `Account/GoogleAuth.swift`: Google sign-in per mailbox with the otter-mail project's "iOS" OAuth
+- `Account/GoogleAuth.swift`: Google sign-in per mailbox with the otterware project's "iOS" OAuth
   client (no secret; PKCE; Google returns to the client ID's reversed form). Refresh tokens stay in
   the Keychain.
 - `Account/Relay.swift`: the Otter relay (`packages/contracts/src/relay.ts`). Signing in hands it

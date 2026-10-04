@@ -128,13 +128,13 @@ pnpm --filter @otter-mail/relay smoke   # needs gcloud; Token Creator on relay-s
 A manual deploy, if ever needed: `pnpm --filter @otter-mail/relay run deploy` with wrangler
 credentials (`wrangler login`, or `CLOUDFLARE_API_TOKEN`).
 
-## Google Cloud setup (project `otter-mail`, done once)
+## Google Cloud setup (project `otterware`, number `997327858649`)
 
 - Topic `gmail-push`; `gmail-api-push@system.gserviceaccount.com` has Pub/Sub Publisher on it.
-- Service account `gmail-push-relay@otter-mail.iam.gserviceaccount.com`: Pub/Sub signs push
+- Service account `gmail-push-relay@otterware.iam.gserviceaccount.com`: Pub/Sub signs push
   requests as it (the relay checks the token's audience and email). Nobody else may impersonate
   it.
-- Service account `relay-smoke@otter-mail.iam.gserviceaccount.com`: the smoke test's identity.
+- Service account `relay-smoke@otterware.iam.gserviceaccount.com`: the smoke test's identity.
 - Workload Identity pool `github`, provider `otter-mail`: GitHub Actions in
   `otterware-app/otter-mail` (only) may mint `relay-smoke` ID tokens and publish to `gmail-push`. No
   service account keys exist.
@@ -142,9 +142,20 @@ credentials (`wrangler login`, or `CLOUDFLARE_API_TOKEN`).
   token with that URL as audience; 10 minutes retention (a missed notification only delays a
   sync: the app still polls every few minutes).
 
-Secrets (`wrangler secret put …`): `BETTER_AUTH_SECRET` (also keys the Gmail token sealing),
-`GOOGLE_WEB_CLIENT_SECRET` (the "Web application" OAuth client, whose ID is `GOOGLE_WEB_CLIENT_ID`
-in `wrangler.jsonc`). Locally, put them in `.dev.vars` (gitignored).
+Secrets: `BETTER_AUTH_SECRET` (also keys Gmail token sealing), `GOOGLE_GMAIL_CLIENT_SECRET`
+(the current Web client, `GOOGLE_GMAIL_CLIENT_ID`), and the original
+`GOOGLE_WEB_CLIENT_SECRET` (the previous Web client, `GOOGLE_WEB_CLIENT_ID`).
+Locally, put them in `.dev.vars` (gitignored). Preserve both original secrets.
+
+The original `otter-mail` project remains active for existing Google grants and installed
+apps. Google refresh tokens belong to their issuing OAuth client. Sealed web grants record
+that client; grants without a client field use the original Web client. Native apps retain
+their original credentials when refreshing existing grants. New sign-ins use `otterware`.
+`/v1/me` retains the original `pushTopic` for older apps and adds `pushTopics`, indexed by
+the Google project number. Updated apps select the topic for their grant; Gmail requires the
+watch topic to belong to the OAuth client's project. Both projects' authenticated push
+subscriptions deliver to the same relay, which accepts exactly their two service accounts.
+Do not delete the old clients, topic, subscription, or signing account while old grants exist.
 
 ## Shared identity service
 

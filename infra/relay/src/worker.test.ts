@@ -22,9 +22,11 @@ import {
   generateKeyPair,
   jwtVerify,
   SignJWT,
+  EncryptJWT,
 } from "jose";
 import { afterAll, beforeAll, describe, expect, it } from "vite-plus/test";
 import { unstable_startWorker } from "wrangler";
+import { derivedKey } from "./keys.ts";
 import { localConfig } from "../scripts/local-config.ts";
 import type { ListProjectsResponse, Project } from "@otter-mail/contracts/projects";
 import type {
@@ -38,12 +40,14 @@ import type {
 import { TUNNEL_CLOSE } from "@otter-mail/contracts/relay";
 
 const CLIENT_ID = "test-client.apps.googleusercontent.com";
-const WEB_CLIENT_ID = "test-web-client.apps.googleusercontent.com";
+const WEB_CLIENT_ID = "997327858649-test-web.apps.googleusercontent.com";
+const LEGACY_WEB_CLIENT_ID = "187875144740-test-web.apps.googleusercontent.com";
 const IOS_CLIENT_ID = "test-ios-client.apps.googleusercontent.com";
 const IOS_STORE_CLIENT_ID = "test-ios-store-client.apps.googleusercontent.com";
 const APP_ORIGIN = "http://app.test";
 const PUSH_AUDIENCE = "https://relay.test/push/gmail";
 const PUSH_SERVICE_ACCOUNT = "push@test.iam.gserviceaccount.com";
+const LEGACY_PUSH_SERVICE_ACCOUNT = "push@legacy.iam.gserviceaccount.com";
 const root = path.resolve(import.meta.dirname, "..");
 
 let signingKey: CryptoKey;
@@ -171,13 +175,18 @@ beforeAll(async () => {
       },
       GOOGLE_JWKS_URL: { type: "plain_text", value: `http://127.0.0.1:${port}/certs` },
       GOOGLE_TOKEN_URL: { type: "plain_text", value: `http://127.0.0.1:${port}/token` },
-      GOOGLE_WEB_CLIENT_ID: { type: "plain_text", value: WEB_CLIENT_ID },
-      GOOGLE_WEB_CLIENT_SECRET: { type: "plain_text", value: "web-secret" },
+      GOOGLE_WEB_CLIENT_ID: { type: "plain_text", value: LEGACY_WEB_CLIENT_ID },
+      GOOGLE_WEB_CLIENT_SECRET: { type: "plain_text", value: "legacy-secret" },
+      GOOGLE_GMAIL_CLIENT_ID: { type: "plain_text", value: WEB_CLIENT_ID },
+      GOOGLE_GMAIL_CLIENT_SECRET: { type: "plain_text", value: "web-secret" },
       APP_ORIGIN: { type: "plain_text", value: APP_ORIGIN },
       COOKIE_DOMAIN: { type: "plain_text", value: "" },
       TUNNEL_TEST_TARGET: { type: "plain_text", value: mailTarget },
       PUSH_AUDIENCE: { type: "plain_text", value: PUSH_AUDIENCE },
       PUSH_SERVICE_ACCOUNT: { type: "plain_text", value: PUSH_SERVICE_ACCOUNT },
+      PUSH_SERVICE_ACCOUNT_LEGACY: { type: "plain_text", value: LEGACY_PUSH_SERVICE_ACCOUNT },
+      PUSH_TOPIC: { type: "plain_text", value: "projects/otterware/topics/gmail-push" },
+      PUSH_TOPIC_LEGACY: { type: "plain_text", value: "projects/otter-mail/topics/gmail-push" },
       BETTER_AUTH_SECRET: {
         type: "plain_text",
         value: "test-secret-that-is-long-enough-for-better-auth",
@@ -241,7 +250,14 @@ function signInRequest(token: string) {
  * refresh tokens "rt:<email>", and anything for revoked@ is invalid_grant.
  */
 async function googleToken(form: URLSearchParams): Promise<[number, unknown]> {
-  if (form.get("client_id") !== WEB_CLIENT_ID || form.get("client_secret") !== "web-secret") {
+  const clientId = form.get("client_id");
+  const secret =
+    clientId === WEB_CLIENT_ID
+      ? "web-secret"
+      : clientId === LEGACY_WEB_CLIENT_ID
+        ? "legacy-secret"
+        : null;
+  if (!secret || form.get("client_secret") !== secret) {
     return [401, { error: "invalid_client" }];
   }
   const grant = form.get("grant_type");
@@ -257,7 +273,7 @@ async function googleToken(form: URLSearchParams): Promise<[number, unknown]> {
     {
       access_token: `at:${email}:${Date.now()}`,
       expires_in: 3599,
-      id_token: await idToken(email, { aud: WEB_CLIENT_ID }),
+      id_token: await idToken(email, { aud: clientId! }),
       ...(grant === "authorization_code" ? { refresh_token: `rt:${email}` } : {}),
     },
   ];
@@ -378,6 +394,10 @@ describe("sign-in", () => {
     const me = (await (await call("GET", "/v1/me", token)).json()) as MeResponse;
     expect(me.user).toMatchObject({ id: user.id, email: "owner@example.com", name: "Test User" });
     expect(me.pushTopic).toBe("projects/otter-mail/topics/gmail-push");
+    expect(me.pushTopics).toEqual({
+      "997327858649": "projects/otterware/topics/gmail-push",
+      "187875144740": "projects/otter-mail/topics/gmail-push",
+    });
   });
 
   it("signing in again (another Mac) is the same user, with its own session", async () => {
@@ -1029,7 +1049,7 @@ describe("web app", () => {
       await callback(owner.token, `code=code:mail%40example.com&state=${state}`),
     );
     expect(message.type).toBe("otter:gmail-sign-in");
-    expect(message.result).toMatchObject({ email: "mail@example.com" });
+    expect(message.result).toMatchObject({ email: "mail@example.com", clientId: WEB_CLIENT_ID });
     expect(message.result!.sealed).not.toContain("rt:"); // sealed, not readable
 
     const refreshed = await call("POST", "/v1/gmail/token", owner.token, {
@@ -1051,6 +1071,38 @@ describe("web app", () => {
       sealed: message.result!.sealed,
     });
     expect(stolen.status).toBe(400);
+  });
+
+  it("refreshes a pre-migration sealed grant with its original client and secret", async () => {
+    const owner = await signIn("legacy-owner@example.com");
+    const sealed = await new EncryptJWT({
+      email: "legacy@example.com",
+      refreshToken: "rt:legacy@example.com",
+    })
+      .setProtectedHeader({ alg: "dir", enc: "A256GCM" })
+      .setSubject(owner.user.id)
+      .encrypt(
+        await derivedKey(
+          "test-secret-that-is-long-enough-for-better-auth",
+          "otter-mail gmail seal",
+        ),
+      );
+    const response = await call("POST", "/v1/gmail/token", owner.token, { sealed });
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as {
+      clientId: string;
+      idToken: string;
+      accessToken: string;
+    };
+    expect(body.clientId).toBe(LEGACY_WEB_CLIENT_ID);
+    expect(body.accessToken).toMatch(/^at:legacy@example.com:/);
+    expect(
+      (
+        await call("PUT", "/v1/accounts/legacy%40example.com", owner.token, {
+          idToken: body.idToken,
+        })
+      ).status,
+    ).toBe(204);
   });
 
   it("says when Google revoked the sign-in", async () => {
@@ -1115,6 +1167,7 @@ describe("realtime", () => {
 
   it("only accepts pushes Pub/Sub signed for this endpoint", async () => {
     const note = { emailAddress: "inbox@example.com", historyId: "1" };
+    expect((await push(note, { email: LEGACY_PUSH_SERVICE_ACCOUNT })).status).toBe(204);
     expect((await push(note, { email: "someone@example.com" })).status).toBe(401);
     expect((await push(note, { aud: "https://elsewhere/push" })).status).toBe(401);
     expect((await call("POST", "/push/gmail", undefined, {})).status).toBe(401);

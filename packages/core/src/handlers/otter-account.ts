@@ -80,14 +80,20 @@ function refresh(): Promise<void> {
 
 async function refreshOnce(): Promise<void> {
   try {
-    const { pushTopic } = await relayRequest<MeResponse>("GET", "/v1/me");
+    const { pushTopic, pushTopics } = await relayRequest<MeResponse>("GET", "/v1/me");
     await reconcileAccounts(removeLocalAccount);
     const linked = linkedAccountIds();
     const pushed: string[] = [];
     for (const account of await listAccounts()) {
       const watch = findProvider(account)?.watchViaRelay;
       if (!watch || !linked.has(account.email.toLowerCase()) || !isSignedIn(account)) continue;
-      if (await watch(account.id, pushTopic)) pushed.push(account.id);
+      try {
+        const clientId = pushTopics ? await platform().google.getClientId?.(account.id) : undefined;
+        const topic = (clientId && pushTopics?.[clientId.split("-")[0]!]) || pushTopic;
+        if (await watch(account.id, topic)) pushed.push(account.id);
+      } catch (err) {
+        logger.info("otter-account", `Couldn't watch ${account.id}: ${String(err)}`);
+      }
     }
     setPushedAccounts(pushed);
   } catch (err) {

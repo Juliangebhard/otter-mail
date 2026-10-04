@@ -136,10 +136,13 @@ final class GmailProvider: MailProvider {
     /** Asks Gmail to push this mailbox's changes to the relay, once a day; the relay's events do the rest. */
     func watch(pushTopic: String?, _ state: inout MailboxState, onChange: @escaping () -> Void) async -> Task<Void, Never>? {
         guard let pushTopic else { return nil }
-        guard (state.watchedAt ?? .distantPast) < .now.addingTimeInterval(-86_400)
+        let topic = GoogleCredentials.pushTopic(api.email, fallback: pushTopic)
+        guard state.watchTopic != topic
+            || (state.watchedAt ?? .distantPast) < .now.addingTimeInterval(-86_400)
             || (state.watchExpiresAt ?? .distantPast) < .now.addingTimeInterval(86_400) else { return nil }
-        if let watch = try? await api.watch(topic: pushTopic) {
+        if let watch = try? await api.watch(topic: topic) {
             state.watchedAt = .now
+            state.watchTopic = topic
             state.watchExpiresAt = Double(watch.expiration).map { Date(timeIntervalSince1970: $0 / 1000) }
             // watch.historyId is the end marker; never replace a pending history baseline with it.
         }
