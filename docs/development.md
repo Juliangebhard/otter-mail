@@ -28,9 +28,9 @@
 
 The dev commands pick ports from the worktree path, so several checkouts can run at once. Set
 `OTTER_MAIL_PORT_OFFSET` to choose one yourself. `t3.json` sets up new T3 Code worktrees (install,
-then symlinks to the main checkout's `.env`, `.env.local` and `infra/relay/.dev.vars`) and offers
-both dev commands as scripts. These files are shared, so editing them in a worktree changes the
-main checkout's copy too.
+then symlinks to the main checkout's `.env.local` and `infra/relay/.dev.vars`) and offers both dev
+commands as scripts. These files are shared, so editing them in a worktree changes the main
+checkout's copy too.
 
 ## Agent development
 
@@ -73,7 +73,7 @@ profile in `chromium/` and logs in `logs/main.log`. Delete it to start fresh.
 
 Use the dedicated `otterware.demo@gmail.com` Google account for demos and integration checks
 that need real Gmail, Google OAuth, Contacts or Calendar. It contains synthetic mail, contacts
-and calendar events. Keep its credentials in the main checkout's ignored `.env`:
+and calendar events. Keep its credentials in the main checkout's ignored `.env.local`:
 
 ```dotenv
 OTTER_MAIL_GMAIL_DEMO_EMAIL=otterware.demo@gmail.com
@@ -82,7 +82,7 @@ OTTER_MAIL_GMAIL_DEMO_PASSWORD=your-private-demo-password
 
 New T3 worktrees symlink that file during setup. For an existing worktree without the link,
 find the main checkout as the parent directory of
-`git rev-parse --path-format=absolute --git-common-dir` and read its `.env`. The values are
+`git rev-parse --path-format=absolute --git-common-dir` and read its `.env.local`. The values are
 private inputs for agent/browser sign-in; the app does not consume them or sign in automatically.
 Keep the password out of commits, logs, screenshots and app bundles, and never give it a
 `VITE_` prefix.
