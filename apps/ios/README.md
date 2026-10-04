@@ -106,6 +106,9 @@ this push path to Otter or Apple. APNs has no unread badge. The extension fetche
 messages' headers/preview **directly from Gmail**, then changes the notification on this phone.
 Enriched taps open that mailbox/thread, fetching it directly if it isn't cached; generic taps open
 the mailbox and sync. The demo needs neither Google nor Apple configuration.
+Notification and mailbox-list previews render Markdown as plain text on-device, keeping link
+labels and words without their URL destinations or formatting markers. Input and display length
+are bounded, including truncated Gmail link snippets; the message body is left intact.
 
 `NotificationShared/` contains the direct reader, shared OAuth refresh, Keychain access and
 App Group markers. The app moves existing Google refresh tokens from its original private
@@ -159,6 +162,11 @@ app and extension. Provision both targets for their matching group:
 for migration. The `APNS_ENVIRONMENT` build setting and signed `aps-environment` must match:
 Debug `development` → sandbox; Release/TestFlight `production` → production. If signing with a
 custom development profile, keep the plist environment consistent with that profile.
+
+The shared App Group also grants Keychain access under its unprefixed group name. Keep only the
+app-private prefixed group in `keychain-access-groups`; adding the App Group there fails signed
+archives against the profiles' prefixed Keychain allowlist. Google token queries select the App
+Group explicitly, while existing Otter sessions remain in the app-private default group.
 
 Regenerate the main App Store profile with the new capabilities, and add the extension's
 “Otter Mail Notifications App Store” profile. The release workflow also needs
