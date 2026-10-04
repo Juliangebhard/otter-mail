@@ -21,6 +21,7 @@ import type { Env } from "./worker.ts";
 const AUTHORIZE_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const tokenUrl = (env: Env) => env.GOOGLE_TOKEN_URL || TOKEN_URL;
+const clientId = (env: Env) => env.GOOGLE_GMAIL_CLIENT_ID ?? env.GOOGLE_WEB_CLIENT_ID;
 
 export const callbackUrl = (env: Env) => `${env.BETTER_AUTH_URL}/v1/gmail/callback`;
 
@@ -37,7 +38,7 @@ export async function authorizeUrl(env: Env, userId: string, loginHint?: string)
     .sign(await key(env, "state"));
   const url = new URL(AUTHORIZE_URL);
   url.search = new URLSearchParams({
-    client_id: env.GOOGLE_WEB_CLIENT_ID,
+    client_id: clientId(env),
     redirect_uri: callbackUrl(env),
     response_type: "code",
     scope: GMAIL_SCOPES.join(" "),
@@ -64,13 +65,24 @@ type GoogleTokens = {
   error?: string;
 };
 
-async function tokenRequest(env: Env, params: Record<string, string>): Promise<GoogleTokens> {
+async function tokenRequest(
+  env: Env,
+  params: Record<string, string>,
+  issuedTo = clientId(env),
+): Promise<GoogleTokens> {
+  if (issuedTo !== clientId(env) && issuedTo !== env.GOOGLE_WEB_CLIENT_ID)
+    throw new GoogleTokenError("unsupported_client");
+  const secret =
+    issuedTo === env.GOOGLE_GMAIL_CLIENT_ID
+      ? env.GOOGLE_GMAIL_CLIENT_SECRET
+      : env.GOOGLE_WEB_CLIENT_SECRET;
+  if (!secret) throw new GoogleTokenError("missing_client_secret");
   const response = await fetch(tokenUrl(env), {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
-      client_id: env.GOOGLE_WEB_CLIENT_ID,
-      client_secret: env.GOOGLE_WEB_CLIENT_SECRET,
+      client_id: issuedTo,
+      client_secret: secret,
       ...params,
     }),
   });
@@ -94,6 +106,7 @@ export type SignInResult = {
   sealed: string;
   accessToken: string;
   expiresIn: number;
+  clientId: string;
 };
 
 /** Exchanges the code, then seals the refresh token for this user. */
@@ -110,8 +123,13 @@ export async function completeSignIn(
   if (!tokens.refresh_token || !tokens.id_token) {
     throw new GoogleTokenError("Google did not return a refresh token.");
   }
-  const claims = await verifyGoogleJwt(tokens.id_token, env.GOOGLE_WEB_CLIENT_ID, googleKeys(env));
-  const sealed = await new EncryptJWT({ email: claims.email, refreshToken: tokens.refresh_token })
+  const issuedTo = clientId(env);
+  const claims = await verifyGoogleJwt(tokens.id_token, issuedTo, googleKeys(env));
+  const sealed = await new EncryptJWT({
+    email: claims.email,
+    refreshToken: tokens.refresh_token,
+    clientId: issuedTo,
+  })
     .setProtectedHeader({ alg: "dir", enc: "A256GCM" })
     .setSubject(userId)
     .setIssuedAt()
@@ -123,22 +141,31 @@ export async function completeSignIn(
     sealed,
     accessToken: tokens.access_token,
     expiresIn: tokens.expires_in,
+    clientId: issuedTo,
   };
 }
 
 /** A fresh access token (and ID token) from a sealed refresh token, for its owner only. */
 export async function refresh(env: Env, userId: string, sealed: string) {
-  const { payload } = await jwtDecrypt<{ refreshToken: string }>(sealed, await key(env, "seal"), {
-    subject: userId,
-  });
-  const tokens = await tokenRequest(env, {
-    grant_type: "refresh_token",
-    refresh_token: payload.refreshToken,
-  });
+  const { payload } = await jwtDecrypt<{ refreshToken: string; clientId?: string }>(
+    sealed,
+    await key(env, "seal"),
+    {
+      subject: userId,
+    },
+  );
+  // Tokens sealed before the migration belong to the original Mail web client.
+  const issuedTo = payload.clientId ?? env.GOOGLE_WEB_CLIENT_ID;
+  const tokens = await tokenRequest(
+    env,
+    { grant_type: "refresh_token", refresh_token: payload.refreshToken },
+    issuedTo,
+  );
   return {
     accessToken: tokens.access_token,
     expiresIn: tokens.expires_in,
     idToken: tokens.id_token ?? null,
+    clientId: issuedTo,
   };
 }
 

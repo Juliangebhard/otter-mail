@@ -5,6 +5,29 @@ import Testing
 nonisolated struct NotificationTests: Sendable {
     private func data(_ json: String) -> Data { Data(json.utf8) }
 
+    @Test func existingGoogleGrantKeepsItsOriginalClientAndTopic() throws {
+        let email = "legacy-grant-test@otter.example"
+        defer { GoogleCredentials.forget(email) }
+        try #require(Keychain.set(GoogleCredentials.refreshKey(email), "fake-original-refresh"))
+        let credential = try #require(GoogleCredentials.credential(email))
+        #expect(credential.refreshToken == "fake-original-refresh")
+        #expect(credential.clientID == GoogleCredentials.legacyClientID)
+        #expect(GoogleCredentials.pushTopic(email, fallback: "legacy-topic") == "legacy-topic")
+        try #require(GoogleCredentials.save(email, credential: credential))
+        #expect(GoogleCredentials.credential(email)?.clientID == GoogleCredentials.legacyClientID)
+    }
+
+    @Test func newGoogleGrantRecordsItsClientAndSelectsTheNewTopic() throws {
+        let email = "current-grant-test@otter.example"
+        defer { GoogleCredentials.forget(email) }
+        try #require(GoogleCredentials.save(email, credential: .init(refreshToken: "fake-current-refresh", clientID: GoogleCredentials.clientID)))
+        let credential = try #require(GoogleCredentials.credential(email))
+        #expect(credential.refreshToken == "fake-current-refresh")
+        #expect(credential.clientID == GoogleCredentials.clientID)
+        #expect(GoogleCredentials.pushTopic(email, fallback: "legacy-topic") == "projects/otterware/topics/gmail-push")
+    }
+
+
     @Test func previewKeepsLinkLabelsAndFormattedWords() throws {
         let snippet = "[Rasur Shop](https://example.com/pages/products) [Besuchen Sie uns]\n(https://example.com/track?id=123) Lieber Laurin, **something big** is coming &amp; it’s exciting."
         let message = try JSONDecoder().decode(GmailNotification.Message.self, from: JSONSerialization.data(withJSONObject: ["id": "a", "threadId": "t", "snippet": snippet]))

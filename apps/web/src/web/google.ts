@@ -20,7 +20,7 @@ import {
 import type { Page } from "./platform";
 import { SIGN_IN_CANCELLED } from "./protocol";
 
-type Stored = { sealed: string; accessToken: string; expiresAt: number };
+type Stored = { sealed: string; accessToken: string; expiresAt: number; clientId?: string };
 
 const FILE = "google-tokens.json";
 /** Refresh a little before Google expires the token, never mid-request. */
@@ -33,7 +33,10 @@ export function webGoogleAuth(deps: {
 }): GoogleAuth {
   const { relayUrl, page, files } = deps;
   let tokens = new Map<string, Stored>();
-  const refreshes = new Map<string, Promise<{ accessToken: string; idToken: string | null }>>();
+  const refreshes = new Map<
+    string,
+    Promise<{ accessToken: string; idToken: string | null; clientId?: string }>
+  >();
 
   async function save(): Promise<void> {
     await files.write(FILE, JSON.stringify(Object.fromEntries(tokens)));
@@ -64,16 +67,18 @@ export function webGoogleAuth(deps: {
         accessToken: string;
         expiresIn: number;
         idToken: string | null;
+        clientId?: string;
       };
       if (tokens.has(accountId)) {
         tokens.set(accountId, {
           ...stored,
           accessToken: body.accessToken,
           expiresAt: Date.now() + body.expiresIn * 1000,
+          clientId: body.clientId ?? stored.clientId,
         });
         await save();
       }
-      return { accessToken: body.accessToken, idToken: body.idToken };
+      return { accessToken: body.accessToken, idToken: body.idToken, clientId: body.clientId };
     })().finally(() => refreshes.delete(accountId));
     refreshes.set(accountId, pending);
     return pending;
@@ -95,6 +100,7 @@ export function webGoogleAuth(deps: {
         sealed: result.sealed,
         accessToken: result.accessToken,
         expiresAt: Date.now() + result.expiresIn * 1000,
+        clientId: result.clientId,
       });
       await save();
       const existing = await accountStore.getAccount(result.email);
@@ -128,6 +134,10 @@ export function webGoogleAuth(deps: {
       if (!idToken)
         throw new Error("Google did not return an ID token. Sign in to this account again.");
       return idToken;
+    },
+
+    async getClientId(accountId) {
+      return tokens.get(accountId)?.clientId ?? (await refresh(accountId)).clientId;
     },
 
     async removeTokens(accountId) {

@@ -52,9 +52,12 @@ signed builds (below).
 Release builds need the Google OAuth client, or the app can't sign in (the workflow fails early
 without it). Under Settings → Secrets and variables → Actions:
 
-- Variable `OTTER_MAIL_GOOGLE_CLIENT_ID`: the "Desktop app" client ID from the `otter-mail`
+- Variable `OTTER_MAIL_GOOGLE_CLIENT_ID`: the "Desktop app" client ID from the `otterware`
   project.
 - Secret `OTTER_MAIL_GOOGLE_CLIENT_SECRET`: its client secret.
+- Variable `OTTER_MAIL_GOOGLE_LEGACY_CLIENT_ID` and secret
+  `OTTER_MAIL_GOOGLE_LEGACY_CLIENT_SECRET`: the original `otter-mail` Desktop client.
+  Keep these for existing grants; the new client is used for new sign-ins.
 
 ## Signing and notarization
 

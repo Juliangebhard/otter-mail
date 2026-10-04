@@ -113,6 +113,8 @@ jobs:
           VERSION: ${{ needs.preflight.outputs.version }}
           OTTER_MAIL_GOOGLE_CLIENT_ID: ${{ vars.OTTER_MAIL_GOOGLE_CLIENT_ID }}
           OTTER_MAIL_GOOGLE_CLIENT_SECRET: ${{ secrets.OTTER_MAIL_GOOGLE_CLIENT_SECRET }}
+          OTTER_MAIL_GOOGLE_LEGACY_CLIENT_ID: ${{ vars.OTTER_MAIL_GOOGLE_LEGACY_CLIENT_ID }}
+          OTTER_MAIL_GOOGLE_LEGACY_CLIENT_SECRET: ${{ secrets.OTTER_MAIL_GOOGLE_LEGACY_CLIENT_SECRET }}
           CSC_LINK: ${{ secrets.CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}

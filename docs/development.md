@@ -71,9 +71,9 @@ profile in `chromium/` and logs in `logs/main.log`. Delete it to start fresh.
 ## Google sign-in
 
 Accounts sign in through the browser with PKCE and a loopback redirect (`127.0.0.1`), using the
-"Desktop app" OAuth client of the `otter-mail` Google Cloud project. The client ID and secret are
+"Desktop app" OAuth client of the `otterware` Google Cloud project. The client ID and secret are
 baked in at build time and never committed: copy `.env.example` to `.env.local` and fill them in
-(Credentials: https://console.cloud.google.com/auth/clients?project=otter-mail). The same
+(Credentials: https://console.cloud.google.com/auth/clients?project=otterware). The same
 `OTTER_MAIL_GOOGLE_CLIENT_ID` / `OTTER_MAIL_GOOGLE_CLIENT_SECRET` variables override the baked-in
 values at runtime.
 
@@ -97,7 +97,7 @@ The same renderer runs in a browser, with the mail backend (`packages/core`) in 
 
 ```sh
 # once (gitignored): the relay's secrets
-printf 'BETTER_AUTH_SECRET=any-long-local-secret\nGOOGLE_WEB_CLIENT_SECRET=...\n' > infra/relay/.dev.vars
+printf 'BETTER_AUTH_SECRET=any-long-local-secret\nGOOGLE_GMAIL_CLIENT_SECRET=...\nGOOGLE_WEB_CLIENT_SECRET=...\n' > infra/relay/.dev.vars
 pnpm dev    # the app on http://localhost:5833, the relay on http://localhost:8787
 ```
 

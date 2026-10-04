@@ -1,15 +1,25 @@
 # Google OAuth verification
 
-Otter Mail signs in to Google through the `otter-mail` Google Cloud project (owned by
-chris.kafrouni@gmail.com). Its consent screen is published. The original branding and
-`otterware.dev` were verified; the move to `otterware.app` needs the new domain and branding
-to be verified too (see [domain migration](domain-migration.md)). The Gmail scope still needs Google's
-data-access verification; until then sign-in shows "Google hasn't verified this app"
-(Advanced → Go to Otter Mail) and the app is capped at 100 users.
+Otter applications use the `otterware` Google Cloud project (number `997327858649`,
+owned by chris.kafrouni@gmail.com). Laurin has Editor access. The consent screen is
+published for external users; Google's branding and data-access verification are separate
+from deployment. Until data access is verified, Gmail/Calendar sign-in shows the unverified
+app warning and has Google's 100-user cap. The Mail project's existing review has an [unlisted demo](https://youtu.be/BDEHA3mwF9Y);
+Google's 30 September reply requests clearer Calendar/Contacts demonstrations and exact scope
+matching. That video demonstrates the original project IDs. Completing the Otterware review
+needs updated consent evidence for the new IDs and Calendar's additional scopes/client.
+Branding ownership is verified via the project owner's Search Console properties.
+
+The original `otter-mail` project remains active for existing grants and installed apps.
+Refresh tokens cannot move to another OAuth client. Accounts keeps its existing database,
+session/signing secrets and issuer (`https://accounts.otterware.app/v1/auth`), so the project
+move preserves Otter accounts and sessions. Mail's new clients retain old grant credentials
+and select the Gmail push topic belonging to each grant's project. Do not remove the original
+clients or Pub/Sub delivery infrastructure while those grants are in use.
 
 ## Submitting
 
-Google Auth Platform → Data access (https://console.cloud.google.com/auth/scopes?project=otter-mail).
+Google Auth Platform → Data access (https://console.cloud.google.com/auth/scopes?project=otterware).
 The form only saves once every field is filled, including the video link.
 
 The app asks for five scopes (`GMAIL_SCOPES` in `packages/contracts/src/index.ts`), plus
@@ -70,7 +80,7 @@ Record the installed app, signed in with a test account, narrating or captioning
 
 1. Otter Mail's home page, then open the app and click **Add Gmail account**.
 2. The browser's Google consent screen, with the address bar expanded so the `client_id`
-   (`187875144740-aspevse90oidb4ra3t2fcdfmbagm6jep…`) is readable. Show the unverified-app
+   (`997327858649-n30jr99d21200libki4bgeojpr1kfq59…`) is readable. Show the unverified-app
    screen (Advanced → Go to Otter Mail) and the scope list, then Continue.
 3. Gmail: the inbox loads; open and read a message; search; reply and send; add a label; archive;
    move a message to Trash, then empty Trash (permanent delete).
@@ -85,15 +95,23 @@ renewed yearly; follow the instructions in that email.
 
 ## Clients
 
-Four OAuth clients in the project (Google Auth Platform → Clients). All ask for `openid email
-profile` as well.
+Five OAuth clients in `otterware` (Google Auth Platform → Clients). All request identity
+scopes as well. Secrets live in Cloudflare or GitHub settings, never this repository.
 
-| Client                                | Used by                                                                   | Gmail scopes                                                                                              |
-| ------------------------------------- | ------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| "Otter Mail" (Desktop)                | the Mac app (`OTTER_MAIL_GOOGLE_CLIENT_ID`, `187875144740-aspevse90…`)    | all five (`GMAIL_SCOPES`); Otter sign-in asks for identity only                                           |
-| "Otter Mail - Web" (Web application)  | the relay, for the web app (`GOOGLE_WEB_CLIENT_ID`, `187875144740-drhr…`) | all five (`GMAIL_SCOPES`); Otter sign-in asks for identity only                                           |
-| "Otter Mail - IOS" (iOS)              | iPhone Debug builds, bundle `dev.otterware.mail.dev` (`…-tegr2te…`)       | `https://mail.google.com/`, `gmail.settings.basic` (`GoogleAuth.swift`): no calendar or contacts features |
-| "Otter Mail iPhone (App Store)" (iOS) | iPhone Release builds, bundle `dev.otterware.mail` (`…-vu3ordog…`)        | as Debug                                                                                                  |
+| Client                          | Client ID                                                                  | Used by                                                                                      |
+| ------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| Otterware - Web                 | `997327858649-hvcu3vfk5m83q9jid8g17pv6etmc491v.apps.googleusercontent.com` | Accounts (`GOOGLE_AUTH_CLIENT_ID`) and Mail Gmail (`GOOGLE_GMAIL_CLIENT_ID`)                 |
+| Otter Mail - Mac                | `997327858649-n30jr99d21200libki4bgeojpr1kfq59.apps.googleusercontent.com` | Mac release credentials                                                                      |
+| Otter Mail - iPhone Development | `997327858649-0dfa4knnv1ur7021dn1ojuovoj1i3ed8.apps.googleusercontent.com` | `dev.otterware.mail.dev`                                                                     |
+| Otter Mail - iPhone App Store   | `997327858649-vcvktkdnrs6p8c31ucsp1oeia7l8taho.apps.googleusercontent.com` | `dev.otterware.mail`                                                                         |
+| Otter Calendar - Desktop        | `997327858649-lp9asje3r9shdf2iia4ce0vgbm0613n5.apps.googleusercontent.com` | Calendar repository variable `T3CODE_GOOGLE_CLIENT_ID`, secret `T3CODE_GOOGLE_CLIENT_SECRET` |
+
+Mail Mac/Web request the five Mail scopes above. iPhone requests full mail and
+`gmail.settings.basic`. Calendar requests `calendar.events` and
+`calendar.calendarlist.readonly` (read/write events, read calendar list), matching its existing
+Google implementation; Accounts itself requests identity only. Include Calendar's event
+editing and calendar selection in the verification justification/video. Calendar release
+workflows must consume the repository's credentials when Laurin integrates shared auth.
 
 Sign-ins from before a scope was added keep working without it: calendar.events (asked for before
 calendar.events.owned) covers the same calls; without calendar, RSVP is emailed; without

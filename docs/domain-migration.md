@@ -26,7 +26,10 @@ and `PUSH_AUDIENCE`. Local development still overrides these settings with local
 
 ## Google Cloud
 
-The project and OAuth client IDs remain unchanged (`otter-mail`). In Google Auth Platform's
+The domain migration retained the `otter-mail` project and its OAuth client IDs.
+The later move to `otterware` keeps those clients for existing grants; see
+[Google OAuth verification](google-verification.md) and [relay setup](../infra/relay/README.md#google-cloud-setup-project-otterware-number-997327858649).
+For the original Google Auth Platform's
 **Otter Mail - Web** client, retain the old URLs and localhost entries and add:
 
 - JavaScript origin: `https://mail.otterware.app`
