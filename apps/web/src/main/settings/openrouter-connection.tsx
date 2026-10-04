@@ -38,7 +38,7 @@ export function OpenRouterConnection({ provider }: { provider: ProviderSnapshot 
     <SettingsSection title="OpenRouter connection">
       <SettingsRow
         title="Mail and chat history"
-        description="When you use this agent, your prompts and mail returned by its tools are sent to Otter Mail's server, OpenRouter and the selected model provider. Otter Mail keeps chat history until you delete the chat or your Otter account."
+        description="When you use this agent, your prompts and mail or calendar data returned by its tools are sent to Otter Mail's server, OpenRouter and the selected model provider. Otter Mail keeps chat history until you delete the chat or your Otter account."
       />
       <SettingsRow
         title="API key"
