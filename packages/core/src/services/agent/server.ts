@@ -156,7 +156,7 @@ export class OpenRouterAgentServer {
     const response = await fetch(`${API}/models/user`, {
       headers: { ...HEADERS, Authorization: `Bearer ${key}` },
       signal: AbortSignal.timeout(4000),
-      redirect: "error",
+      redirect: "manual",
     });
     if (!response.ok) throw new Error(httpError(response.status));
     const body = (await response.json()) as {
@@ -210,7 +210,7 @@ export class OpenRouterAgentServer {
       fetch(`${API}/key`, {
         headers: { Authorization: `Bearer ${key}` },
         signal: AbortSignal.timeout(4000),
-        redirect: "error",
+        redirect: "manual",
       }),
       this.catalog(key),
     ]);

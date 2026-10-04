@@ -114,6 +114,24 @@ describe("the server OpenRouter agent", () => {
     expect(files.files.get("api-key")).toBe(KEY);
   });
 
+  it.each(["/key", "/models/user"])(
+    "rejects a redirect from %s without replacing the working key",
+    async (endpoint) => {
+      await server.connect(KEY);
+      const original = fetcher.getMockImplementation() as (
+        input: string,
+        init?: RequestInit,
+      ) => Promise<Response>;
+      fetcher.mockImplementation(async (input: string, init?: RequestInit) =>
+        input.endsWith(endpoint)
+          ? new Response(null, { status: 302, headers: { Location: "https://other.example" } })
+          : original(input, init),
+      );
+      await expect(server.connect(KEY)).rejects.toThrow();
+      expect(files.files.get("api-key")).toBe(KEY);
+    },
+  );
+
   it("runs real SDK tool steps on the server, bridges a tool to the initiating device, and resumes on another device", async () => {
     await server.connect(KEY);
     responses.push(
