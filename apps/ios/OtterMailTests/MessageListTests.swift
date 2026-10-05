@@ -10,18 +10,21 @@ struct MessageListTests {
         let preferences = Preferences(defaults: defaults)
         #expect(preferences.messageListStyle == .classic)
         #expect(preferences.groupMessagesByDay && preferences.dimReadMessages)
+        #expect(!preferences.fullWidthMessages)
         var changed: [String] = []
         preferences.onChange = { changed.append($0) }
         let remote = [
             "otter:message-list-style": "dividers",
             "otter:group-messages-by-day": "false",
             "otter:dim-read-messages": "false",
+            "otter:full-width-messages": "true",
         ]
         preferences.apply(ui: remote, settings: [:])
         #expect(changed.isEmpty)
         let restored = Preferences(defaults: defaults)
         #expect(restored.messageListStyle == .dividers)
         #expect(!restored.groupMessagesByDay && !restored.dimReadMessages)
+        #expect(restored.fullWidthMessages)
         for (key, value) in remote { #expect(restored.uiSection[key] == value) }
         preferences.dimReadMessages = true
         #expect(changed == ["ui"])

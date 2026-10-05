@@ -7,9 +7,13 @@ import SwiftUI
  * One message of a conversation. Folded, it's who and a line of it; open,
  * the whole message, translated when it's in a language the user doesn't
  * read and Settings › Translate automatically is on (Apple's on-device
- * Translation, as on the Mac).
+ * Translation, as on the Mac). Its text selects as anywhere in iOS; the
+ * whole message's Translate and Copy are on its header.
  */
 struct MessageView: View {
+    /** The reader's side inset; Settings › Full-width messages takes it off the content. */
+    static let inset: CGFloat = 20
+
     @Environment(Preferences.self) private var preferences
     @Environment(MailStore.self) private var store
     @Environment(\.palette) private var palette
@@ -30,21 +34,30 @@ struct MessageView: View {
     @State private var attachmentError: String?
 
     var body: some View {
+        let fullWidth = preferences.fullWidthMessages
         VStack(alignment: .leading, spacing: 12) {
             header
+                .padding(.horizontal, Self.inset)
                 .contentShape(.rect)
                 .onTapGesture(perform: onTap)
+                .contextMenu {
+                    Button("Translate", systemImage: "translate") { showTranslation = true }
+                    Button("Copy", systemImage: "doc.on.doc") { UIPasteboard.general.string = message.text }
+                }
 
             if open {
                 if let translated, !showOriginal {
-                    Text(translated).bodyText(palette)
+                    SelectableText(text: translated)
+                        .padding(.horizontal, fullWidth ? 0 : Self.inset)
                 } else if let html = message.html {
-                    HTMLBody(html: html, inline: message.inline ?? []) { image in
+                    HTMLBody(html: html, inline: message.inline ?? [], cornerRadius: fullWidth ? 0 : 14) { image in
                         await store.sync?.inlineImage(image, of: message, in: mailbox.email)
                     }
+                    .padding(.horizontal, fullWidth ? 0 : Self.inset)
                 } else {
                     let (body, quote) = Quote.split(message.text)
-                    Text(showQuote ? message.text : body).bodyText(palette)
+                    SelectableText(text: showQuote ? message.text : body)
+                        .padding(.horizontal, fullWidth ? 0 : Self.inset)
                     if quote != nil && !showQuote {
                         Button("Show quoted text", systemImage: "ellipsis") { showQuote = true }
                             .labelStyle(.iconOnly)
@@ -53,6 +66,7 @@ struct MessageView: View {
                             .frame(width: 36, height: 22)
                             .background(palette.surface, in: .capsule)
                             .overlay(Capsule().strokeBorder(palette.border))
+                            .padding(.horizontal, Self.inset)
                     }
                 }
 
@@ -62,6 +76,7 @@ struct MessageView: View {
                     }
                     .font(.footnote)
                     .foregroundStyle(palette.muted)
+                    .padding(.horizontal, Self.inset)
                 }
 
                 if !message.attachments.isEmpty {
@@ -80,6 +95,7 @@ struct MessageView: View {
                         }
                     }
                     .scrollIndicators(.hidden)
+                    .contentMargins(.horizontal, Self.inset, for: .scrollContent)
                 }
             }
         }
@@ -100,10 +116,6 @@ struct MessageView: View {
             let read = preferences.effectiveReadLanguages
             guard !read.contains(where: { $0.hasPrefix(language) }), let target = read.first else { return }
             translation = .init(source: Locale.Language(identifier: language), target: Locale.Language(identifier: target))
-        }
-        .contextMenu {
-            Button("Translate", systemImage: "translate") { showTranslation = true }
-            Button("Copy", systemImage: "doc.on.doc") { UIPasteboard.general.string = message.text }
         }
     }
 
@@ -197,13 +209,56 @@ struct AttachmentChip: View {
     }
 }
 
-private extension Text {
-    func bodyText(_ palette: Palette) -> some View {
-        font(.callout)
-            .foregroundStyle(palette.text)
-            .lineSpacing(4)
-            .textSelection(.enabled)
-            .frame(maxWidth: .infinity, alignment: .leading)
+/**
+ * A plain-text body in UIKit's text view, which selects like Mail: hold to
+ * pick a word, drag the handles, then Copy, Translate or Share. (SwiftUI's
+ * selectable Text only copies all of it.)
+ */
+private struct SelectableText: UIViewRepresentable {
+    @Environment(\.palette) private var palette
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    let text: String
+
+    func makeUIView(context: Context) -> UITextView {
+        let view = UITextView()
+        view.isEditable = false
+        view.isScrollEnabled = false
+        view.backgroundColor = .clear
+        view.textContainerInset = .zero
+        view.textContainer.lineFragmentPadding = 0
+        view.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        return view
+    }
+
+    func updateUIView(_ view: UITextView, context: Context) {
+        // Setting the text again would drop the user's selection.
+        let shown = Shown(text: text, color: palette.text, size: dynamicTypeSize)
+        guard context.coordinator.shown != shown else { return }
+        context.coordinator.shown = shown
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.lineSpacing = 4
+        view.attributedText = NSAttributedString(string: text, attributes: [
+            .font: UIFont.preferredFont(forTextStyle: .callout),
+            .foregroundColor: UIColor(palette.text),
+            .paragraphStyle: paragraph,
+        ])
+    }
+
+    func sizeThatFits(_ proposal: ProposedViewSize, uiView: UITextView, context: Context) -> CGSize? {
+        guard let width = proposal.width else { return nil }
+        return CGSize(width: width, height: ceil(uiView.sizeThatFits(CGSize(width: width, height: .greatestFiniteMagnitude)).height))
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    final class Coordinator {
+        var shown: Shown?
+    }
+
+    nonisolated struct Shown: Equatable {
+        let text: String
+        let color: Color
+        let size: DynamicTypeSize
     }
 }
 
