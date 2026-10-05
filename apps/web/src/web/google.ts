@@ -18,7 +18,7 @@ import {
 } from "@otter-mail/core";
 
 import type { Page } from "./platform";
-import { SIGN_IN_CANCELLED } from "./protocol";
+import { SIGN_IN_CANCELLED, type GoogleSignInResult } from "./protocol";
 
 type Stored = { sealed: string; accessToken: string; expiresAt: number; clientId?: string };
 
@@ -84,6 +84,27 @@ export function webGoogleAuth(deps: {
     return pending;
   }
 
+  /** A sign-in from the relay: its tokens, then the account, kept under the address. */
+  async function keep(result: GoogleSignInResult): Promise<GmailAccount> {
+    tokens.set(result.email, {
+      sealed: result.sealed,
+      accessToken: result.accessToken,
+      expiresAt: Date.now() + result.expiresIn * 1000,
+      clientId: result.clientId,
+    });
+    await save();
+    const existing = await accountStore.getAccount(result.email);
+    const account: GmailAccount = {
+      ...existing,
+      id: result.email,
+      email: result.email,
+      name: result.name,
+      picture: result.picture ?? undefined,
+    };
+    await accountStore.addAccount(account);
+    return account;
+  }
+
   return {
     async load() {
       const bytes = await files.read(FILE);
@@ -96,23 +117,23 @@ export function webGoogleAuth(deps: {
           ? new SignInCancelledError()
           : err;
       });
-      tokens.set(result.email, {
-        sealed: result.sealed,
-        accessToken: result.accessToken,
-        expiresAt: Date.now() + result.expiresIn * 1000,
-        clientId: result.clientId,
+      return keep(result);
+    },
+
+    // `pnpm dev:demo`: the local relay seals the mailbox's saved sign-in, as the popup would.
+    async addDemoAccount(mailbox) {
+      const refreshToken = mailbox.refreshTokens.web;
+      if (!refreshToken) {
+        throw new Error(`${mailbox.email} has no web sign-in yet: run \`pnpm dev:demo --login\`.`);
+      }
+      const response = await fetch(`${relayUrl}/v1/dev/gmail`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refreshToken }),
       });
-      await save();
-      const existing = await accountStore.getAccount(result.email);
-      const account: GmailAccount = {
-        ...existing,
-        id: result.email,
-        email: result.email,
-        name: result.name,
-        picture: result.picture ?? undefined,
-      };
-      await accountStore.addAccount(account);
-      return account;
+      if (!response.ok) throw new Error(`The relay couldn't sign it in (${response.status}).`);
+      return keep((await response.json()) as GoogleSignInResult);
     },
 
     // The page owns the popup: cancelling closes it, which rejects addAccount.

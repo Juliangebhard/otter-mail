@@ -33,7 +33,7 @@ to another app. This page is where they're compared.
 | Google profile picture per mailbox          | ✓ (kept current)   | ✓ (kept current)                    | —                       |
 | Remove a mailbox (unlinks it everywhere)    | ✓                  | ✓                                   | ✓                       |
 | Mailbox linked elsewhere shows "signed out" | ✓                  | ✓                                   | ✓                       |
-| Demo mailbox                                | —                  | `pnpm dev:demo` only                | TestFlight / Xcode only |
+| Demo mailbox                                | —                  | `pnpm dev:fake` only                | TestFlight / Xcode only |
 
 ## Reading
 
@@ -79,7 +79,7 @@ Implementation boundaries and removal steps: [Todoist feature guide](integration
 
 Connect with Todoist in Settings → Integrations (browser consent with PKCE), or use a personal
 API token. Credentials stay on each device; OAuth tokens refresh automatically. Todoist data
-is fetched on demand and needs an internet connection. In `pnpm dev:demo`, Connect with Todoist
+is fetched on demand and needs an internet connection. In `pnpm dev:fake`, Connect with Todoist
 opens a pretend account, or use token `demo`; no requests are sent to Todoist. Demo filters
 support search, today, overdue, 7 days, priorities and labels with `&` / `|`.
 
@@ -281,7 +281,7 @@ read operations and saving drafts do not. Full access skips those prompts. On iP
 tools read and search, inspect supported attachments, save new plain text drafts, send and
 queue organization changes; calendar, project, theme and view tools are omitted. OpenRouter
 follow-ups queue on Mac/web; steering is available with Hermes. The iPhone waits for the current
-OpenRouter turn to finish before another question. `pnpm dev:demo` runs the same agent runtime
+OpenRouter turn to finish before another question. `pnpm dev:fake` runs the same agent runtime
 on the local Vite server, with a private browser session and server-side key storage.
 
 Claude and Codex get Otter Mail's own tools (an MCP server in the Mac app's backend), so they
@@ -367,7 +367,7 @@ clients receive a link to that page instead of deleting a shared identity withou
 
 ## Google OAuth scopes
 
-What each scope in `GMAIL_SCOPES` (`packages/contracts/src/index.ts`) is for:
+What each scope in `GMAIL_SCOPES` (`packages/contracts/src/google.ts`) is for:
 
 - `https://mail.google.com/`: every Gmail mail feature (reading, search, sending, drafts,
   labels, delete forever, push). The iPhone app asks for this one only (plus `openid email

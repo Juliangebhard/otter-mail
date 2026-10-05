@@ -1,7 +1,7 @@
 import Foundation
 
 /**
- * The demo mailbox: the same pretend Gmail accounts as `pnpm dev:demo`
+ * The demo mailbox: the same pretend Gmail accounts as `pnpm dev:fake`
  * (apps/web/src/web/demo/seed.ts), exported to Resources/DemoMailboxes.json
  * by `pnpm ios:resources`. Messages are placed `hoursAgo` before launch, so
  * the mail always looks recent.

@@ -49,8 +49,8 @@ type TabMessage =
   | { type: "hello" };
 
 const ALL_TABS = "*";
-/** The demo (VITE_DEMO) runs its own backend, apart from real mail on the same origin. */
-const NAME = __DEMO__ ? "otter-mail-demo" : "otter-mail";
+/** The demos run their own backend, apart from real mail on the same origin. */
+const NAME = __DEMO__ ? "otter-mail-demo" : __DEV_DEMO__ ? "otter-mail-dev-demo" : "otter-mail";
 
 export function connectBackend(page: PageHandlers) {
   const tab = crypto.randomUUID();

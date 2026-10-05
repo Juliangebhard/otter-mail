@@ -273,7 +273,7 @@ Screenshots must be attached manually on GitHub; do not upload them elsewhere.
 
 Only continue into a fix if the user chooses it. Use a separate clean checkout
 of current main in ./fix, leaving the version-matched diagnosis source alone.
-Reproduce using pnpm dev:demo and synthetic mail, not the user's real accounts.
+Reproduce using pnpm dev:fake and synthetic mail, not the user's real accounts.
 Follow AGENTS.md, add a meaningful regression check, and run the required checks.
 Show the diff and test results before asking to publish a draft PR through the
 user's GitHub account (using a fork if needed). Link the issue when one exists.

@@ -2,24 +2,41 @@
 // `pnpm dev:mail`: a mail server on this machine for trying IMAP mailboxes in
 // development (scripts/dev-mail/compose.yaml): Dovecot with a seeded mailbox,
 // Mailpit catching what it sends. Its certificate comes from a dev CA made
-// once per checkout in .otter-mail/dev-mail, which `pnpm dev` and
-// `pnpm dev:desktop` trust (and nothing else does). `pnpm dev:mail down` stops it.
+// once in ~/.otter-mail/dev-mail, shared by every checkout (one server runs
+// for them all), which the dev runs trust (and nothing else does).
+// `pnpm dev:mail down` stops it. `pnpm dev:demo` starts it too.
 
 import * as NodeChildProcess from "node:child_process";
 import * as NodeFS from "node:fs";
 import * as NodeNet from "node:net";
+import * as NodeOS from "node:os";
 import * as NodePath from "node:path";
 
+import type { DemoImapMailbox } from "../packages/contracts/src/demo.ts";
+
 const repoRoot = NodePath.resolve(import.meta.dirname, "..");
-const certDir = NodePath.join(repoRoot, ".otter-mail/dev-mail");
+const certDir = NodePath.join(NodeOS.homedir(), ".otter-mail/dev-mail");
 const compose = ["compose", "-f", NodePath.join(repoRoot, "scripts/dev-mail/compose.yaml")];
 const DOVECOT = "dovecot/dovecot:2.4.5";
 const USER = "me@otter.test";
+
+/** The dev CA, for the dev runs to trust. */
+export const devMailCa = NodePath.join(certDir, "ca.pem");
+
+/** The seeded mailbox, as the demo runs add it. */
+export const devMailbox: DemoImapMailbox = {
+  provider: "imap",
+  email: USER,
+  password: "pass",
+  imap: { host: "localhost", port: 31993, security: "tls" },
+  smtp: { host: "localhost", port: 31465, security: "tls" },
+};
 
 const docker = (args: string[], input?: string) =>
   NodeChildProcess.execFileSync("docker", args, {
     input,
     encoding: "utf8",
+    env: { ...process.env, OTTER_MAIL_DEV_MAIL_CERTS: certDir },
     stdio: [input === undefined ? "ignore" : "pipe", "pipe", "inherit"],
   });
 
@@ -216,15 +233,21 @@ function seed(): void {
   );
 }
 
-if (process.argv[2] === "down") {
-  docker([...compose, "down"]);
-  process.exit(0);
+/** Starts the server (or finds it running) and seeds its mailbox. */
+export async function startDevMail(): Promise<void> {
+  makeCertificates();
+  docker([...compose, "up", "-d"]);
+  await waitForImap();
+  seed();
 }
-makeCertificates();
-docker([...compose, "up", "-d"]);
-await waitForImap();
-seed();
-console.log(`Dovecot is up, with a seeded mailbox. Add it in the app with:
+
+if (import.meta.main) {
+  if (process.argv[2] === "down") {
+    docker([...compose, "down"]);
+    process.exit(0);
+  }
+  await startDevMail();
+  console.log(`Dovecot is up, with a seeded mailbox. Add it in the app with:
 
   Email     ${USER}  (any user @otter.test works; each starts empty but this one)
   Password  pass
@@ -232,5 +255,6 @@ console.log(`Dovecot is up, with a seeded mailbox. Add it in the app with:
   SMTP      localhost, port 31465, TLS    (31587 with STARTTLS)
 
 What it sends lands in Mailpit: http://localhost:8025
-Its certificate is from ${NodePath.relative(repoRoot, certDir)}/ca.pem, which only \`pnpm dev\` and \`pnpm dev:desktop\` trust.
+Its certificate is from ~/.otter-mail/dev-mail/ca.pem, which only the dev runs trust.
 Stop it with \`pnpm dev:mail down\`.`);
+}

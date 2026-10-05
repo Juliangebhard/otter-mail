@@ -29,9 +29,9 @@ export type Page = {
  */
 async function openDatabase(): Promise<SqlDatabase> {
   const sqlite3 = await sqlite3InitModule();
-  // The demo keeps its own cache (in OPFS's ".otter-mail-demo").
+  // The demos keep their own cache (in OPFS's ".otter-mail-demo", ".otter-mail-dev-demo").
   const pool = await sqlite3.installOpfsSAHPoolVfs({
-    name: __DEMO__ ? "otter-mail-demo" : "otter-mail",
+    name: __DEMO__ ? "otter-mail-demo" : __DEV_DEMO__ ? "otter-mail-dev-demo" : "otter-mail",
   });
   const db = new pool.OpfsSAHPoolDb("/mail-cache.db");
   const bind = (params: SqlValue[]) => (params.length > 0 ? (params as never) : undefined);
@@ -48,12 +48,14 @@ async function openDatabase(): Promise<SqlDatabase> {
   };
 }
 
-// ── Files (OPFS, under files/, or demo-files/ in demo mode) ────────────────
+// ── Files (OPFS, under files/, or the demos' demo-files/ and dev-demo-files/) ──
 
 async function directory(path: string[], create: boolean): Promise<FileSystemDirectoryHandle> {
   let dir = await (
     await navigator.storage.getDirectory()
-  ).getDirectoryHandle(__DEMO__ ? "demo-files" : "files", { create: true });
+  ).getDirectoryHandle(__DEMO__ ? "demo-files" : __DEV_DEMO__ ? "dev-demo-files" : "files", {
+    create: true,
+  });
   for (const name of path) dir = await dir.getDirectoryHandle(name, { create });
   return dir;
 }
