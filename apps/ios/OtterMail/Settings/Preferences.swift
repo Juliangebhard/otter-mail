@@ -76,6 +76,8 @@ final class Preferences {
     var messageListStyle: MessageListStyle { didSet { ui("otter:message-list-style", messageListStyle.rawValue) } }
     var groupMessagesByDay: Bool { didSet { ui("otter:group-messages-by-day", String(groupMessagesByDay)) } }
     var dimReadMessages: Bool { didSet { ui("otter:dim-read-messages", String(dimReadMessages)) } }
+    /** Messages' content edge to edge, without the reader's side inset (the iPhone's own). */
+    var fullWidthMessages: Bool { didSet { ui("otter:full-width-messages", String(fullWidthMessages)) } }
     var advance: Advance { didSet { ui("gmail:advance-direction", advance.rawValue) } }
     var arrangement: Arrangement {
         didSet {
@@ -113,6 +115,7 @@ final class Preferences {
             "otter:message-list-style": messageListStyle.rawValue,
             "otter:group-messages-by-day": String(groupMessagesByDay),
             "otter:dim-read-messages": String(dimReadMessages),
+            "otter:full-width-messages": String(fullWidthMessages),
             "gmail:advance-direction": advance.rawValue,
             "mail:mailboxes": Self.json(arrangement),
         ]
@@ -138,6 +141,9 @@ final class Preferences {
         if let value = (ui["otter:message-list-style"] as? String).flatMap(MessageListStyle.init), value != messageListStyle { messageListStyle = value }
         if let value = (ui["otter:group-messages-by-day"] as? String).flatMap(Bool.init), value != groupMessagesByDay { groupMessagesByDay = value }
         if let value = (ui["otter:dim-read-messages"] as? String).flatMap(Bool.init), value != dimReadMessages { dimReadMessages = value }
+        if let value = (ui["otter:full-width-messages"] as? String).flatMap(Bool.init), value != fullWidthMessages {
+            fullWidthMessages = value
+        }
         if let value = (ui["gmail:advance-direction"] as? String).flatMap(Advance.init), value != advance { advance = value }
         if let value = (ui["mail:mailboxes"] as? String)?.data(using: .utf8),
            let decoded = try? JSONDecoder().decode(Arrangement.self, from: value), decoded != arrangement {
@@ -158,6 +164,7 @@ final class Preferences {
         messageListStyle = defaults.string(forKey: "otter:message-list-style").flatMap(MessageListStyle.init) ?? .classic
         groupMessagesByDay = defaults.string(forKey: "otter:group-messages-by-day").flatMap(Bool.init) ?? true
         dimReadMessages = defaults.string(forKey: "otter:dim-read-messages").flatMap(Bool.init) ?? true
+        fullWidthMessages = defaults.string(forKey: "otter:full-width-messages").flatMap(Bool.init) ?? false
         advance = defaults.string(forKey: "gmail:advance-direction").flatMap(Advance.init) ?? .next
         arrangement = defaults.string(forKey: "mail:mailboxes")?.data(using: .utf8)
             .flatMap { try? JSONDecoder().decode(Arrangement.self, from: $0) } ?? Arrangement()

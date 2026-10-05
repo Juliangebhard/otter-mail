@@ -38,9 +38,11 @@ struct ThreadView: View {
                     .foregroundStyle(palette.text)
                     .textSelection(.enabled)
                     .padding(.bottom, 8)
+                    .padding(.horizontal, MessageView.inset)
 
                 labels(thread, mailbox)
                     .padding(.bottom, 20)
+                    .padding(.horizontal, MessageView.inset)
 
                 ForEach(thread.messages) { message in
                     let open = message.id == thread.messages.last?.id || message.unread || expanded.contains(message.id)
@@ -56,7 +58,6 @@ struct ThreadView: View {
                     }
                 }
             }
-            .padding(.horizontal, 20)
             .padding(.top, 8)
         }
         .minimizingNavigationBar()

@@ -5,6 +5,7 @@ import WebKit
 struct HTMLBody: View {
     let html: String
     var inline: [Attachment] = []
+    var cornerRadius: CGFloat = 14
     var load: @MainActor @Sendable (Attachment) async -> Data? = { _ in nil }
 
     @State private var page: WebPage?
@@ -19,7 +20,7 @@ struct HTMLBody: View {
             }
         }
         .frame(height: height)
-        .clipShape(.rect(cornerRadius: 14))
+        .clipShape(.rect(cornerRadius: cornerRadius))
         .task(id: html) {
             var configuration = WebPage.Configuration()
             configuration.urlSchemeHandlers[URLScheme("cid")!] = InlineImages(images: inline, load: load)

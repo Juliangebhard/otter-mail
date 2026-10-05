@@ -113,6 +113,9 @@ struct SettingsView: View {
                             Label("App icon", systemImage: "app")
                         }
                     }
+                    Toggle(isOn: $preferences.fullWidthMessages) {
+                        Label("Full-width messages", systemImage: "arrow.left.and.right")
+                    }
                 }
 
                 Section("Message list") {
