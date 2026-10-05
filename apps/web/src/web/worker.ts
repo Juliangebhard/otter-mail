@@ -5,7 +5,8 @@
  * handlers and receives its pushes; see protocol.ts.
  */
 
-import { registeredHandlers, startCore } from "@otter-mail/core";
+import { parseDemoMailboxes } from "@otter-mail/contracts/demo";
+import { addDemoMailboxes, registeredHandlers, startCore, type Platform } from "@otter-mail/core";
 
 import { webPlatform, type Page } from "./platform";
 import type { FromWorker, PageRequests, ToWorker } from "./protocol";
@@ -47,7 +48,30 @@ async function invoke(id: number, channel: string, params: unknown): Promise<voi
   }
 }
 
-const ready = webPlatform(page).then(startCore);
+/**
+ * `pnpm dev:demo`: this browser is signed in to the demo's Otter account (its
+ * first mailbox's address) before core asks who's here, and its mailboxes are
+ * added before the page asks for any.
+ */
+async function startDemo(platform: Platform): Promise<void> {
+  const json = await (await fetch("/__dev/demo-mailboxes")).text();
+  const email = parseDemoMailboxes(json)[0]?.email;
+  const me = await fetch(`${platform.relayUrl}/v1/me`, { credentials: "include" });
+  const signedIn = me.ok && ((await me.json()) as { user: { email: string } }).user.email === email;
+  if (email && !signedIn) {
+    const response = await fetch(`${platform.relayUrl}/v1/dev/session`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email }),
+    });
+    if (!response.ok) throw new Error(`The relay couldn't sign in ${email} (${response.status}).`);
+  }
+  await startCore(platform);
+  await addDemoMailboxes(json).catch((err: unknown) => console.error("Demo mailboxes:", err));
+}
+
+const ready = webPlatform(page).then(__DEV_DEMO__ ? startDemo : startCore);
 
 self.addEventListener("message", (event: MessageEvent<ToWorker>) => {
   const message = event.data;

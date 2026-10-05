@@ -99,6 +99,7 @@ export {
 } from "./services/agent/tools/index.js";
 export * from "./services/agent/types.js";
 export { getAttachmentBytes } from "./services/attachment-cache.js";
+export { addDemoMailboxes } from "./services/demo-mailboxes.js";
 export { KEYBINDINGS_FILE } from "./services/keybindings-store.js";
 export { syncAllAccounts, turnedOffMailboxes } from "./services/mail-sync.js";
 export {

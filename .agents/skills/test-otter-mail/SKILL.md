@@ -1,23 +1,24 @@
 ---
 name: test-otter-mail
-description: Test Otter Mail's UI and behavior in T3's built-in Browser panel against the seeded demo mailbox (`pnpm dev:demo`), with no Google, Gmail or Otter account. Use for browser verification of any change to the renderer (apps/web) or the mail backend (packages/core).
+description: Test Otter Mail's UI and behavior in T3's built-in Browser panel against the seeded made-up mailbox (`pnpm dev:fake`), with no Google, Gmail or Otter account. Use for browser verification of any change to the renderer (apps/web) or the mail backend (packages/core).
 ---
 
-# Test Otter Mail on the demo mailbox
+# Test Otter Mail on the made-up mailbox
 
 Use T3's built-in Browser panel (the `preview_*` tools) for verification. If
 its tools are absent or the panel reports unavailable, explain the blocker and
 stop verification. Do not install or switch to another automation system.
 
-Test against the demo mailbox, never the user's real accounts: don't sign in
+Test against the made-up mailbox, never the user's real accounts: don't sign in
 to Google or Otter, and don't use `pnpm dev` (the relay and real sign-ins) for
-testing unless the change is about sign-in or the relay itself.
+testing unless the change is about sign-in or the relay itself. When a change
+needs real Gmail or IMAP, use the demo mailboxes instead (`pnpm dev:demo`,
+docs/development.md#demo-mailboxes).
 
 ## Start the app
 
-Reuse this task's healthy `pnpm dev:demo` server. Otherwise run `pnpm dev:demo`
-from the repository root (or the "Dev (demo mailbox)" script in `t3.json`) and
-keep its terminal session. Read the URL from its first line
+Reuse this task's healthy `pnpm dev:fake` server. Otherwise run `pnpm dev:fake`
+from the repository root and keep its terminal session. Read the URL from its first line
 (`[dev] http://localhost:<port>`): 5833 in the main checkout, another port in a
 linked worktree or when 5833 is busy. The page title ends in "(demo)".
 

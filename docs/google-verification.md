@@ -28,7 +28,7 @@ clients or Pub/Sub delivery infrastructure while those grants are in use.
 Google Auth Platform → Data access (https://console.cloud.google.com/auth/scopes?project=otterware).
 The form only saves once every field is filled, including the video link.
 
-The app asks for five scopes (`GMAIL_SCOPES` in `packages/contracts/src/index.ts`), plus
+The app asks for five scopes (`GMAIL_SCOPES` in `packages/contracts/src/google.ts`), plus
 `openid email profile`: `https://mail.google.com/`, `gmail.settings.basic`,
 `calendar.events.owned`, `contacts.readonly`, `contacts.other.readonly`. Each is the narrowest that
 does the job; justifications below.

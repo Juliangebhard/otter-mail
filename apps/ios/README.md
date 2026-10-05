@@ -65,7 +65,7 @@ pnpm dev:ios --relay local # against `pnpm dev`'s relay on :8787
 ```
 
 Or open `OtterMail.xcodeproj` in Xcode (27 or later). The welcome screen offers the demo mailbox,
-the same pretend mail as `pnpm dev:demo`; build and test against it rather than real accounts.
+the same pretend mail as `pnpm dev:fake`; build and test against it rather than real accounts.
 
 Debug builds are `dev.otterware.mail.dev`, release builds `dev.otterware.mail`. The Google "iOS"
 client is registered for the former. The project signs with team 838JVGY7W4; to run on your

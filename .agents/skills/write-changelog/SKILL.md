@@ -100,7 +100,7 @@ Type what you want and Enter does it: commands you name come first, and mail sea
 
 ## Screenshots
 
-- From the demo mailbox (`pnpm dev:demo`, see the test-otter-mail skill),
+- From the made-up mailbox (`pnpm dev:fake`, see the test-otter-mail skill),
   never real mail, at a 1600x1000 viewport. Dark is the default; light is fine
   when the feature is about appearance.
 - Crop to the feature when the whole window isn't the point.

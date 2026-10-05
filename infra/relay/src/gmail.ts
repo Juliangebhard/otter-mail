@@ -8,6 +8,7 @@
  *   GET  /v1/gmail/authorize  (popup) → Google's consent
  *   GET  /v1/gmail/callback   → posts the sealed token and a first access token to the page
  *   POST /v1/gmail/token      `{ sealed }` → a fresh access token (410 once Google revoked it)
+ *   POST /v1/dev/gmail        `pnpm dev:demo` only: a saved sign-in, sealed as the popup would
  */
 
 import { GMAIL_SCOPES } from "@otter-mail/contracts";
@@ -123,13 +124,38 @@ export async function completeSignIn(
   if (!tokens.refresh_token || !tokens.id_token) {
     throw new GoogleTokenError("Google did not return a refresh token.");
   }
-  const issuedTo = clientId(env);
-  const claims = await verifyGoogleJwt(tokens.id_token, issuedTo, googleKeys(env));
-  const sealed = await new EncryptJWT({
-    email: claims.email,
-    refreshToken: tokens.refresh_token,
-    clientId: issuedTo,
-  })
+  return sealSignIn(env, userId, clientId(env), tokens.refresh_token, tokens);
+}
+
+/**
+ * The demo (`pnpm dev:demo`, DEV_DEMO): its mailbox's saved sign-in with
+ * the web client, sealed for this user as the popup's would be.
+ */
+export async function demoSignIn(
+  env: Env,
+  userId: string,
+  refreshToken: string,
+): Promise<SignInResult> {
+  const issuedTo = env.GOOGLE_WEB_CLIENT_ID;
+  const tokens = await tokenRequest(
+    env,
+    { grant_type: "refresh_token", refresh_token: refreshToken },
+    issuedTo,
+  );
+  if (!tokens.id_token) throw new GoogleTokenError("Google did not return an ID token.");
+  return sealSignIn(env, userId, issuedTo, refreshToken, tokens);
+}
+
+/** Seals the refresh token for this user: what the page keeps, with a first access token. */
+async function sealSignIn(
+  env: Env,
+  userId: string,
+  issuedTo: string,
+  refreshToken: string,
+  tokens: GoogleTokens,
+): Promise<SignInResult> {
+  const claims = await verifyGoogleJwt(tokens.id_token!, issuedTo, googleKeys(env));
+  const sealed = await new EncryptJWT({ email: claims.email, refreshToken, clientId: issuedTo })
     .setProtectedHeader({ alg: "dir", enc: "A256GCM" })
     .setSubject(userId)
     .setIssuedAt()

@@ -436,6 +436,14 @@ describe("sign-in", () => {
     expect((await call("GET", "/v1/me")).status).toBe(401);
     expect((await call("GET", "/v1/accounts", "forged")).status).toBe(401);
   });
+
+  it("has no demo sign-ins without DEV_DEMO (only `pnpm dev:demo` sets it)", async () => {
+    const session = await call("POST", "/v1/dev/session", undefined, { email: "x@example.com" });
+    expect(session.status).toBe(404);
+    expect(session.headers.get("set-cookie")).toBeNull();
+    const { token } = await signIn("demo-check@example.com", "demo-check-sub");
+    expect((await call("POST", "/v1/dev/gmail", token, { refreshToken: "x" })).status).toBe(404);
+  });
 });
 
 describe("devices", () => {

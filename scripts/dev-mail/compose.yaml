@@ -1,6 +1,7 @@
 # `pnpm dev:mail`: a mail server on this machine for trying IMAP mailboxes in
 # development (docs/development.md). Dovecot as in core's protocol tests, with
-# a certificate from the checkout's dev CA; Mailpit catches what it sends.
+# a certificate from the dev CA (~/.otter-mail/dev-mail, which scripts/dev-mail.ts
+# passes as OTTER_MAIL_DEV_MAIL_CERTS); Mailpit catches what it sends.
 name: otter-mail-dev-mail
 services:
   dovecot:
@@ -14,8 +15,8 @@ services:
       - "127.0.0.1:31587:31587" # SMTP submission, STARTTLS
     volumes:
       - ./dovecot.conf:/etc/dovecot/conf.d/otter-mail-dev.conf:ro
-      - ../../.otter-mail/dev-mail/tls.crt:/etc/dovecot/ssl/tls.crt:ro
-      - ../../.otter-mail/dev-mail/tls.key:/etc/dovecot/ssl/tls.key:ro
+      - ${OTTER_MAIL_DEV_MAIL_CERTS:?run pnpm dev:mail}/tls.crt:/etc/dovecot/ssl/tls.crt:ro
+      - ${OTTER_MAIL_DEV_MAIL_CERTS:?run pnpm dev:mail}/tls.key:/etc/dovecot/ssl/tls.key:ro
   mailpit:
     image: axllent/mailpit:latest
     ports:

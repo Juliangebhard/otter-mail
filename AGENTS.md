@@ -96,19 +96,17 @@ it; the web app needs it (the relay keeps its Gmail sign-ins alive).
   the same `apps/web`, so UI work is checked in the browser. See docs/development.md.
 - `pnpm dev:ios`: the iPhone app in the simulator (it has the same demo mailbox, from the welcome
   screen).
-- `pnpm dev:demo`: the web app on a seeded demo mailbox (a pretend Gmail, no Google or Otter
+- `pnpm dev:fake`: the web app on a made-up mailbox (a pretend Gmail, no Google or Otter
   account, no relay). Build and test against it rather than the user's real accounts; see the
   `test-otter-mail` skill (`.agents/skills`).
-- For real Gmail, Google OAuth, Contacts or Calendar demos and integration checks, use the
-  dedicated `otterware.demo@gmail.com` Google account. Its credentials are
-  `OTTER_MAIL_GMAIL_DEMO_EMAIL` / `OTTER_MAIL_GMAIL_DEMO_PASSWORD` in the main checkout's ignored
-  `.env.local`, shared with new T3 worktrees by symlink. If the link is missing, find the main
-  checkout as the parent of `git rev-parse --path-format=absolute --git-common-dir` and read its
-  `.env.local`.
-  Sign in through Google in the regular app; `pnpm dev:demo` uses fake Gmail and `pnpm dev:mail`
-  is for IMAP tests. Preserve the demo fixtures and send test mail only to the demo account
-  itself. Keep credentials out of logs, commits, screenshots and app bundles. See
-  [Google demo account](docs/development.md#google-demo-account).
+- `pnpm dev:demo` and `pnpm dev:demo:desktop`: `pnpm dev` and `pnpm dev:desktop` opening on the
+  demo mailboxes, already added: the dedicated `otterware.demo@gmail.com` Google account and the
+  local IMAP server's (`pnpm dev:mail`, started for you). For real Gmail, Google OAuth, Contacts,
+  Calendar or IMAP checks. They come from `OTTER_MAIL_DEMO_MAILBOXES` in the main checkout's
+  ignored `.env.local` (shared with T3 worktrees by symlink); `--login` signs them in to Google
+  once per machine. Preserve the demo fixtures and send test mail only to the demo account itself.
+  Keep credentials out of logs, commits, screenshots and app bundles. See
+  [Demo mailboxes](docs/development.md#demo-mailboxes).
 - `pnpm start` runs the built app unpackaged; `pnpm dist:desktop:dmg` builds a DMG in `release/`.
 - Data homes (`apps/desktop/src/paths.ts`, as in T3 Code): the installed app uses
   `~/.otter-mail/userdata`; dev runs use `~/.otter-mail/dev`, or `<worktree>/.otter-mail` in a

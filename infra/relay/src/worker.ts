@@ -9,8 +9,9 @@
 
 import { zValidator } from "@hono/zod-validator";
 import { WorkerEntrypoint } from "cloudflare:workers";
-import { Hono } from "hono";
+import { Hono, type MiddlewareHandler } from "hono";
 import { bearerAuth } from "hono/bearer-auth";
+import { setSignedCookie } from "hono/cookie";
 import { cors } from "hono/cors";
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
@@ -111,6 +112,12 @@ export interface Env {
    * machine included. Only `pnpm dev` sets it; never in wrangler.jsonc.
    */
   TUNNEL_ALLOW_PRIVATE?: string;
+  /**
+   * "true" opens the demo's routes (`pnpm dev:demo`): an Otter session for any
+   * address, without Google, and its saved Gmail sign-in sealed for it. Only
+   * the dev runner sets it; never in wrangler.jsonc.
+   */
+  DEV_DEMO?: string;
 }
 
 type Session = { id: string; user: RelayUser; expiresAt: number; createdAt: number };
@@ -204,6 +211,40 @@ app.post("/v1/auth/browser-sign-out/start", async (c) => {
   return c.redirect(c.env.APP_ORIGIN, 303);
 });
 app.on(["GET", "POST"], "/v1/auth/*", (c) => c.var.auth.handler(c.req.raw));
+
+// ── The demo (`pnpm dev:demo`, DEV_DEMO) ─────────────────────────────────────
+
+/** Everywhere but the demo's local relay, these routes don't exist. */
+const demoOnly: MiddlewareHandler<App> = async (c, next) => {
+  if (c.env.DEV_DEMO !== "true") throw new HTTPException(404, { message: "Not found." });
+  await next();
+};
+
+/** Signs the browser in to the Otter account for `email` (made if new), as Google would. */
+app.post(
+  "/v1/dev/session",
+  demoOnly,
+  zValidator("json", z.object({ email: mailbox }), rejectInvalid),
+  async (c) => {
+    const { email } = c.req.valid("json");
+    const ctx = await c.var.auth.$context;
+    const user =
+      (await ctx.internalAdapter.findUserByEmail(email))?.user ??
+      (await ctx.internalAdapter.createUser(
+        { email, name: email, emailVerified: true },
+        { method: "admin" },
+      ));
+    const session = await ctx.internalAdapter.createSession(user.id, false);
+    const cookie = ctx.authCookies.sessionToken;
+    await setSignedCookie(c, cookie.name, session.token, ctx.secret, {
+      path: "/",
+      httpOnly: true,
+      sameSite: "Lax",
+      maxAge: cookie.attributes.maxAge,
+    });
+    return c.json({ email });
+  },
+);
 app.get("/.well-known/*", (c) => c.var.auth.handler(c.req.raw));
 app.route("/otter", identity);
 
@@ -282,6 +323,14 @@ authed.post(
       throw new HTTPException(400, { message: "Invalid sealed token." });
     }
   },
+);
+
+authed.post(
+  "/dev/gmail",
+  demoOnly,
+  zValidator("json", z.object({ refreshToken: z.string().min(1) }), rejectInvalid),
+  async (c) =>
+    c.json(await gmail.demoSignIn(c.env, c.var.session.user.id, c.req.valid("json").refreshToken)),
 );
 
 authed.get("/me", (c) => {

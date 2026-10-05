@@ -7,14 +7,16 @@
  * way, in a Web Worker.
  */
 
+import { DEMO_MAILBOXES_ENV } from "@otter-mail/contracts/demo";
 import {
+  addDemoMailboxes,
   onSettingsChanged,
   registeredHandlers,
   shutdownProviders,
   startCore,
 } from "@otter-mail/core";
 
-import type { ToBackend } from "./backend-protocol.js";
+import { appInfo, type ToBackend } from "./backend-protocol.js";
 import { registerBackendHandlers } from "./handlers/backend.js";
 import { logger, sendLogsTo } from "./logger.js";
 import { postToMain, settleRequest, tellMain } from "./main-link.js";
@@ -35,6 +37,13 @@ async function start(): Promise<void> {
     logger.error("backend", "MCP server failed to start", error),
   );
   onSettingsChanged((settings, patch) => tellMain({ kind: "settings", settings, patch }));
+  // `pnpm dev:demo:desktop`: its mailboxes are here before the windows ask.
+  const demo = process.env[DEMO_MAILBOXES_ENV];
+  if (demo && !appInfo().packaged) {
+    await addDemoMailboxes(demo).catch((error: unknown) =>
+      logger.error("backend", "Couldn't add the demo mailboxes", error),
+    );
+  }
   postToMain({ type: "ready", channels: [...registeredHandlers().keys()] });
 }
 

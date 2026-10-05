@@ -20,6 +20,7 @@ import * as http from "node:http";
 import * as path from "node:path";
 
 import { GMAIL_SCOPES } from "@otter-mail/contracts";
+import type { DemoGmailMailbox } from "@otter-mail/contracts/demo";
 import {
   accountStore,
   broadcast,
@@ -323,10 +324,35 @@ async function addAccount(loginHint?: string): Promise<GmailAccount> {
     if (err instanceof SignInCancelledError) throw err;
     throw new Error(`Google OAuth authorization failed: ${String(err)}`, { cause: err });
   }
+  return saveAccount(tokens);
+}
 
-  const userInfoResponse = await fetch(USERINFO_URL, {
-    headers: { Authorization: `Bearer ${tokens.accessToken}` },
-  });
+/**
+ * The demo mailbox (`pnpm dev:demo:desktop`): its saved sign-in with this
+ * app's client instead of the browser; the first refresh proves it still works.
+ */
+async function addDemoAccount(mailbox: DemoGmailMailbox): Promise<GmailAccount> {
+  const refreshToken = mailbox.refreshTokens.desktop;
+  if (!refreshToken) {
+    throw new Error(
+      `${mailbox.email} has no Mac app sign-in yet: run \`pnpm dev:demo:desktop --login\`.`,
+    );
+  }
+  const response = await tokenRequest({ grant_type: "refresh_token", refresh_token: refreshToken });
+  return saveAccount(toStored((await getCredentials()).clientId, response, refreshToken));
+}
+
+/** Who signed in (userinfo), then their tokens and the account, stored under the email. */
+async function saveAccount(tokens: StoredTokens): Promise<GmailAccount> {
+  // Right after a new grant, Google can answer 500 for a few seconds.
+  let userInfoResponse: Response;
+  for (let attempt = 1; ; attempt++) {
+    userInfoResponse = await fetch(USERINFO_URL, {
+      headers: { Authorization: `Bearer ${tokens.accessToken}` },
+    });
+    if (userInfoResponse.status < 500 || attempt === 4) break;
+    await new Promise((resolve) => setTimeout(resolve, attempt * 1000));
+  }
   if (!userInfoResponse.ok) {
     throw new Error(
       `Failed to fetch Google user info: ${userInfoResponse.status} ${userInfoResponse.statusText}`,
@@ -484,6 +510,7 @@ async function removeAccountTokens(accountId: string): Promise<void> {
 export const googleAuth: GoogleAuth = {
   load: loadSignIns,
   addAccount,
+  addDemoAccount,
   cancelSignIn,
   isSignedIn,
   getAccessToken,

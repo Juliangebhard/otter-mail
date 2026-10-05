@@ -8,6 +8,7 @@
 
 import type { ChatProvider } from "./services/agent/types.js";
 import type { GmailAccount } from "./types.js";
+import type { DemoGmailMailbox } from "@otter-mail/contracts/demo";
 import type { SupportError } from "@otter-mail/shared/support";
 
 export type SqlValue = string | number | bigint | null | Uint8Array;
@@ -34,6 +35,11 @@ export interface GoogleAuth {
   load(): Promise<void>;
   /** Signs an account in (or back in: `loginHint`); stores it and returns it. */
   addAccount(loginHint?: string): Promise<GmailAccount>;
+  /**
+   * Development's demo mailbox (`pnpm dev:demo`): signs it in with its saved
+   * Google sign-in for this shell's OAuth client, instead of the browser.
+   */
+  addDemoAccount?(mailbox: DemoGmailMailbox): Promise<GmailAccount>;
   /** Stops waiting for a sign-in in progress; `addAccount` rejects with SignInCancelledError. */
   cancelSignIn(): void;
   isSignedIn(accountId: string): boolean;

@@ -9,22 +9,24 @@
 
 ## Commands
 
-| Command                  | What it does                                                                       |
-| ------------------------ | ---------------------------------------------------------------------------------- |
-| `pnpm install`           | Installs dependencies and the git pre-commit hook (formats staged files).          |
-| `pnpm dev`               | The web app and a local relay (see [The web app](#the-web-app)).                   |
-| `pnpm dev:desktop`       | Vite dev server + main-process watcher + Electron, restarting on main changes.     |
-| `pnpm dev:web`           | The web app alone, against `VITE_RELAY_URL`.                                       |
-| `pnpm dev:demo`          | The web app on a made-up mailbox, no accounts (see [Demo mailbox](#demo-mailbox)). |
-| `pnpm dev:mail`          | A local IMAP server with a seeded mailbox (see [IMAP locally](#imap-locally)).     |
-| `pnpm dev:ios`           | Builds the iPhone app and runs it in the simulator (see `apps/ios/README.md`).     |
-| `pnpm ios:resources`     | Re-exports the themes and demo mailbox the iPhone app bundles.                     |
-| `pnpm start`             | Runs the built app unpackaged (`pnpm build` first).                                |
-| `pnpm build`             | Builds `apps/web/dist` and `apps/desktop/dist-electron`.                           |
-| `pnpm build:translator`  | Builds the Swift translator helper.                                                |
-| `pnpm typecheck`         | TypeScript across the workspace.                                                   |
-| `pnpm lint` / `pnpm fmt` | Oxlint and Oxfmt through Vite+.                                                    |
-| `pnpm dist:desktop:dmg`  | Unsigned DMG + ZIP for this Mac's architecture in `release/`.                      |
+| Command                  | What it does                                                                             |
+| ------------------------ | ---------------------------------------------------------------------------------------- |
+| `pnpm install`           | Installs dependencies and the git pre-commit hook (formats staged files).                |
+| `pnpm dev`               | The web app and a local relay (see [The web app](#the-web-app)).                         |
+| `pnpm dev:desktop`       | Vite dev server + main-process watcher + Electron, restarting on main changes.           |
+| `pnpm dev:web`           | The web app alone, against `VITE_RELAY_URL`.                                             |
+| `pnpm dev:demo`          | `pnpm dev` opening on the demo mailboxes (see [Demo mailboxes](#demo-mailboxes)).        |
+| `pnpm dev:demo:desktop`  | `pnpm dev:desktop` opening on the demo mailboxes.                                        |
+| `pnpm dev:fake`          | The web app on a made-up mailbox, no accounts (see [Made-up mailbox](#made-up-mailbox)). |
+| `pnpm dev:mail`          | A local IMAP server with a seeded mailbox (see [IMAP locally](#imap-locally)).           |
+| `pnpm dev:ios`           | Builds the iPhone app and runs it in the simulator (see `apps/ios/README.md`).           |
+| `pnpm ios:resources`     | Re-exports the themes and demo mailbox the iPhone app bundles.                           |
+| `pnpm start`             | Runs the built app unpackaged (`pnpm build` first).                                      |
+| `pnpm build`             | Builds `apps/web/dist` and `apps/desktop/dist-electron`.                                 |
+| `pnpm build:translator`  | Builds the Swift translator helper.                                                      |
+| `pnpm typecheck`         | TypeScript across the workspace.                                                         |
+| `pnpm lint` / `pnpm fmt` | Oxlint and Oxfmt through Vite+.                                                          |
+| `pnpm dist:desktop:dmg`  | Unsigned DMG + ZIP for this Mac's architecture in `release/`.                            |
 
 The dev commands pick ports from the worktree path, so several checkouts can run at once. Set
 `OTTER_MAIL_PORT_OFFSET` to choose one yourself. `t3.json` sets up new T3 Code worktrees (install,
@@ -69,33 +71,46 @@ profile in `chromium/` and logs in `logs/main.log`. Delete it to start fresh.
 - Nothing is ever copied between homes.
 - Renderer logs are in the DevTools console (View → Toggle Developer Tools).
 
-## Google demo account
+## Demo mailboxes
 
-Use the dedicated `otterware.demo@gmail.com` Google account for demos and integration checks
-that need real Gmail, Google OAuth, Contacts or Calendar. It contains synthetic mail, contacts
-and calendar events. Keep its credentials in the main checkout's ignored `.env.local`:
+`pnpm dev:demo` (the web app) and `pnpm dev:demo:desktop` (the Mac app) open on real mailboxes
+made for development, already added, past the setup: the dedicated `otterware.demo@gmail.com`
+Google account (synthetic mail, contacts and calendar events) and the local IMAP server's
+`me@otter.test` ([IMAP locally](#imap-locally), started for you; it needs Docker). They keep their
+own data, apart from the mailboxes you develop with: the Mac app in a `demo/` data home, the web
+app in its own OPFS storage (`.otter-mail-dev-demo`, `dev-demo-files/`), signed in to an Otter
+account of the demo's address on the local relay.
+
+One variable in the main checkout's ignored `.env.local` holds them, a JSON list
+(`packages/contracts/src/demo.ts`):
 
 ```dotenv
-OTTER_MAIL_GMAIL_DEMO_EMAIL=otterware.demo@gmail.com
-OTTER_MAIL_GMAIL_DEMO_PASSWORD=your-private-demo-password
+OTTER_MAIL_DEMO_MAILBOXES='[{"provider":"gmail","email":"otterware.demo@gmail.com","password":"…","refreshTokens":{}}]'
 ```
 
-New T3 worktrees symlink that file during setup. For an existing worktree without the link,
-find the main checkout as the parent directory of
-`git rev-parse --path-format=absolute --git-common-dir` and read its `.env.local`. The values are
-private inputs for agent/browser sign-in; the app does not consume them or sign in automatically.
-Keep the password out of commits, logs, screenshots and app bundles, and never give it a
-`VITE_` prefix.
+Once per machine, `pnpm dev:demo:desktop --login` and `pnpm dev:demo --login` sign the Gmail
+mailbox in to Google (Google's page, in your browser; the password is there) and save each
+sign-in in the list, one per OAuth client: the Mac app's, and the relay's web client, which comes
+back to `http://localhost:8787/v1/gmail/callback` (so no other `pnpm dev` may hold that port
+then). Copying `.env.local` to another machine brings them along. An IMAP entry is
+`{"provider":"imap","email","password","imap":{"host","port","security"},"smtp":{…}}`.
 
-Open the regular app (`pnpm dev` with Google/relay configured, or https://mail.otterware.app),
-sign into Otter with this Google account, and add the same account as a Gmail mailbox. Use a
-separate browser profile from the user's personal account. Preserve the seeded reviewer data,
-and send test mail only to `otterware.demo@gmail.com` itself; the fixtures' `otter.example`
-addresses are fictional.
+How they get in, in development only:
 
-`pnpm dev:demo` is for UI checks against fake Gmail; it does not exercise Google sign-in or
-real Google APIs. `pnpm dev:mail` is for IMAP-specific checks. Use the dedicated Google account
-when demonstrating Gmail-specific behavior.
+- The dev runner reads the list, adds the local IMAP server's mailbox and hands it to the app as
+  `OTTER_MAIL_DEMO_MAILBOXES`.
+- Core's `addDemoMailboxes` adds those the app doesn't have yet before the windows ask for any.
+  The Mac app refreshes the saved Google sign-in itself; the web app has the local relay seal it,
+  as its sign-in popup would.
+- The web app gets the list from its Vite dev server (`/__dev/demo-mailboxes`), never a build.
+  The local relay runs with `DEV_DEMO=true` (never in `wrangler.jsonc`), which opens
+  `/v1/dev/session` (an Otter session for an address, without Google) and `/v1/dev/gmail`.
+
+New T3 worktrees symlink `.env.local` during setup; the dev runner falls back to the main
+checkout's (the parent of `git rev-parse --path-format=absolute --git-common-dir`). Keep the
+password and sign-ins out of commits, logs, screenshots and app bundles, and never give them a
+`VITE_` prefix. Preserve the seeded reviewer data, and send test mail only to
+`otterware.demo@gmail.com` itself; the fixtures' `otter.example` addresses are fictional.
 
 ## Google sign-in
 
@@ -144,8 +159,9 @@ Dovecot, as in core's protocol tests, with special-use folders and a few seeded 
 settings to enter: password `pass`, IMAP on `localhost` port 31993 (TLS), SMTP on 31465 (TLS).
 `pnpm dev:mail down` stops it and drops its mail: the next run starts from the seed again.
 
-Both apps verify certificates, so the server's comes from a dev CA made once per checkout in
-`.otter-mail/dev-mail/` (gitignored). The dev runner trusts it when it exists, and only there:
+Both apps verify certificates, so the server's comes from a dev CA made once in
+`~/.otter-mail/dev-mail/`, shared by every checkout (one server serves them all). The dev runner
+trusts it when it exists, and only there:
 
 - `pnpm dev`: the web app's TLS (`apps/web/src/web/tls.ts`) adds it to Mozilla's roots through
   `VITE_DEV_MAIL_CA`, read in dev builds only. The local relay runs with
@@ -154,11 +170,11 @@ Both apps verify certificates, so the server's comes from a dev CA made once per
 - `pnpm dev:desktop`: `NODE_EXTRA_CA_CERTS`, which the Mac app's backend process honors.
 
 The web app still needs an Otter account to open the tunnel (sign in as usual). Delete
-`.otter-mail/dev-mail/` and rerun `pnpm dev:mail` for a new CA.
+`~/.otter-mail/dev-mail/` and rerun `pnpm dev:mail` for a new CA.
 
-## Demo mailbox
+## Made-up mailbox
 
-`pnpm dev:demo` runs the web app alone with `VITE_DEMO=1`: no relay, no Google or Otter account.
+`pnpm dev:fake` runs the web app alone with `VITE_DEMO=1`: no relay, no Google or Otter account.
 The backend's Worker puts a pretend Gmail in front of `fetch` (`apps/web/src/web/demo`), seeded
 with two mailboxes, "Personal" (`demo@otter.example`) and "Work" (`sam@acme.example`): a few weeks
 of threads, newsletters with unsubscribe links, attachments, calendar invitations, drafts, spam
@@ -169,9 +185,9 @@ and trash, and plenty of non-ASCII names. Use it to build and test without your 
   (`in:`, `is:`, `label:`, `category:`, `from:`, `has:attachment`, …) plus free text.
 - Calendar RSVPs go out as email replies (no calendar); avatars fall back to initials; the Otter
   account (signing in, devices, synced preferences) is unavailable.
-- The demo keeps its own storage (OPFS `.otter-mail-demo` and `demo-files/`, lock and channel
+- It keeps its own storage (OPFS `.otter-mail-demo` and `demo-files/`, lock and channel
   `otter-mail-demo`), apart from real mail on the same origin. Add `?reset-demo` to the address
-  to start over (close other demo tabs first).
+  to start over (close other tabs of it first).
 - Real builds leave all of it out: `__DEMO__` is `false` unless `VITE_DEMO=1`.
 
 `pnpm --filter @otter-mail/site build` assembles the deployable site (the web app) in
