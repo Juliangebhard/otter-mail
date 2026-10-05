@@ -9,6 +9,8 @@
 
 import { contextBridge, ipcRenderer } from "electron";
 
+import { installNativeMessaging } from "./native-messaging-preload.js";
+
 /** The extension's id from its address: a page's, or (no `location` in a worker's preload) its worker's. */
 function ownExtensionId(): string | null {
   const own = (where: { protocol: string; host: string }) =>
@@ -26,6 +28,25 @@ function ownExtensionId(): string | null {
 const extensionId = ownExtensionId();
 
 if (extensionId) {
+  const nativeListeners = new Map<string, (kind: string, payload: unknown) => void>();
+  ipcRenderer.on("crx:nativeEvent", (_event, id: string, kind: string, payload: unknown) => {
+    nativeListeners.get(id)?.(kind, payload);
+  });
+  contextBridge.executeInMainWorld({
+    func: installNativeMessaging,
+    args: [
+      {
+        call: (method: string, args: unknown[]) =>
+          ipcRenderer.invoke("crx:nativeCall", extensionId, method, args),
+        listen: (id: string, listener: (kind: string, payload: unknown) => void) => {
+          nativeListeners.set(id, listener);
+        },
+        forget: (id: string) => {
+          nativeListeners.delete(id);
+        },
+      },
+    ],
+  });
   const listeners = new Map<string, Set<(...args: unknown[]) => void>>();
   ipcRenderer.on("crx:event", (_event, name: string, args: unknown[]) => {
     for (const listener of listeners.get(name) ?? []) listener(...args);
