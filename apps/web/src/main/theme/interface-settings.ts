@@ -74,7 +74,7 @@ export const INTERFACE_FONT_SIZE: InterfaceSetting = {
   min: 12,
   max: 20,
   step: 1,
-  defaultValue: 14,
+  defaultValue: 16,
 };
 
 const SETTINGS = [CONTRAST, GLASS_OPACITY, INTERFACE_FONT_SIZE, MARK_READ_DELAY];
