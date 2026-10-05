@@ -37,6 +37,8 @@ import { broadcast } from "../ipc.js";
 import { logger } from "../logger.js";
 import { getMainWindow } from "../windows/main-window.js";
 import { getBrowserSession, isPageUrl, preparePage } from "./browser.js";
+import { hostOS } from "../os/index.js";
+import { enableNativeMessaging } from "./native-messaging-ipc.js";
 
 /** The parts of an extension's manifest.json read here. */
 type Manifest = {
@@ -1208,6 +1210,7 @@ export async function removeExtension(id: string): Promise<void> {
 /** Sets up extensions' side of the browser session: their preload, their calls, the toolbar. */
 export function setupExtensions(preloadPath: string): void {
   const ses = getBrowserSession();
+  enableNativeMessaging(ses, hostOS.nativeMessagingDirectories());
   for (const type of ["frame", "service-worker"] as const) {
     ses.registerPreloadScript({ id: `otter-extensions-${type}`, type, filePath: preloadPath });
   }

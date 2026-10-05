@@ -14,6 +14,7 @@ import type { HostOS } from "../types.js";
 import { setAutostart } from "./autostart.js";
 import { listMailApps, setDefaultMailApp } from "./mail-apps.js";
 import { linuxTerminals } from "./terminals.js";
+import { nativeMessagingDirectories } from "./native-messaging.js";
 
 /** The renderer's --workspace-topbar-height: the window controls fill it. */
 const TOPBAR_HEIGHT = 42;
@@ -28,6 +29,7 @@ let appIcon: NativeImage | null = null;
 const icon = () => (appIcon ??= appIconImage(DEFAULT_APP_ICON));
 
 export const linuxOS: HostOS = {
+  nativeMessagingDirectories,
   modifierKey: "ctrlKey",
 
   mainWindowOptions: () => ({

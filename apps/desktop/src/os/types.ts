@@ -36,6 +36,9 @@ export type AppMenuItems = {
 
 /** The main process's side of the operating system. */
 export interface HostOS {
+  /** Installed native messaging hosts, in the app's profile and Chrome's standard locations. */
+  nativeMessagingDirectories(): string[];
+
   /** The modifier of the app's shortcuts: ⌘ on macOS, Ctrl elsewhere (a KeyboardEvent flag). */
   modifierKey: "metaKey" | "ctrlKey";
 

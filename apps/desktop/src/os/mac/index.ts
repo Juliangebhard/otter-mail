@@ -8,12 +8,14 @@ import { app } from "electron";
 import type { HostOS } from "../types.js";
 import { listMailApps, setDefaultMailApp } from "./mail-apps.js";
 import { macTerminals } from "./terminals.js";
+import { nativeMessagingDirectories } from "./native-messaging.js";
 
 /** The renderer's --workspace-topbar-height: the traffic lights sit centered in it. */
 const TOPBAR_HEIGHT = 42;
 const WINDOW_BUTTON_RADIUS = 7;
 
 export const macOS: HostOS = {
+  nativeMessagingDirectories,
   modifierKey: "metaKey",
 
   mainWindowOptions: () => ({

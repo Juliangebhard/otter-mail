@@ -342,15 +342,16 @@ can't embed other sites, so the web app opens links in a new browser tab as befo
 | Toolbar: pinned extensions, Extensions menu, badges, popups                | ✓   | —   | —      |
 | Settings › Browser: extensions on/off, details, remove, developer mode     | ✓   | —   | —      |
 | Extensions' context menu items and notifications                           | ✓   | —   | —      |
-| Native messaging (an extension talking to its Mac app, e.g. 1Password's)   | —   | —   | —      |
+| Native messaging (an extension talking to its Mac app, e.g. 1Password's)   | ✓   | —   | —      |
 
 Extensions install through electron-chrome-web-store (MIT) and run on Electron's extension
 support, plus Otter Mail's own layer for what Chrome has and Electron doesn't
 (`apps/desktop/src/services/extensions.ts` and its preload): `chrome.action`, the rest of
 `chrome.tabs`, `chrome.windows`, `contextMenus`, `notifications`, `webNavigation`, `commands`,
-`permissions`, and simple `downloads` and `privacy`. 1Password signs in and unlocks in its
-popup, but can't reach the 1Password app. Camera, microphone, location and notifications are
-refused to pages.
+`permissions`, native messaging, and simple `downloads` and `privacy`. To connect 1Password to
+its desktop app on Mac, add Otter Mail in 1Password's Settings › Browser › Add Browser. It then
+shares the desktop app's unlock, including Touch ID. Camera, microphone, location and
+notifications are refused to pages.
 
 ## Translation
 
