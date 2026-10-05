@@ -195,7 +195,7 @@ export function ExtensionToolbar() {
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       icon={<PuzzleIcon className="size-4" />}
-                      onSelect={() => void gmailApi.openSettings({ pane: "extensions" })}
+                      onSelect={() => void gmailApi.openSettings({ pane: "browser" })}
                     >
                       Manage extension
                     </DropdownMenuItem>
@@ -204,7 +204,7 @@ export function ExtensionToolbar() {
               );
             })}
             <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={() => void gmailApi.openSettings({ pane: "extensions" })}>
+            <DropdownMenuItem onSelect={() => void gmailApi.openSettings({ pane: "browser" })}>
               <span className="flex items-center justify-between gap-2">
                 Manage extensions
                 <ArrowUpRightIcon className="size-4 text-muted-foreground" />

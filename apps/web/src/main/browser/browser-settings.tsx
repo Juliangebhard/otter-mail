@@ -1,10 +1,8 @@
 import { useState } from "react";
 
 import { Dialog } from "~/components/ui/dialog";
-import { Switch } from "~/components/ui/switch";
 import { Text } from "~/components/ui/text";
 import { ipc } from "~/lib/ipc";
-import { gmailApi } from "../gmail/api";
 import { toast } from "../gmail/toast";
 import { Btn } from "../gmail/ui";
 import {
@@ -15,17 +13,17 @@ import {
   SettingsSection,
 } from "../settings/settings-ui";
 import { searchableSetting } from "../settings/settings-search";
-import { setExtensionsButton, setOpenLinksIn, useBrowser, type OpenLinksIn } from "./store";
+import { ExtensionsSection } from "./extensions-section";
+import { setOpenLinksIn, useBrowser, type OpenLinksIn } from "./store";
 
 const OPEN_LINKS_OPTIONS: { value: OpenLinksIn; label: string }[] = [
   { value: "app", label: "In Otter Mail" },
   { value: "browser", label: "In your default browser" },
 ];
 
-/** Settings › Browser (Mac): where links open, the toolbar's extensions, browsing data. */
+/** Settings › Browser (Mac): where links open, extensions, browsing data. */
 export function BrowserSettingsPane() {
   const openLinksIn = useBrowser((s) => s.openLinksIn);
-  const extensionsButton = useBrowser((s) => s.extensionsButton);
   const [clearing, setClearing] = useState(false);
 
   return (
@@ -38,7 +36,7 @@ export function BrowserSettingsPane() {
               <SettingResetButton label="open links" onClick={() => setOpenLinksIn("app")} />
             ) : null
           }
-          description="Links in mail and chat open in a tab in the agent panel, or in your Mac's default browser."
+          description="Links in mail and chat open in a tab in the agent panel, or in your Mac's default browser. ⌘-click opens one the other way."
           control={
             <RowSelect
               value={openLinksIn}
@@ -50,30 +48,7 @@ export function BrowserSettingsPane() {
         />
       </SettingsSection>
 
-      <SettingsSection title="Extensions">
-        <SettingsRow
-          {...searchableSetting("browser-extensions-button")}
-          resetAction={
-            extensionsButton ? null : (
-              <SettingResetButton
-                label="extensions button"
-                onClick={() => setExtensionsButton(true)}
-              />
-            )
-          }
-          description="The puzzle in the browser's toolbar, listing every extension to run or pin."
-          control={<Switch checked={extensionsButton} onCheckedChange={setExtensionsButton} />}
-        />
-        <SettingsRow
-          title="Manage extensions"
-          description="Turn them on or off, see what they can read, or remove them."
-          control={
-            <Btn size="sm" onClick={() => void gmailApi.openSettings({ pane: "extensions" })}>
-              Manage
-            </Btn>
-          }
-        />
-      </SettingsSection>
+      <ExtensionsSection />
 
       <SettingsSection title="Browsing data">
         <SettingsRow

@@ -11,7 +11,7 @@ const COMPONENTS: Components = {
       href={href}
       onClick={(e) => {
         e.preventDefault();
-        if (href) openLink(href);
+        if (href) openLink(href, { flip: e.metaKey });
       }}
       className="text-primary underline underline-offset-2 hover:opacity-80"
     >

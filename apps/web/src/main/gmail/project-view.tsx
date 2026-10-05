@@ -254,7 +254,7 @@ function Links({ project }: { project: Project }) {
             role="button"
             tabIndex={0}
             title={link.url}
-            onClick={() => openLink(link.url)}
+            onClick={(e) => openLink(link.url, { flip: e.metaKey })}
             className={SIDE_ROW}
           >
             <LinkIcon className="size-3.5 shrink-0 text-muted-foreground" />

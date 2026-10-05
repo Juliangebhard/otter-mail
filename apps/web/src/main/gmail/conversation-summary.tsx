@@ -1,4 +1,5 @@
 import { ExternalLinkIcon, FileTextIcon, PenLineIcon, SearchIcon } from "lucide-react";
+import type { MouseEvent } from "react";
 import { getAccountColor, getAccountDisplayName } from "./account-style";
 import { parseAddressEntry, splitAddressList } from "./address";
 import { useAccounts, useMessage } from "./hooks";
@@ -41,9 +42,9 @@ export function ConversationSummary({
   const people = participants(sent, account?.email);
   const withFiles = sent.filter((m) => m.hasAttachments);
 
-  const openInGmail = () => {
+  const openInGmail = (e: MouseEvent) => {
     const user = encodeURIComponent(account?.email ?? accountId);
-    openLink(`https://mail.google.com/mail/u/${user}/#all/${threadId}`);
+    openLink(`https://mail.google.com/mail/u/${user}/#all/${threadId}`, { flip: e.metaKey });
   };
 
   return (

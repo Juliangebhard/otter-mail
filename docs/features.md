@@ -311,14 +311,14 @@ can't embed other sites, so the web app opens links in a new browser tab as befo
 | -------------------------------------------------------------------------- | --- | --- | ------ |
 | Pages as tabs beside the chats: back, forward, reload, address and search  | ✓   | —   | —      |
 | ⌘W closes a chat or page, selecting the left tab, then the right if needed | ✓   | —   | —      |
-| Links in mail and chat open in a tab (or the default browser, a setting)   | ✓   | —   | —      |
+| Links in mail and chat open in a tab or the default browser; ⌘-click flips | ✓   | —   | —      |
 | Start page (⌘T): new chat, extensions, suggested sites; ⌘L for the address | ✓   | —   | —      |
 | Panel fills the window (expand), for a page or a long chat                 | ✓   | ✓   | —      |
 | Sign-in popups, links to other apps (asked first), mailto: opens a message | ✓   | —   | —      |
 | Context menu, site info (clear a site's data), clear all browsing data     | ✓   | —   | —      |
 | Chrome Web Store extensions: add (asked first), auto-update                | ✓   | —   | —      |
 | Toolbar: pinned extensions, Extensions menu, badges, popups                | ✓   | —   | —      |
-| Settings › Extensions: on/off, details, remove, developer mode (unpacked)  | ✓   | —   | —      |
+| Settings › Browser: extensions on/off, details, remove, developer mode     | ✓   | —   | —      |
 | Extensions' context menu items and notifications                           | ✓   | —   | —      |
 | Native messaging (an extension talking to its Mac app, e.g. 1Password's)   | —   | —   | —      |
 

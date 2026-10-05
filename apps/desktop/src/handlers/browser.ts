@@ -12,7 +12,7 @@ import {
   setExtensionEnabled,
 } from "../services/extensions.js";
 
-/** Settings › Extensions and › Browser, and the browser toolbar: extensions and browsing data. */
+/** Settings › Browser and the browser toolbar: extensions and browsing data. */
 export function registerBrowserHandlers(): void {
   ipcMain.handle("browser:extensions", () => listExtensions());
 

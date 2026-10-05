@@ -8,7 +8,6 @@ export type SettingsTarget = {
     | "agents"
     | "integrations"
     | "browser"
-    | "extensions"
     | "otter";
 };
 
