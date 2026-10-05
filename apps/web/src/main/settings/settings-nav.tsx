@@ -143,12 +143,14 @@ export function SettingsNav({
 
   return (
     <>
+      {/* In a browser tab there's no title band above (SidebarTitle): the
+          heading centers in its place, after the sidebar toggle. */}
       <ScrollArea
         className="flex-1"
-        viewportClassName="scroll-fade-y px-(--sidebar-content-inset) pb-8 pt-3"
+        viewportClassName="scroll-fade-y px-(--sidebar-content-inset) pb-8 pt-3 web:pt-[calc(var(--workspace-topbar-height)/2-1rem)]"
         contentClassName="flex flex-col gap-0.5"
       >
-        <h2 className="mb-1 flex h-8 items-center px-(--sidebar-row-content-inset) text-base font-semibold text-sidebar-foreground">
+        <h2 className="mb-1 flex h-8 items-center pe-(--sidebar-row-content-inset) ps-(--sidebar-heading-inset) text-base font-semibold text-sidebar-foreground">
           Settings
         </h2>
         <div className="mb-2 flex h-9 shrink-0 items-center gap-2 rounded-full bg-foreground/[0.06] ps-3 pe-2.5 transition-colors focus-within:bg-foreground/[0.08]">

@@ -67,7 +67,7 @@ export function SpacePeekCard({
       onMouseEnter={() => onHover(true)}
       onMouseLeave={() => onHover(false)}
       style={{ width: `calc(${width}px - 2 * var(--peek-gap))` }}
-      className="absolute bottom-[calc(0.25rem+var(--peek-gap))] left-(--peek-gap) top-[calc(var(--workspace-topbar-height)+var(--peek-gap))] z-40 overflow-hidden rounded-[calc(var(--radius-xl)-var(--peek-gap))] border border-(--panel-edge) bg-canvas text-sidebar-foreground shadow-[0_18px_48px_-12px_rgb(0_0_0/30%)] transition-opacity duration-150 ease-out [--peek-gap:0.25rem] starting:opacity-0 dark:shadow-[0_18px_48px_-12px_rgb(0_0_0/70%)]"
+      className="absolute bottom-[calc(0.25rem+var(--peek-gap))] left-(--peek-gap) top-[calc(var(--workspace-topbar-height)+var(--peek-gap))] web:inset-y-(--peek-gap) z-40 overflow-hidden rounded-[calc(var(--radius-xl)-var(--peek-gap))] border border-(--panel-edge) bg-canvas text-sidebar-foreground shadow-[0_18px_48px_-12px_rgb(0_0_0/30%)] transition-opacity duration-150 ease-out [--peek-gap:0.25rem] starting:opacity-0 dark:shadow-[0_18px_48px_-12px_rgb(0_0_0/70%)]"
     >
       <div aria-hidden className="absolute inset-0 bg-(--sidebar-panel-surface)" />
       <div

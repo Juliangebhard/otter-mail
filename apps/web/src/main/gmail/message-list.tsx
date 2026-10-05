@@ -45,8 +45,6 @@ import {
   ChevronDownIcon,
   PaperclipIcon,
   FolderIcon,
-  SquarePenIcon,
-  SlidersHorizontalIcon,
 } from "lucide-react";
 import { IconBtn, HintTooltip, cn } from "./ui";
 import {
@@ -109,8 +107,6 @@ type MessageListProps = {
   /** Clip the list to the shared panel's corners where it meets the frame. */
   roundedLeft?: boolean;
   roundedRight?: boolean;
-  /** A view's space has no sidebar: the list names it, and New message and Edit are here. */
-  space?: { name: string; onCompose: () => void; onEdit: () => void };
   /** Active account — used for account-mode queries and as a fallback owner id. */
   accountId: string;
   labelId: string;
@@ -508,7 +504,7 @@ function MessageRow({
             data-draft={isDraft || undefined}
             data-flagged={message.starred || undefined}
             data-unread={unread || undefined}
-            data-read={(!unread && !isDraft) || undefined}
+            data-read={!unread || undefined}
             data-selected={selected || undefined}
             data-checked={checked || undefined}
             onClick={onRowClick}
@@ -753,7 +749,7 @@ function ThreadMessageRow({
       ref={ref}
       type="button"
       onClick={onClick}
-      data-read={(!message.unread && !isDraft) || undefined}
+      data-read={!message.unread || undefined}
       data-selected={selected || undefined}
       className={cn(
         "message-list-thread-row group flex w-full cursor-pointer select-none flex-col gap-0.5 rounded-lg py-2 pr-3 pl-6 text-left outline-none focus-visible:ring-2 focus-visible:ring-focus-ring",
@@ -823,6 +819,12 @@ function UnreadFilterIcon({ on, className }: { on: boolean; className?: string }
   );
 }
 
+/** The sidebar's names where they aren't Gmail's (accounts-sidebar.tsx). */
+const SIDEBAR_LABEL_NAMES: Record<string, string> = {
+  [ALL_MAIL_LABEL_ID]: "All Mail",
+  SPAM: "Junk",
+};
+
 function formatConversationSummary(total: number, unread: number): string {
   const conversations = `${total.toLocaleString()} conversation${total === 1 ? "" : "s"}`;
   return unread > 0 ? `${conversations} · ${unread.toLocaleString()} unread` : conversations;
@@ -840,7 +842,6 @@ export function MessageList({
   roundedLeft,
   roundedRight,
   renderFloatingReader,
-  space,
   accountId,
   labelId,
   combined,
@@ -926,6 +927,12 @@ export function MessageList({
         : (labelSearchToken(labelId, nameOf(accountId, labelId)) ?? "");
     }
   });
+  // Named as the sidebar names it.
+  const listName = combined
+    ? combined.name
+    : (SIDEBAR_LABEL_NAMES[labelId] ??
+      SYSTEM_LABEL_NAMES[labelId] ??
+      (activeLabel ? labelDisplayName(activeLabel) : null));
   const projectRows = projectThreads.data?.pages[0]?.messages;
   const { mailboxTotal, mailboxUnread } = project
     ? {
@@ -1886,29 +1893,17 @@ export function MessageList({
       >
         {headerLeading}
         <div className="min-w-0 flex-1 truncate text-sm text-muted-foreground">
-          {/* A view's space has the title band's controls beside it: its name alone. */}
-          {space ? (
-            <span className="font-medium text-foreground">{space.name}</span>
-          ) : project ? (
-            formatConversationSummary(mailboxTotal, mailboxUnread)
-          ) : (
-            formatMailboxSummary(mailboxTotal, mailboxUnread)
-          )}
+          {/* Where you are (the sidebar may be hidden, a view has none), then how much. */}
+          {listName ? (
+            <>
+              <span className="font-medium text-foreground">{listName}</span>
+              {" · "}
+            </>
+          ) : null}
+          {project
+            ? formatConversationSummary(mailboxTotal, mailboxUnread)
+            : formatMailboxSummary(mailboxTotal, mailboxUnread)}
         </div>
-        {space ? (
-          <HintTooltip label="Edit view">
-            <IconBtn label="Edit view" onClick={space.onEdit}>
-              <SlidersHorizontalIcon className="size-4" />
-            </IconBtn>
-          </HintTooltip>
-        ) : null}
-        {space ? (
-          <HintTooltip label="New message" shortcut="compose.new">
-            <IconBtn label="New message" onClick={space.onCompose}>
-              <SquarePenIcon className="size-4" />
-            </IconBtn>
-          </HintTooltip>
-        ) : null}
         <HintTooltip label="Search this mailbox" shortcut="search.focus">
           <IconBtn label="Search this mailbox" onClick={onSearchView}>
             <SearchIcon className="size-4" />
@@ -1941,6 +1936,8 @@ export function MessageList({
           roundedRight && "rounded-br-xl",
           !search && roundedLeft && "rounded-tl-xl",
           !search && roundedRight && "rounded-tr-xl",
+          // In a browser tab the panel's corners are above the header, and it's square on the right.
+          "web:rounded-t-none web:rounded-r-none",
         )}
         contentClassName={filteredMessages.length === 0 ? "h-full" : undefined}
         viewportClassName={[

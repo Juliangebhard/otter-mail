@@ -273,29 +273,35 @@ export function PanelControlSlot() {
 
 /**
  * Room left at the start of the band next to the rail (sidebar hidden) for
- * what sits over it: traffic lights, toggle, arrows.
+ * what sits over it: traffic lights, toggle, arrows. A view's space has no
+ * sidebar, so no toggle (`SidebarControl`): only the traffic lights.
  */
-export function TitlebarInset() {
+export function TitlebarInset({ toggle = true }: { toggle?: boolean }) {
   // The band's own px-4 already covers 1rem of it, and the rail its width.
   return (
     <span
       aria-hidden
       className={cn(
         "shrink-0",
-        features.historyButtons
-          ? "w-[max(0px,calc(var(--workspace-titlebar-content-left)+var(--workspace-history-controls-width)-1rem-var(--workspace-rail-width)))]"
-          : "w-[max(0px,calc(var(--workspace-titlebar-content-left)-1rem-var(--workspace-rail-width)))]",
+        !toggle
+          ? "w-[max(0px,calc(var(--workspace-controls-left)-1rem-var(--workspace-rail-width)))]"
+          : features.historyButtons
+            ? "w-[max(0px,calc(var(--workspace-titlebar-content-left)+var(--workspace-history-controls-width)-1rem-var(--workspace-rail-width)))]"
+            : "w-[max(0px,calc(var(--workspace-titlebar-content-left)-1rem-var(--workspace-rail-width)))]",
       )}
     />
   );
 }
 
-/** The setup's title band: room for the traffic lights, then the wordmark. */
+/**
+ * The setup's title band: room for the traffic lights, then the wordmark (in
+ * a browser tab, in line with the panel's content below).
+ */
 export function WindowTitle({ className }: { className?: string }) {
   return (
     <div
       className={cn(
-        "drag-region flex h-(--workspace-topbar-height) shrink-0 items-center pl-(--workspace-titlebar-content-left) pr-3",
+        "drag-region flex h-(--workspace-topbar-height) shrink-0 items-center pl-(--workspace-titlebar-content-left) pr-3 web:pl-6",
         className,
       )}
     >
@@ -310,10 +316,12 @@ export function WindowTitle({ className }: { className?: string }) {
 
 /**
  * The sidebar's title band in the main window: the traffic lights, the
- * pinned toggle and back/forward sit over it.
+ * pinned toggle and back/forward sit over it. A browser tab has none of them
+ * there (the toggle sits over the rail), so the sidebar's heading takes the
+ * band instead (`SpaceHeading`).
  */
 export function SidebarTitle() {
-  return <div className="drag-region h-(--workspace-topbar-height) shrink-0" />;
+  return <div className="drag-region h-(--workspace-topbar-height) shrink-0 web:hidden" />;
 }
 
 type MailboxOption = { id: string; account: GmailAccount | null; name: string; shortcut: string };
