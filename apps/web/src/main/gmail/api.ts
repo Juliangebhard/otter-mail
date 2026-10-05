@@ -388,8 +388,6 @@ export type SettingsPane =
   | "agents"
   /** The agent panel's browser (Mac): links, extensions, browsing data. */
   | "browser"
-  /** The browser's extensions (Mac). */
-  | "extensions"
   | "integrations"
   /** The Otter account page, opened from the user button at the bottom of the nav. */
   | "otter";

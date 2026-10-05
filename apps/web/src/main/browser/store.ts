@@ -203,9 +203,13 @@ export function setOpenLinksIn(value: OpenLinksIn): void {
   set({ openLinksIn: value });
 }
 
-/** A link from mail or chat: a tab in the agent panel (Mac), unless Settings › Browser says otherwise. */
-export function openLink(url: string): void {
-  if (features.browser && /^https?:/i.test(url) && get().openLinksIn === "app") {
+/**
+ * A link from mail or chat: a tab in the agent panel (Mac), unless Settings › Browser says
+ * otherwise. ⌘-click (`flip`) opens it the other way.
+ */
+export function openLink(url: string, { flip = false } = {}): void {
+  const inApp = (get().openLinksIn === "app") !== flip;
+  if (features.browser && /^https?:/i.test(url) && inApp) {
     openTab(url);
     return;
   }

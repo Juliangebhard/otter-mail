@@ -761,7 +761,7 @@ function HtmlBody({
           console.log("[MessageBody:linkClick]", { href: raw.slice(0, 60) });
           e.preventDefault();
           if (/^mailto:/i.test(url)) void window.desktopBridge.openExternal(url).catch(() => {});
-          else openLink(url);
+          else openLink(url, { flip: e.metaKey });
         }
       });
       // The click handler above is the fast path, but WKWebView doesn't reliably

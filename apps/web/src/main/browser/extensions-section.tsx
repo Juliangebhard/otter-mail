@@ -8,8 +8,14 @@ import { Text } from "~/components/ui/text";
 import { ipc } from "~/lib/ipc";
 import { toast } from "../gmail/toast";
 import { Btn, cn } from "../gmail/ui";
-import { SettingsPageContainer } from "../settings/settings-ui";
-import { CHROME_WEB_STORE_URL, openTab, setPinned, useBrowser } from "./store";
+import {
+  SettingResetButton,
+  SettingsGroup,
+  SettingsRow,
+  SettingsSection,
+} from "../settings/settings-ui";
+import { searchableSetting } from "../settings/settings-search";
+import { CHROME_WEB_STORE_URL, openTab, setExtensionsButton, setPinned, useBrowser } from "./store";
 
 /** An installed extension (apps/desktop/src/services/extensions.ts' BrowserExtension). */
 type Extension = {
@@ -47,13 +53,14 @@ function useExtensions() {
 const PILL = "rounded-full px-3.5";
 
 /**
- * Settings › Extensions (Mac): Chrome's extensions page, as ChatGPT has it.
- * Each one's card turns it on or off, shows its details, or removes it;
- * developer mode loads one from a folder.
+ * Settings › Browser › Extensions (Mac): Chrome's extensions page, as ChatGPT
+ * has it. Each one's card turns it on or off, shows its details, or removes
+ * it; developer mode loads one from a folder.
  */
-export function ExtensionsPane() {
+export function ExtensionsSection() {
   const extensions = useExtensions();
   const pinned = useBrowser((s) => s.pinned);
+  const extensionsButton = useBrowser((s) => s.extensionsButton);
   const [query, setQuery] = useState("");
   const [developerMode, setDeveloperMode] = useState(
     () => localStorage.getItem(DEVELOPER_MODE_KEY) === "1",
@@ -85,23 +92,37 @@ export function ExtensionsPane() {
   };
 
   return (
-    <SettingsPageContainer
-      title="Extensions"
-      searchId="browser-extensions"
-      action={
-        <label className="flex cursor-pointer items-center gap-2 text-sm text-foreground">
-          Developer mode
-          <Switch
-            checked={developerMode}
-            onCheckedChange={(on) => {
-              localStorage.setItem(DEVELOPER_MODE_KEY, on ? "1" : "0");
-              setDeveloperMode(on);
-            }}
-          />
-        </label>
-      }
-    >
-      <div className="space-y-4 px-[1px]">
+    <SettingsSection {...searchableSetting("browser-extensions")} variant="plain">
+      <SettingsGroup>
+        <SettingsRow
+          {...searchableSetting("browser-extensions-button")}
+          resetAction={
+            extensionsButton ? null : (
+              <SettingResetButton
+                label="extensions button"
+                onClick={() => setExtensionsButton(true)}
+              />
+            )
+          }
+          description="The puzzle in the browser's toolbar, listing every extension to run or pin."
+          control={<Switch checked={extensionsButton} onCheckedChange={setExtensionsButton} />}
+        />
+        <SettingsRow
+          title="Developer mode"
+          description="Load an extension from a folder."
+          control={
+            <Switch
+              checked={developerMode}
+              onCheckedChange={(on) => {
+                localStorage.setItem(DEVELOPER_MODE_KEY, on ? "1" : "0");
+                setDeveloperMode(on);
+              }}
+            />
+          }
+        />
+      </SettingsGroup>
+
+      <div className="mt-4 space-y-4 px-[1px]">
         <div className="flex items-center gap-2">
           <div className="flex h-9 min-w-0 flex-1 items-center gap-2 rounded-full bg-foreground/[0.05] px-3.5 focus-within:bg-foreground/[0.08]">
             <SearchIcon className="size-4 shrink-0 text-muted-foreground" />
@@ -124,7 +145,6 @@ export function ExtensionsPane() {
           </Btn>
         </div>
 
-        <h2 className="px-4 pt-2 text-sm font-medium text-foreground">All extensions</h2>
         {shown.length === 0 ? (
           <div className="flex flex-col items-center gap-2 rounded-xl border border-border/70 px-6 py-10 text-center">
             <PuzzleIcon className="size-6 text-muted-foreground" />
@@ -249,6 +269,6 @@ export function ExtensionsPane() {
           Its settings go with it. You can add it again from the Web Store.
         </Text>
       </Dialog>
-    </SettingsPageContainer>
+    </SettingsSection>
   );
 }

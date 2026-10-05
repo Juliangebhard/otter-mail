@@ -494,7 +494,7 @@ function PageMenu({ url, onDevTools }: { url: string; onDevTools?: () => void })
         ) : null}
         <DropdownMenuItem
           icon={<PuzzleIcon className="size-4" />}
-          onSelect={() => void gmailApi.openSettings({ pane: "extensions" })}
+          onSelect={() => void gmailApi.openSettings({ pane: "browser" })}
         >
           Extensions
         </DropdownMenuItem>
@@ -530,7 +530,7 @@ function StartPage({
           <button
             type="button"
             className={tile}
-            onClick={() => void gmailApi.openSettings({ pane: "extensions" })}
+            onClick={() => void gmailApi.openSettings({ pane: "browser" })}
           >
             <PuzzleIcon />
             Extensions

@@ -37,7 +37,6 @@ export const SETTINGS_SECTION_LABELS: Readonly<Record<SettingsPane, string>> = {
   accounts: "Mailboxes",
   agents: "Agents",
   browser: "Browser",
-  extensions: "Extensions",
   integrations: "Integrations",
 };
 
@@ -390,7 +389,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "browser-extensions",
     title: "Extensions",
-    pane: "extensions",
+    pane: "browser",
     available: features.browser,
     searchTerms: [
       "chrome web store add-ons plugins ad blocker password manager developer mode unpacked",

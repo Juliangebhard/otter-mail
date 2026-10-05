@@ -150,7 +150,10 @@ export function InviteCard({ accountId, messageId }: { accountId: string; messag
         </div>
         {invite.htmlLink ? (
           <HintTooltip label="Open in Google Calendar">
-            <IconBtn label="Open in Google Calendar" onClick={() => openLink(invite.htmlLink!)}>
+            <IconBtn
+              label="Open in Google Calendar"
+              onClick={(e) => openLink(invite.htmlLink!, { flip: e.metaKey })}
+            >
               <ExternalLinkIcon className="size-4" />
             </IconBtn>
           </HintTooltip>
