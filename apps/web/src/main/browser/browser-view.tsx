@@ -316,7 +316,14 @@ function BrowserPage({
             className="flex min-h-0 flex-1 bg-white"
           />
         ) : (
-          <StartPage onNavigate={navigate} onNewChat={onNewChat} />
+          <StartPage
+            onNavigate={navigate}
+            // The chat takes the start page's place, as a site would.
+            onNewChat={() => {
+              closeTab(tab.id);
+              onNewChat();
+            }}
+          />
         )}
         {failure || crashed ? (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-canvas p-6 text-center">

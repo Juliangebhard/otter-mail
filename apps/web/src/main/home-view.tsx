@@ -285,9 +285,10 @@ function PaneResizer({ onPointerDown }: { onPointerDown: (e: ReactPointerEvent) 
  * transparent: their title bands sit on the frame, their bodies on the panel.
  */
 const PANE = "min-h-0 overflow-hidden";
-/** The sidebar's body sits in the panel, between the frame's tone and the
-    canvas, with a faint full-height divider before the list. */
-const PANE_SIDEBAR = `${PANE} relative text-sidebar-foreground before:pointer-events-none before:absolute before:bottom-px before:left-px before:right-0 before:top-[calc(var(--workspace-topbar-height)+1px)] before:-z-10 before:rounded-l-[calc(var(--radius-xl)-1px)] before:bg-(--sidebar-panel-surface) after:pointer-events-none after:absolute after:bottom-0 after:right-0 after:top-0 after:z-20 after:w-px after:bg-border/70`;
+/** The sidebar's body sits in the panel (in a browser tab, its heading too),
+    between the frame's tone and the canvas, with a faint full-height divider
+    before the list. */
+const PANE_SIDEBAR = `${PANE} relative text-sidebar-foreground before:pointer-events-none before:absolute before:bottom-px before:left-px before:right-0 before:top-[calc(var(--workspace-topbar-height)+1px)] web:before:inset-y-0 before:-z-10 before:rounded-l-[calc(var(--radius-xl)-1px)] before:bg-(--sidebar-panel-surface) after:pointer-events-none after:absolute after:bottom-0 after:right-0 after:top-0 after:z-20 after:w-px after:bg-border/70`;
 /** Faint full-height dividers, through the title band (ChatGPT): on the
     list's right, the chat's left. */
 const PANE_LIST = `${PANE} relative after:pointer-events-none after:absolute after:bottom-0 after:right-0 after:top-0 after:z-20 after:w-px after:bg-border/70`;
@@ -1331,9 +1332,12 @@ function MailHome() {
   const readerOwnsBand =
     !settingsRoute && !(composeOpen && composeAccountId) && !!readerAccount && !!selectedMessageId;
   const titleTrailing = <TitleTrailing showPanelToggle={!chatOpen && !settingsRoute} />;
+  // A view's space has no sidebar to toggle.
+  const sidebarToggle = !(viewSpace && !settingsRoute);
+  const titlebarInset = <TitlebarInset toggle={sidebarToggle} />;
   const readerLeading = fullInbox ? (
     <>
-      {sidebarOpen ? null : <TitlebarInset />}
+      {sidebarOpen ? null : titlebarInset}
       <HintTooltip label="Back to message list" shortcut="message.close">
         <IconBtn label="Back to message list" onClick={closeMessage}>
           <ArrowLeftIcon className="size-4" />
@@ -1374,7 +1378,7 @@ function MailHome() {
   const mainIsLeftmost = !sidebarOpen && !listVisible;
   const titleControls = (
     <TitleControls
-      leading={mainIsLeftmost ? <TitlebarInset /> : null}
+      leading={mainIsLeftmost ? titlebarInset : null}
       syncing={globalSync.syncing}
       syncLabel={globalSync.label}
       // Room for the pinned panel toggle while the panel is closed; when
@@ -1412,17 +1416,19 @@ function MailHome() {
             syncing={globalSync.syncing || manualSyncing}
           />
           {/* A thin margin of frame on every free side (ChatGPT), so the panel
-              floats with all four corners rounded. */}
-          <div className="relative isolate flex min-w-0 flex-1 pb-1 pr-1">
+              floats with all four corners rounded. A browser tab has no window
+              to frame: there the panel fills the page beside the rail, title
+              bands and all, rounded only against the rail. */}
+          <div className="relative isolate flex min-w-0 flex-1 pb-1 pr-1 web:p-0">
             {/* The inset content panel, behind the panes and under their title bands. */}
             <div
               aria-hidden
-              className="pointer-events-none absolute bottom-1 left-0 right-1 top-(--workspace-topbar-height) -z-10 rounded-xl bg-canvas"
+              className="pointer-events-none absolute bottom-1 left-0 right-1 top-(--workspace-topbar-height) -z-10 rounded-xl bg-canvas web:inset-y-0 web:right-0 web:rounded-r-none"
             />
             {/* The rim stays above sticky day headers and the panes' surfaces. */}
             <div
               aria-hidden
-              className="pointer-events-none absolute bottom-1 left-0 right-1 top-(--workspace-topbar-height) z-30 rounded-xl border border-(--panel-edge)"
+              className="pointer-events-none absolute bottom-1 left-0 right-1 top-(--workspace-topbar-height) z-30 rounded-xl border border-(--panel-edge) web:inset-y-0 web:right-0 web:rounded-r-none web:border-y-0 web:border-r-0"
             />
             <div
               ref={setMailWorkspace}
@@ -1555,7 +1561,7 @@ function MailHome() {
                       data-tour="list"
                     >
                       <MessageList
-                        headerLeading={sidebarOpen ? null : <TitlebarInset />}
+                        headerLeading={sidebarOpen ? null : titlebarInset}
                         headerTrailing={wideInbox ? titleTrailing : undefined}
                         roundedLeft={!sidebarOpen}
                         roundedRight={wideInbox && !chatOpen}
@@ -1588,15 +1594,6 @@ function MailHome() {
                         onOpenChat={openChat}
                         onSearchView={searchFromView}
                         viewQueryRef={viewQueryRef}
-                        space={
-                          viewSpace
-                            ? {
-                                name: viewSpace.name,
-                                onCompose: () => setComposeOpen(true),
-                                onEdit: () => openViewEditor(viewSpace.id),
-                              }
-                            : undefined
-                        }
                         project={isProjects && !activeSearch ? { id: selectedLabelId } : undefined}
                         search={
                           activeSearch
@@ -1721,7 +1718,7 @@ function MailHome() {
       </div>
 
       {/* Pinned titlebar toggles (Otter Code): same window spot whatever the panes do. */}
-      {(viewSpace && !settingsRoute) || panelExpanded ? null : (
+      {!sidebarToggle || panelExpanded ? null : (
         <SidebarControl sidebarOpen={sidebarOpen} onToggleSidebar={toggleSidebar} />
       )}
       {!settingsRoute ? (

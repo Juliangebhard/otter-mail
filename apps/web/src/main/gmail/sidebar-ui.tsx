@@ -208,11 +208,15 @@ export function Section({
   );
 }
 
-/** A space's heading, past the panel's rounded corner (Codex's "Codex"), with its actions at the right. */
+/**
+ * A space's heading, past the panel's rounded corner (Codex's "Codex"), with
+ * its actions at the right. In a browser tab it's the sidebar's title band
+ * (ChatGPT's), level with the other columns' headers, after the sidebar toggle.
+ */
 export function SpaceHeading({ title, children }: { title: string; children?: ReactNode }) {
   return (
-    <div className="shrink-0 px-(--sidebar-content-inset) pb-2 pt-(--radius-xl)">
-      <h2 className="flex h-9 items-center gap-1 ps-(--sidebar-row-content-inset) text-lg font-semibold tracking-tight text-sidebar-foreground">
+    <div className="shrink-0 px-(--sidebar-content-inset) pb-2 pt-(--radius-xl) web:pt-0">
+      <h2 className="flex h-9 items-center gap-1 ps-(--sidebar-heading-inset) text-lg font-semibold tracking-tight text-sidebar-foreground web:h-(--workspace-topbar-height)">
         <span className="min-w-0 flex-1 truncate">{title}</span>
         {children}
       </h2>

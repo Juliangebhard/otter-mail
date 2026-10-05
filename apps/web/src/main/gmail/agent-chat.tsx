@@ -1833,8 +1833,10 @@ export function AgentChatPanel({
       <div
         className={cn(
           "drag-region flex h-(--workspace-topbar-height) shrink-0 items-center gap-1 px-3",
-          // Filling the window, the strip starts by the traffic lights.
-          expanded && "pl-[calc(var(--workspace-controls-left)-var(--workspace-rail-width))]",
+          // Filling the window, the strip starts by the traffic lights (with none,
+          // a browser tab's or Linux's, it keeps its own inset).
+          expanded &&
+            "pl-[max(--spacing(3),calc(var(--workspace-controls-left)-var(--workspace-rail-width)))]",
         )}
       >
         <ChatTabs

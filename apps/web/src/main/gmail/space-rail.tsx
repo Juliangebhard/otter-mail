@@ -165,9 +165,16 @@ export function SpaceRail({
       className="flex w-(--workspace-rail-width) shrink-0 flex-col items-center pb-(--sidebar-content-inset) text-sidebar-foreground"
     >
       {/* Under the title band, and past the panel's rounded corner: level with
-          the sidebar's heading. */}
-      <div aria-hidden className="drag-region h-(--workspace-topbar-height) w-full shrink-0" />
-      <div className="mt-(--radius-xl) flex flex-col items-center gap-1" data-tour="mailbox">
+          the sidebar's heading. A browser tab has no title band: the first
+          space sits in line with the columns' headers. */}
+      <div
+        aria-hidden
+        className="drag-region h-(--workspace-topbar-height) w-full shrink-0 web:hidden"
+      />
+      <div
+        className="mt-(--radius-xl) flex flex-col items-center gap-1 web:mt-[calc((var(--workspace-topbar-height)-2.25rem)/2)]"
+        data-tour="mailbox"
+      >
         {options.map((option) => (
           <span key={option.id} className="contents">
             {spaceButton({
