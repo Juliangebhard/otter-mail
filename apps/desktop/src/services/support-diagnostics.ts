@@ -1,15 +1,15 @@
 import * as fs from "node:fs/promises";
-import * as os from "node:os";
 import * as path from "node:path";
 import { summarizeSupportLog, type SupportError } from "@otter-mail/shared/support";
 import { appInfo } from "../backend-protocol.js";
+import { backendOS } from "../os/backend.js";
 
 /** Bounded tail read; the raw log never leaves this process. */
 export async function desktopSupportDiagnostics(): Promise<{
   environment: string;
   errors?: SupportError[];
 }> {
-  const environment = `macOS (Darwin ${os.release()}, ${os.arch()}); Electron ${process.versions.electron ?? "unknown"}`;
+  const environment = `${backendOS.environment()}; Electron ${process.versions.electron ?? "unknown"}`;
   let errors: SupportError[] | undefined;
   try {
     const file = await fs.open(path.join(appInfo().stateDir, "logs", "main.log"), "r");

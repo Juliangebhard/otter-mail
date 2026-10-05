@@ -1,12 +1,12 @@
 # Otter Mail
 
-Gmail, calm and fast. A macOS app, and the same app in your browser at
+Gmail, calm and fast. An app for macOS and Linux, and the same app in your browser at
 [mail.otterware.app](https://mail.otterware.app).
 
 - Several Gmail accounts side by side, or combined into one inbox
 - Gmail labels, plus saved views that filter across accounts
 - A local SQLite cache with full-text search, so mail opens instantly and works offline
-- A menu-bar mini inbox, new-mail notifications, and a Dock unread badge
+- New-mail notifications, and a Dock unread badge
 - On-device translation of mail in other languages (Apple Translation on the Mac, Chrome's
   built-in translator on the web; nothing leaves your device)
 - Calendar invitations you can answer in place, and one-click unsubscribe
@@ -33,7 +33,7 @@ Mac releases support Apple Silicon Macs (arm64).
 | Signatures, kept in Gmail                                     | ✓                                      | ✓                                              | ✓                                              |
 | Gmail sign-in                                                 | Tokens stay on your Mac                | Through our relay (tokens pass, never stored)  | Through our relay (tokens pass, never stored)  |
 | Keyboard shortcuts, edited in Settings                        | ✓                                      | ✓                                              | ✓                                              |
-| Menu-bar mini inbox, launch at login                          | ✓                                      | –                                              | –                                              |
+| Launch at login                                               | ✓                                      | –                                              | –                                              |
 | Default mail app (mailto: links)                              | ✓                                      | –                                              | –                                              |
 | On-device translation                                         | ✓ Apple Translation                    | ✓ Chrome's built-in translator                 | –                                              |
 | Agents                                                        | OpenRouter, Claude Code, Codex, Hermes | OpenRouter, Hermes                             | OpenRouter, Hermes                             |
@@ -42,7 +42,8 @@ Mac releases support Apple Silicon Macs (arm64).
 
 ## Install
 
-Download the latest DMG from [Releases](https://github.com/otterware-app/otter-mail/releases).
+Download the latest DMG (Mac) or .deb (Debian, Ubuntu: `sudo apt install ./Otter-Mail-*.deb`)
+from [Releases](https://github.com/otterware-app/otter-mail/releases).
 Installed apps update themselves from the same page. Or open
 [mail.otterware.app](https://mail.otterware.app) in your browser.
 

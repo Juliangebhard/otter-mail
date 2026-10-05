@@ -60,7 +60,12 @@ export function requestProblemReport(): void {
 
 const TEXTAREA =
   "w-full resize-y rounded-lg border border-border/70 bg-surface-raised/60 px-3 py-2 text-sm leading-5 outline-none placeholder:text-placeholder focus-visible:border-focus-ring/60 focus-visible:ring-[3px] focus-visible:ring-focus-ring/16";
-const currentPlatform = window.desktopBridge.platform === "web" ? "web" : "mac";
+const currentPlatform: keyof typeof SUPPORT_PLATFORMS =
+  window.desktopBridge.platform === "web"
+    ? "web"
+    : window.desktopBridge.platform === "linux"
+      ? "linux"
+      : "mac";
 const emptyReport: SupportReport = {
   kind: "bug",
   platform: currentPlatform,
@@ -385,13 +390,11 @@ export function ReportProblemDialog() {
       setDraftStatus("waiting");
       toast.success("Investigation opened in your terminal. Its findings will return here.");
     });
-  const terminalName = terminals?.apps.find(
-    (item) => item.bundleId === terminals.selectedBundleId,
-  )?.name;
-  const chooseTerminal = (bundleId: string | null) =>
+  const terminalName = terminals?.apps.find((item) => item.id === terminals.selectedId)?.name;
+  const chooseTerminal = (id: string | null) =>
     run("save", async () => {
       setTerminals(
-        await window.desktopBridge.invoke<SupportTerminals>("support:setTerminal", { bundleId }),
+        await window.desktopBridge.invoke<SupportTerminals>("support:setTerminal", { id }),
       );
     });
 
@@ -462,16 +465,16 @@ export function ReportProblemDialog() {
             <DropdownMenuSeparator />
             <DropdownMenuSub label={"Terminal: " + (terminalName ?? "System default")}>
               <DropdownMenuCheckboxItem
-                checked={!terminals.selectedBundleId}
+                checked={!terminals.selectedId}
                 onSelect={() => void chooseTerminal(null)}
               >
                 System default{terminals.defaultName ? " (" + terminals.defaultName + ")" : ""}
               </DropdownMenuCheckboxItem>
               {terminals.apps.map((item) => (
                 <DropdownMenuCheckboxItem
-                  key={item.bundleId}
-                  checked={terminals.selectedBundleId === item.bundleId}
-                  onSelect={() => void chooseTerminal(item.bundleId)}
+                  key={item.id}
+                  checked={terminals.selectedId === item.id}
+                  onSelect={() => void chooseTerminal(item.id)}
                 >
                   {item.name}
                 </DropdownMenuCheckboxItem>
@@ -628,9 +631,9 @@ export function ReportProblemDialog() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {(["mac", "web", "ios"] as const).map((platform) => (
+                      {Object.entries(SUPPORT_PLATFORMS).map(([platform, label]) => (
                         <SelectItem key={platform} value={platform}>
-                          {SUPPORT_PLATFORMS[platform]}
+                          {label}
                         </SelectItem>
                       ))}
                     </SelectContent>

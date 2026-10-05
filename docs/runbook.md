@@ -7,7 +7,7 @@ breaks. The details behind each step are in `docs/release.md`, `infra/relay/READ
 | Part           | Ships                       | You do                                 |
 | -------------- | --------------------------- | -------------------------------------- |
 | Web app, relay | on merge to `main`          | nothing                                |
-| Mac app        | when you run Release        | one click                              |
+| Mac, Linux app | when you run Release        | one click                              |
 | iPhone app     | when you run Release iPhone | one click, then TestFlight / App Store |
 
 ## Web app and relay
@@ -25,12 +25,12 @@ the Google and GitHub settings that go with these URLs. D1 migrations run before
   revert on `main` so the next deploy doesn't bring it back. Migrations don't roll back: fix
   forward.
 
-## Mac app
+## Mac and Linux app
 
 1. Actions → **Release** → Run workflow → `patch`, `minor` or `major` (or
    `gh workflow run release.yml -f bump=minor`).
-2. It builds arm64 (Apple Silicon), signs with the Developer ID, notarizes, publishes a GitHub Release
-   and bumps the version on `main`.
+2. It builds arm64 (Apple Silicon), signs with the Developer ID, notarizes, builds the Linux
+   .debs (x64, arm64), publishes one GitHub Release and bumps the version on `main`.
 3. Installed apps update themselves ("Restart to update" in the sidebar).
 
 A changelog note is not part of a release. When you want one, it can land on `main` before or

@@ -42,7 +42,7 @@ export function OpenRouterConnection({ provider }: { provider: ProviderSnapshot 
       />
       <SettingsRow
         title="API key"
-        description="Saved on Otter Mail's server for your account. The agent and its chats are shared across your Mac, browser, and iPhone."
+        description="Saved on Otter Mail's server for your account. The agent and its chats are shared across your computers, browsers, and iPhone."
         control={
           <TextInput
             type="password"

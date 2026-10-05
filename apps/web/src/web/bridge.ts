@@ -318,9 +318,9 @@ const updatesDisabled: UpdateState = {
 export const webBridge: DesktopBridge = {
   platform: "web",
   features: {
-    trafficLights: false,
+    windowControls: null,
+    vibrancy: false,
     historyButtons: false,
-    menuBar: false,
     launchAtLogin: false,
     dockBadge: false,
     defaultMailApp: false,

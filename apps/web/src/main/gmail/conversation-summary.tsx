@@ -8,6 +8,7 @@ import type { GmailMessageDetail, GmailMessageSummary } from "./types";
 import { HintTooltip, cn } from "./ui";
 import { UnsubscribeLink } from "./unsubscribe-link";
 import { openLink } from "../browser/store";
+import { isModClick } from "../keybindings/keys";
 
 type OpenFile = (messageId: string, attachment: GmailMessageDetail["attachments"][number]) => void;
 
@@ -44,7 +45,7 @@ export function ConversationSummary({
 
   const openInGmail = (e: MouseEvent) => {
     const user = encodeURIComponent(account?.email ?? accountId);
-    openLink(`https://mail.google.com/mail/u/${user}/#all/${threadId}`, { flip: e.metaKey });
+    openLink(`https://mail.google.com/mail/u/${user}/#all/${threadId}`, { flip: isModClick(e) });
   };
 
   return (

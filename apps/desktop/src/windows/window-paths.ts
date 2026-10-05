@@ -62,7 +62,7 @@ export function handleRendererProtocol(): void {
   });
 }
 
-/** URL of one of the renderer's HTML entry points ("index.html", "tray-popover.html"). */
+/** URL of one of the renderer's HTML entry points ("index.html"). */
 export function getWindowUrl(htmlFileName: string): string {
   if (devServerUrl) return `${devServerUrl}/${htmlFileName}`;
   return `${RENDERER_SCHEME}://${RENDERER_HOST}/${htmlFileName}`;

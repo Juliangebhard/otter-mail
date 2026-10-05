@@ -1,22 +1,12 @@
 /**
- * The Mac-only channels the mail backend serves itself (backend.ts), as core
- * handlers: the menu-bar popover's mini inbox, read from the local mail cache
- * (the popover doesn't sync on its own; it reflects what sync already wrote),
- * syncing every mailbox, an attachment's bytes for main to drag out, and the
- * agents on this Mac given Otter Mail's tools (services/agent/connected-agents.ts).
+ * The desktop-only channels the mail backend serves itself (backend.ts), as
+ * core handlers: syncing every mailbox, an attachment's bytes for main to drag
+ * out, and the agents on this computer given Otter Mail's tools
+ * (services/agent/connected-agents.ts).
  */
 
 import type { AgentAccess, AgentTokens, ConnectedAgent } from "@otter-mail/contracts/agent-tokens";
-import {
-  accountStore,
-  getAttachmentBytes,
-  handle,
-  mailStore,
-  syncAllAccounts,
-  turnedOffMailboxes,
-  type GmailAccount,
-  type GmailMessageSummary,
-} from "@otter-mail/core";
+import { getAttachmentBytes, handle, syncAllAccounts } from "@otter-mail/core";
 
 import {
   addAgent,
@@ -26,36 +16,9 @@ import {
 } from "../services/agent/connected-agents.js";
 import { serverUrl } from "../services/agent/mcp-server.js";
 
-const PREVIEW_LIMIT = 15;
-
-export type TrayAccountSnapshot = {
-  account: GmailAccount;
-  unreadCount: number;
-  messages: GmailMessageSummary[];
-};
-
-export type TraySnapshot = {
-  accounts: TrayAccountSnapshot[];
-  totalUnread: number;
-};
-
 export function registerBackendHandlers(): void {
-  handle("tray:getSnapshot", async (params: unknown): Promise<TraySnapshot> => {
-    const p = params as Record<string, unknown> | undefined;
-    const unreadOnly = p?.unreadOnly !== false;
-    const accounts = await accountStore.listAccounts();
-    return {
-      accounts: accounts.map((account) => ({
-        account,
-        unreadCount: mailStore.countInboxUnreadForAccount(account.id),
-        messages: mailStore.listInboxPreview(account.id, PREVIEW_LIMIT, unreadOnly),
-      })),
-      totalUnread: mailStore.countInboxUnreadAll(turnedOffMailboxes()),
-    };
-  });
-
-  // The popover's sync button, and Mailbox → Synchronize All Mailboxes.
-  handle("tray:sync", async () => {
+  // Mailbox → Synchronize All Mailboxes.
+  handle("desktop:syncAll", async () => {
     await syncAllAccounts({ force: true });
     return { ok: true };
   });

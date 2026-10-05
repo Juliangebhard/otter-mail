@@ -110,7 +110,7 @@ export function useGmailWriteFailureToasts(): void {
   }, [qc]);
 }
 
-/** Refreshes mail caches when another window (the menu-bar popover) changed mail. */
+/** Refreshes mail caches when the backend changed mail on its own (a scheduled send going out). */
 export function useExternalMailChanges(): void {
   const qc = useQueryClient();
   useEffect(

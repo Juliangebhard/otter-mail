@@ -34,6 +34,8 @@ export function buildSupportLauncher(input: {
   model: string;
   directory: string;
   searchPath: string;
+  /** The script's first line: the OS's login shell (HostOS.terminals.launcher). */
+  shebang: string;
 }): string {
   const quote = (value: string) => `'${value.replaceAll("'", "'\\''")}'`;
   const prompt =
@@ -46,7 +48,7 @@ export function buildSupportLauncher(input: {
   args.push(prompt);
   const homeVariable = input.agent === "codex" ? "CODEX_HOME" : "CLAUDE_CONFIG_DIR";
   return [
-    "#!/bin/zsh -l",
+    input.shebang,
     "set -e",
     "umask 077",
     `cd -- ${quote(input.directory)}`,

@@ -2,14 +2,13 @@ import { todoistSignIn } from "./services/todoist-oauth.js";
 /**
  * The desktop's Platform for @otter-mail/core, in the mail backend's utility
  * process (backend.ts): its data in the state directory (paths.ts), SQLite
- * through node:sqlite, and what only the main process can do (safeStorage,
- * dialogs, notifications, the Dock) asked of main (main-link.ts).
+ * through node:sqlite, what only the main process can do (safeStorage,
+ * dialogs, notifications, the badge) asked of main (main-link.ts), and what
+ * differs between macOS and Linux from os/backend.ts.
  */
 
 import { AsyncLocalStorage } from "node:async_hooks";
-import { execFileSync } from "node:child_process";
 import * as fs from "node:fs/promises";
-import * as os from "node:os";
 import * as path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
@@ -18,11 +17,11 @@ import type { AsyncContext, Platform, SqlDatabase } from "@otter-mail/core";
 import { appInfo } from "./backend-protocol.js";
 import { logger } from "./logger.js";
 import { requestMain, tellMain } from "./main-link.js";
+import { backendOS } from "./os/backend.js";
 import { googleAuth } from "./services/gmail-oauth.js";
 import { connectMailSocket } from "./services/mail-socket.js";
 import { claudeProvider } from "./services/agent/claude.js";
 import { codexProvider } from "./services/agent/codex.js";
-import { appleTranslator } from "./services/translator.js";
 import { desktopSupportDiagnostics } from "./services/support-diagnostics.js";
 
 const home = () => appInfo().stateDir;
@@ -48,22 +47,13 @@ async function readSecrets(): Promise<Record<string, string>> {
   }
 }
 
-/** The Mac's name as the user set it ("Chris's MacBook Pro"). */
-function computerName(): string {
-  try {
-    return execFileSync("/usr/sbin/scutil", ["--get", "ComputerName"], { encoding: "utf8" }).trim();
-  } catch {
-    return os.hostname().replace(/\.local$/, "");
-  }
-}
-
 function openDatabase(): SqlDatabase {
   const db = new DatabaseSync(path.join(home(), "mail-cache.db"));
   db.exec("PRAGMA journal_mode = WAL;");
   return db as unknown as SqlDatabase;
 }
 
-/** Listeners for the Mac waking up (main says so, backend.ts). */
+/** Listeners for the computer waking up (main says so, backend.ts). */
 export const resumeListeners = new Set<() => void>();
 
 export function desktopPlatform(): Platform {
@@ -125,7 +115,7 @@ export function desktopPlatform(): Platform {
     todoistSignIn,
     relayUrl: process.env.OTTER_MAIL_RELAY_URL?.trim() || "https://relay.mail.otterware.app",
     relaySession: "bearer",
-    deviceName: computerName(),
+    deviceName: backendOS.deviceName(),
 
     broadcast: (channel, params) => tellMain({ kind: "broadcast", channel, params }),
     notify: (notification) => tellMain({ kind: "notify", ...notification }),
@@ -139,7 +129,7 @@ export function desktopPlatform(): Platform {
       return { run: (value, fn) => storage.run(value, fn), get: () => storage.getStore() };
     },
     offlineDownloads: true,
-    translator: appleTranslator,
+    translator: backendOS.translator,
     agentProviders: [codexProvider, claudeProvider],
   };
 }

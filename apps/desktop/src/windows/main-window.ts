@@ -1,19 +1,17 @@
 /**
  * The main mail window: one instance, created on launch and again from the
- * Dock, the menu-bar popover or a notification after it was closed.
+ * Dock, a second launch or a notification after it was closed.
  */
 
 import { app, BrowserWindow, shell } from "electron";
 
 import { logger } from "../logger.js";
+import { hostOS } from "../os/index.js";
 import { attachBrowser } from "../services/browser.js";
 import { getPreloadPath, getWindowUrl } from "./window-paths.js";
 import { savedFrame, trackFrame } from "./window-state.js";
 
 const FRAME_KEY = "main";
-/** The renderer's --workspace-topbar-height: the traffic lights sit centered in it. */
-const TOPBAR_HEIGHT = 42;
-const WINDOW_BUTTON_RADIUS = 7;
 
 let mainWindow: BrowserWindow | null = null;
 let creating: Promise<BrowserWindow> | null = null;
@@ -54,7 +52,10 @@ export async function createMainWindow(): Promise<BrowserWindow> {
 
   creating = (async () => {
     const frame = savedFrame(FRAME_KEY);
+    // Its frame is the OS's: macOS's glass and traffic lights, Linux's controls.
+    const chrome = hostOS.mainWindowOptions();
     const win = new BrowserWindow({
+      ...chrome,
       width: frame?.width ?? 1180,
       height: frame?.height ?? 780,
       ...(frame ? { x: frame.x, y: frame.y } : {}),
@@ -62,24 +63,13 @@ export async function createMainWindow(): Promise<BrowserWindow> {
       minHeight: 520,
       title: app.getName(),
       show: false,
-      titleBarStyle: "hiddenInset",
-      trafficLightPosition: { x: 14, y: TOPBAR_HEIGHT / 2 - WINDOW_BUTTON_RADIUS },
-      // Native glass: the renderer keeps its base layers transparent and
-      // paints a translucent frame over the vibrancy material.
-      transparent: true,
-      backgroundColor: "#00000000",
-      vibrancy: "sidebar",
-      visualEffectState: "followWindow",
       webPreferences: {
+        ...chrome.webPreferences,
         preload: getPreloadPath(),
         contextIsolation: true,
         nodeIntegration: false,
         sandbox: true,
         spellcheck: true,
-        // macOS rubber-banding, off in Electron by default: scrollers (the
-        // mailbox pages' swipe included) stretch past their ends, harder
-        // the further, like any Mac app.
-        scrollBounce: true,
         // The agent panel's browser tabs (services/browser.ts vets each one).
         webviewTag: true,
       },
@@ -87,6 +77,7 @@ export async function createMainWindow(): Promise<BrowserWindow> {
     mainWindow = win;
     if (frame?.maximized) win.maximize();
     trackFrame(FRAME_KEY, win);
+    hostOS.windowFollowsTheme(win);
     openLinksExternally(win);
     attachBrowser(win);
 

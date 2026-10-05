@@ -4,8 +4,9 @@
  * (see scripts/build-desktop-artifact.ts); only stable releases are offered.
  *
  * A new version downloads in the background as soon as it's found. The
- * sidebar then offers "Restart to update", and it also installs whenever the
- * app quits (⌘Q, Dock → Quit, logging out).
+ * sidebar then offers "Restart to update"; on macOS it also installs whenever
+ * the app quits (⌘Q, Dock → Quit, logging out). On Linux the update is the
+ * .deb, which dpkg installs with the admin password (HostOS).
  */
 
 import { app, ipcMain } from "electron";
@@ -17,6 +18,7 @@ import { UPDATE_STATE_CHANNEL, type UpdateState } from "@otter-mail/contracts";
 
 import { broadcast } from "./ipc.js";
 import { logger } from "./logger.js";
+import { hostOS } from "./os/index.js";
 
 const { autoUpdater } = electronUpdater;
 
@@ -117,7 +119,7 @@ export function initUpdates(): void {
 
   autoUpdater.logger = null;
   autoUpdater.autoDownload = true;
-  autoUpdater.autoInstallOnAppQuit = true;
+  autoUpdater.autoInstallOnAppQuit = hostOS.installsUpdatesOnQuit;
   autoUpdater.allowPrerelease = false;
   autoUpdater.allowDowngrade = false;
 

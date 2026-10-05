@@ -2,7 +2,8 @@
 
 ## Prerequisites
 
-- An Apple Silicon Mac with macOS 26 or newer (the translator uses Apple's Translation framework).
+- An Apple Silicon Mac with macOS 26 or newer (the translator uses Apple's Translation framework),
+  or Linux (Debian 12+, Ubuntu 22.04+) for everything but the translator and the iPhone app.
 - Node 24 (`engines` in `package.json`) and pnpm 11 via `corepack enable`.
 - Full Xcode 26 or newer, selected with `sudo xcode-select -s /Applications/Xcode.app`, to build
   `native/translator`. Without it the app still runs; translation just fails.
@@ -27,12 +28,22 @@
 | `pnpm typecheck`         | TypeScript across the workspace.                                                         |
 | `pnpm lint` / `pnpm fmt` | Oxlint and Oxfmt through Vite+.                                                          |
 | `pnpm dist:desktop:dmg`  | Unsigned DMG + ZIP for this Mac's architecture in `release/`.                            |
+| `pnpm dist:desktop:deb`  | The Linux .deb (x64) in `release/`; on Linux.                                            |
 
 The dev commands pick ports from the worktree path, so several checkouts can run at once. Set
 `OTTER_MAIL_PORT_OFFSET` to choose one yourself. `t3.json` sets up new T3 Code worktrees (install,
 then symlinks to the main checkout's `.env.local` and `infra/relay/.dev.vars`) and offers both dev
 commands as scripts. These files are shared, so editing them in a worktree changes the main
 checkout's copy too.
+
+## Linux
+
+What differs between macOS and Linux lives in `apps/desktop/src/os` (`HostOS`); a new
+OS-specific behavior goes there, with a method on the interface both implement, rather than a
+`process.platform` check elsewhere. `pnpm dev:desktop` and `pnpm start` run on Linux as on a
+Mac. Without a keyring the desktop knows (GNOME Keyring, KWallet), secrets are sealed with an
+app key: run under GNOME or KDE, or set `XDG_CURRENT_DESKTOP=GNOME` with gnome-keyring running,
+to exercise the keyring.
 
 ## Agent development
 

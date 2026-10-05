@@ -1,18 +1,17 @@
 /**
- * Default-mail-app inspection and selection. Electron only covers
- * registering *this* app (`app.setAsDefaultProtocolClient`), so enumerating
- * installed mailto handlers and handing the default to another app goes
- * through LaunchServices via osascript/JXA. Values cross into the scripts as
- * argv, never by string interpolation.
+ * The Mac's mail apps (HostOS.mailApps). Electron only covers registering
+ * *this* app (`app.setAsDefaultProtocolClient`), so enumerating installed
+ * mailto handlers and handing the default to another app goes through
+ * LaunchServices via osascript/JXA. An app's id is its bundle identifier.
+ * Values cross into the scripts as argv, never by string interpolation.
  */
 
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
-const execFileAsync = promisify(execFile);
+import type { MailApps } from "../types.js";
 
-export type MailApp = { bundleId: string; name: string; path: string };
-export type MailAppsResult = { apps: MailApp[]; defaultBundleId: string | null };
+const execFileAsync = promisify(execFile);
 
 async function runJxa(script: string, args: string[] = []): Promise<string> {
   const { stdout } = await execFileAsync("/usr/bin/osascript", [
@@ -44,7 +43,7 @@ function run() {
     const bundleId = bundleIdAt(u);
     if (!bundleId) continue;
     apps.push({
-      bundleId,
+      id: bundleId,
       path: u.path.js,
       name: fm.displayNameAtPath(u.path).js.replace(/\\.app$/, ""),
     });
@@ -52,7 +51,7 @@ function run() {
   const def = ws.URLForApplicationToOpenURL(url);
   return JSON.stringify({
     apps,
-    defaultBundleId: def.isNil() ? null : bundleIdAt(def),
+    defaultId: def.isNil() ? null : bundleIdAt(def),
   });
 }
 `;
@@ -65,18 +64,18 @@ function run(argv) {
 }
 `;
 
-export async function listMailApps(): Promise<MailAppsResult> {
-  const parsed = JSON.parse(await runJxa(LIST_SCRIPT)) as MailAppsResult;
+export async function listMailApps(): Promise<MailApps> {
+  const parsed = JSON.parse(await runJxa(LIST_SCRIPT)) as MailApps;
   const seen = new Set<string>();
   const apps = parsed.apps.filter((a) => {
-    if (seen.has(a.bundleId)) return false;
-    seen.add(a.bundleId);
+    if (seen.has(a.id)) return false;
+    seen.add(a.id);
     return true;
   });
-  return { apps, defaultBundleId: parsed.defaultBundleId };
+  return { apps, defaultId: parsed.defaultId };
 }
 
-export async function setDefaultMailHandler(bundleId: string): Promise<void> {
+export async function setDefaultMailApp(bundleId: string): Promise<void> {
   const { status } = JSON.parse(await runJxa(SET_SCRIPT, [bundleId])) as { status: number };
   if (status !== 0) {
     throw new Error(`LSSetDefaultHandlerForURLScheme failed with status ${status}`);

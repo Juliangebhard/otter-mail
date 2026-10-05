@@ -28,6 +28,7 @@ import {
 } from "./settings-ui";
 import { searchableSetting } from "./settings-search";
 import { features } from "../features";
+import { osNames } from "../os-names";
 import { Btn } from "../gmail/ui";
 import { requestTour, startSetup } from "../onboarding/onboarding";
 import { requestProblemReport } from "../support/report-problem";
@@ -73,11 +74,10 @@ function GeneralPane() {
     getAdvanceDirection(),
   );
   const [launchAtLogin, setLaunchAtLogin] = useState(DEFAULT_SETTINGS.launchAtLogin);
-  const [trayEnabled, setTrayEnabled] = useState(DEFAULT_SETTINGS.trayEnabled);
   const [railDots, setRailDots] = useRailUnreadDots();
   const [dockBadge, setDockBadge] = useState(DEFAULT_SETTINGS.dockBadgeEnabled);
-  const [mailApps, setMailApps] = useState<MailApp[]>([]);
-  const [defaultMailBundleId, setDefaultMailBundleId] = useState<string | null>(null);
+  const [mailApps, setMailApps] = useState<MailApp[] | null>(null);
+  const [defaultMailAppId, setDefaultMailAppId] = useState<string | null>(null);
 
   const loadSyncSettings = async () => {
     console.log("[Settings:loadSyncSettings]");
@@ -86,7 +86,6 @@ function GeneralPane() {
       setSyncInterval(settings.syncIntervalSeconds);
       setNotificationsMode(settings.notificationsMode);
       setLaunchAtLogin(settings.launchAtLogin);
-      setTrayEnabled(settings.trayEnabled);
       setDockBadge(settings.dockBadgeEnabled);
     } catch (error) {
       toast.error(`Failed to load sync settings: ${error}`);
@@ -98,7 +97,7 @@ function GeneralPane() {
     try {
       const result = await gmailApi.listMailApps();
       setMailApps(result.apps);
-      setDefaultMailBundleId(result.defaultBundleId);
+      setDefaultMailAppId(result.defaultId);
     } catch (error) {
       console.log("[Settings:listMailApps] failed", { error: String(error) });
     }
@@ -164,17 +163,6 @@ function GeneralPane() {
     }
   };
 
-  const handleTrayEnabledChange = async (checked: boolean) => {
-    setTrayEnabled(checked);
-    console.log("[Settings:setTrayEnabled]", { checked });
-    try {
-      await gmailApi.setSyncSettings({ trayEnabled: checked });
-    } catch (error) {
-      toast.error(`Failed to save menu-bar icon setting: ${error}`);
-      void loadSyncSettings();
-    }
-  };
-
   const handleDockBadgeChange = async (checked: boolean) => {
     setDockBadge(checked);
     console.log("[Settings:setDockBadgeEnabled]", { checked });
@@ -186,11 +174,11 @@ function GeneralPane() {
     }
   };
 
-  const handleDefaultMailChange = async (bundleId: string) => {
-    setDefaultMailBundleId(bundleId);
-    console.log("[Settings:setDefaultMailApp]", { bundleId });
+  const handleDefaultMailChange = async (id: string) => {
+    setDefaultMailAppId(id);
+    console.log("[Settings:setDefaultMailApp]", { id });
     try {
-      await gmailApi.setDefaultMailApp(bundleId);
+      await gmailApi.setDefaultMailApp(id);
     } catch (error) {
       toast.error(`Failed to change default mail app: ${error}`);
     }
@@ -215,9 +203,9 @@ function GeneralPane() {
 
   return (
     <SettingsPageContainer title="General">
-      {/* What only the Mac app has isn't shown elsewhere. */}
-      {features.launchAtLogin || features.menuBar || features.dockBadge ? (
-        <SettingsSection title="Startup, Dock & menu bar">
+      {/* What only the desktop app has isn't shown elsewhere. */}
+      {features.launchAtLogin || features.dockBadge ? (
+        <SettingsSection title={features.dockBadge ? "Startup & Dock" : "Startup"}>
           {features.launchAtLogin ? (
             <SettingsRow
               {...searchableSetting("launch-at-login")}
@@ -229,33 +217,12 @@ function GeneralPane() {
                   />
                 ) : null
               }
-              description="Open Otter Mail automatically when you log in to your Mac."
+              description={`Open Otter Mail automatically when you log in to your ${osNames.computer}.`}
               control={
                 <Switch
                   id="launchAtLogin"
                   checked={launchAtLogin}
                   onCheckedChange={(checked) => void handleLaunchAtLoginChange(checked)}
-                />
-              }
-            />
-          ) : null}
-          {features.menuBar ? (
-            <SettingsRow
-              {...searchableSetting("menu-bar-icon")}
-              resetAction={
-                trayEnabled !== DEFAULT_SETTINGS.trayEnabled ? (
-                  <SettingResetButton
-                    label="menu bar icon"
-                    onClick={() => void handleTrayEnabledChange(DEFAULT_SETTINGS.trayEnabled)}
-                  />
-                ) : null
-              }
-              description="An Otter Mail icon in the menu bar with a quick unread inbox view."
-              control={
-                <Switch
-                  id="trayEnabled"
-                  checked={trayEnabled}
-                  onCheckedChange={(checked) => void handleTrayEnabledChange(checked)}
                 />
               }
             />
@@ -363,12 +330,14 @@ function GeneralPane() {
         <SettingsSection title="System">
           <SettingsRow
             {...searchableSetting("default-mail-app")}
-            description="Which app opens mailto: links across macOS."
+            description={`Which app opens mailto: links across ${osNames.system}.`}
             control={
               <RowSelect
-                value={defaultMailBundleId ?? undefined}
+                value={defaultMailAppId ?? undefined}
                 onValueChange={(v) => void handleDefaultMailChange(v)}
-                options={mailApps.map((app) => ({ value: app.bundleId, label: app.name }))}
+                options={(mailApps ?? []).map((app) => ({ value: app.id, label: app.name }))}
+                // Linux may have no mail app at all, or none set as the default.
+                placeholder={mailApps ? "None" : undefined}
                 ariaLabel="Default email app"
               />
             }

@@ -975,43 +975,6 @@ export function countInboxUnreadAll(except: ReadonlySet<string> = new Set()): nu
   return rows.reduce((sum, r) => (except.has(r.accountId) ? sum : sum + r.n), 0);
 }
 
-/** Total unread INBOX messages for a single account — drives the tray menu sublabels. */
-export function countInboxUnreadForAccount(accountId: string): number {
-  const d = getDb();
-  const row = d
-    .prepare(`
-      SELECT COUNT(*) AS n
-        FROM messages m
-        JOIN message_labels ml
-          ON ml.accountId = m.accountId AND ml.messageId = m.id AND ml.labelId = 'INBOX'
-       WHERE m.unread = 1 AND m.accountId = ?
-    `)
-    .get(accountId) as unknown as { n: number } | undefined;
-  return row?.n ?? 0;
-}
-
-/** Most recent INBOX threads for a single account — the tray popover's mini inbox. `unreadOnly` restricts to unread threads (the popover's default "Unread" mode); pass false for its "All" mode. */
-export function listInboxPreview(
-  accountId: string,
-  limit: number,
-  unreadOnly: boolean,
-): GmailMessageSummary[] {
-  const d = getDb();
-  const unreadClause = unreadOnly ? "AND m.unread = 1" : "";
-  const rows = d
-    .prepare(
-      threadPageQuery(`
-        SELECT DISTINCT m.accountId AS accountId, m.threadId AS threadId
-          FROM messages m
-          JOIN message_labels ml
-            ON ml.accountId = m.accountId AND ml.messageId = m.id
-         WHERE m.accountId = ? AND ml.labelId = 'INBOX' ${unreadClause} AND ${NOT_SPAM_TRASH}
-      `),
-    )
-    .all(accountId, limit, 0) as unknown as ThreadRow[];
-  return rows.map(rowToThreadSummary);
-}
-
 export function countMessagesForLabel(accountId: string, labelId: string): number {
   const d = getDb();
   const row = d

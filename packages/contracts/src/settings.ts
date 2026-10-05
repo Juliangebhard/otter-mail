@@ -9,8 +9,6 @@ export type AppSettings = {
   notificationsMode: NotificationsMode;
   /** Automatically open the app when the user logs in. */
   launchAtLogin: boolean;
-  /** Show the menu-bar icon and mini-inbox popover (opt-in). */
-  trayEnabled: boolean;
   /** Show the unread count on the Dock icon (Mac app). */
   dockBadgeEnabled: boolean;
   /** Languages the user reads (BCP-47 codes, first = where translations go).
@@ -24,7 +22,6 @@ export const DEFAULT_SETTINGS: AppSettings = {
   syncIntervalSeconds: 30,
   notificationsMode: "inbox",
   launchAtLogin: false,
-  trayEnabled: false,
   dockBadgeEnabled: false,
   readLanguages: [],
   autoTranslate: false,

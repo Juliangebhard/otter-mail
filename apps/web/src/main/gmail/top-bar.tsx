@@ -1,11 +1,9 @@
 import type { ReactNode } from "react";
-import { DropdownMenu as RadixMenu } from "radix-ui";
 import { useRouter, type RouterHistory } from "@tanstack/react-router";
 import { useSyncExternalStore } from "react";
 import {
   ArchiveXIcon,
   BookmarkIcon,
-  ChevronDownIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
   ClockIcon,
@@ -22,10 +20,9 @@ import {
   TagIcon,
   Trash2Icon,
 } from "lucide-react";
-import { IconBtn, HintTooltip, UnreadPill, cn, restoreFocusForKeyboardOnly } from "./ui";
+import { IconBtn, HintTooltip, cn } from "./ui";
 import { COMBINED_ACCOUNT_ID } from "./custom-views";
 import { getAccountDisplayName } from "./account-style";
-import { AccountPicture } from "./account-picture";
 import { useAllAccountLabels } from "./hooks";
 import {
   DropdownMenu,
@@ -264,9 +261,14 @@ export function PanelControl({ open, onToggle }: { open: boolean; onToggle: () =
   );
 }
 
-/** Room left in a band for the pinned panel toggle. */
+/** Room left in a band for the pinned panel toggle, and the window controls beside it. */
 export function PanelControlSlot() {
-  return <span aria-hidden className="w-(--workspace-titlebar-control-size) shrink-0" />;
+  return (
+    <span
+      aria-hidden
+      className="w-[calc(var(--workspace-titlebar-control-size)+var(--workspace-window-controls-width))] shrink-0"
+    />
+  );
 }
 
 /**
@@ -314,20 +316,6 @@ export function SidebarTitle() {
   return <div className="drag-region h-(--workspace-topbar-height) shrink-0" />;
 }
 
-/** Round mark for a mailbox: the account's picture, or its initial; layers for All mailboxes. */
-function MailboxMark({
-  account,
-  iconClassName,
-}: {
-  account: GmailAccount | null;
-  iconClassName?: string;
-}) {
-  if (!account) {
-    return <LayersIcon className={cn("size-4.5 shrink-0", iconClassName)} aria-hidden />;
-  }
-  return <AccountPicture account={account} className="size-4.5 text-[9px]" />;
-}
-
 type MailboxOption = { id: string; account: GmailAccount | null; name: string; shortcut: string };
 
 /** The mailboxes to switch between, in ⌘1… order: All mailboxes (when on), then each account. */
@@ -359,88 +347,6 @@ export function useInboxUnread(accounts: GmailAccount[]): Record<string, number>
   );
   const total = Object.values(counts).reduce((sum, n) => sum + n, 0);
   return { ...counts, [COMBINED_ACCOUNT_ID]: total };
-}
-
-/** Mailbox switcher, the menu-bar popover's heading. */
-export function MailboxSwitcher({
-  accounts,
-  selectedAccountId,
-  onSelectAccount,
-  className,
-}: {
-  accounts: GmailAccount[];
-  selectedAccountId: string | null;
-  onSelectAccount: (accountId: string) => void;
-  className?: string;
-}) {
-  const options = useMailboxOptions(accounts);
-  const unread = useInboxUnread(accounts);
-  const isCombined = selectedAccountId === COMBINED_ACCOUNT_ID;
-  const selectedAccount = isCombined
-    ? null
-    : (accounts.find((a) => a.id === selectedAccountId) ?? null);
-  const mailboxName = isCombined
-    ? "All mailboxes"
-    : selectedAccount
-      ? getAccountDisplayName(selectedAccount)
-      : "Mailbox";
-  return (
-    <RadixMenu.Root>
-      <RadixMenu.Trigger asChild>
-        <button
-          type="button"
-          aria-label="Switch mailbox"
-          className={cn(
-            "group/switcher flex h-9 w-full min-w-0 cursor-pointer items-center gap-2 rounded-lg px-(--sidebar-row-content-inset) text-left text-sidebar-foreground outline-none hover:bg-sidebar-row-hover focus-visible:ring-2 focus-visible:ring-focus-ring data-[state=open]:bg-sidebar-row-hover",
-            className,
-          )}
-        >
-          <span className="flex size-4.5 shrink-0 items-center justify-center">
-            <MailboxMark account={selectedAccount} iconClassName="text-sidebar-muted-foreground" />
-          </span>
-          {/* A heading, like Codex's "Codex ⌄": the name, then its chevron. */}
-          <span className="min-w-0 truncate text-base font-semibold tracking-tight">
-            {mailboxName}
-          </span>
-          <ChevronDownIcon
-            className="size-4 shrink-0 text-sidebar-muted-foreground transition-transform group-data-[state=open]/switcher:rotate-180"
-            aria-hidden
-          />
-        </button>
-      </RadixMenu.Trigger>
-      <RadixMenu.Portal>
-        <RadixMenu.Content
-          align="start"
-          sideOffset={4}
-          onCloseAutoFocus={restoreFocusForKeyboardOnly}
-          className="dropdown-glass z-[130] w-(--radix-dropdown-menu-trigger-width) min-w-52 rounded-lg p-1 text-foreground shadow-[0_16px_40px_-18px_rgb(0_0_0/55%)] outline-none dark:shadow-[0_18px_44px_-18px_rgb(0_0_0/80%)]"
-        >
-          {options.map((option) => {
-            const selected = option.id === (selectedAccountId ?? "");
-            return (
-              <RadixMenu.Item
-                key={option.id}
-                onSelect={() => onSelectAccount(option.id)}
-                className={cn(
-                  "flex min-h-8 cursor-pointer select-none items-center gap-2 rounded-md px-2 py-1 text-sm outline-none data-[highlighted]:bg-accent-surface data-[highlighted]:text-foreground",
-                  selected && "bg-foreground/[0.08]",
-                )}
-              >
-                <span className="flex size-4.5 shrink-0 items-center justify-center">
-                  <MailboxMark account={option.account} iconClassName="text-muted-foreground" />
-                </span>
-                <span className="min-w-0 flex-1 truncate">{option.name}</span>
-                <UnreadPill count={unread[option.id] ?? 0} />
-                <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-                  {option.shortcut}
-                </span>
-              </RadixMenu.Item>
-            );
-          })}
-        </RadixMenu.Content>
-      </RadixMenu.Portal>
-    </RadixMenu.Root>
-  );
 }
 
 /**

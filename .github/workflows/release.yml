@@ -154,9 +154,57 @@ jobs:
           retention-days: 7
           compression-level: 0
 
+  build_linux:
+    name: Build Linux (.deb, x64 and arm64)
+    needs: [preflight]
+    # The app is bundled JavaScript on Electron: one runner packages both
+    # architectures (electron-builder fetches each one's Electron).
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.preflight.outputs.ref }}
+
+      - name: Setup Vite+
+        uses: voidzero-dev/setup-vp@v1
+        with:
+          node-version-file: package.json
+          cache: true
+          run-install: true
+
+      - name: Build desktop artifacts
+        shell: bash
+        env:
+          VERSION: ${{ needs.preflight.outputs.version }}
+          OTTER_MAIL_GOOGLE_CLIENT_ID: ${{ vars.OTTER_MAIL_GOOGLE_CLIENT_ID }}
+          OTTER_MAIL_GOOGLE_CLIENT_SECRET: ${{ secrets.OTTER_MAIL_GOOGLE_CLIENT_SECRET }}
+          OTTER_MAIL_GOOGLE_LEGACY_CLIENT_ID: ${{ vars.OTTER_MAIL_GOOGLE_LEGACY_CLIENT_ID }}
+          OTTER_MAIL_GOOGLE_LEGACY_CLIENT_SECRET: ${{ secrets.OTTER_MAIL_GOOGLE_LEGACY_CLIENT_SECRET }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$OTTER_MAIL_GOOGLE_CLIENT_ID" || -z "$OTTER_MAIL_GOOGLE_CLIENT_SECRET" ]]; then
+            echo "::error::Set the OTTER_MAIL_GOOGLE_CLIENT_ID variable and OTTER_MAIL_GOOGLE_CLIENT_SECRET secret; without them the app can't sign in to Google."
+            exit 1
+          fi
+          node scripts/build-desktop-artifact.ts --platform linux --arch x64 --build-version "$VERSION"
+          node scripts/build-desktop-artifact.ts --platform linux --arch arm64 --build-version "$VERSION" --skip-build
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: desktop-linux
+          path: |
+            release/*.deb
+            release/*.yml
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
+
   release:
     name: Publish GitHub release
-    needs: [preflight, build_mac]
+    needs: [preflight, build_mac, build_linux]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
@@ -178,10 +226,13 @@ jobs:
       - name: Changelog note
         run: node scripts/changelog-release-notes.ts "${{ needs.preflight.outputs.version }}" > "$RUNNER_TEMP/notes.md"
 
+      # Mac and Linux side by side: their update feeds are latest-mac.yml,
+      # latest-linux.yml and latest-linux-arm64.yml.
       - name: Download artifacts
         uses: actions/download-artifact@v8
         with:
-          name: desktop-mac
+          pattern: desktop-*
+          merge-multiple: true
           path: release-assets
 
       - name: Publish release

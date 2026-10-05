@@ -28,6 +28,7 @@ import { broadcast } from "../ipc.js";
 import { logger } from "../logger.js";
 import { extensionMenuItems, reachOf, setupExtensions, trackTab } from "./extensions.js";
 import { parseMailtoUrl, setPendingMailto } from "./mailto-target.js";
+import { hostOS } from "../os/index.js";
 
 export const BROWSER_PARTITION = "persist:browser";
 
@@ -167,17 +168,22 @@ export function attachBrowser(win: BrowserWindow): void {
     trackTab(page);
     // A focused guest page's keys never reach the panel's dispatcher.
     page.on("before-input-event", (event, input) => {
+      // ⇧⌘B (Ctrl+Shift+B off the Mac).
+      const mod = hostOS.modifierKey === "metaKey";
       if (
         input.type === "keyDown" &&
         input.key.toLowerCase() === "b" &&
-        input.meta &&
+        (mod ? input.meta && !input.control : input.control && !input.meta) &&
         input.shift &&
-        !input.control &&
         !input.alt
       ) {
         event.preventDefault();
         if (!win.isDestroyed())
-          win.webContents.send("keybindings:keydown", { key: "b", metaKey: true, shiftKey: true });
+          win.webContents.send("keybindings:keydown", {
+            key: "b",
+            [hostOS.modifierKey]: true,
+            shiftKey: true,
+          });
         return;
       }
       if (

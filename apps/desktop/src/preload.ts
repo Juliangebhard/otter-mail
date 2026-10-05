@@ -14,6 +14,8 @@ import {
   type UpdateState,
 } from "@otter-mail/contracts";
 
+import { featuresFor } from "./os/features.js";
+
 function subscribe(channel: string, listener: (params: unknown) => void): () => void {
   const handler = (_event: IpcRendererEvent, params: unknown) => listener(params);
   ipcRenderer.on(channel, handler);
@@ -24,20 +26,8 @@ function subscribe(channel: string, listener: (params: unknown) => void): () => 
 
 const bridge: DesktopBridge = {
   platform: process.platform,
-  features: {
-    trafficLights: true,
-    historyButtons: true,
-    menuBar: true,
-    launchAtLogin: true,
-    dockBadge: true,
-    defaultMailApp: true,
-    translation: true,
-    dragOut: true,
-    openFiles: true,
-    externalAgent: true,
-    localAgents: true,
-    browser: true,
-  },
+  // What this OS's app can do; the renderer hides the rest.
+  features: featuresFor(process.platform),
   invoke: <T>(channel: string, params?: unknown) =>
     ipcRenderer.invoke(channel, params) as Promise<T>,
   on: subscribe,

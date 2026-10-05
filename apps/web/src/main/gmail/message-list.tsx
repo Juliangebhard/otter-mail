@@ -87,6 +87,7 @@ import { beginUndoGroup, clearUndo } from "./undo";
 import { isMoveSourceLabel, setThreadDragImage, writeThreadDrag } from "./thread-drag";
 import { useProjectThreads } from "./projects";
 import { AddToProjectItems } from "./project-menus";
+import { isModClick } from "../keybindings/keys";
 
 type ResolveLabel = (accountId: string | undefined, labelId: string) => GmailLabel | undefined;
 
@@ -1176,10 +1177,10 @@ export function MessageList({
   };
 
   const handleRowClick = (e: React.MouseEvent, message: GmailMessageSummary) => {
-    // Cmd+click (or Option+click) adds/removes one row, Finder-style. The
-    // open message counts as already selected, so the first Cmd+click keeps
-    // it instead of starting over.
-    if ((e.metaKey || e.altKey) && !e.shiftKey) {
+    // ⌘-click (Ctrl-click off the Mac, or Option/Alt-click) adds/removes one
+    // row, Finder-style. The open message counts as already selected, so the
+    // first such click keeps it instead of starting over.
+    if ((isModClick(e) || e.altKey) && !e.shiftKey) {
       if (
         checkedRef.current.size === 0 &&
         selectedMessageId &&

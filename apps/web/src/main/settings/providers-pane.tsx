@@ -59,6 +59,7 @@ import {
   useFollowUpBehavior,
   type FollowUpBehavior,
 } from "../gmail/chat-queue";
+import { shortcutText } from "../keybindings/keys";
 
 function useNow(intervalMs: number): number {
   const [now, setNow] = useState(() => Date.now());
@@ -644,7 +645,7 @@ function AgentEditor({
               />
             ) : null
           }
-          description="Default for new turns; also switchable from the composer (⇧⌘A)."
+          description={`Default for new turns; also switchable from the composer (${shortcutText("mod+shift+a")}).`}
           control={
             <Select
               value={settings.runtimeMode}
@@ -834,7 +835,7 @@ function FollowUpSection() {
             />
           ) : null
         }
-        description="Queue follow-ups while the agent runs or steer the current run. Press ⌘ + Enter to do the opposite for one message."
+        description={`Queue follow-ups while the agent runs or steer the current run. Press ${shortcutText("mod+enter")} to do the opposite for one message.`}
         control={
           <Select
             value={behavior}

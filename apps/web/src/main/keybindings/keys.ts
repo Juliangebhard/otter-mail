@@ -245,6 +245,19 @@ export function formatShortcut(shortcut: Shortcut): string {
   return shortcut.map((s) => strokeTokens(s).join(isMacPlatform ? "" : "+")).join(" then ");
 }
 
+/** A fixed shortcut written into copy, in this computer's keys: "mod+k" → `⌘K` or `Ctrl+K`. */
+export function shortcutText(value: string): string {
+  const shortcut = parseShortcut(value);
+  return shortcut ? formatShortcut(shortcut) : value;
+}
+
+/** The shortcut modifier's name in copy ("⌘-click", "Ctrl-click"). */
+export const modKeyName = isMacPlatform ? "⌘" : "Ctrl";
+
+/** A click with the shortcut modifier held: ⌘ on a Mac, Ctrl elsewhere. */
+export const isModClick = (event: { metaKey: boolean; ctrlKey: boolean }) =>
+  isMacPlatform ? event.metaKey : event.ctrlKey;
+
 // ── `when` expressions ───────────────────────────────────────────────────────
 
 export type WhenNode =

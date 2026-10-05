@@ -26,12 +26,14 @@
   --sidebar-content-inset: 0.5rem;
   --sidebar-control-gap: 0.5rem;
   --sidebar-row-content-inset: 0.625rem;
-  /* Thin chrome, like Linear's: the traffic lights sit centered in it (main-window.ts). */
+  /* Thin chrome, like Linear's: the window controls sit centered in it (apps/desktop/src/os). */
   --workspace-topbar-height: 42px;
   /* Otter Code's titlebar anchors: the sidebar and agent toggles sit at
      these window positions whatever the panes do; headers leave room. */
   --workspace-controls-left: 82px;
   --workspace-controls-right: 1rem;
+  /* Window controls at the top bar's right end (Linux's); the rightmost band leaves them room. */
+  --workspace-window-controls-width: 0px;
   --workspace-titlebar-control-size: 1.75rem;
   --workspace-titlebar-control-gap: 0.5rem;
   /* Recently viewed, back and forward after the pinned toggle (the Mac app's
@@ -131,11 +133,20 @@
   --chat-composer-highlight: transparent;
 }
 
-/* A browser tab has no traffic lights to clear: the sidebar toggle sits over the rail. */
-html[data-platform="web"] {
+/* No traffic lights to clear (a browser tab, Linux): the sidebar toggle sits over the rail. */
+html:not([data-window-controls="left"]) {
   --workspace-controls-left: calc(
     (var(--workspace-rail-width) - var(--workspace-titlebar-control-size)) / 2
   );
+}
+/* Linux's minimize, maximize and close sit at the top bar's right end: what
+   pins there (the agent panel toggle) moves left of them. The title bar area
+   is the window controls overlay's (os/linux main window). */
+html[data-window-controls="right"] {
+  --workspace-window-controls-width: calc(
+    100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw)
+  );
+  --workspace-controls-right: calc(var(--workspace-window-controls-width) + 0.5rem);
 }
 .dark {
   --glass-blur: 16px;

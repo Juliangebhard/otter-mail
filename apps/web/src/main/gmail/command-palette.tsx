@@ -69,6 +69,7 @@ import { useProjects } from "./projects";
 import { PROJECTS_SPACE } from "./spaces";
 import { ViewMark } from "./view-icon";
 import { requestNewProject } from "./project-menus";
+import { shortcutText } from "../keybindings/keys";
 
 /**
  * Command palette (⌘K), modeled on Otter Code's: a frosted card anchored near
@@ -362,7 +363,7 @@ export function CommandPalette({
         id: "settings",
         icon: <SettingsIcon className={ICON} />,
         title: "Settings",
-        shortcut: "⌘,",
+        shortcut: shortcutText("mod+,"),
         run: () => onOpenSettings(),
       },
       {

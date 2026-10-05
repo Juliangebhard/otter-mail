@@ -1,8 +1,8 @@
 /**
- * A conversation another surface (the menu-bar popover, a notification) asked
- * the main window to open. The main window pulls it via `window:takePendingOpenMessage` on
- * mount and whenever `mail:open` is broadcast — the same handoff used for
- * settings deep links and mailto: targets.
+ * A conversation a notification asked the main window to open. The main
+ * window pulls it via `window:takePendingOpenMessage` on mount and whenever
+ * `mail:open` is broadcast — the same handoff used for settings deep links
+ * and mailto: targets.
  */
 export type OpenMessageTarget = { accountId: string; messageId: string };
 

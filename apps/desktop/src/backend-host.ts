@@ -2,7 +2,7 @@
  * Runs the mail backend (backend.ts: @otter-mail/core) in an Electron utility
  * process and connects it to the app: the windows' invokes on its channels
  * are forwarded to it, what it broadcasts goes out to every window, and what
- * it asks of main (the Keychain, dialogs, notifications, the Dock) is done
+ * it asks of main (safeStorage, dialogs, notifications, the badge) is done
  * here. A backend that dies is started again. See backend-protocol.ts.
  */
 
@@ -32,8 +32,8 @@ import {
 } from "./backend-protocol.js";
 import { broadcast } from "./ipc.js";
 import { logger } from "./logger.js";
+import { hostOS } from "./os/index.js";
 import { setPendingOpenMessage } from "./services/open-message-target.js";
-import { createTray, destroyTray, setTrayUnread } from "./services/tray.js";
 import { focusMainWindow } from "./windows/main-window.js";
 
 let backend: UtilityProcess | null = null;
@@ -203,7 +203,7 @@ function carryOut(effect: MainEffect): void {
       }
       notification.on("click", () => {
         notificationsAwaitingClick.delete(notification);
-        // The same handoff as a click in the menu-bar popover.
+        // The main window pulls it on mount, or on mail:open.
         if (open) setPendingOpenMessage(open);
         void focusMainWindow().then(() => open && broadcast("mail:open"));
       });
@@ -213,7 +213,6 @@ function carryOut(effect: MainEffect): void {
     case "unread":
       unreadCount = effect.count;
       showDockBadge();
-      setTrayUnread(effect.count);
       return;
     case "settings":
       applySettings(effect.settings, effect.patch);
@@ -228,10 +227,10 @@ let unreadCount = 0;
 let dockBadgeEnabled = false;
 
 function showDockBadge(): void {
-  app.dock?.setBadge(dockBadgeEnabled && unreadCount > 0 ? String(unreadCount) : "");
+  hostOS.setBadge(dockBadgeEnabled ? unreadCount : 0);
 }
 
-/** Shows or hides the Dock badge, keeping the count for when it comes back. */
+/** Shows or hides the unread badge, keeping the count for when it comes back. */
 export function setDockBadgeEnabled(enabled: boolean): void {
   dockBadgeEnabled = enabled;
   showDockBadge();
@@ -243,11 +242,7 @@ function applySettings(settings: AppSettings, patch: Partial<AppSettings>): void
     setDockBadgeEnabled(settings.dockBadgeEnabled);
   }
   if (patch.launchAtLogin !== undefined) {
-    app.setLoginItemSettings({ openAtLogin: settings.launchAtLogin });
-  }
-  if (patch.trayEnabled !== undefined) {
-    if (settings.trayEnabled) void createTray();
-    else destroyTray();
+    hostOS.setLaunchAtLogin(settings.launchAtLogin);
   }
 }
 

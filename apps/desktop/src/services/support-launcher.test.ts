@@ -81,6 +81,7 @@ describe("support handoff", () => {
           homePath,
           model,
           searchPath: process.env.PATH ?? "/usr/bin:/bin",
+          shebang: "#!/bin/sh",
         }),
       );
       await exec(process.platform === "darwin" ? "/bin/zsh" : "/bin/sh", [launcher], {

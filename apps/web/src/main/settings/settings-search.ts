@@ -1,4 +1,5 @@
 import { features } from "../features";
+import { osNames } from "../os-names";
 import type { SettingsPane } from "../gmail/api";
 import { commandLabel, DEFAULT_KEYBINDINGS, KEYBINDING_COMMANDS } from "../keybindings/commands";
 
@@ -80,14 +81,7 @@ export const SETTINGS_SEARCH_ITEMS = [
     title: "Launch at login",
     pane: "general",
     available: features.launchAtLogin,
-    searchTerms: ["startup open automatically log in mac"],
-  },
-  {
-    id: "menu-bar-icon",
-    title: "Show menu-bar icon",
-    pane: "general",
-    available: features.menuBar,
-    searchTerms: ["tray status bar unread inbox popover"],
+    searchTerms: ["startup open automatically log in mac computer"],
   },
   {
     id: "rail-unread-dots",
@@ -366,7 +360,7 @@ export const SETTINGS_SEARCH_ITEMS = [
   },
   {
     id: "connected-agents",
-    title: "Agents on this Mac",
+    title: `Agents on this ${osNames.computer}`,
     pane: "agents",
     available: features.localAgents,
     searchTerms: ["mcp server token connect claude code codex cursor external tools"],

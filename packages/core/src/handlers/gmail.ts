@@ -1371,12 +1371,6 @@ export function registerGmailHandlers(): void {
         }
         patch.launchAtLogin = p.launchAtLogin;
       }
-      if (p?.trayEnabled !== undefined) {
-        if (typeof p.trayEnabled !== "boolean") {
-          throw new Error('Invalid parameter: "trayEnabled" must be a boolean.');
-        }
-        patch.trayEnabled = p.trayEnabled;
-      }
       if (p?.dockBadgeEnabled !== undefined) {
         if (typeof p.dockBadgeEnabled !== "boolean") {
           throw new Error('Invalid parameter: "dockBadgeEnabled" must be a boolean.');

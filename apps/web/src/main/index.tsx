@@ -31,4 +31,8 @@ if (!window.desktopBridge) {
   );
 }
 
+// Where the window's own controls sit; the top bar leaves them room (styles.css).
+document.documentElement.dataset.windowControls =
+  window.desktopBridge.features.windowControls ?? "none";
+
 await import("./app");
