@@ -41,6 +41,7 @@ import {
   useBrowser,
   type BrowserTab,
 } from "./store";
+import { shortcutText } from "../keybindings/keys";
 
 /** Electron's `<webview>`, the parts used here. */
 type Webview = HTMLElement & {
@@ -254,7 +255,7 @@ function BrowserPage({
     <>
       <div className="flex h-12 shrink-0 items-center gap-2 border-b border-border/70 px-3">
         <div className="flex shrink-0 items-center rounded-full bg-foreground/[0.06] p-0.5">
-          <HintTooltip label="Back" hint="⌘[" side="bottom">
+          <HintTooltip label="Back" hint={shortcutText("mod+[")} side="bottom">
             <IconBtn
               label="Back"
               className="rounded-full"
@@ -264,7 +265,7 @@ function BrowserPage({
               <ArrowLeftIcon className="size-4" />
             </IconBtn>
           </HintTooltip>
-          <HintTooltip label="Forward" hint="⌘]" side="bottom">
+          <HintTooltip label="Forward" hint={shortcutText("mod+]")} side="bottom">
             <IconBtn
               label="Forward"
               className="rounded-full"
@@ -282,7 +283,7 @@ function BrowserPage({
               </IconBtn>
             </HintTooltip>
           ) : (
-            <HintTooltip label="Reload" hint="⌘R" side="bottom">
+            <HintTooltip label="Reload" hint={shortcutText("mod+r")} side="bottom">
               <IconBtn
                 label="Reload"
                 className="rounded-full"

@@ -4,18 +4,38 @@ Every user-facing feature and where it works, checked against the code. Mac and 
 same renderer (`apps/web`) over core, so they match unless noted; the iPhone app is its own
 Swift code (`apps/ios`). Gmail and IMAP are noted where they differ.
 The Mac app supports Apple Silicon Macs (arm64).
+The Linux app is the same desktop app; it matches the Mac column except where
+[Linux](#linux) says otherwise.
 
 ✓ supported · — not supported · a note means partly, or differently
 
 An app shows only what it supports: what it doesn't have isn't listed, switched off, or pointed
 to another app. This page is where they're compared.
 
+## Linux
+
+A .deb for Debian 12+ and Ubuntu 22.04+ (x64 and arm64), installed with apt, updating itself
+from GitHub Releases. Everything in the Mac column works the same, except:
+
+| Feature                    | Linux                                                                                       |
+| -------------------------- | ------------------------------------------------------------------------------------------- |
+| Window                     | frameless; minimize, maximize and close over the top bar's right end; no glass              |
+| Shortcuts                  | Ctrl where the Mac uses ⌘, in shortcuts and clicks (shown so everywhere)                    |
+| Closing the window         | quits (no Dock to bring it back); launching it again opens it                               |
+| Open at login              | ✓ (an XDG autostart entry)                                                                  |
+| Default mail app           | ✓ (xdg; the list is the apps that open mailto: links)                                       |
+| Dock badge                 | —                                                                                           |
+| Translation                | — (no on-device translator)                                                                 |
+| Saved passwords and tokens | the desktop's keyring (GNOME Keyring, KWallet); elsewhere sealed with an app key, as Chrome |
+| Updates                    | the .deb; "Restart to update" asks for the admin password (not installed on quit)           |
+| Feedback to a local agent  | ✓ (x-terminal-emulator, or a chosen terminal)                                               |
+
 ## Getting started
 
-| Feature                                                             | Mac                                | Web | iPhone              |
-| ------------------------------------------------------------------- | ---------------------------------- | --- | ------------------- |
-| Setup: a mailbox, the look, notifications, the agent, keys practice | ✓ (plus login, menu bar, mail app) | ✓   | welcome screen only |
-| Tour of the app on your own mail (⌘K, Settings → General)           | ✓                                  | ✓   | —                   |
+| Feature                                                             | Mac                      | Web | iPhone              |
+| ------------------------------------------------------------------- | ------------------------ | --- | ------------------- |
+| Setup: a mailbox, the look, notifications, the agent, keys practice | ✓ (plus login, mail app) | ✓   | welcome screen only |
+| Tour of the app on your own mail (⌘K, Settings → General)           | ✓                        | ✓   | —                   |
 
 ## Mailboxes & accounts
 
@@ -338,7 +358,6 @@ refused to pages.
 
 ## Mac-only
 
-- Menu-bar icon and mini inbox (open, archive, trash, compose, sync).
 - Dock badge (off by default; Settings → General); launch at login; default mail app (mailto: links).
 - Drag attachments out to Finder.
 - Menus: Sync Now, Back / Forward (⌘[ ⌘]).

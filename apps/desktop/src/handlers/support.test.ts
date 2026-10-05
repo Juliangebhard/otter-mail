@@ -17,10 +17,14 @@ vi.mock("electron", () => ({
       fixture.handlers.set(channel, handler),
   },
 }));
-vi.mock("node:child_process", () => ({
-  execFile: (...args: unknown[]) => {
-    fixture.open(args[0], args[1]);
-    (args.at(-1) as (error: null, stdout: string, stderr: string) => void)(null, "", "");
+vi.mock("../os/index.js", () => ({
+  hostOS: {
+    terminals: {
+      list: async () => ({ apps: [], defaultName: "Terminal" }),
+      open: async (launcher: string, terminalId: string | null) =>
+        fixture.open(launcher, terminalId),
+      launcher: { fileName: "Investigate Otter Mail.command", shebang: "#!/bin/zsh -l" },
+    },
   },
 }));
 vi.mock("../backend-host.js", () => ({
@@ -103,7 +107,7 @@ describe("Terminal support handler", () => {
     expect(await fs.readFile(launcher, "utf-8")).not.toContain(body);
     expect((await fs.stat(directory)).mode & 0o777).toBe(0o700);
     expect((await fs.stat(path.join(directory, "prompt.md"))).mode & 0o777).toBe(0o600);
-    expect(fixture.open).toHaveBeenCalledWith("/usr/bin/open", [launcher]);
+    expect(fixture.open).toHaveBeenCalledWith(launcher, null);
     expect(await fixture.handlers.get("support:resumeSession")!(null)).toEqual(session);
     expect(await fixture.handlers.get("support:readDraft")!(null, { id: sessions[0] })).toBeNull();
     await fs.writeFile(

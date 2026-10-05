@@ -1,15 +1,17 @@
 #!/usr/bin/env node
-// Builds the distributable Otter Mail app (DMG + ZIP for macOS) with
-// electron-builder.
+// Builds the distributable Otter Mail app with electron-builder: a DMG + ZIP
+// for macOS (Apple Silicon), or a .deb for Linux (Debian, Ubuntu; x64 or arm64).
 //
 //   node scripts/build-desktop-artifact.ts --platform mac --arch arm64
 //   node scripts/build-desktop-artifact.ts --platform mac --build-version 0.2.0 --signed
+//   node scripts/build-desktop-artifact.ts --platform linux --arch x64
 //
-// Steps: build web + desktop bundles and the arm64 translator, stage a
-// self-contained app directory (package.json, dist-electron/, renderer/, the
-// translator), run electron-builder on it, and copy the artifacts and update
-// manifests into --output-dir. The main process and preload are fully
-// bundled, so the stage has no node_modules.
+// Steps: build web + desktop bundles (and, for macOS, the arm64 translator),
+// stage a self-contained app directory (package.json, dist-electron/,
+// renderer/, the translator), run electron-builder on it, and copy the
+// artifacts and update manifests into --output-dir. The main process and
+// preload are fully bundled, so the stage has no node_modules: a Linux build
+// for either architecture runs on any Linux machine.
 
 import * as NodeChildProcess from "node:child_process";
 import * as NodeFS from "node:fs";
@@ -21,6 +23,9 @@ import { buildTranslator, findTranslatorBinary, repoRoot } from "./build-transla
 
 const APP_ID = "dev.otterware.mail";
 const PRODUCT_NAME = "Otter Mail";
+// Linux: the executable, the .desktop file (otter-mail.desktop) and the package.
+const LINUX_NAME = "otter-mail";
+const MAINTAINER = "Christophe Kafrouni <chris.kafrouni@gmail.com>";
 const DEFAULT_UPDATE_REPOSITORY = "otterware-app/otter-mail";
 
 const desktopDir = NodePath.join(repoRoot, "apps", "desktop");
@@ -31,16 +36,17 @@ const electronBuilderBin = NodePath.join(desktopDir, "node_modules", ".bin", "el
 const HELP = `Usage: node scripts/build-desktop-artifact.ts [options]
 
 Options:
-  --platform mac            Target platform (only mac is supported). Default: mac.
-  --target dmg              Installer target; a zip is always built too (auto-update
-                            needs it). Default: dmg.
-  --arch arm64              Target architecture (Apple Silicon only). Default: arm64.
+  --platform mac|linux      Target platform. Default: mac. Build each on its own OS.
+  --target dmg|zip|deb      Installer target. mac: dmg (default) or zip; a zip is
+                            always built too (auto-update needs it). linux: deb.
+  --arch arm64|x64          Target architecture. mac: arm64 (Apple Silicon only).
+                            linux: x64 (default) or arm64.
   --build-version <v>       App version. Default: apps/desktop/package.json version.
   --output-dir <dir>        Where artifacts are copied. Default: release/.
   --skip-build              Reuse existing apps/web/dist, apps/desktop/dist-electron
                             and translator builds.
   --keep-stage              Keep the temporary staging directory.
-  --signed                  Sign with Developer ID (CSC_LINK and CSC_KEY_PASSWORD, or
+  --signed                  macOS: sign with Developer ID (CSC_LINK and CSC_KEY_PASSWORD, or
                             CSC_NAME for an identity in the keychain) and
                             notarize (APPLE_API_KEY, APPLE_API_KEY_ID,
                             APPLE_API_ISSUER). Unsigned builds are ad hoc.
@@ -56,9 +62,9 @@ Environment:
 `;
 
 interface Options {
-  readonly platform: "mac";
+  readonly platform: "mac" | "linux";
   readonly target: string;
-  readonly arch: "arm64";
+  readonly arch: "arm64" | "x64";
   readonly version: string;
   readonly outputDir: string;
   readonly skipBuild: boolean;
@@ -85,8 +91,8 @@ export function parseOptions(argv: readonly string[]): Options | null {
     args: [...argv],
     options: {
       platform: { type: "string", default: "mac" },
-      target: { type: "string", default: "dmg" },
-      arch: { type: "string", default: "arm64" },
+      target: { type: "string" },
+      arch: { type: "string" },
       "build-version": { type: "string" },
       "output-dir": { type: "string", default: "release" },
       "skip-build": { type: "boolean", default: false },
@@ -98,16 +104,27 @@ export function parseOptions(argv: readonly string[]): Options | null {
   });
   if (values.help) return null;
 
-  if (values.platform !== "mac") {
-    throw new Error(`Unsupported --platform "${values.platform}". Only "mac" is supported.`);
+  const platform = values.platform;
+  if (platform !== "mac" && platform !== "linux") {
+    throw new Error(`Unsupported --platform "${platform}". Use "mac" or "linux".`);
   }
-  if (values.target !== "dmg" && values.target !== "zip") {
-    throw new Error(`Unsupported --target "${values.target}". Use "dmg" (or "zip").`);
-  }
-  if (values.arch !== "arm64") {
-    throw new Error(
-      `Unsupported --arch "${values.arch}". Only Apple Silicon (arm64) is supported.`,
-    );
+  const target = values.target ?? (platform === "mac" ? "dmg" : "deb");
+  const arch = values.arch ?? (platform === "mac" ? "arm64" : "x64");
+  if (platform === "mac") {
+    if (target !== "dmg" && target !== "zip") {
+      throw new Error(`Unsupported --target "${target}" for mac. Use "dmg" (or "zip").`);
+    }
+    if (arch !== "arm64") {
+      throw new Error(
+        `Unsupported --arch "${arch}" for mac. Only Apple Silicon (arm64) is supported.`,
+      );
+    }
+  } else {
+    if (target !== "deb") throw new Error(`Unsupported --target "${target}" for linux. Use "deb".`);
+    if (arch !== "x64" && arch !== "arm64") {
+      throw new Error(`Unsupported --arch "${arch}" for linux. Use "x64" or "arm64".`);
+    }
+    if (values.signed) throw new Error("--signed is for macOS builds.");
   }
   const version =
     values["build-version"]?.trim().replace(/^v/, "") ||
@@ -117,9 +134,9 @@ export function parseOptions(argv: readonly string[]): Options | null {
   }
 
   return {
-    platform: "mac",
-    target: values.target,
-    arch: "arm64",
+    platform,
+    target,
+    arch,
     version,
     outputDir: NodePath.resolve(repoRoot, values["output-dir"]),
     skipBuild: values["skip-build"],
@@ -169,7 +186,16 @@ const ENTITLEMENTS = `<?xml version="1.0" encoding="UTF-8"?>
 </plist>
 `;
 
+/**
+ * On Linux the product name is the install directory (/opt/otter-mail): a
+ * space there breaks xdg-utils, which reads the .desktop file's Exec line
+ * (xdg-mime, xdg-open) and would take the app for missing. People still see
+ * "Otter Mail": the .desktop entry's Name, and the app names itself (paths.ts).
+ */
+const productName = (platform: "mac" | "linux") => (platform === "mac" ? PRODUCT_NAME : LINUX_NAME);
+
 export function createBuildConfig(options: {
+  platform: "mac" | "linux";
   version: string;
   target: string;
   signed: boolean;
@@ -180,7 +206,7 @@ export function createBuildConfig(options: {
   const publish = resolvePublishConfig(options.version, options.env);
   const config: Record<string, unknown> = {
     appId: APP_ID,
-    productName: PRODUCT_NAME,
+    productName: productName(options.platform),
     electronVersion: options.electronVersion,
     artifactName: "Otter-Mail-${version}-${arch}.${ext}",
     electronLanguages: ["en-US"],
@@ -189,20 +215,20 @@ export function createBuildConfig(options: {
     nodeGypRebuild: false,
     files: ["package.json", "dist-electron/**/*", "renderer/**/*", "!**/*.map"],
     directories: { buildResources: "resources", output: "dist" },
-    extraResources: [
-      { from: "bin/translator", to: "bin/translator" },
-      { from: "resources/app-icons", to: "app-icons" },
+    extraResources: [{ from: "resources/app-icons", to: "app-icons" }],
+    // macOS: Info.plist's URL types. Linux: the .desktop file's MimeType, which
+    // lets the app be the default mail app (x-scheme-handler/mailto).
+    protocols: [
+      { name: "Email", schemes: ["mailto"] },
+      { name: PRODUCT_NAME, schemes: ["ottermail"] },
     ],
     mac: {
+      extraResources: [{ from: "bin/translator", to: "bin/translator" }],
       target: options.target === "dmg" ? ["dmg", "zip"] : ["zip"],
       category: "public.app-category.productivity",
       icon: "icon.icns",
       darkModeSupport: true,
       hardenedRuntime: true,
-      protocols: [
-        { name: "Email", schemes: ["mailto"] },
-        { name: PRODUCT_NAME, schemes: ["ottermail"] },
-      ],
       extendInfo: {
         LSApplicationCategoryType: "public.app-category.productivity",
         // Show new-mail notifications as banners that stay out of the way.
@@ -224,6 +250,42 @@ export function createBuildConfig(options: {
             hardenedRuntime: false,
             notarize: false,
           }),
+    },
+    linux: {
+      target: ["deb"],
+      executableName: LINUX_NAME,
+      icon: "icon.png",
+      // The .desktop file's Categories (electron-builder writes it as is).
+      category: "Network;Email;Office",
+      synopsis: "Gmail, calm and fast.",
+      maintainer: MAINTAINER,
+      vendor: "Otterware",
+      // The windows' WM_CLASS / app_id is the package.json's desktopName, which
+      // ties them to otter-mail.desktop (their icon in docks and Alt+Tab) and
+      // names the app to xdg-settings when it becomes the default mail app.
+      syncDesktopName: true,
+      desktop: {
+        entry: {
+          Name: PRODUCT_NAME,
+          Keywords: "mail;email;gmail;imap;",
+        },
+      },
+    },
+    deb: {
+      packageName: LINUX_NAME,
+      // electron-builder's defaults (GTK, NSS, libnotify, libsecret…) plus
+      // xdg-utils, for xdg-mime (the default mail app) and xdg-open.
+      depends: [
+        "libgtk-3-0",
+        "libnotify4",
+        "libnss3",
+        "libxss1",
+        "libxtst6",
+        "xdg-utils",
+        "libatspi2.0-0",
+        "libuuid1",
+        "libsecret-1-0",
+      ],
     },
     dmg: {
       title: `${PRODUCT_NAME} ${options.version}`,
@@ -303,7 +365,10 @@ function main(): void {
     console.log(HELP);
     return;
   }
-  if (process.platform !== "darwin") fail("macOS artifacts must be built on macOS.");
+  const mac = options.platform === "mac";
+  if (mac && process.platform !== "darwin") fail("macOS artifacts must be built on macOS.");
+  // fpm, which electron-builder packages the .deb with, only runs on Linux.
+  if (!mac && process.platform !== "linux") fail("Linux artifacts must be built on Linux.");
 
   const electronVersion = readJson<{ version: string }>(
     NodePath.join(desktopDir, "node_modules", "electron", "package.json"),
@@ -312,7 +377,7 @@ function main(): void {
     NodePath.join(desktopDir, "package.json"),
   );
   log(
-    `Otter Mail ${options.version} for mac/${options.target} (arch=${options.arch}, ` +
+    `Otter Mail ${options.version} for ${options.platform}/${options.target} (arch=${options.arch}, ` +
       `update feed=${resolvePublishConfig(options.version, process.env) ? "yes" : "none"}, signed=${options.signed})`,
   );
 
@@ -325,14 +390,14 @@ function main(): void {
       label: `(apps/desktop) OTTER_MAIL_VERSION=${options.version} vp pack`,
     });
   }
-  const translatorBinary = resolveTranslatorBinary(options);
+  // Apple's Translation: macOS only.
+  const translatorBinary = mac ? resolveTranslatorBinary(options) : null;
 
   const requiredInputs = [
     NodePath.join(desktopDir, "dist-electron", "main.cjs"),
     NodePath.join(desktopDir, "dist-electron", "backend.cjs"),
     NodePath.join(desktopDir, "dist-electron", "preload.cjs"),
     NodePath.join(webDir, "dist", "index.html"),
-    NodePath.join(webDir, "dist", "tray-popover.html"),
   ];
   const missing = requiredInputs.filter((path) => !NodeFS.existsSync(path));
   if (missing.length > 0) {
@@ -350,9 +415,11 @@ function main(): void {
   );
   copyDir(NodePath.join(webDir, "dist"), NodePath.join(stageDir, "renderer"), notMap);
   copyDir(NodePath.join(desktopDir, "resources"), NodePath.join(stageDir, "resources"));
-  NodeFS.mkdirSync(NodePath.join(stageDir, "bin"));
-  NodeFS.copyFileSync(translatorBinary, NodePath.join(stageDir, "bin", "translator"));
-  NodeFS.chmodSync(NodePath.join(stageDir, "bin", "translator"), 0o755);
+  if (translatorBinary) {
+    NodeFS.mkdirSync(NodePath.join(stageDir, "bin"));
+    NodeFS.copyFileSync(translatorBinary, NodePath.join(stageDir, "bin", "translator"));
+    NodeFS.chmodSync(NodePath.join(stageDir, "bin", "translator"), 0o755);
+  }
 
   let entitlementsPath: string | undefined;
   if (options.signed) {
@@ -362,13 +429,16 @@ function main(): void {
 
   const stagedPackageJson = {
     name: "otter-mail",
-    productName: PRODUCT_NAME,
+    productName: productName(options.platform),
     version: options.version,
     description: desktopPackage.description ?? "Gmail, calm and fast.",
-    author: "Otterware",
+    author: MAINTAINER,
+    homepage: "https://otterware.app/mail/",
+    ...(mac ? {} : { desktopName: `${LINUX_NAME}.desktop` }),
     main: "dist-electron/main.cjs",
     devDependencies: { electron: electronVersion },
     build: createBuildConfig({
+      platform: options.platform,
       version: options.version,
       target: options.target,
       signed: options.signed,
@@ -415,7 +485,14 @@ function main(): void {
       .join(",");
   }
 
-  const builderArgs = ["--projectDir", stageDir, "--mac", "--arm64", "--publish", "never"];
+  const builderArgs = [
+    "--projectDir",
+    stageDir,
+    mac ? "--mac" : "--linux",
+    `--${options.arch}`,
+    "--publish",
+    "never",
+  ];
   run(electronBuilderBin, builderArgs, {
     env: buildEnv,
     label: `electron-builder ${builderArgs.join(" ")}`,
@@ -424,11 +501,11 @@ function main(): void {
   const distDir = NodePath.join(stageDir, "dist");
   const artifacts = NodeFS.readdirSync(distDir).filter(
     (name) =>
-      /\.(dmg|zip|blockmap|yml)$/.test(name) &&
+      /\.(dmg|zip|deb|blockmap|yml)$/.test(name) &&
       name !== "builder-debug.yml" &&
       name !== "builder-effective-config.yaml",
   );
-  if (!artifacts.some((name) => name.endsWith(".dmg") || name.endsWith(".zip"))) {
+  if (!artifacts.some((name) => /\.(dmg|zip|deb)$/.test(name))) {
     fail(`electron-builder produced no artifacts in ${distDir}.`);
   }
   NodeFS.mkdirSync(options.outputDir, { recursive: true });

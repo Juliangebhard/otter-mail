@@ -3,13 +3,19 @@
 export const SUPPORT_REPO = "https://github.com/otterware-app/otter-mail";
 export const MAX_SUPPORT_BODY = 100_000;
 export const SUPPORT_TYPES = { bug: "Bug report", feature: "Feature request" } as const;
-export const SUPPORT_PLATFORMS = { mac: "Mac", web: "Web", ios: "iPhone" } as const;
+export const SUPPORT_PLATFORMS = {
+  mac: "Mac",
+  linux: "Linux",
+  web: "Web",
+  ios: "iPhone",
+} as const;
 
 export type SupportAgent = { id: "claude" | "codex"; label: string };
 export type SupportTerminals = {
-  apps: { bundleId: string; name: string }[];
+  /** By id: a bundle identifier on macOS, a .desktop file's on Linux. */
+  apps: { id: string; name: string }[];
   defaultName: string | null;
-  selectedBundleId: string | null;
+  selectedId: string | null;
 };
 export type SupportReport = {
   /** Optional so existing saved investigations can still be resumed. */

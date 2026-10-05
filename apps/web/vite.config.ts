@@ -75,7 +75,6 @@ export default defineConfig(({ command }) => ({
           new URL("./todoist-callback/index.html", import.meta.url),
         ),
         main: NodeURL.fileURLToPath(new URL("./index.html", import.meta.url)),
-        "tray-popover": NodeURL.fileURLToPath(new URL("./tray-popover.html", import.meta.url)),
       },
     },
   },

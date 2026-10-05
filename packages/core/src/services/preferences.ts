@@ -80,7 +80,7 @@ export function setUiPreference(key: string, value: string): Promise<void> {
 
 // ── Sections ────────────────────────────────────────────────────────────────
 
-/** App settings that follow the account (launch at login and the menu bar stay per Mac). */
+/** App settings that follow the account (launch at login and the Dock badge stay per computer). */
 const SYNCED_SETTINGS = [
   "syncIntervalSeconds",
   "notificationsMode",

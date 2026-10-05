@@ -15,7 +15,6 @@ vi.mock("electron", () => ({
     isPackaged: false,
     getPath: () => fixture.directory,
     getAppPath: () => "/app",
-    dock: { setIcon: fixture.setIcon },
   },
   nativeImage: {
     createFromPath: (path: string) => ({ path, isEmpty: () => fixture.missingImage }),
@@ -26,6 +25,7 @@ vi.mock("electron", () => ({
   },
 }));
 vi.mock("../ipc.js", () => ({ broadcast: fixture.broadcast }));
+vi.mock("../os/index.js", () => ({ hostOS: { setAppIcon: fixture.setIcon } }));
 vi.mock("../logger.js", () => ({ logger: { warn: vi.fn() } }));
 
 const { registerAppIconHandlers } = await import("./app-icon.js");

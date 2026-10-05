@@ -13,6 +13,8 @@ import {
   SettingsSection,
 } from "../settings/settings-ui";
 import { searchableSetting } from "../settings/settings-search";
+import { osNames } from "../os-names";
+import { modKeyName } from "../keybindings/keys";
 import { ExtensionsSection } from "./extensions-section";
 import { setOpenLinksIn, useBrowser, type OpenLinksIn } from "./store";
 
@@ -36,7 +38,7 @@ export function BrowserSettingsPane() {
               <SettingResetButton label="open links" onClick={() => setOpenLinksIn("app")} />
             ) : null
           }
-          description="Links in mail and chat open in a tab in the agent panel, or in your Mac's default browser. ⌘-click opens one the other way."
+          description={`Links in mail and chat open in a tab in the agent panel, or in your ${osNames.computer}'s default browser. ${modKeyName}-click opens one the other way.`}
           control={
             <RowSelect
               value={openLinksIn}

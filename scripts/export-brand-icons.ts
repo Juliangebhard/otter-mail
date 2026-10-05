@@ -3,6 +3,7 @@
 //   assets/dev/blueprint-macos-1024.png   the development ("blueprint") variant
 //   apps/desktop/resources/icon.icns      the released app
 //   apps/desktop/resources/icon-dev.icns  `pnpm dev:desktop` / `pnpm start` builds
+//   apps/desktop/resources/icon.png       the released Linux app (512px)
 // macOS only (swift, sips, iconutil). Run with `pnpm icons:export`.
 
 import * as NodeChildProcess from "node:child_process";
@@ -42,6 +43,7 @@ function icns(png: string, output: string): void {
 run("swift", [NodePath.join(root, "scripts/lib/blueprint-icon.swift"), prodPng, devPng]);
 icns(prodPng, NodePath.join(resources, "icon.icns"));
 icns(devPng, NodePath.join(resources, "icon-dev.icns"));
+run("sips", ["-z", "512", "512", prodPng, "--out", NodePath.join(resources, "icon.png")]);
 console.log(
-  "Icons exported: assets/dev/blueprint-macos-1024.png, resources/icon.icns, resources/icon-dev.icns",
+  "Icons exported: assets/dev/blueprint-macos-1024.png, resources/icon.icns, resources/icon-dev.icns, resources/icon.png",
 );

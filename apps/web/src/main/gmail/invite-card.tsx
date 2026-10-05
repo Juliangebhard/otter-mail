@@ -13,6 +13,7 @@ import { CalendarIcon, CheckIcon, ExternalLinkIcon, MapPinIcon } from "lucide-re
 import { gmailApi, type CalendarInvite, type RsvpResponse } from "./api";
 import { HintTooltip, IconBtn, cn } from "./ui";
 import { openLink } from "../browser/store";
+import { isModClick } from "../keybindings/keys";
 
 const inviteKey = (accountId: string, messageId: string) => [
   "calendar-invite",
@@ -152,7 +153,7 @@ export function InviteCard({ accountId, messageId }: { accountId: string; messag
           <HintTooltip label="Open in Google Calendar">
             <IconBtn
               label="Open in Google Calendar"
-              onClick={(e) => openLink(invite.htmlLink!, { flip: e.metaKey })}
+              onClick={(e) => openLink(invite.htmlLink!, { flip: isModClick(e) })}
             >
               <ExternalLinkIcon className="size-4" />
             </IconBtn>

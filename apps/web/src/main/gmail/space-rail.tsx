@@ -33,6 +33,7 @@ import { requestProblemReport } from "../support/report-problem";
 import { setSyncedPreference } from "../synced-preferences";
 import { PROJECTS_SPACE } from "./spaces";
 import { ViewMark } from "./view-icon";
+import { shortcutText } from "../keybindings/keys";
 
 /** A rail button: a square that lights up on hover, and stays lit where you are. */
 const RAIL_BUTTON =
@@ -293,7 +294,7 @@ function AccountMenu({
         <DropdownMenuSeparator />
         <DropdownMenuItem
           icon={<SettingsIcon />}
-          accelerator="⌘,"
+          accelerator={shortcutText("mod+,")}
           onSelect={() => onOpenSettings()}
         >
           Settings
@@ -304,7 +305,7 @@ function AccountMenu({
         {otter?.realtime === "live" ? null : (
           <DropdownMenuItem
             icon={<RotateCwIcon className={syncing ? "animate-spin" : undefined} />}
-            accelerator="⌘R"
+            accelerator={shortcutText("mod+r")}
             disabled={syncing}
             onSelect={onSync}
           >

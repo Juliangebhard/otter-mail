@@ -582,7 +582,7 @@ function MailHome() {
   // asks for the window: a new message, a conversation opened from elsewhere.
   const [chatExpanded, setChatExpanded] = useState(false);
   useEffect(() => {
-    // oxlint-disable-next-line react/set-state-in-effect -- Synchronize pane and composer state with route, tray and navigation events.
+    // oxlint-disable-next-line react/set-state-in-effect -- Synchronize pane and composer state with route, notification and navigation events.
     if (!chatOpen || composeOpen || selectedMessageId) setChatExpanded(false);
   }, [chatOpen, composeOpen, selectedMessageId]);
   const panelExpanded = chatExpanded && chatVisible;
@@ -606,7 +606,7 @@ function MailHome() {
   useEffect(() => {
     if (!tourRequested) return;
     if (settingsRouteRef.current) leaveSettingsRef.current();
-    // oxlint-disable-next-line react/set-state-in-effect -- Synchronize pane and composer state with route, tray and navigation events.
+    // oxlint-disable-next-line react/set-state-in-effect -- Synchronize pane and composer state with route, notification and navigation events.
     setComposeOpen(false);
     localStorage.setItem("gmail:sidebar-open", "1");
     setMailSidebarOpen(true);
@@ -869,18 +869,18 @@ function MailHome() {
     return unsub;
   }, []);
 
-  // A conversation clicked in the menu-bar popover, or a new-mail
-  // notification, opens here, in the reader (once there's mail to open it
-  // in, when it started the app).
-  const [openFromTray, setOpenFromTray] = useState<{ accountId: string; messageId: string } | null>(
-    null,
-  );
+  // A conversation clicked in a new-mail notification opens here, in the
+  // reader (once there's mail to open it in, when it started the app).
+  const [openFromNotification, setOpenFromNotification] = useState<{
+    accountId: string;
+    messageId: string;
+  } | null>(null);
   useEffect(() => {
     const pull = async () => {
       const target = await gmailApi.takePendingOpenMessage().catch(() => null);
       if (!target) return;
-      console.log("[HomeView:openFromTray]", { messageId: target.messageId });
-      setOpenFromTray(target);
+      console.log("[HomeView:openFromNotification]", { messageId: target.messageId });
+      setOpenFromNotification(target);
     };
     void pull();
     return window.desktopBridge.on("mail:open", () => void pull());
@@ -1003,7 +1003,7 @@ function MailHome() {
   const goForAccountEffect = useLatest(go);
   useEffect(() => {
     if (!misplaced) return;
-    // oxlint-disable-next-line react/set-state-in-effect -- Synchronize pane and composer state with route, tray and navigation events.
+    // oxlint-disable-next-line react/set-state-in-effect -- Synchronize pane and composer state with route, notification and navigation events.
     setComposeOpen(false);
     goForAccountEffect.current({}, true);
   }, [misplaced, goForAccountEffect]);
@@ -1249,12 +1249,12 @@ function MailHome() {
   };
   const openMessageForEffect = useLatest(openMessage);
   useEffect(() => {
-    if (!openFromTray || !hasMail) return;
-    // oxlint-disable-next-line react/set-state-in-effect -- Synchronize pane and composer state with route, tray and navigation events.
-    setOpenFromTray(null);
+    if (!openFromNotification || !hasMail) return;
+    // oxlint-disable-next-line react/set-state-in-effect -- Synchronize pane and composer state with route, notification and navigation events.
+    setOpenFromNotification(null);
     setComposeOpen(false);
-    openMessageForEffect.current(openFromTray.accountId, openFromTray.messageId);
-  }, [openFromTray, hasMail, openMessageForEffect]);
+    openMessageForEffect.current(openFromNotification.accountId, openFromNotification.messageId);
+  }, [openFromNotification, hasMail, openMessageForEffect]);
 
   const handlePaletteGoToView = (viewId: string) => {
     console.log("[HomeView:paletteGoToView]", { viewId });
@@ -1387,9 +1387,9 @@ function MailHome() {
       <div
         className={cn(
           "surface-grain flex h-full text-foreground",
-          // The Mac window is frosted glass (main-window.ts's vibrancy): the
-          // frame lets it through, more so as Glass opacity goes down.
-          features.trafficLights ? "bg-sidebar-surface/(--frame-opacity)" : "bg-sidebar-surface",
+          // The Mac window is frosted glass (its vibrancy): the frame lets it
+          // through, more so as Glass opacity goes down.
+          features.vibrancy ? "bg-sidebar-surface/(--frame-opacity)" : "bg-sidebar-surface",
         )}
         data-panel-animations={panelAnimationsActive ? "true" : "false"}
         data-mail-layout={isProjects ? "split" : mailLayout}

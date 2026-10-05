@@ -39,6 +39,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { toast } from "./toast";
 import { IconBtn, cn } from "./ui";
 import { openLink } from "../browser/store";
+import { isModClick } from "../keybindings/keys";
 
 const date = (ms: number) =>
   new Date(ms).toLocaleDateString([], {
@@ -254,7 +255,7 @@ function Links({ project }: { project: Project }) {
             role="button"
             tabIndex={0}
             title={link.url}
-            onClick={(e) => openLink(link.url, { flip: e.metaKey })}
+            onClick={(e) => openLink(link.url, { flip: isModClick(e) })}
             className={SIDE_ROW}
           >
             <LinkIcon className="size-3.5 shrink-0 text-muted-foreground" />

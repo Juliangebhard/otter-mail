@@ -36,35 +36,40 @@ export interface UpdateState {
   checkedAt: number | null;
   message: string | null;
   /**
-   * Set when macOS refused to install a downloaded update (a build without a
+   * Set when an update can't install itself (macOS refusing a build without a
    * Developer ID signature): the release page to install it from by hand.
    */
   manualDownloadUrl: string | null;
 }
 
 /**
- * What the shell running the app can do. The desktop app has everything; the
- * web app (a browser tab) has none of these, and the UI hides them.
+ * What the shell running the app can do. The desktop app sets these per
+ * operating system (apps/desktop/src/os/features.ts); the web app (a browser
+ * tab) has none of the desktop's, and the UI hides what's off.
  */
 export interface BridgeFeatures {
-  /** macOS window chrome: traffic lights over the window's top-left corner. */
-  trafficLights: boolean;
+  /**
+   * Where the window's own controls sit over the top bar, which leaves them
+   * room: "left" for macOS's traffic lights, "right" for minimize, maximize
+   * and close on Linux; null in a browser tab, whose controls are the browser's.
+   */
+  windowControls: "left" | "right" | null;
+  /** The window is native frosted glass (macOS vibrancy): the frame lets it through. */
+  vibrancy: boolean;
   /** Back and forward buttons in the title bar (a browser has its own). */
   historyButtons: boolean;
-  /** The menu-bar icon and mini inbox. */
-  menuBar: boolean;
   launchAtLogin: boolean;
   /** The unread count on the Dock icon. */
   dockBadge: boolean;
-  /** Being the Mac's default mail app (mailto: links). */
+  /** Being the computer's default mail app (mailto: links). */
   defaultMailApp: boolean;
-  /** Apple's on-device translation. */
+  /** On-device translation (Apple's on macOS, the browser's built-in one on the web). */
   translation: boolean;
-  /** Dragging attachments out to Finder. */
+  /** Dragging attachments out to the file manager (Finder, Files). */
   dragOut: boolean;
-  /** Opening an attachment in its default app (Preview, Pages, …). */
+  /** Opening an attachment in its default app. */
   openFiles: boolean;
-  /** Handing a support report to a locally installed agent in Terminal. */
+  /** Handing a support report to a locally installed agent in a terminal. */
   externalAgent: boolean;
   /**
    * Codex and Claude, the command-line agents installed on this computer, and
@@ -113,12 +118,12 @@ export interface OtterAccountState {
   realtime: "off" | "connecting" | "live";
 }
 
-/** A Mac signed in to the Otter account (`otter:listDevices`). */
+/** A computer signed in to the Otter account (`otter:listDevices`). */
 export interface OtterDevice {
   /** Its session token, which `otter:signOutDevice` takes. */
   token: string;
   name: string;
-  /** This Mac. */
+  /** This computer. */
   current: boolean;
   lastActiveAt: number;
 }

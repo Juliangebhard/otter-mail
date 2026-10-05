@@ -23,7 +23,9 @@ Dock → Quit, logging out).
    `apps/desktop/package.json`'s version (`0.1.0`).
 
 3. The workflow builds `main`'s HEAD for arm64 on `macos-15` (DMG + ZIP, with
-   `latest-mac.yml` and blockmaps for the updater), publishes the GitHub Release as the latest
+   `latest-mac.yml` and blockmaps for the updater) and for Linux on `ubuntu-24.04` (a .deb each
+   for x64 and arm64, with `latest-linux.yml` and `latest-linux-arm64.yml`), publishes the
+   GitHub Release as the latest
    with the version's changelog note (`changelog/<version>.md`, if `main` has one) above notes
    generated since the previous release, and commits the new version to
    `apps/*/package.json` on `main`.
@@ -46,6 +48,11 @@ OTTER_MAIL_UPDATE_URL=http://127.0.0.1:8791 \
 Run the 0.9.0 app from `/tmp/old` with `OTTER_MAIL_HOME=/tmp/test-home` so it stays off your
 data. Unsigned builds download the update but macOS refuses to install it; the full flow needs
 signed builds (below).
+
+On Linux, the same with `--platform linux --arch x64`; install the old .deb with
+`sudo apt install ./Otter-Mail-0.9.0-amd64.deb`. "Restart to update" installs the new one with
+dpkg, asking for the admin password (pkexec), and starts it again. Linux builds aren't signed:
+apt checks the update's SHA-512 from the feed.
 
 ## Google OAuth client
 
@@ -78,6 +85,11 @@ Optional repository variable: `XCODE_APP`, the Xcode to build with on the runner
 `/Applications/Xcode_26.0.app`). By default the newest Xcode 26+ on the image is used.
 
 ## Building locally
+
+`pnpm dist:desktop:deb` (on Linux) builds the .deb for x64; `--arch arm64` builds the arm64
+one on the same machine. It installs to `/opt/otter-mail` with `otter-mail` on the PATH, an
+`otter-mail.desktop` that handles mailto: links, and depends on what Debian 12+ and
+Ubuntu 22.04+ ship (GTK 3, NSS, libnotify, libsecret, xdg-utils).
 
 `pnpm dist:desktop:dmg` builds an unsigned Apple Silicon DMG. With the secrets above exported
 (`APPLE_API_KEY` as a path to the `.p8`), `node scripts/build-desktop-artifact.ts --arch arm64

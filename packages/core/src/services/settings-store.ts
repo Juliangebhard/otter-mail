@@ -17,7 +17,7 @@ export async function getSettings(): Promise<AppSettings> {
 type SettingsListener = (settings: AppSettings, patch: Partial<AppSettings>) => void;
 const listeners = new Set<SettingsListener>();
 
-/** Runs `listener` after every settings change (the desktop applies launch-at-login and the tray). */
+/** Runs `listener` after every settings change (the desktop applies launch-at-login and the badge). */
 export function onSettingsChanged(listener: SettingsListener): void {
   listeners.add(listener);
 }

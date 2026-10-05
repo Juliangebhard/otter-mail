@@ -4,6 +4,7 @@ import * as path from "node:path";
 import {
   MAX_SUPPORT_BODY,
   parseSupportDraft,
+  SUPPORT_PLATFORMS,
   type SupportDraft,
   type SupportReport,
   type SupportSession,
@@ -20,7 +21,7 @@ export function validSupportReport(value: unknown): value is SupportReport {
   return (
     !!report &&
     (report.kind === undefined || report.kind === "bug" || report.kind === "feature") &&
-    (report.platform === undefined || ["mac", "web", "ios"].includes(report.platform)) &&
+    (report.platform === undefined || Object.hasOwn(SUPPORT_PLATFORMS, report.platform)) &&
     [report.title, report.happened, report.expected, report.steps].every(
       (field, index) =>
         typeof field === "string" && field.length <= [160, 6_000, 4_000, 4_000][index]!,

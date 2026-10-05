@@ -1,11 +1,11 @@
 # Otter Mail
 
-Otter Mail is a calm, fast Gmail client: an Electron app for macOS, and the same app in the
-browser at https://mail.otterware.app. It is laid out like Otter Code (our fork of T3 Code): a
-pnpm monorepo built with Vite+ (`vp`); the Mac app ships through GitHub Releases with
-auto-update.
+Otter Mail is a calm, fast Gmail client: an Electron app for macOS and Linux (Debian and
+Ubuntu, a .deb), and the same app in the browser at https://mail.otterware.app. It is laid out
+like Otter Code (our fork of T3 Code): a pnpm monorepo built with Vite+ (`vp`); the desktop app
+ships through GitHub Releases with auto-update.
 
-What each app supports (Mac, web, iPhone; Gmail vs IMAP): `docs/features.md`. Keep it current
+What each app supports (Mac, Linux, web, iPhone; Gmail vs IMAP): `docs/features.md`. Keep it current
 when a feature lands or goes.
 
 ## Where code lives
@@ -14,29 +14,36 @@ when a feature lands or goes.
   mail cache, sync, the JSON stores, the Otter account (better-auth client), mailboxes synced
   across devices, realtime push, and the handlers the UI calls. It is plain TypeScript: anything
   platform-specific goes through the `Platform` interface (`src/platform.ts`).
-- `apps/desktop`: the Electron main process (`src/main.ts`: windows, menus, the tray, the Dock,
+- `apps/desktop`: the Electron main process (`src/main.ts`: windows, menus, the Dock,
   updates), the preload, and the mail backend: core in a utility process (`src/backend.ts`) with
   the desktop platform (`src/platform.ts`: node:sqlite, and safeStorage, dialogs and
   notifications asked of main). Main forwards the windows' invokes to it (`src/backend-host.ts`,
   messages in `src/backend-protocol.ts`), so syncing never holds up the app itself.
-  - `src/handlers/`: the Mac-only handlers (tray, default mail app, …); `backend.ts` there holds
+  - `src/os/`: everything that differs between macOS and Linux, behind one interface
+    (`types.ts`: `HostOS` for main, `BackendOS` for the backend) that `mac/` and `linux/`
+    implement: window frame, menu, badge, login items, secrets, default mail app,
+    terminals, updates. `features.ts` is what each OS's app shows (`desktopBridge.features`).
+    The rest of the app asks `hostOS` / `backendOS` and never checks `process.platform`.
+  - `src/handlers/`: the desktop-only handlers (default mail app, app icon, …); `backend.ts` there holds
     the ones the backend serves.
-  - `src/services/`: Google sign-in (loopback OAuth), tray, Apple's translator, the agent panel's
+  - `src/services/`: Google sign-in (loopback OAuth), the agent panel's
     browser (`browser.ts`: its session, the Web Store, popups and permissions; `extensions.ts`
     with `src/extensions-preload.ts`: Chrome's extension APIs Electron lacks), the local agents
     (Claude, Codex; Hermes is in core) and the MCP server that gives them, and other agents on
     the Mac with a token, Otter Mail's tools, default mail app.
-  - `src/windows/`: the main window, the menu-bar popover, and where their pages load from.
+  - `src/windows/`: the main window, and where its pages load from.
   - `src/updates.ts`: electron-updater against GitHub Releases.
-- `apps/web`: the React renderer, one build for both apps. `index.html` is the main window,
-  `tray-popover.html` the menu-bar mini inbox. UI primitives live in `src/components/ui/`.
+- `apps/web`: the React renderer, one build for both apps. `index.html` is the main window.
+  UI primitives live in `src/components/ui/`.
   Where the main window is (mailbox, label, conversation, Settings pane) is its route
-  (`src/main/router.tsx`, TanStack Router): in the hash in the Mac app, real paths on the web
+  (`src/main/router.tsx`, TanStack Router): in the hash in the desktop app, real paths on the web
   (`/you@gmail.com/INBOX/<id>`, `/all/inbox`, `/settings/appearance`).
   `src/main/browser/` is the agent panel's browser (Mac): `<webview>` tabs beside the chats, and
   `openLink`, where links from mail and chat go.
   `src/web/` is the browser shell: core in a Web Worker (SQLite WASM on OPFS) hosted by one
-  tab for every open tab (`backend.ts`), and the bridge that stands in for the preload. What only the Mac app has is off in `desktopBridge.features`.
+  tab for every open tab (`backend.ts`), and the bridge that stands in for the preload. What only the desktop app has is off in `desktopBridge.features`.
+  What the computer is called in copy (Mac / computer) is
+  `src/main/os-names.ts`; shortcuts in copy go through `shortcutText("mod+k")` (⌘K, Ctrl+K).
 - `apps/ios`: Otter Mail for iPhone, a native SwiftUI app (iOS 27, Liquid Glass): ChatGPT's
   layout (a drawer of mailboxes you swipe through), Otter Code's list rows. Its own Swift code,
   not the TypeScript core: it signs in to Google itself (the "iOS" OAuth client, PKCE), talks to
@@ -55,7 +62,7 @@ when a feature lands or goes.
   mail: Gmail → Pub/Sub → relay → WebSocket to each signed-in device. Push notifications carry
   mailbox addresses and history IDs. The optional OpenRouter agent processes and stores chats
   and mail/calendar tool results on the relay. The web app's Gmail tokens pass through it (never
-  stored), the Mac app's never do. See its
+  stored), the desktop app's never do. See its
   README.
 - `native/translator`: a Swift command-line helper for Apple's on-device Translation. It reads a
   JSON request on stdin and prints JSON. Building it needs full Xcode (macOS 26 SDK).
@@ -77,7 +84,7 @@ when a feature lands or goes.
 
 The app is local-first: it talks to Gmail directly and renders from its SQLite cache. The Otter
 account (the user button by Back in Settings) is who you are; mailboxes are the Gmail accounts
-it holds, which follow you to every device, with push from the relay. The Mac app works without
+it holds, which follow you to every device, with push from the relay. The desktop app works without
 it; the web app needs it (the relay keeps its Gmail sign-ins alive).
 
 - Renderer → backend: `window.desktopBridge.invoke(channel, params)` → a handler registered with
@@ -91,7 +98,7 @@ it; the web app needs it (the relay keeps its Gmail sign-ins alive).
 ## Dev
 
 - `pnpm install`, then `pnpm dev`: the web app on :5833 with a local relay on :8787 (open it in
-  a browser, e.g. the T3 preview). `pnpm dev:desktop` runs the Mac app (Vite dev server +
+  a browser, e.g. the T3 preview). `pnpm dev:desktop` runs the desktop app (Vite dev server +
   main-process watcher + Electron with reload); `pnpm dev:web` the web app alone. Both apps render
   the same `apps/web`, so UI work is checked in the browser. See docs/development.md.
 - `pnpm dev:ios`: the iPhone app in the simulator (it has the same demo mailbox, from the welcome
@@ -107,7 +114,8 @@ it; the web app needs it (the relay keeps its Gmail sign-ins alive).
   once per machine. Preserve the demo fixtures and send test mail only to the demo account itself.
   Keep credentials out of logs, commits, screenshots and app bundles. See
   [Demo mailboxes](docs/development.md#demo-mailboxes).
-- `pnpm start` runs the built app unpackaged; `pnpm dist:desktop:dmg` builds a DMG in `release/`.
+- `pnpm start` runs the built app unpackaged; `pnpm dist:desktop:dmg` builds a DMG in `release/`
+  (on a Mac), `pnpm dist:desktop:deb` a .deb (on Linux).
 - Data homes (`apps/desktop/src/paths.ts`, as in T3 Code): the installed app uses
   `~/.otter-mail/userdata`; dev runs use `~/.otter-mail/dev`, or `<worktree>/.otter-mail` in a
   linked worktree. `pnpm dev:desktop --home <dir>` overrides. Never point dev at the installed app's home.
@@ -115,11 +123,12 @@ it; the web app needs it (the relay keeps its Gmail sign-ins alive).
 
 ## Releases
 
-Stable only (no nightlies). The Mac app (and web) and the iPhone app release separately, each with
+Stable only (no nightlies). The desktop app (Mac, Linux, and web) and the iPhone app release separately, each with
 its own version:
 
-- Mac: run the Release workflow from `main` with a patch/minor/major bump, or push a `vX.Y.Z`
-  tag. Installed apps download updates on their own and offer "Restart to update" in the sidebar.
+- Mac and Linux: run the Release workflow from `main` with a patch/minor/major bump, or push a
+  `vX.Y.Z` tag. It builds the DMG and the .debs (x64, arm64) into one GitHub Release. Installed
+  apps download updates on their own and offer "Restart to update" in the sidebar.
   A release never needs a changelog note: don't write one, or ask about one, unless the user asks.
 - iPhone: run the Release iPhone workflow from `main` when `apps/ios` (or what it bundles from
   `packages/shared`) has changed. It uploads to TestFlight and tags `ios-vX.Y.Z`.
@@ -144,7 +153,8 @@ change in the simulator, in light and dark.
 - Match the surrounding code: its naming, comment density and idioms.
 - The mail cache is local-first: the UI renders from SQLite and sync catches up. Keep IPC
   payloads small and never block the renderer on Gmail.
-- The Mac app targets macOS only (Apple Translation, the Dock badge, the menu-bar popover); the
-  web app runs in current browsers. Gate Mac-only UI with `features`, never with ad-hoc checks.
+- The desktop app targets macOS (Apple Translation, the Dock badge) and Linux (Debian first:
+  xdg); the web app runs in current browsers. Put what
+  differs by OS in `apps/desktop/src/os`, gate UI with `features`, never with ad-hoc checks.
 - Each app shows only what works on it. Hide what it doesn't have; don't show it disabled or
   labeled "Available in the Mac app" (an error explaining why something just failed may say so).

@@ -8,12 +8,11 @@ import { app, ipcMain, nativeImage } from "electron";
 import { invokeBackend, tempFile } from "../backend-host.js";
 import { broadcast } from "../ipc.js";
 import { logger } from "../logger.js";
-import { listMailApps, setDefaultMailHandler } from "../services/default-mail.js";
+import { hostOS } from "../os/index.js";
 import { takePendingMailto } from "../services/mailto-target.js";
 import { takePendingOpenMessage } from "../services/open-message-target.js";
 import { focusMainWindow } from "../windows/main-window.js";
 import { setSettingsTarget, takeSettingsTarget } from "../windows/settings-window.js";
-import { registerTrayPopoverHandlers } from "./tray-popover.js";
 import { registerSupportHandlers } from "./support.js";
 import { registerAppIconHandlers } from "./app-icon.js";
 import { registerBrowserHandlers } from "./browser.js";
@@ -44,12 +43,12 @@ export function registerHandlers(): void {
 
   ipcMain.handle("window:getSettingsTarget", async () => takeSettingsTarget());
 
-  // A conversation the menu-bar popover asked the main window to open.
+  // A conversation a notification asked the main window to open.
   ipcMain.handle("window:takePendingOpenMessage", async () => takePendingOpenMessage());
 
   // Default-mail-app plumbing: the renderer pulls pending mailto targets on
   // mount and on the compose:mailto broadcast; Settings offers a "set as
-  // default" button (macOS shows its own consent dialog).
+  // default" button (macOS shows its own consent dialog; Linux asks xdg-settings).
   ipcMain.handle("app:takePendingMailto", async () => takePendingMailto());
 
   ipcMain.handle("app:getDefaultMailStatus", async () => {
@@ -57,14 +56,13 @@ export function registerHandlers(): void {
     return { isDefault };
   });
 
-  // Without a bundleId this registers Otter Mail itself (macOS consent
-  // dialog); with one it hands the default to that app instead
-  // (Settings dropdown, LaunchServices via JXA).
+  // Without an id this registers Otter Mail itself; with one it hands the
+  // default to that app instead (the Settings dropdown; HostOS.mailApps).
   ipcMain.handle("app:setDefaultMailApp", async (_event, params: unknown) => {
-    const bundleId = (params as { bundleId?: unknown } | undefined)?.bundleId;
-    if (typeof bundleId === "string" && bundleId.length > 0) {
-      await setDefaultMailHandler(bundleId);
-      logger.info("handlers", "setDefaultMailApp", { bundleId });
+    const id = (params as { id?: unknown } | undefined)?.id;
+    if (typeof id === "string" && id.length > 0) {
+      await hostOS.mailApps.setDefault(id);
+      logger.info("handlers", "setDefaultMailApp", { id });
       return { ok: true };
     }
     const ok = app.setAsDefaultProtocolClient("mailto");
@@ -72,9 +70,9 @@ export function registerHandlers(): void {
     return { ok };
   });
 
-  ipcMain.handle("app:listMailApps", async () => listMailApps());
+  ipcMain.handle("app:listMailApps", async () => hostOS.mailApps.list());
 
-  // gmail:dragAttachment — native drag-out to Finder (startDrag needs a real file on disk)
+  // gmail:dragAttachment — native drag-out to the file manager (startDrag needs a real file on disk)
   ipcMain.handle("gmail:dragAttachment", async (event, params: unknown) => {
     const p = params as Record<string, unknown> | undefined;
     const { accountId, messageId, attachmentId, filename, taskId } = p ?? {};
@@ -113,7 +111,6 @@ export function registerHandlers(): void {
     return { accepted: true };
   });
 
-  registerTrayPopoverHandlers();
   registerSupportHandlers();
 
   logger.info("handlers", "✓ IPC handlers registered");

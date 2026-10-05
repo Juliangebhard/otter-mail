@@ -83,6 +83,7 @@ import type { GmailMessageSummary } from "./types";
 import { features } from "../features";
 import { BrowserPages, BrowserTabs } from "../browser/browser-view";
 import { closeTab as closeBrowserTab, newTab, selectTab, useBrowser } from "../browser/store";
+import { modKeyName, shortcutText } from "../keybindings/keys";
 
 /** What the attached context items are, so the chip shows a fitting icon. */
 type ContextKind = "draft" | "sent" | "mail" | "mixed" | "quote" | "project";
@@ -1814,7 +1815,7 @@ export function AgentChatPanel({
   const submitTooltip =
     submitMode === "send" || editing
       ? submitLabel
-      : `Click to ${followUp}, ⌘-click or ⌘↩ to ${alternateAction}`;
+      : `Click to ${followUp}, ${modKeyName}-click or ${shortcutText("mod+enter")} to ${alternateAction}`;
 
   // Only the active conversation drives the "working…" / stop UI.
   const streamingActive = run != null;

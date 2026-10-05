@@ -11,6 +11,7 @@ import {
   type SupportSession,
 } from "@otter-mail/shared/support";
 import { invokeBackend } from "../backend-host.js";
+import { hostOS } from "../os/index.js";
 import { ensureShellPath } from "../services/agent/shell-path.js";
 import { buildSupportLauncher, supportBinary } from "../services/support-launcher.js";
 import {
@@ -58,11 +59,14 @@ async function launchAgents() {
 }
 
 export function registerSupportHandlers(): void {
-  ipcMain.handle("support:terminals", () => getSupportTerminals(app.getPath("userData")));
+  ipcMain.handle("support:terminals", () =>
+    getSupportTerminals(app.getPath("userData"), hostOS.terminals),
+  );
   ipcMain.handle("support:setTerminal", (_event, params: unknown) =>
     setSupportTerminal(
       app.getPath("userData"),
-      (params as { bundleId?: unknown } | undefined)?.bundleId,
+      hostOS.terminals,
+      (params as { id?: unknown } | undefined)?.id,
     ),
   );
   ipcMain.handle("support:resumeSession", () => resumeSupportSession(app.getPath("userData")));
@@ -148,7 +152,7 @@ export function registerSupportHandlers(): void {
     }
     await fs.writeFile(path.join(directory, "prompt.md"), prompt, { mode: 0o600 });
     await fs.writeFile(path.join(directory, "report.md"), p.body, { mode: 0o600 });
-    const launcher = path.join(directory, "Investigate Otter Mail.command");
+    const launcher = path.join(directory, hostOS.terminals.launcher.fileName);
     await fs.writeFile(
       launcher,
       buildSupportLauncher({
@@ -156,10 +160,11 @@ export function registerSupportHandlers(): void {
         agent: agent.id,
         directory,
         searchPath: process.env.PATH ?? "/usr/bin:/bin",
+        shebang: hostOS.terminals.launcher.shebang,
       }),
       { mode: 0o700 },
     );
-    await openSupportTerminal(app.getPath("userData"), launcher).catch(() => {
+    await openSupportTerminal(app.getPath("userData"), hostOS.terminals, launcher).catch(() => {
       throw new Error(
         "Couldn't open your terminal. Choose another terminal in the report actions menu, or download the report.",
       );

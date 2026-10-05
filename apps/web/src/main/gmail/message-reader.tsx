@@ -139,6 +139,7 @@ import type {
 import { features } from "../features";
 import { openLink } from "../browser/store";
 import { AttachmentPreview, attachmentPreview, type PreviewFile } from "./attachment-preview";
+import { isModClick } from "../keybindings/keys";
 
 type MessageReaderProps = {
   accountId: string;
@@ -761,7 +762,7 @@ function HtmlBody({
           console.log("[MessageBody:linkClick]", { href: raw.slice(0, 60) });
           e.preventDefault();
           if (/^mailto:/i.test(url)) void window.desktopBridge.openExternal(url).catch(() => {});
-          else openLink(url, { flip: e.metaKey });
+          else openLink(url, { flip: isModClick(e) });
         }
       });
       // The click handler above is the fast path, but WKWebView doesn't reliably

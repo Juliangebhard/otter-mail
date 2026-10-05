@@ -3,6 +3,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "re
 import { createPortal } from "react-dom";
 import { XIcon } from "lucide-react";
 import type { KeybindingCommand } from "../keybindings/commands";
+import { isMacPlatform, modKeyName, shortcutText } from "../keybindings/keys";
 import { Btn, IconBtn, cn } from "../gmail/ui";
 import { ShortcutKeys } from "./keycap";
 
@@ -58,7 +59,7 @@ const STOPS: TourStop[] = [
   {
     target: "list",
     title: "Triage from the keyboard",
-    body: "Gmail's keys, so you already know them: move through the list and act without the mouse. ⌘- or ⇧-click selects several; drag them onto a label to file them.",
+    body: `Gmail's keys, so you already know them: move through the list and act without the mouse. ${modKeyName}- or ${isMacPlatform ? "⇧" : "Shift"}-click selects several; drag them onto a label to file them.`,
     keys: [
       { command: "list.next", label: "Next" },
       { command: "message.archive", label: "Archive" },
@@ -89,7 +90,7 @@ const STOPS: TourStop[] = [
     agent: true,
   },
   {
-    title: "Everything else is ⌘K away",
+    title: `Everything else is ${shortcutText("mod+k")} away`,
     body: "Mailboxes, views, messages, themes and actions, all from one search. The keys start out as Gmail's; remap any of them, or add your own, in Settings → Keybindings.",
     keys: [
       { command: "commandPalette.toggle", label: "Command palette" },

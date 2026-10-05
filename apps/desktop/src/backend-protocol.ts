@@ -33,9 +33,9 @@ export type MainEffect =
       body?: string;
       open?: { accountId: string; messageId: string };
     }
-  /** The Dock badge and the menu-bar tooltip. */
+  /** The Dock badge. */
   | { kind: "unread"; count: number }
-  /** Settings main applies itself (open at login, the menu-bar item). */
+  /** Settings main applies itself (open at login, the Dock badge). */
   | { kind: "settings"; settings: AppSettings; patch: Partial<AppSettings> }
   | { kind: "log"; level: Level; scope: string; message: string; data?: string };
 

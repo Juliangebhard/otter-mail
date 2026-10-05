@@ -12,7 +12,7 @@ import path from "path";
 
 import type { TranslationStatus, Translator } from "@otter-mail/core";
 
-import { appInfo } from "../backend-protocol.js";
+import { appInfo } from "../../backend-protocol.js";
 
 const STATUSES: ReadonlySet<string> = new Set(["ok", "notInstalled", "unsupported", "unavailable"]);
 

@@ -87,9 +87,12 @@ export type GmailSearchResult = {
 /** Parsed mailto: link, delivered when OtterMail is the default mail app. */
 export type MailtoTarget = { to: string; cc: string; subject: string; body: string };
 
-/** An installed mailto: handler (Settings default-mail dropdown). */
-export type MailApp = { bundleId: string; name: string; path: string };
-export type MailAppsResult = { apps: MailApp[]; defaultBundleId: string | null };
+/**
+ * An installed mailto: handler (Settings default-mail dropdown), by id: its
+ * bundle identifier on macOS, its .desktop file on Linux.
+ */
+export type MailApp = { id: string; name: string; path: string };
+export type MailAppsResult = { apps: MailApp[]; defaultId: string | null };
 
 /*
  * Agent providers (mirrors main/services/agent/types.ts). A snapshot
@@ -354,7 +357,6 @@ export type SyncSettings = {
   syncIntervalSeconds: number;
   notificationsMode: NotificationsMode;
   launchAtLogin: boolean;
-  trayEnabled: boolean;
   dockBadgeEnabled: boolean;
 };
 
@@ -636,7 +638,7 @@ export const gmailApi = {
   getSettingsTarget: (): Promise<SettingsTarget | null> => ipc("window:getSettingsTarget"),
 
   /** Cmd+click: open a single message in its own window. */
-  /** A conversation the menu-bar popover asked this window to open, if any. */
+  /** A conversation a notification asked this window to open, if any. */
   takePendingOpenMessage: (): Promise<{ accountId: string; messageId: string } | null> =>
     ipc("window:takePendingOpenMessage"),
 
@@ -644,9 +646,9 @@ export const gmailApi = {
 
   getDefaultMailStatus: (): Promise<{ isDefault: boolean }> => ipc("app:getDefaultMailStatus"),
 
-  /** No bundleId = register OtterMail (consent dialog); with one, hand the default to that app. */
-  setDefaultMailApp: (bundleId?: string): Promise<{ ok: boolean }> =>
-    ipc("app:setDefaultMailApp", bundleId ? { bundleId } : undefined),
+  /** No id = register Otter Mail itself; with one, hand the default to that app. */
+  setDefaultMailApp: (id?: string): Promise<{ ok: boolean }> =>
+    ipc("app:setDefaultMailApp", id ? { id } : undefined),
 
   listMailApps: (): Promise<MailAppsResult> => ipc("app:listMailApps"),
 

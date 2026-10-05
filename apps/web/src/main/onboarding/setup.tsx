@@ -68,6 +68,8 @@ import {
   useThemeChoice,
 } from "../theme/apply-theme";
 import { features } from "../features";
+import { shortcutText } from "../keybindings/keys";
+import { osNames } from "../os-names";
 import { KEY_DRILL_COUNT, KeyTrainer } from "./key-trainer";
 import { MailField } from "./mail-field";
 import { ShortcutKeys } from "./keycap";
@@ -310,7 +312,7 @@ const PILLARS: { icon: ReactNode; title: string; body: string }[] = [
   {
     icon: <KeyboardIcon />,
     title: "Made for the keyboard",
-    body: "Gmail's shortcuts out of the box, each one yours to remap, and ⌘K for everything else.",
+    body: `Gmail's shortcuts out of the box, each one yours to remap, and ${shortcutText("mod+k")} for everything else.`,
   },
   {
     icon: <MousePointer2Icon />,
@@ -632,7 +634,7 @@ function HabitsStep() {
     }
   };
 
-  const onMac = features.launchAtLogin || features.menuBar || features.defaultMailApp;
+  const onComputer = features.launchAtLogin || features.defaultMailApp;
 
   return (
     <>
@@ -674,9 +676,9 @@ function HabitsStep() {
         </div>
       </div>
 
-      {onMac ? (
+      {onComputer ? (
         <div className="mt-8">
-          <SectionTitle>On this Mac</SectionTitle>
+          <SectionTitle>On this {osNames.computer}</SectionTitle>
           <SettingsGroup>
             {features.launchAtLogin ? (
               <SettingsRow
@@ -691,23 +693,10 @@ function HabitsStep() {
                 }
               />
             ) : null}
-            {features.menuBar ? (
-              <SettingsRow
-                title="Menu-bar inbox"
-                description="Unread mail one click away: open, archive or trash without switching apps."
-                control={
-                  <Switch
-                    checked={settings?.trayEnabled ?? false}
-                    disabled={!settings}
-                    onCheckedChange={(checked) => void update({ trayEnabled: checked })}
-                  />
-                }
-              />
-            ) : null}
             {features.defaultMailApp ? (
               <SettingsRow
                 title="Default mail app"
-                description="Email links everywhere on your Mac open a new message here."
+                description={`Email links everywhere on your ${osNames.computer} open a new message here.`}
                 control={
                   isDefaultMail ? (
                     <span className="flex items-center gap-1.5 text-[13px] text-muted-foreground">

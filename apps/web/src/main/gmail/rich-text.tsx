@@ -20,6 +20,7 @@ import {
   RemoveFormattingIcon,
 } from "lucide-react";
 import { cn } from "./ui";
+import { shortcutText } from "../keybindings/keys";
 
 /** Marks the signature block inside the editor. */
 const SIGNATURE_ATTR = "data-signature";
@@ -291,42 +292,62 @@ export const RichTextArea = forwardRef<
           !showToolbar && "hidden",
         )}
       >
-        <ToolBtn label="Bold (⌘B)" active={toolbar.bold} onClick={() => exec("bold")}>
+        <ToolBtn
+          label={`Bold (${shortcutText("mod+b")})`}
+          active={toolbar.bold}
+          onClick={() => exec("bold")}
+        >
           <BoldIcon className="size-4" />
         </ToolBtn>
-        <ToolBtn label="Italic (⌘I)" active={toolbar.italic} onClick={() => exec("italic")}>
+        <ToolBtn
+          label={`Italic (${shortcutText("mod+i")})`}
+          active={toolbar.italic}
+          onClick={() => exec("italic")}
+        >
           <ItalicIcon className="size-4" />
         </ToolBtn>
         <ToolBtn
-          label="Underline (⌘U)"
+          label={`Underline (${shortcutText("mod+u")})`}
           active={toolbar.underline}
           onClick={() => exec("underline")}
         >
           <UnderlineIcon className="size-4" />
         </ToolBtn>
         <ToolBtn
-          label="Strikethrough (⇧⌘X)"
+          label={`Strikethrough (${shortcutText("mod+shift+x")})`}
           active={toolbar.strike}
           onClick={() => exec("strikeThrough")}
         >
           <StrikethroughIcon className="size-4" />
         </ToolBtn>
         <span className="mx-1 h-4 w-px shrink-0 bg-border" aria-hidden />
-        <ToolBtn label="Link (⌘K)" onClick={openLinkInput}>
+        <ToolBtn label={`Link (${shortcutText("mod+k")})`} onClick={openLinkInput}>
           <Link2Icon className="size-4" />
         </ToolBtn>
         <span className="mx-1 h-4 w-px shrink-0 bg-border" aria-hidden />
-        <ToolBtn label="Bulleted list (⇧⌘8)" onClick={() => exec("insertUnorderedList")}>
+        <ToolBtn
+          label={`Bulleted list (${shortcutText("mod+shift+8")})`}
+          onClick={() => exec("insertUnorderedList")}
+        >
           <ListIcon className="size-4" />
         </ToolBtn>
-        <ToolBtn label="Numbered list (⇧⌘7)" onClick={() => exec("insertOrderedList")}>
+        <ToolBtn
+          label={`Numbered list (${shortcutText("mod+shift+7")})`}
+          onClick={() => exec("insertOrderedList")}
+        >
           <ListOrderedIcon className="size-4" />
         </ToolBtn>
-        <ToolBtn label="Quote (⇧⌘9)" onClick={() => exec("formatBlock", "blockquote")}>
+        <ToolBtn
+          label={`Quote (${shortcutText("mod+shift+9")})`}
+          onClick={() => exec("formatBlock", "blockquote")}
+        >
           <TextQuoteIcon className="size-4" />
         </ToolBtn>
         <span className="mx-1 h-4 w-px shrink-0 bg-border" aria-hidden />
-        <ToolBtn label="Clear formatting (⌘\\)" onClick={() => exec("removeFormat")}>
+        <ToolBtn
+          label={`Clear formatting (${shortcutText("mod+\\")})`}
+          onClick={() => exec("removeFormat")}
+        >
           <RemoveFormattingIcon className="size-4" />
         </ToolBtn>
       </div>

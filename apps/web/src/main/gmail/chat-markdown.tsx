@@ -3,6 +3,7 @@ import Markdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 import { openLink } from "../browser/store";
+import { isModClick } from "../keybindings/keys";
 
 const COMPONENTS: Components = {
   p: ({ children }) => <p className="whitespace-pre-wrap">{children}</p>,
@@ -11,7 +12,7 @@ const COMPONENTS: Components = {
       href={href}
       onClick={(e) => {
         e.preventDefault();
-        if (href) openLink(href, { flip: e.metaKey });
+        if (href) openLink(href, { flip: isModClick(e) });
       }}
       className="text-primary underline underline-offset-2 hover:opacity-80"
     >

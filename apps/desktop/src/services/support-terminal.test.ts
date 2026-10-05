@@ -6,8 +6,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test"
 const fixture = vi.hoisted(() => ({
   calls: vi.fn(),
   apps: [
-    { bundleId: "com.mitchellh.ghostty", name: "Ghostty" },
-    { bundleId: "com.apple.Terminal", name: "Terminal" },
+    { id: "com.mitchellh.ghostty", name: "Ghostty" },
+    { id: "com.apple.Terminal", name: "Terminal" },
   ],
 }));
 vi.mock("node:child_process", () => ({
@@ -24,8 +24,13 @@ vi.mock("node:child_process", () => ({
     },
   }),
 }));
-const { getSupportTerminals, openSupportTerminal, setSupportTerminal } =
-  await import("./support-terminal.js");
+const support = await import("./support-terminal.js");
+const { macTerminals } = await import("../os/mac/terminals.js");
+const getSupportTerminals = (home: string) => support.getSupportTerminals(home, macTerminals);
+const setSupportTerminal = (home: string, id: unknown) =>
+  support.setSupportTerminal(home, macTerminals, id);
+const openSupportTerminal = (home: string, launcher: string) =>
+  support.openSupportTerminal(home, macTerminals, launcher);
 let home: string;
 beforeEach(async () => {
   home = await fs.mkdtemp(path.join(os.tmpdir(), "otter-terminal-test-"));
@@ -35,18 +40,18 @@ afterEach(async () => {
   await fs.rm(home, { recursive: true, force: true });
 });
 
-describe("support terminal preference", () => {
+describe("support terminal preference (macOS)", () => {
   it("follows macOS's file association until a terminal is chosen", async () => {
     const launcher = path.join(home, "Investigate Otter Mail.command");
     await openSupportTerminal(home, launcher);
     expect(fixture.calls).toHaveBeenCalledExactlyOnceWith("/usr/bin/open", [launcher]);
-    expect((await getSupportTerminals(home)).selectedBundleId).toBeNull();
+    expect((await getSupportTerminals(home)).selectedId).toBeNull();
   });
 
   it("remembers Ghostty locally and sends the launcher as a literal file argument", async () => {
     const selected = await setSupportTerminal(home, "com.mitchellh.ghostty");
-    expect(selected.selectedBundleId).toBe("com.mitchellh.ghostty");
-    expect((await getSupportTerminals(home)).selectedBundleId).toBe("com.mitchellh.ghostty");
+    expect(selected.selectedId).toBe("com.mitchellh.ghostty");
+    expect((await getSupportTerminals(home)).selectedId).toBe("com.mitchellh.ghostty");
     expect((await fs.stat(path.join(home, "support-terminal.json"))).mode & 0o777).toBe(0o600);
     const launcher = path.join(home, "a 'quoted' $(touch PWNED).command");
     await openSupportTerminal(home, launcher);
@@ -67,7 +72,7 @@ describe("support terminal preference", () => {
       path.join(home, "support-terminal.json"),
       JSON.stringify("removed.terminal"),
     );
-    expect((await getSupportTerminals(home)).selectedBundleId).toBeNull();
+    expect((await getSupportTerminals(home)).selectedId).toBeNull();
     await openSupportTerminal(home, "launcher.command");
     expect(fixture.calls).toHaveBeenLastCalledWith("/usr/bin/open", ["launcher.command"]);
   });

@@ -12,10 +12,11 @@ import { registerHandlers } from "./handlers/index.js";
 import { requestSupportReport } from "./handlers/support.js";
 import { broadcast } from "./ipc.js";
 import { logger, logToFile } from "./logger.js";
+import { hostOS } from "./os/index.js";
+import type { AppMenuItems } from "./os/types.js";
 import { configureAppPaths } from "./paths.js";
 import { focusedBrowserPage, setupBrowser } from "./services/browser.js";
 import { parseMailtoUrl, setPendingMailto } from "./services/mailto-target.js";
-import { createTray, destroyTray } from "./services/tray.js";
 import { initUpdates } from "./updates.js";
 import { setSettingsTarget } from "./windows/settings-window.js";
 import { createMainWindow, focusMainWindow, getMainWindow } from "./windows/main-window.js";
@@ -47,13 +48,12 @@ if (!app.requestSingleInstanceLock()) {
 registerRendererScheme();
 
 // ── mailto: handling (default mail app) ───────────────────────────────
-// Clicking a mailto link anywhere in macOS lands here once Otter Mail is the
-// default mail app. Stash the parsed target (the renderer pulls it via
-// app:takePendingMailto on mount — covers cold starts) and nudge any live
-// main window via broadcast. Registered before `ready`: cold starts deliver
-// the URL early.
-app.on("open-url", (event, url) => {
-  event.preventDefault();
+// Clicking a mailto link anywhere on the computer lands here once Otter Mail
+// is the default mail app: macOS sends it as `open-url`, Linux starts the app
+// with it as an argument (a running app hears of it as a second instance).
+// Stash the parsed target (the renderer pulls it via app:takePendingMailto on
+// mount — covers cold starts) and nudge any live main window via broadcast.
+function openMailto(url: string): void {
   const target = parseMailtoUrl(url);
   logger.info("main", "open-url", { mailto: target != null });
   if (!target) return;
@@ -61,10 +61,22 @@ app.on("open-url", (event, url) => {
   if (app.isReady()) {
     void focusMainWindow().then(() => broadcast("compose:mailto"));
   }
-});
+}
 
-app.on("second-instance", () => {
-  void focusMainWindow();
+const mailtoArgument = (argv: string[]) => argv.find((arg) => /^mailto:/i.test(arg));
+
+// Registered before `ready`: cold starts deliver the URL early.
+app.on("open-url", (event, url) => {
+  event.preventDefault();
+  openMailto(url);
+});
+const launchMailto = mailtoArgument(process.argv);
+if (launchMailto) openMailto(launchMailto);
+
+app.on("second-instance", (_event, argv) => {
+  const url = mailtoArgument(argv);
+  if (url) openMailto(url);
+  else void focusMainWindow();
 });
 
 // ── Appearance ────────────────────────────────────────────────────────
@@ -130,234 +142,197 @@ ipcMain.handle("window:closeMain", () => {
 });
 
 // ── Application menu ──────────────────────────────────────────────────
+// The items are the same everywhere; each OS arranges them (HostOS.applicationMenu).
 function setupApplicationMenu(): void {
   const isMainFocused = () => {
     const focused = BrowserWindow.getFocusedWindow();
     return focused != null && focused === getMainWindow();
   };
 
-  const menu = Menu.buildFromTemplate([
-    {
-      label: app.getName(),
-      submenu: [
-        { role: "about" },
-        {
-          label: "Check for Updates…",
-          click: () => {
-            void focusMainWindow().then(() => broadcast("updates:checkRequested"));
-          },
-        },
-        { type: "separator" },
-        {
-          label: "Settings…",
-          accelerator: "Command+,",
-          click: async () => {
-            setSettingsTarget({});
-            await focusMainWindow();
-            broadcast("settings:open");
-          },
-        },
-        { type: "separator" },
-        { role: "services" },
-        { type: "separator" },
-        { role: "hide" },
-        { role: "hideOthers" },
-        { role: "unhide" },
-        { type: "separator" },
-        { role: "quit" },
-      ],
+  const items: AppMenuItems = {
+    about: { role: "about" },
+    checkForUpdates: {
+      label: "Check for Updates…",
+      click: () => {
+        void focusMainWindow().then(() => broadcast("updates:checkRequested"));
+      },
     },
-    {
-      label: "File",
-      submenu: [
-        // Otter Code's ⌘W: closes the active chat tab first; the window only
-        // closes once there's no tab left to close. The main window decides
-        // (window:closeRequest → agent tab, or window:closeMain).
-        {
-          label: "Close",
-          accelerator: "Command+W",
-          click: () => {
-            if (isMainFocused()) {
-              broadcast("window:closeRequest");
-              return;
-            }
-            BrowserWindow.getFocusedWindow()?.close();
-          },
-        },
-        { type: "separator" },
-        // The agent panel's browser (services/browser.ts).
-        {
-          label: "New Tab",
-          accelerator: "Command+T",
-          click: (_item, _window, event) => {
-            if (event.triggeredByAccelerator) {
-              if (isMainFocused())
-                getMainWindow()?.webContents.send("keybindings:keydown", {
-                  key: "t",
-                  metaKey: true,
-                });
-              return;
-            }
-            void focusMainWindow().then(() => broadcast("browser:newTab"));
-          },
-        },
-        {
-          label: "Open Location…",
-          accelerator: "Command+L",
-          click: () => void focusMainWindow().then(() => broadcast("browser:focusAddress")),
-        },
-      ],
+    settings: {
+      label: "Settings…",
+      click: async () => {
+        setSettingsTarget({});
+        await focusMainWindow();
+        broadcast("settings:open");
+      },
     },
-    {
-      label: "Edit",
-      submenu: [
-        // ⌘Z undoes the last mail action (archive, move, send…), ⇧⌘Z redoes
-        // it — but text fields keep their own undo: the main window decides
-        // (edit:undo → mail undo, or edit:nativeUndo back to the page). A
-        // browser tab's page undoes its own typing.
-        {
-          label: "Undo",
-          accelerator: "CommandOrControl+Z",
-          click: () => {
-            const page = focusedBrowserPage();
-            if (page) {
-              page.undo();
-              return;
-            }
-            if (isMainFocused()) {
-              broadcast("edit:undo");
-              return;
-            }
-            BrowserWindow.getFocusedWindow()?.webContents.undo();
-          },
+    file: [
+      // Otter Code's ⌘W: closes the active chat tab first; the window only
+      // closes once there's no tab left to close. The main window decides
+      // (window:closeRequest → agent tab, or window:closeMain).
+      {
+        label: "Close",
+        accelerator: "CommandOrControl+W",
+        click: () => {
+          if (isMainFocused()) {
+            broadcast("window:closeRequest");
+            return;
+          }
+          BrowserWindow.getFocusedWindow()?.close();
         },
-        {
-          label: "Redo",
-          accelerator: "Shift+CommandOrControl+Z",
-          click: () => {
-            const page = focusedBrowserPage();
-            if (page) {
-              page.redo();
-              return;
-            }
-            if (isMainFocused()) {
-              broadcast("edit:redo");
-              return;
-            }
-            BrowserWindow.getFocusedWindow()?.webContents.redo();
-          },
+      },
+      { type: "separator" },
+      // The agent panel's browser (services/browser.ts).
+      {
+        label: "New Tab",
+        accelerator: "CommandOrControl+T",
+        click: (_item, _window, event) => {
+          if (event.triggeredByAccelerator) {
+            if (isMainFocused())
+              getMainWindow()?.webContents.send("keybindings:keydown", {
+                key: "t",
+                [hostOS.modifierKey]: true,
+              });
+            return;
+          }
+          void focusMainWindow().then(() => broadcast("browser:newTab"));
         },
-        { type: "separator" },
-        { role: "cut" },
-        { role: "copy" },
-        { role: "paste" },
-        { role: "pasteAndMatchStyle" },
-        { role: "delete" },
-        { role: "selectAll" },
-        { type: "separator" },
-        {
-          label: "Speech",
-          submenu: [{ role: "startSpeaking" }, { role: "stopSpeaking" }],
+      },
+      {
+        label: "Open Location…",
+        accelerator: "CommandOrControl+L",
+        click: () => void focusMainWindow().then(() => broadcast("browser:focusAddress")),
+      },
+    ],
+    edit: [
+      // ⌘Z undoes the last mail action (archive, move, send…), ⇧⌘Z redoes
+      // it — but text fields keep their own undo: the main window decides
+      // (edit:undo → mail undo, or edit:nativeUndo back to the page). A
+      // browser tab's page undoes its own typing.
+      {
+        label: "Undo",
+        accelerator: "CommandOrControl+Z",
+        click: () => {
+          const page = focusedBrowserPage();
+          if (page) {
+            page.undo();
+            return;
+          }
+          if (isMainFocused()) {
+            broadcast("edit:undo");
+            return;
+          }
+          BrowserWindow.getFocusedWindow()?.webContents.undo();
         },
-      ],
-    },
-    {
-      // No plain Reload: ⌘R belongs to Sync Now. Force Reload (⇧⌘R) stays for
-      // when the page really needs reloading.
-      label: "View",
-      submenu: [
-        { role: "forceReload" },
-        { role: "toggleDevTools" },
-        { type: "separator" },
-        { role: "resetZoom" },
-        { role: "zoomIn" },
-        { role: "zoomOut" },
-        { type: "separator" },
-        { role: "togglefullscreen" },
-      ],
-    },
-    {
-      label: "Go",
-      // Through the mail's history, or a focused browser tab's.
-      submenu: [
-        {
-          label: "Back",
-          accelerator: "Command+[",
-          click: () => {
-            const page = focusedBrowserPage();
-            if (page) page.navigationHistory.goBack();
-            else broadcast("nav:back");
-          },
+      },
+      {
+        label: "Redo",
+        accelerator: "Shift+CommandOrControl+Z",
+        click: () => {
+          const page = focusedBrowserPage();
+          if (page) {
+            page.redo();
+            return;
+          }
+          if (isMainFocused()) {
+            broadcast("edit:redo");
+            return;
+          }
+          BrowserWindow.getFocusedWindow()?.webContents.redo();
         },
-        {
-          label: "Forward",
-          accelerator: "Command+]",
-          click: () => {
-            const page = focusedBrowserPage();
-            if (page) page.navigationHistory.goForward();
-            else broadcast("nav:forward");
-          },
+      },
+      { type: "separator" },
+      { role: "cut" },
+      { role: "copy" },
+      { role: "paste" },
+      { role: "pasteAndMatchStyle" },
+      { role: "delete" },
+      { role: "selectAll" },
+    ],
+    // No plain Reload: ⌘R belongs to Sync Now. Force Reload (⇧⌘R) stays for
+    // when the page really needs reloading.
+    view: [
+      { role: "forceReload" },
+      { role: "toggleDevTools" },
+      { type: "separator" },
+      { role: "resetZoom" },
+      { role: "zoomIn" },
+      { role: "zoomOut" },
+      { type: "separator" },
+      { role: "togglefullscreen" },
+    ],
+    // Through the mail's history, or a focused browser tab's.
+    go: [
+      {
+        label: "Back",
+        accelerator: "CommandOrControl+[",
+        click: () => {
+          const page = focusedBrowserPage();
+          if (page) page.navigationHistory.goBack();
+          else broadcast("nav:back");
         },
-      ],
-    },
-    {
-      label: "Mailbox",
-      submenu: [
-        // ⌘R refreshes mail like the sidebar's Sync button (with its spinner)
-        // instead of reloading the page; see the View menu below. In a
-        // focused browser tab it reloads that page, as in a browser.
-        {
-          label: "Sync Now",
-          accelerator: "Command+R",
-          click: () => {
-            const page = focusedBrowserPage();
-            if (page) {
-              page.reload();
-              return;
-            }
-            logger.info("main", "Menu: Sync Now");
-            broadcast("mail:syncNow");
-          },
+      },
+      {
+        label: "Forward",
+        accelerator: "CommandOrControl+]",
+        click: () => {
+          const page = focusedBrowserPage();
+          if (page) page.navigationHistory.goForward();
+          else broadcast("nav:forward");
         },
-        {
-          label: "Synchronize All Mailboxes",
-          accelerator: "Shift+Command+N",
-          click: () => {
-            logger.info("main", "Menu: Synchronize All Mailboxes");
-            void invokeBackend("tray:sync");
-          },
+      },
+    ],
+    mailbox: [
+      // ⌘R refreshes mail like the sidebar's Sync button (with its spinner)
+      // instead of reloading the page; see the View menu. In a focused
+      // browser tab it reloads that page, as in a browser.
+      {
+        label: "Sync Now",
+        accelerator: "CommandOrControl+R",
+        click: () => {
+          const page = focusedBrowserPage();
+          if (page) {
+            page.reload();
+            return;
+          }
+          logger.info("main", "Menu: Sync Now");
+          broadcast("mail:syncNow");
         },
-      ],
-    },
-    { role: "windowMenu" },
-    {
-      role: "help",
-      submenu: [
-        {
-          label: "Send Feedback…",
-          click: () => {
-            requestSupportReport();
-            void focusMainWindow().then(() => broadcast("support:open"));
-          },
+      },
+      {
+        label: "Synchronize All Mailboxes",
+        accelerator: "Shift+CommandOrControl+N",
+        click: () => {
+          logger.info("main", "Menu: Synchronize All Mailboxes");
+          void invokeBackend("desktop:syncAll");
         },
-      ],
-    },
-  ]);
-  Menu.setApplicationMenu(menu);
+      },
+    ],
+    help: [
+      {
+        label: "Send Feedback…",
+        click: () => {
+          requestSupportReport();
+          void focusMainWindow().then(() => broadcast("support:open"));
+        },
+      },
+    ],
+  };
+  Menu.setApplicationMenu(Menu.buildFromTemplate(hostOS.applicationMenu(items)));
 }
 
 // ── Lifecycle events ──────────────────────────────────────────────────
-// As in T3 Code: closing the window (⌘W, the red button) leaves the app
-// running in the background, where mail keeps syncing and notifying; the Dock
-// icon or the menu bar brings the window back. ⌘Q quits.
-app.on("window-all-closed", () => {});
+// Closing the window may leave the app running in the background, where mail
+// keeps syncing and notifying, as long as the OS can bring the window back
+// (HostOS.runsWithoutWindows).
+app.on("window-all-closed", () => {
+  if (!hostOS.runsWithoutWindows) app.quit();
+});
 
 app.on("activate", (_event, hasVisibleWindows) => {
   if (!hasVisibleWindows) void focusMainWindow();
 });
 
 app.on("will-quit", () => {
-  destroyTray();
   // It stops the assistants' processes (Codex app-servers) on its way out.
   stopBackend();
 });
@@ -371,6 +346,7 @@ void app.whenReady().then(async () => {
   });
 
   restoreThemeSource();
+  hostOS.prepareSecrets();
   handleRendererProtocol();
   app.setAboutPanelOptions({
     applicationName: app.getName(),
@@ -386,10 +362,7 @@ void app.whenReady().then(async () => {
 
   const startupSettings = (await invokeBackend("gmail:getSyncSettings")) as AppSettings;
   if (app.isPackaged) {
-    app.setLoginItemSettings({ openAtLogin: startupSettings.launchAtLogin });
-  }
-  if (startupSettings.trayEnabled) {
-    void createTray();
+    hostOS.setLaunchAtLogin(startupSettings.launchAtLogin);
   }
   setDockBadgeEnabled(startupSettings.dockBadgeEnabled);
 
