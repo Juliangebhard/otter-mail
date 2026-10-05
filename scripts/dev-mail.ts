@@ -44,8 +44,21 @@ const docker = (args: string[], input?: string) =>
 function makeCertificates(): void {
   if (NodeFS.existsSync(NodePath.join(certDir, "tls.crt"))) return;
   NodeFS.mkdirSync(certDir, { recursive: true });
+  // As you rather than the image's user (vmail), who can't write here on Linux.
+  const user = `${process.getuid!()}:${process.getgid!()}`;
   const openssl = (args: string[]) =>
-    docker(["run", "--rm", "-v", `${certDir}:/out`, "--entrypoint", "openssl", DOVECOT, ...args]);
+    docker([
+      "run",
+      "--rm",
+      "--user",
+      user,
+      "-v",
+      `${certDir}:/out`,
+      "--entrypoint",
+      "openssl",
+      DOVECOT,
+      ...args,
+    ]);
   const key = ["-newkey", "ec", "-pkeyopt", "ec_paramgen_curve:P-256", "-nodes", "-days", "825"];
   openssl([
     "req",
@@ -81,6 +94,8 @@ function makeCertificates(): void {
     "-out",
     "/out/tls.crt",
   ]);
+  // Dovecot reads them through its mounts as vmail: a localhost certificate, for this machine.
+  for (const file of ["tls.key", "tls.crt"]) NodeFS.chmodSync(NodePath.join(certDir, file), 0o644);
 }
 
 async function waitForImap(): Promise<void> {
