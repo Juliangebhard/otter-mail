@@ -1,7 +1,7 @@
 # IMAP mailboxes
 
-Otter Mail reads Gmail through the Gmail API, and every other mailbox through IMAP (sending over
-SMTP). The Otter account itself stays a Google sign-in (better-auth). This is how the two
+Otter Mail reads Gmail through the Gmail API, and other mailboxes through IMAP (sending over
+SMTP). Outlook mailboxes use Microsoft OAuth with IMAP and SMTP on the desktop. The Otter account itself stays a Google sign-in (better-auth). This is how the two
 providers sit side by side, and where a third (Outlook, Microsoft Graph) would go.
 
 ## Layers
@@ -90,7 +90,14 @@ Its own Swift implementation of the same design: a `MailProvider` protocol with 
 Gmail client and an IMAP one (Network.framework, TLS by the system), IDLE while the app is in
 the foreground, and the same folder ↔ label mapping, so its lists and drawer work unchanged.
 
-## Adding a provider later
+## Outlook on the desktop
 
-Outlook: an OAuth sign-in (like Google's) and either IMAP with XOAUTH2 (the IMAP provider with
-another way to log in) or a Microsoft Graph provider next to `gmail/` and `imap/`.
+Outlook.com and Microsoft 365 mailboxes use the existing IMAP provider with SASL XOAUTH2.
+The `auth: "microsoft"` field on `ImapSettings` follows the Otter account so another desktop
+knows to ask for Microsoft sign-in. Access and refresh tokens stay in that desktop's sealed
+secret store. The sign-in uses a public Microsoft Entra client, authorization code with PKCE,
+and a one-shot localhost callback. The desktop refreshes access tokens before they expire.
+See [Outlook setup](integrations/outlook.md) for registration and server requirements.
+
+The browser and iPhone do not offer Microsoft sign-in yet. A Microsoft mailbox linked on the
+desktop can appear signed out there; neither asks for an IMAP password for it.

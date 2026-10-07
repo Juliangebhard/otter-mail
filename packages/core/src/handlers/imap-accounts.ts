@@ -8,6 +8,7 @@
 import { IMAP_CAPABILITIES, type ImapSettings, type MailServer } from "@otter-mail/contracts/mail";
 
 import { broadcast, handle } from "../ipc.js";
+import { platform } from "../platform.js";
 import { MailProtocolError, connectImap, connectSmtp } from "../protocols/index.js";
 import * as accountStore from "../services/account-store.js";
 import { appPasswordUrl, discoverImap, mxHosts, servesImap } from "../services/imap-discovery.js";
@@ -16,6 +17,7 @@ import { accountAdded } from "../services/linked-accounts.js";
 import * as mailSync from "../services/mail-sync.js";
 import { syncedSignature } from "../services/preferences.js";
 import type { GmailAccount } from "../types.js";
+import { runAsTask } from "./ipc-budget.js";
 
 const VERIFY_TIMEOUT_MS = 20_000;
 
@@ -24,6 +26,9 @@ function describe(err: unknown, server: MailServer, settings: ImapSettings): str
   const message = err instanceof Error ? err.message : String(err);
   if (!(err instanceof MailProtocolError)) return message;
   if (err.kind === "auth") {
+    if (settings.auth === "microsoft") {
+      return `${server.host} rejected Microsoft sign-in for ${settings.username}. Check that IMAP and SMTP AUTH are enabled for this mailbox, then sign in again.`;
+    }
     const appPasswords = appPasswordUrl(settings.imap.host);
     return appPasswords
       ? `${server.host} didn't accept the password for ${settings.username}. It needs an app password, which you can make at ${appPasswords}.`
@@ -57,7 +62,10 @@ export async function verifyLogin(
   password: string,
   email?: string,
 ): Promise<void> {
-  const auth = { user: settings.username, pass: password };
+  const auth =
+    settings.auth === "microsoft"
+      ? { user: settings.username, accessToken: password }
+      : { user: settings.username, pass: password };
   try {
     const imap = await connectImap({ ...settings.imap, auth, timeoutMs: VERIFY_TIMEOUT_MS });
     await imap.logout();
@@ -97,6 +105,7 @@ function settings(value: unknown): ImapSettings {
   const raw = (value ?? {}) as Partial<ImapSettings>;
   return {
     username: text(raw.username, "Username"),
+    ...(raw.auth === "microsoft" ? { auth: "microsoft" as const } : {}),
     imap: server(raw.imap, "IMAP"),
     smtp: server(raw.smtp, "SMTP"),
   };
@@ -118,6 +127,7 @@ export async function addImapAccount(params: unknown): Promise<GmailAccount> {
   const password = typeof p.password === "string" ? p.password : "";
   if (!password) throw new Error("Password is required.");
   const imap = settings(p.imap);
+  if (imap.auth === "microsoft") throw new Error("Use Microsoft sign-in for Outlook mailboxes.");
   const id = email.toLowerCase();
   const existing = await accountStore.getAccount(id);
   if (existing && existing.provider !== "imap") throw new Error(`${email} is already added.`);
@@ -142,6 +152,51 @@ export async function addImapAccount(params: unknown): Promise<GmailAccount> {
   return withCapabilities(account);
 }
 
+/** Microsoft OAuth, then XOAUTH2 over Outlook's IMAP and SMTP servers. */
+export async function addOutlookAccount(params: unknown): Promise<GmailAccount> {
+  const p = (params ?? {}) as Record<string, unknown>;
+  const email = text(p.email, "Email").toLowerCase();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new Error("Enter a valid email address.");
+  const microsoft = platform().microsoft;
+  if (!microsoft) throw new Error("Microsoft sign-in is not available in this app yet.");
+  const existing = await accountStore.getAccount(email);
+  if (existing && (existing.provider !== "imap" || existing.imap?.auth !== "microsoft")) {
+    throw new Error(`${email} is already added.`);
+  }
+  const personal = /@(outlook\.|hotmail\.|live\.|msn\.)/i.test(email);
+  const imap: ImapSettings = {
+    username: email,
+    auth: "microsoft",
+    imap: { host: "outlook.office365.com", port: 993, security: "tls" },
+    smtp: {
+      host: personal ? "smtp-mail.outlook.com" : "smtp.office365.com",
+      port: 587,
+      security: "starttls",
+    },
+  };
+  await microsoft.signIn(email);
+  try {
+    await verifyLogin(imap, await microsoft.getAccessToken(email), email);
+  } catch (err) {
+    await microsoft.removeTokens(email);
+    throw err;
+  }
+  const account: GmailAccount = {
+    ...existing,
+    id: email,
+    email,
+    name: existing?.name ?? email,
+    provider: "imap",
+    imap,
+    signature: existing?.signature ?? syncedSignature(email),
+  };
+  await accountStore.addAccount(account);
+  await accountAdded(account);
+  mailSync.syncAccount(email, { force: true });
+  broadcast("gmail:accounts-changed");
+  return withCapabilities(account);
+}
+
 /** Signs a mailbox back in on this device with its stored settings. */
 export async function signInImap(params: unknown): Promise<void> {
   const p = (params ?? {}) as Record<string, unknown>;
@@ -152,6 +207,7 @@ export async function signInImap(params: unknown): Promise<void> {
   if (!account?.imap || account.provider !== "imap") {
     throw new Error(`${accountId} isn't an IMAP mailbox.`);
   }
+  if (account.imap.auth === "microsoft") throw new Error("Use Microsoft sign-in for this mailbox.");
   await verifyLogin(account.imap, password, account.email);
   await setImapPassword(account.id, password);
   await accountAdded(account);
@@ -165,4 +221,10 @@ export function registerImapAccountHandlers(): void {
   );
   handle("gmail:addImapAccount", addImapAccount);
   handle("gmail:signInImap", signInImap);
+  handle("gmail:addOutlookAccount", (params: unknown) => {
+    const p = (params ?? {}) as Record<string, unknown>;
+    return runAsTask(typeof p.taskId === "string" ? p.taskId : undefined, () =>
+      addOutlookAccount(params),
+    );
+  });
 }

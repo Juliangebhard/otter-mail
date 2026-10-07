@@ -324,6 +324,7 @@ export const webBridge: DesktopBridge = {
     launchAtLogin: false,
     dockBadge: false,
     defaultMailApp: false,
+    outlookMail: false,
     translation: hasBuiltInTranslator,
     dragOut: false,
     openFiles: false,

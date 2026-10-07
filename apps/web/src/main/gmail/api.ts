@@ -423,6 +423,8 @@ export const gmailApi = {
   /** Adds an IMAP mailbox once its login and SMTP work; rejects with a readable message. */
   addImapAccount: (params: AddImapAccountParams): Promise<GmailAccount> =>
     ipc("gmail:addImapAccount", params),
+  addOutlookAccount: (email: string): Promise<GmailAccount> =>
+    task("gmail:addOutlookAccount", { email }),
   /** Signs an IMAP mailbox in on this device (its password never syncs). */
   signInImap: (accountId: string, password: string): Promise<void> =>
     ipc("gmail:signInImap", { accountId, password }),

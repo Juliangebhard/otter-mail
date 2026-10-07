@@ -70,7 +70,10 @@ export async function removeLocalAccount(accountId: string): Promise<void> {
   mailSync.forgetAccount(accountId);
   forgetLiveCursors(accountId);
   await findProvider(accountId)?.removeAccount(accountId);
-  if (providerKindOf(accountId) === "imap") await deleteImapPassword(accountId);
+  if (providerKindOf(accountId) === "imap") {
+    await deleteImapPassword(accountId);
+    await platform().microsoft?.removeTokens(accountId);
+  }
   await storeRemoveAccount(accountId);
   mailStore.removeAccountData(accountId);
   updateDockBadge();

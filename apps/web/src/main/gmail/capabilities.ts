@@ -20,7 +20,7 @@ export function useCapabilities(accountId: string | null | undefined): MailCapab
 
 /** Signs in with a password on each device (IMAP) rather than with Google. */
 export function signsInWithPassword(account: GmailAccount): boolean {
-  return account.imap != null;
+  return account.imap != null && account.imap.auth !== "microsoft";
 }
 
 /** Where the account's mail lives, for copy like "Nothing is deleted from Gmail". */

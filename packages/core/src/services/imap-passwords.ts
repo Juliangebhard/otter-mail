@@ -17,7 +17,7 @@ const secretName = (accountId: string) => `imap-password:${accountId}`;
 export async function loadImapPasswords(): Promise<void> {
   passwords.clear();
   for (const account of await listAccounts()) {
-    if (account.provider !== "imap") continue;
+    if (account.provider !== "imap" || account.imap?.auth === "microsoft") continue;
     const password = await platform()
       .secrets.get(secretName(account.id))
       .catch(() => null);

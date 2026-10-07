@@ -63,6 +63,8 @@ export interface BridgeFeatures {
   dockBadge: boolean;
   /** Being the computer's default mail app (mailto: links). */
   defaultMailApp: boolean;
+  /** Microsoft OAuth for Outlook mailboxes. */
+  outlookMail: boolean;
   /** On-device translation (Apple's on macOS, the browser's built-in one on the web). */
   translation: boolean;
   /** Dragging attachments out to the file manager (Finder, Files). */

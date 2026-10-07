@@ -423,7 +423,12 @@ authed.put(
       idToken: z.string().optional(),
       provider: z.enum(["gmail", "imap"]).optional(),
       imap: z
-        .object({ username: z.string().min(1).max(320), imap: mailServer, smtp: mailServer })
+        .object({
+          username: z.string().min(1).max(320),
+          auth: z.literal("microsoft").optional(),
+          imap: mailServer,
+          smtp: mailServer,
+        })
         .optional(),
       name: profileField,
       picture: profileField,

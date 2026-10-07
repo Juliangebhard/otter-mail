@@ -56,6 +56,15 @@ export interface GoogleAuth {
   removeTokens(accountId: string): Promise<void>;
 }
 
+/** Microsoft OAuth for Outlook mailboxes, with refresh tokens kept on this device. */
+export interface MicrosoftAuth {
+  load(): Promise<void>;
+  signIn(email: string): Promise<void>;
+  isSignedIn(accountId: string): boolean;
+  getAccessToken(accountId: string): Promise<string>;
+  removeTokens(accountId: string): Promise<void>;
+}
+
 /**
  * A TCP connection to a mail server (IMAP, SMTP), TLS already negotiated when
  * asked for. The desktop opens real sockets; the web app tunnels through the
@@ -135,6 +144,7 @@ export interface Platform {
   };
 
   google: GoogleAuth;
+  microsoft?: MicrosoftAuth;
   /** Opens browser consent and returns its callback URL; the backend builds the PKCE URL. */
   todoistSignIn?: (authorize: (redirectUri: string) => Promise<string>) => Promise<string>;
   /**

@@ -11,6 +11,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./select";
 import type { GmailAccount } from "./types";
 import { cn } from "./ui";
+import { features } from "../features";
+import outlookLogoUrl from "../assets/outlook-logo.svg";
 
 /**
  * Adding a mailbox: Gmail (Google's sign-in in the browser) or any other
@@ -38,6 +40,7 @@ export function AddMailboxMenu({
   children: ReactNode;
 }) {
   const [imapOpen, setImapOpen] = useState(false);
+  const [outlookOpen, setOutlookOpen] = useState(false);
   return (
     <>
       <DropdownMenu>
@@ -46,13 +49,87 @@ export function AddMailboxMenu({
           <DropdownMenuItem icon={<MailIcon />} onSelect={onGmail}>
             Gmail
           </DropdownMenuItem>
+          {features.outlookMail ? (
+            <DropdownMenuItem
+              icon={<img src={outlookLogoUrl} alt="" className="size-4 object-contain" />}
+              onSelect={() => setOutlookOpen(true)}
+            >
+              Outlook / Microsoft 365
+            </DropdownMenuItem>
+          ) : null}
           <DropdownMenuItem icon={<ServerIcon />} onSelect={() => setImapOpen(true)}>
             Other mail (IMAP)
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
       <ImapAccountDialog open={imapOpen} onOpenChange={setImapOpen} onAdded={onAdded} />
+      {features.outlookMail ? (
+        <OutlookAccountDialog open={outlookOpen} onOpenChange={setOutlookOpen} onAdded={onAdded} />
+      ) : null}
     </>
+  );
+}
+
+export function OutlookAccountDialog({
+  open,
+  onOpenChange,
+  onAdded,
+  initialEmail = "",
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onAdded?: (account: GmailAccount) => void;
+  initialEmail?: string;
+}) {
+  const [email, setEmail] = useState(initialEmail);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const submit = async () => {
+    const address = email.trim();
+    if (!looksLikeEmail(address)) {
+      setError("Enter your email address.");
+      throw new Error("invalid");
+    }
+    setPending(true);
+    setError(null);
+    try {
+      const account = await gmailApi.addOutlookAccount(address);
+      onAdded?.(account);
+    } catch (err) {
+      setError(readableError(err));
+      throw err;
+    } finally {
+      setPending(false);
+    }
+  };
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        onOpenChange(next);
+        if (!next) {
+          setEmail(initialEmail);
+          setError(null);
+        }
+      }}
+      title="Add Outlook mail"
+      description="Sign in with Microsoft to connect an Outlook.com or Microsoft 365 mailbox."
+      confirmLabel={pending ? "Signing in…" : "Sign in with Microsoft"}
+      confirmDisabled={pending}
+      onConfirm={submit}
+    >
+      <Field label="Email">
+        <Input
+          type="email"
+          autoComplete="username"
+          autoFocus
+          value={email}
+          onChange={(event) => setEmail(event.target.value)}
+          placeholder="you@outlook.com"
+        />
+      </Field>
+      {error ? <p className="mt-3 text-sm text-destructive">{error}</p> : null}
+    </Dialog>
   );
 }
 

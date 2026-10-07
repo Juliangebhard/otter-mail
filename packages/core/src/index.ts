@@ -35,6 +35,7 @@ import { refreshSignatures } from "./services/signatures.js";
 export async function startCore(platform: Platform): Promise<void> {
   setPlatform(platform);
   await platform.google.load();
+  await platform.microsoft?.load();
   await loadImapPasswords();
   await loadOtterAccount();
 
@@ -82,6 +83,7 @@ export { SIGNED_OUT_MESSAGE, SignInCancelledError } from "./google.js";
 export { readJson, writeJson } from "./json-file.js";
 export { logger } from "./logger.js";
 export type * from "./platform.js";
+export { platform } from "./platform.js";
 export * as accountStore from "./services/account-store.js";
 export * as mailStore from "./services/mail-store.js";
 export { runAsTask } from "./handlers/ipc-budget.js";

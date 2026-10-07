@@ -41,6 +41,7 @@ const shared = {
     __GOOGLE_LEGACY_CLIENT_SECRET__: JSON.stringify(
       buildEnv("OTTER_MAIL_GOOGLE_LEGACY_CLIENT_SECRET"),
     ),
+    __MICROSOFT_CLIENT_ID__: JSON.stringify(buildEnv("OTTER_MAIL_MICROSOFT_CLIENT_ID")),
   },
   deps: {
     alwaysBundle: (id: string) => !id.startsWith("node:") && !isExternal(id),

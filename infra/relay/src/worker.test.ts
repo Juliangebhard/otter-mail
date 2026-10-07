@@ -610,6 +610,27 @@ describe("IMAP mailboxes", () => {
   const put = (token: string, email: string, body: unknown) =>
     call("PUT", `/v1/accounts/${encodeURIComponent(email)}`, token, body);
 
+  it("keeps Outlook's OAuth marker with server settings, without credentials", async () => {
+    const { token } = await signIn("outlook-owner@example.com");
+    const outlook = {
+      ...settings,
+      username: "me@outlook.com",
+      auth: "microsoft",
+      password: "do-not-store",
+    };
+    expect((await put(token, "me@outlook.com", { provider: "imap", imap: outlook })).status).toBe(
+      204,
+    );
+    expect((await listAccounts(token)).map((account) => account.imap)).toEqual([
+      {
+        username: "me@outlook.com",
+        auth: "microsoft",
+        imap: settings.imap,
+        smtp: settings.smtp,
+      },
+    ]);
+  });
+
   it("links with settings and no ID token, and updates them", async () => {
     const { token } = await signIn("imap-owner@example.com");
     expect(

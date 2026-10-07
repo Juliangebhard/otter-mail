@@ -18,6 +18,7 @@ import {
   type ImapOptions,
   type SelectedMailbox,
   type SmtpOptions,
+  type MailAuth,
 } from "../../protocols/index.js";
 import { getAccount } from "../../services/account-store.js";
 import { getImapPassword, setAsideImapPassword } from "../../services/imap-passwords.js";
@@ -26,7 +27,7 @@ import type { Lane } from "../provider.js";
 const IDLE_CLOSE_MS = 2 * 60_000;
 
 /** What a signed-in IMAP account needs to reach its servers. */
-export type ImapAccess = { settings: ImapSettings; password: string };
+export type ImapAccess = { settings: ImapSettings; auth: MailAuth; password?: string };
 
 /** Who's asking: background work waits behind the user (quota.ts's tiers, for IMAP). */
 let tierContext: AsyncContext<Lane> | null = null;
@@ -59,28 +60,40 @@ export const isSignInFailure = (err: unknown): boolean =>
 /** Sets the password aside when the server refused it (see setAsideImapPassword). */
 export function noteSignInFailure(accountId: string, access: ImapAccess, err: unknown): void {
   if (err instanceof MailProtocolError && err.kind === "auth") {
-    setAsideImapPassword(accountId, access.password, err.message);
+    if (access.password) setAsideImapPassword(accountId, access.password, err.message);
   }
 }
 
 export async function accessFor(accountId: string): Promise<ImapAccess> {
   const account = await getAccount(accountId);
   if (!account?.imap) throw new Error(`${accountId} isn't an IMAP mailbox.`);
+  if (account.imap.auth === "microsoft") {
+    const microsoft = platform().microsoft;
+    if (!microsoft?.isSignedIn(accountId)) throw new NeedsPassword(account.email);
+    return {
+      settings: account.imap,
+      auth: { user: account.imap.username, accessToken: await microsoft.getAccessToken(accountId) },
+    };
+  }
   const password = getImapPassword(accountId);
   if (!password) throw new NeedsPassword(account.email);
-  return { settings: account.imap, password };
+  return {
+    settings: account.imap,
+    auth: { user: account.imap.username, pass: password },
+    password,
+  };
 }
 
-export function imapOptions({ settings, password }: ImapAccess): ImapOptions {
+export function imapOptions({ settings, auth }: ImapAccess): ImapOptions {
   return {
     ...settings.imap,
-    auth: { user: settings.username, pass: password },
+    auth,
     clientId: { name: "Otter Mail", vendor: "Otterware" },
   };
 }
 
-export function smtpOptions({ settings, password }: ImapAccess): SmtpOptions {
-  return { ...settings.smtp, auth: { user: settings.username, pass: password } };
+export function smtpOptions({ settings, auth }: ImapAccess): SmtpOptions {
+  return { ...settings.smtp, auth };
 }
 
 /** Tags a failure with the server it came from (see describeError). */

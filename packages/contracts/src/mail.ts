@@ -26,6 +26,8 @@ export interface MailServer {
 export interface ImapSettings {
   /** The login, usually the address itself. */
   username: string;
+  /** Outlook uses Microsoft OAuth instead of an account password. */
+  auth?: "microsoft";
   imap: MailServer;
   smtp: MailServer;
 }

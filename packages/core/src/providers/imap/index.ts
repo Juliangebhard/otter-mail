@@ -4,6 +4,7 @@
  */
 
 import { IMAP_CAPABILITIES } from "@otter-mail/contracts";
+import { platform } from "../../platform.js";
 
 import { MailProtocolError } from "../../protocols/index.js";
 import { hasImapPassword } from "../../services/imap-passwords.js";
@@ -36,7 +37,11 @@ function describeError(err: unknown): string {
   if (err instanceof MailProtocolError) {
     const where = failedServer.get(err);
     const host = where?.host ?? "the mail server";
-    if (err.kind === "auth") return `Wrong password for ${where?.user ?? "this mailbox"}`;
+    if (err.kind === "auth") {
+      return /outlook|office365/i.test(host)
+        ? `Microsoft sign-in was rejected for ${where?.user ?? "this mailbox"}`
+        : `Wrong password for ${where?.user ?? "this mailbox"}`;
+    }
     if (/certificate|self[- ]signed|CERT_|unable to verify/i.test(err.message)) {
       return `${host}'s certificate isn't trusted — check the server name`;
     }
@@ -54,8 +59,9 @@ export const imapProvider: MailProvider = {
   kind: "imap",
   capabilities: IMAP_CAPABILITIES,
 
-  isSignedIn: hasImapPassword,
-  signedOutMessage: "Enter this mailbox's password to sync it.",
+  isSignedIn: (accountId) =>
+    hasImapPassword(accountId) || !!platform().microsoft?.isSignedIn(accountId),
+  signedOutMessage: "Sign in to this mailbox to sync it.",
   // The password goes with the account (handlers' removeLocalAccount).
   async removeAccount(accountId) {
     closeImap(accountId);

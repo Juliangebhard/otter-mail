@@ -5,6 +5,7 @@ import { signsInWithPassword } from "./capabilities";
 import { useAddAccount } from "./hooks";
 import { toast } from "./toast";
 import type { GmailAccount } from "./types";
+import { features } from "../features";
 
 /**
  * A mailbox with nothing to show because this device isn't signed in to it:
@@ -14,6 +15,29 @@ import type { GmailAccount } from "./types";
  */
 export function SignedOutMailbox({ account }: { account: GmailAccount }) {
   const signIn = useAddAccount();
+  if (account.imap?.auth === "microsoft") {
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-1 px-8 text-center">
+        <span className="text-sm font-medium text-foreground">Not signed in on this device</span>
+        <span className="text-sm text-muted-foreground">
+          Sign in to {account.email} with Microsoft to see its mail here.
+        </span>
+        {features.outlookMail ? (
+          <Button
+            size="small"
+            variant="accent"
+            onClick={() =>
+              void gmailApi.addOutlookAccount(account.email).catch((err: unknown) => {
+                toast.error(`Couldn't sign in to ${account.email}`, { description: String(err) });
+              })
+            }
+          >
+            Sign in with Microsoft
+          </Button>
+        ) : null}
+      </div>
+    );
+  }
   if (signsInWithPassword(account)) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-1 px-8 text-center">

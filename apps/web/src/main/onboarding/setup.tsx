@@ -24,7 +24,7 @@ import {
   type ProvidersState,
   type SyncSettings,
 } from "../gmail/api";
-import { ImapAccountDialog, readableError } from "../gmail/add-mailbox";
+import { ImapAccountDialog, OutlookAccountDialog, readableError } from "../gmail/add-mailbox";
 import { getAccountDisplayName } from "../gmail/account-style";
 import { AccountPicture } from "../gmail/account-picture";
 import {
@@ -82,6 +82,7 @@ import {
   startSetup,
 } from "./onboarding";
 import otterIconUrl from "../assets/otter-mail-icon.png";
+import outlookLogoUrl from "../assets/outlook-logo.svg";
 
 /**
  * First run: a mailbox, then the choices worth making up front (the look,
@@ -396,6 +397,7 @@ function GoogleMark() {
 function MailboxStep({ accounts }: { accounts: GmailAccount[] }) {
   const addAccount = useAddAccount();
   const [imapOpen, setImapOpen] = useState(false);
+  const [outlookOpen, setOutlookOpen] = useState(false);
   const addGmail = async () => {
     console.log("[Setup:addGmail]");
     try {
@@ -411,7 +413,7 @@ function MailboxStep({ accounts }: { accounts: GmailAccount[] }) {
         title={accounts.length > 0 ? "Your mail is connected" : "Connect your mail"}
         description="Otter Mail talks to your mail provider directly and keeps a copy on this device. If you use an agent, the mail and calendar data its tools return are shared with that agent."
       />
-      <div className="grid grid-cols-2 gap-3">
+      <div className={cn("grid gap-3", features.outlookMail ? "grid-cols-3" : "grid-cols-2")}>
         <ChoiceCard
           icon={<GoogleMark />}
           title="Gmail"
@@ -423,10 +425,18 @@ function MailboxStep({ accounts }: { accounts: GmailAccount[] }) {
           disabled={addAccount.isPending}
           onClick={() => void addGmail()}
         />
+        {features.outlookMail ? (
+          <ChoiceCard
+            icon={<img src={outlookLogoUrl} alt="" className="size-5 object-contain" />}
+            title="Outlook"
+            description="Sign in with Microsoft. Your Outlook.com or Microsoft 365 mail stays with its provider."
+            onClick={() => setOutlookOpen(true)}
+          />
+        ) : null}
         <ChoiceCard
           icon={<ServerIcon />}
           title="Other mail"
-          description="iCloud, Fastmail, Outlook or any IMAP server, found from your address."
+          description="iCloud, Fastmail or any IMAP server, found from your address."
           onClick={() => setImapOpen(true)}
         />
       </div>
@@ -462,6 +472,9 @@ function MailboxStep({ accounts }: { accounts: GmailAccount[] }) {
         </div>
       )}
       <ImapAccountDialog open={imapOpen} onOpenChange={setImapOpen} />
+      {features.outlookMail ? (
+        <OutlookAccountDialog open={outlookOpen} onOpenChange={setOutlookOpen} />
+      ) : null}
     </>
   );
 }

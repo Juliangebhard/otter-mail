@@ -9,6 +9,7 @@ const everywhere = {
   historyButtons: true,
   launchAtLogin: true,
   defaultMailApp: true,
+  outlookMail: true,
   dragOut: true,
   openFiles: true,
   externalAgent: true,

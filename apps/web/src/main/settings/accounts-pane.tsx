@@ -6,6 +6,7 @@ import { Dialog } from "~/components/ui/dialog";
 import { Text } from "~/components/ui/text";
 import { CheckIcon, GripVerticalIcon, LayersIcon, PlusIcon, RotateCwIcon } from "lucide-react";
 import { Switch } from "~/components/ui/switch";
+import { features } from "../features";
 import { arrangeAccounts, setMailboxArrangement, useMailboxArrangement } from "../mailboxes";
 import { gmailApi } from "../gmail/api";
 import { toast } from "../gmail/toast";
@@ -480,6 +481,22 @@ function AccountEditor({ account }: { account: GmailAccount }) {
           control={
             account.signedOut && signsInWithPassword(account) ? (
               <ImapPasswordForm account={account} />
+            ) : account.signedOut && account.imap?.auth === "microsoft" ? (
+              features.outlookMail ? (
+                <Btn
+                  size="sm"
+                  variant="primary"
+                  onClick={() =>
+                    void gmailApi.addOutlookAccount(account.email).catch((err: unknown) => {
+                      toast.error(`Couldn't sign in to ${account.email}`, {
+                        description: String(err),
+                      });
+                    })
+                  }
+                >
+                  Sign in with Microsoft
+                </Btn>
+              ) : null
             ) : account.signedOut ? (
               <SignInButton email={account.email} label="Sign in" />
             ) : (
